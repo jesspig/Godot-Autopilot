@@ -84,8 +84,9 @@ const std::vector<ParamSpec> kEditorSelectionSetParams = {
     {"focus", "boolean", "select_tree: scroll the scene tree to the node row when the row is found (default: true)", false},
 };
 
-const std::vector<std::string> kEditorUndoActions = {"create", "add_do",
-                                                      "add_undo", "commit"};
+const std::vector<std::string> kEditorUndoActions = {
+    "create", "add_do", "add_undo", "commit", "undo", "redo", "history",
+    "clear"};
 
 const std::vector<ParamSpec> kEditorUndoParams = {
     {"name", "string", "create: human-readable name shown in the editor's undo history, e.g. 'Move player'; group related changes under one name so they revert together", false},
@@ -93,6 +94,54 @@ const std::vector<ParamSpec> kEditorUndoParams = {
     {"method", "string", "add_do/add_undo: name of the node method to call, e.g. 'set_position' or 'queue_free'", false},
     {"value", "json", "add_do/add_undo: optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
     {"side", "string", "add_do/add_undo: optional branch marker, 'do' for add_do and 'undo' for add_undo; a mismatching value is rejected so a merged call cannot silently swap the branch", false},
+    {"increase_version", "boolean", "clear: bump the undo version after clearing the global history (default: true); false keeps the version so dependent editors are not invalidated", false},
+};
+
+const std::vector<std::string> kScriptEditorActions = {
+    "open", "goto", "list_open", "current", "unsaved", "save_all", "reload_open",
+    "close"};
+
+const std::vector<ParamSpec> kScriptEditorParams = {
+    {"path", "string", "open/goto/close: script file path, e.g. 'res://scripts/player.gd'; goto without path jumps inside the current script; close discards unsaved changes", false},
+    {"line", "integer", "open/goto: 1-based line number; open defaults to -1 (keep the current caret) and goto requires an integer >= 1", false},
+    {"column", "integer", "open: 1-based column number (default 0 keeps the current column)", false},
+    {"grab_focus", "boolean", "open: focus the script editor after opening (default: true)", false},
+};
+
+const std::vector<std::string> kEditorSessionActions = {
+    "get", "mark_unsaved", "play_main", "play_custom"};
+
+const std::vector<ParamSpec> kEditorSessionParams = {
+    {"path", "string", "play_custom: scene file path to run, e.g. 'res://levels/level1.tscn'; local scenes are run straight from the editor", false},
+};
+
+const std::vector<std::string> kEditorInspectActions = {
+    "inspect_object", "edit_resource", "edit_node", "selected_path",
+    "expand_all", "collapse_all"};
+
+const std::vector<ParamSpec> kEditorInspectParams = {
+    {"resource_path", "string", "inspect_object/edit_resource: resource file to open in the Inspector, e.g. 'res://player.tres'; loaded through ResourceLoader and errors when missing or unloadable", false},
+    {"node_path", "string", "inspect_object/edit_node: node path in the edited scene, e.g. 'Player' or 'Level1/Enemy'; resolved against the edited scene root", false},
+    {"for_property", "string", "inspect_object: optional property name to reveal in the Inspector, e.g. 'position'; empty keeps the default object view", false},
+    {"inspector_only", "boolean", "inspect_object: open the object in the Inspector without switching the main screen (default: false)", false},
+};
+
+const std::vector<std::string> kEditorFilesPanelActions = {
+    "select", "selected_paths", "current_path", "current_dir", "navigate",
+    "file_meta"};
+
+const std::vector<ParamSpec> kEditorFilesPanelParams = {
+    {"path", "string", "select/navigate/file_meta: file-system path, e.g. 'res://scenes/game.tscn' or 'res://scripts'; file_meta requires a file path and reports its script class metadata", false},
+};
+
+const std::vector<std::string> kEditorInfoActions = {
+    "theme", "scale", "language", "paths", "multi_window", "distraction_free",
+    "toast"};
+
+const std::vector<ParamSpec> kEditorInfoParams = {
+    {"message", "string", "toast: text shown in the editor toast notification", false},
+    {"severity", "string", "toast: notification severity, 'info' (default), 'warning' or 'error'", false},
+    {"tooltip", "string", "toast: optional tooltip shown when hovering the toast", false},
 };
 
 const std::vector<std::string> kEditorUiActionActions = {"click", "type",
@@ -116,10 +165,6 @@ const std::vector<ParamSpec> kEditorConfigParams = {
     {"path", "string", "main_scene: path of the scene to launch when the project runs, e.g. 'res://game.tscn'; persisted to project.godot", false},
     {"plugin", "string", "plugin_enable: name of the editor plugin to enable or disable, e.g. 'godot_autopilot'", false},
     {"enabled", "boolean", "plugin_enable: true activates the plugin, false deactivates it", false},
-};
-
-const std::vector<ParamSpec> kInspectEditorResourceParams = {
-    {"resource_path", "string", "Path to a resource file to open in the editor's Inspector panel, e.g. 'res://player.tres'; the file is loaded via ResourceLoader and errors when missing or unloadable", true},
 };
 
 const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {
@@ -162,7 +207,7 @@ inline mcp::JsonValue editor_optional_action_schema(
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(12);
+  v.reserve(16);
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_state",
       "Read editor session state in one action tool. action='selection' lists the nodes selected in the edited scene (name/class/path, empty array when none); action='root' returns the edited scene root {name,type,path} or null when no scene is open; action='open' lists the open scene tab paths; action='unsaved' lists scenes with unsaved changes; action='playing' reports {is_playing}; action='info' returns engine_version, project_name, main_scene, edited_root, open_scene_count and is_playing. All actions are read-only and never ask for confirmation.",
@@ -328,11 +373,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
        "{\"action\":\"select_tree\",\"path\":\"Player\",\"focus\":true}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "editor_undo",
-      "Drive the editor undo/redo history in one action tool. action='create' opens a named action; action='add_do' and action='add_undo' register the redo/undo method calls for node_path/method with an optional value; action='commit' closes the action so it becomes one history step. add_do/add_undo keep the do/undo branch explicit and accept an optional side marker ('do' for add_do, 'undo' for add_undo) that is rejected when it would swap the branch, so merged calls cannot reorder the pair. Every action modifies editor state; use the editor's own undo history to verify the result.",
-      "Editor", {"editor", "undo", "redo", "create", "add_do", "add_undo", "commit", "create_editor_undo_redo_action", "add_editor_undo_redo_do", "add_editor_undo_redo_undo", "commit_editor_undo_redo"}, SideEffect::ModifiesWindow, tool_flags::kMutating | tool_flags::kUndoable,
+      "Drive the editor undo/redo history in one action tool. action='create' opens a named action; action='add_do' and action='add_undo' register the redo/undo method calls for node_path/method with an optional value; action='commit' closes the action so it becomes one history step. add_do/add_undo keep the do/undo branch explicit and accept an optional side marker ('do' for add_do, 'undo' for add_undo) that is rejected when it would swap the branch, so merged calls cannot reorder the pair. action='undo' and action='redo' execute one step on the global history; action='history' reports has_undo, has_redo, current_action_name and history_count without changing anything; action='clear' wipes the global history (optional increase_version). Every action except history modifies editor state; none require confirmation. Verify the result through has_undo/has_redo and get_editor_state.",
+      "Editor", {"editor", "undo", "redo", "history", "clear", "create", "add_do", "add_undo", "commit", "create_editor_undo_redo_action", "add_editor_undo_redo_do", "add_editor_undo_redo_undo", "commit_editor_undo_redo"}, SideEffect::ModifiesWindow, tool_flags::kMutating | tool_flags::kUndoable,
       kEditorUndoParams, editor_ops::handle_editor_undo,
       schema::build_action_schema(kEditorUndoActions, kEditorUndoParams,
-                                  "Undo history action: create|add_do|add_undo|commit"),
+                                  "Undo history action: create|add_do|add_undo|commit|undo|redo|history|clear"),
       {
           ToolAlias{"create_editor_undo_redo_action", "editor_undo",
                     [](const mcp::JsonValue &args) {
@@ -356,7 +401,77 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                     {}, "0.4.0", "0.6.0"},
       },
       {"{\"action\":\"create\",\"name\":\"Move player\"}",
-       "{\"action\":\"add_do\",\"node_path\":\"Player\",\"method\":\"set_position\",\"value\":{\"x\":10,\"y\":20}}"}}));
+       "{\"action\":\"add_do\",\"node_path\":\"Player\",\"method\":\"set_position\",\"value\":{\"x\":10,\"y\":20}}",
+       "{\"action\":\"history\"}"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "script_editor",
+      "Open, navigate and maintain scripts in the editor's Script Editor in one action tool. action='open' opens path through EditorInterface.edit_script with optional 1-based line/column (line -1 keeps the caret) and grab_focus, then reports the resulting caret position; action='goto' jumps to a 1-based line in the current script through ScriptEditor.goto_line, or opens path at that line; action='list_open' lists open scripts with unsaved/current flags; action='current' reports the active script path, unsaved state and caret; action='unsaved' lists scripts with unsaved changes; action='save_all' saves every open script and returns saved_paths plus unsaved_after; action='reload_open' reloads open scripts from disk; action='close' closes path and discards unsaved changes. Every action modifies editor window state; none require confirmation. Read action=goto or action=current caret_line to prove the line jump.",
+      "Editor", {"editor", "script", "script_editor", "open", "goto", "save", "reload", "close", "unsaved"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kScriptEditorParams, editor_ops::handle_script_editor,
+      schema::build_action_schema(kScriptEditorActions, kScriptEditorParams,
+                                  "Script editor action: open|goto|list_open|current|unsaved|save_all|reload_open|close"),
+      {},
+      {"{\"action\":\"open\",\"path\":\"res://scripts/player.gd\",\"line\":12,\"column\":5}",
+       "{\"action\":\"goto\",\"line\":42}"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "editor_session",
+      "Read and drive the editable scene session in one action tool. action='get' reports every open scene tab root (name/type/scene_file_path/unsaved), the unsaved scene list, edited_root and playing {is_playing, playing_scene}; action='mark_unsaved' marks the edited scene as dirty; action='play_main' runs the project's main scene; action='play_custom' runs path. get is read-tier; mark_unsaved/play_main/play_custom modify editor window state but never ask for confirmation. With several scene tabs open, use get instead of assuming a single edited root.",
+      "Editor", {"editor", "session", "scenes", "open", "unsaved", "playing", "play", "mark_unsaved"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kEditorSessionParams, editor_ops::handle_editor_session,
+      schema::build_action_schema(kEditorSessionActions, kEditorSessionParams,
+                                  "Session action: get|mark_unsaved|play_main|play_custom"),
+      {},
+      {"{\"action\":\"get\"}",
+       "{\"action\":\"play_custom\",\"path\":\"res://levels/level1.tscn\"}"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "editor_inspect",
+      "Inspect resources and scene nodes in the editor Inspector in one action tool. action='inspect_object' opens resource_path or node_path in the Inspector (optional for_property, inspector_only); action='edit_resource' opens resource_path as an edited resource; action='edit_node' focuses node_path in the Inspector and scene dock; action='selected_path' reports the selected property path and the edited object; action='expand_all' and action='collapse_all' fold the Inspector tree. inspect_object/edit_resource/edit_node modify editor window state, selected_path/expand_all/collapse_all are read-tier; none require confirmation. inspect_editor_resource is the legacy alias of action=edit_resource.",
+      "Editor", {"editor", "inspect", "inspector", "resource", "node", "selected_path", "expand_all", "collapse_all", "inspect_editor_resource"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kEditorInspectParams, editor_ops::handle_editor_inspect,
+      schema::build_action_schema(kEditorInspectActions, kEditorInspectParams,
+                                  "Inspector action: inspect_object|edit_resource|edit_node|selected_path|expand_all|collapse_all"),
+      {
+          ToolAlias{"inspect_editor_resource", "editor_inspect",
+                    [](const mcp::JsonValue &args) {
+                      return editor_alias_action(args, "edit_resource");
+                    },
+                    [](const mcp::JsonValue &result) -> mcp::JsonValue {
+                      if (result.Find("error") != nullptr)
+                        return result;
+                      mcp::JsonValue legacy(mcp::JsonValue::object_tag);
+                      legacy["result"] = mcp::JsonValue("ok");
+                      return legacy;
+                    },
+                    "0.4.0", "0.6.0"},
+      },
+      {"{\"action\":\"edit_node\",\"node_path\":\"Player\"}",
+       "{\"action\":\"edit_resource\",\"resource_path\":\"res://player.tres\"}"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "editor_files",
+      "Locate and inspect files in the editor FileSystem dock in one action tool. action='select' selects path in the dock and reports selected_paths; action='selected_paths' lists the dock selection; action='current_path' reports the focused file path; action='current_dir' reports the focused directory; action='navigate' scrolls the dock to path; action='file_meta' reports type, script_class, extends and import_valid for path from the editor file-system tree. select/navigate modify editor window state, selected_paths/current_path/current_dir/file_meta are read-tier; none require confirmation. get_editor_files action=tree still lists the raw resource tree.",
+      "Editor", {"editor", "files", "filesystem", "select", "navigate", "file_meta", "current_path", "current_dir", "selected_paths"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kEditorFilesPanelParams, editor_ops::handle_editor_files_panel,
+      schema::build_action_schema(kEditorFilesPanelActions,
+                                  kEditorFilesPanelParams,
+                                  "FileSystem dock action: select|selected_paths|current_path|current_dir|navigate|file_meta"),
+      {},
+      {"{\"action\":\"file_meta\",\"path\":\"res://scripts/player.gd\"}",
+       "{\"action\":\"navigate\",\"path\":\"res://scenes\"}"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "editor_info",
+      "Read editor-level information and push a toast in one action tool. action='theme' reports the editor theme base scale, default font flags and type count; action='scale' reports the editor UI scale; action='language' reports the editor UI language; action='paths' reports the EditorPaths data/config/cache/project-settings directories; action='multi_window' and action='distraction_free' report those editor modes; action='toast' pushes an EditorToaster notification with message, optional severity (info/warning/error) and tooltip. Only toast shows an alert; no action requires confirmation.",
+      "Editor", {"editor", "info", "theme", "scale", "language", "paths", "multi_window", "distraction_free", "toast"},
+      SideEffect::ShowsAlert, tool_flags::kMutating,
+      kEditorInfoParams, editor_ops::handle_editor_info,
+      schema::build_action_schema(kEditorInfoActions, kEditorInfoParams,
+                                  "Editor info action: theme|scale|language|paths|multi_window|distraction_free|toast"),
+      {},
+      {"{\"action\":\"scale\"}",
+       "{\"action\":\"toast\",\"message\":\"Build finished\",\"severity\":\"info\"}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "editor_ui_action",
       "Act on editor UI elements in one action tool. action='click' clicks the element at path (optional button, double_click, warp, observe); action='type' focuses path and writes text (optional submit, observe); action='shortcut' injects a keyboard shortcut such as 'ctrl+s' or 'f5'. Element paths come from get_editor_ui action=elements or action=hit. Every action modifies editor window state; read the follow-up state with get_editor_state.",
@@ -406,11 +521,6 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       },
       {"{\"action\":\"main_scene\",\"path\":\"res://game.tscn\"}",
        "{\"action\":\"plugin_enable\",\"plugin\":\"godot_autopilot\",\"enabled\":true}"}}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "inspect_editor_resource",
-      "Open a resource file in the editor's Inspector panel for inspection. Use it after locating a resource, e.g. a .tres or .tscn file, to review and edit its properties visually. Takes resource_path and loads the file through ResourceLoader; errors when the path is missing or the file fails to load. Returns result 'ok'.",
-      "Editor", {"editor", "inspect"}, SideEffect::None, tool_flags::kNone,
-      kInspectEditorResourceParams, editor_ops::handle_inspect_object}));
   v.push_back(make_spec_tool(ToolSpec{
       "build_csharp_assembly",
       "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. The engine path is globalized to an OS absolute path (ProjectSettings.globalize_path) before it reaches dotnet, because dotnet cannot resolve res:// paths. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,project_path,command,pid,started,note}. With wait=true it runs synchronously via OS.execute, temporarily pinning DOTNET_CLI_UI_LANGUAGE=en for the child process and restoring the previous value afterwards so that output_digest carries ASCII English text instead of ACP-mangled localized output, and waits for the BuildResult {project_file,project_path,command,exit_code,success,errors,output_digest,output_empty}: project_file is the res:// project file, project_path the OS absolute path handed to dotnet, command the logical dotnet invocation on the res:// file, exit_code the dotnet exit code, success exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut, output_empty true when nothing was captured (output_hint then explains the exit code); timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available. Both shapes also return next_action (array of executable follow-up steps), restart_required (true when the build succeeded or was launched, independent of whether a game is running, because nothing hot-reloads the loaded assemblies) and game_running. With probe_script the response additionally carries editor_assembly_probe {path,is_dotnet_editor,state,can_instantiate,base_class,hint}: the editor loads the .cs resource without instantiating it, state is 'available' when it loads and 'unavailable' with unavailable=true when the editor is not a .NET build or the load fails; can_instantiate=false on an available probe means the editor still runs the old assembly, so click Build or restart the editor.",

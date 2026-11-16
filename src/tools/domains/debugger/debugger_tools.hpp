@@ -35,6 +35,14 @@ const std::vector<ParamSpec> kGetPluginLogParams = {
 
 const std::vector<ParamSpec> kGetDebuggerSceneTreeParams = {};
 
+const std::vector<std::string> kDebuggerBreakpointsActions = {"list", "set",
+                                                               "clear"};
+
+const std::vector<ParamSpec> kDebuggerBreakpointsParams = {
+    {"path", "string", "set/clear: script file path of the breakpoint, e.g. 'res://scripts/player.gd'", false},
+    {"line", "integer", "set/clear: 1-based line number of the breakpoint", false},
+};
+
 const std::vector<std::string> kGetDebuggerStreamActions = {
     "log", "output", "errors", "session"};
 
@@ -58,7 +66,7 @@ inline mcp::JsonValue stream_args(const mcp::JsonValue &args,
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(3);
+  v.reserve(4);
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_debugger_stream",
       "Read one debugger stream in one tool. action selects the stream: 'log' reads a log stream, 'output' reads stdout/stderr of the running game, 'errors' reads script errors of the running game, 'session' reports the debug session state. source selects where action=log reads from: 'editor' (default) is the editor-process engine log buffer captured by the OS logger — it always has data and needs no running game; 'plugin' is the plugin's own LogSystem buffer with internal diagnostics (authorization denials, timeouts) and supports level/category/filter/since_index; 'game' reads the running game over the runtime channel. action=output and action=errors only accept source='game' and require a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension; without an active session they return an empty result plus a note. action=session returns a text summary with active, breaked, running and session count and ignores source. The on-disk game log is a different source: use get_game_log_entries. Optional limit caps returned entries; action=errors also accepts group and since_seq. Example: {\"action\": \"log\"} or {\"action\": \"errors\", \"since_seq\": 0} or {\"action\": \"log\", \"source\": \"plugin\", \"level\": \"warning\"}.",
@@ -98,6 +106,18 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               },
               {}, "0.4.0", "0.6.0"},
       })));
+  v.push_back(make_spec_tool(ToolSpec{
+      "debugger_breakpoints",
+      "List, set and clear script breakpoints in the editor debugger in one action tool. action='list' reads ScriptEditor.get_breakpoints() and returns each entry as {path, line, raw, enabled}; action='set' enables the breakpoint at path/line and action='clear' disables it through the active EditorDebuggerSession.set_breakpoint(path, line, enabled). list works without a running game; set/clear return the structured error 'no active debugger session' when no debug session is attached. set/clear modify editor window state but never ask for confirmation. Breakpoints only bind to res:// scripts.",
+      "Debugger", {"debugger", "breakpoint", "breakpoints", "script", "debug"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kDebuggerBreakpointsParams, debugger_ops::handle_debugger_breakpoints,
+      schema::build_action_schema(kDebuggerBreakpointsActions,
+                                  kDebuggerBreakpointsParams,
+                                  "Breakpoint action: list|set|clear"),
+      {},
+      {"{\"action\":\"list\"}",
+       "{\"action\":\"set\",\"path\":\"res://scripts/player.gd\",\"line\":12}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_plugin_log",
       "Read the plugin's own in-process LogSystem buffer — internal diagnostics such as 'late game response discarded', authorization denials and timeout diagnostics — and does not require a running game. This is the dedicated tool for the plugin source of get_debugger_stream(action='log', source='plugin'); it is a different source from the editor engine log (get_debugger_stream action='log' source='editor') and from the game process log file on disk (get_game_log_entries). Optional 'limit' (default 100, max 1000), 'level' (debug/info/warning/error, default debug = no filtering), 'category' (system/transport/tools/resources/prompts), 'filter' (case-insensitive substring) and 'since_index' (incremental read from a previous call's next_index; the response includes next_index). Example: {\"level\": \"warning\", \"limit\": 20}.",

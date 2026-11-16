@@ -116,6 +116,7 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_stream(const mcp::JsonValue &args);
+mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args);
 
 void register_classes();
 
