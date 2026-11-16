@@ -4,6 +4,8 @@
 
 ## 2026-11-16
 
+- **版本标记改为开发版 `0.3.4-dev`**：根 `VERSION` 与 `CLI_VERSION` 同步为 `0.3.4-dev`；CMake 取数字前缀 `0.3.4` 建 project，完整字符串写入 `GDA_VERSION`，`gda status` / `--version` / MCP `server_info` 均显示后缀；`version_sync_guard` 放行预发布后缀，技能资产重新生成；五语 README 安装钉改为 `develop`。发布前把 `VERSION` 改回纯 `0.3.4` 并同步版本钉，release workflow 的 tag 校验会阻止带后缀发布。
+
 - **工具面压缩收口（T-25 文档，`feature/tool-surface-closeout` 本地未推送）**：catalog 459→**252**（246 域 + 5 元 + `system_status`）、生产别名 **325**、schema **235/17**、能力矩阵 561 行 mapped 315 / missing 0；35 个域文件（新增 Image、Mesh）。重写 [overview.md](overview.md) 工具面与 [modules/tools_ops_a.md](modules/tools_ops_a.md) / [modules/tools_ops_b.md](modules/tools_ops_b.md)（按 canonical action 工具列表，旧名只留别名列与迁移说明），[tool_surface_baseline.md](tool_surface_baseline.md) 改为最终 252 基线，新增 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md) 压缩段；五语 README 的 badge/描述改为 252 并换用 canonical 示例名，非 EN/ZH 版标注以 EN 为准。旧名残留与相对链接已自查；本轮未编译、未测试，真实引擎 e2e 留待 T-26。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
 
 ## 2026-11-14
