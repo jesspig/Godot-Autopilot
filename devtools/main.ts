@@ -2,6 +2,7 @@
 import { runBuild, type BuildOptions } from "./commands/build";
 import { runClean } from "./commands/clean";
 import { runDeploy, type DeployOptions } from "./commands/deploy";
+import { runJam, type JamOptions } from "./commands/jam";
 import { runPackage } from "./commands/package";
 import { runPackageCheck } from "./commands/package-check";
 import { runTests, type TestOptions } from "./commands/test";
@@ -19,6 +20,7 @@ const USAGE = [
   "  package-check <zip>",
   "  test                     [--preset debug|release] [--single <用例名>]",
   "  audit-tools              [--json|--baseline|--target] [--report [--json] [--out <file>]]",
+  "  jam                      [--theme <id> | --list] [--out <dir>] [--json]",
   "  tui",
 ].join("\n");
 
@@ -159,6 +161,28 @@ function parseTest(args: string[]): TestOptions {
   return options;
 }
 
+function parseJam(args: string[]): JamOptions {
+  const options: JamOptions = { theme: null, out: null, list: false, json: false };
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--json") options.json = true;
+    else if (arg === "--list") options.list = true;
+    else if (arg === "--theme" || arg === "--out") {
+      const value = args[index + 1];
+      if (value === undefined || value === "" || value.startsWith("-")) {
+        throw new UsageError(`jam: argument ${arg}: expected one argument`);
+      }
+      if (arg === "--theme") options.theme = value;
+      else options.out = value;
+      index += 1;
+    } else throw new UsageError(`jam: unrecognized argument: ${arg}`);
+  }
+  if (options.list && (options.theme !== null || options.out !== null)) {
+    throw new UsageError("jam: --list cannot be combined with --theme or --out");
+  }
+  return options;
+}
+
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   if (command === undefined) {
@@ -194,6 +218,8 @@ export async function main(argv: string[]): Promise<number> {
         return runTests(parseTest(rest));
       case "audit-tools":
         return runToolAudit(parseToolAudit(rest));
+      case "jam":
+        return runJam(parseJam(rest));
       case "tui":
         expectNoArgs("tui", rest);
         return runTui();
