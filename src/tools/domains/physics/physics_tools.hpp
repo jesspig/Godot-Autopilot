@@ -18,37 +18,29 @@ const std::vector<ParamSpec> kGetPhysics2dSpaceDirectStateParams = {
     {"space_rid", "integer", "Required. RID of the 2D physics space to inspect; it must be active and attached to a scene or the call fails", true},
 };
 
-const std::vector<ParamSpec> kIntersectPhysics2dRayParams = {
-    {"space_rid", "integer", "Optional RID of the 2D physics space to query; omit to auto-detect the World2D space of the edited scene root's SubViewport in the editor process, which is separate from the running game's physics world", false},
-    {"from", "object", "Required. Ray origin as a Vector2 object with x and y fields, e.g. {'x': 0, 'y': 0}", true},
-    {"to", "object", "Required. Ray destination as a Vector2 object with x and y fields", true},
-    {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers the ray hits; default is all layers", false},
-    {"exclude", "array", "Optional. Array of RID ids to skip during the query, e.g. [12345]", false},
-    {"collide_with_bodies", "boolean", "Optional. Whether physics bodies are hit; default true", false},
-    {"collide_with_areas", "boolean", "Optional. Whether areas are hit; default false", false},
-    {"hit_from_inside", "boolean", "Optional. Whether shapes the ray starts inside of are reported; default false", false},
-};
-
-const std::vector<ParamSpec> kIntersectPhysics2dShapeParams = {
-    {"space_rid", "integer", "Required. RID of the 2D physics space to query", true},
-    {"shape_rid", "integer", "Required. RID of the shape to probe with, e.g. from create_physics_2d_circle_shape", true},
-    {"transform", "object", "Optional. Transform2D placing the shape: object with origin (Vector2), rotation (radians) and scale (Vector2)", false},
-    {"motion", "object", "Optional. Vector2 sweep distance: the shape is moved along this vector while checking for collisions, e.g. {'x': 50, 'y': 0}", false},
-    {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers are intersected; default is all layers", false},
-    {"exclude", "array", "Optional. Array of RID ids to skip during the query", false},
-    {"collide_with_bodies", "boolean", "Optional. Whether physics bodies are hit; default true", false},
-    {"collide_with_areas", "boolean", "Optional. Whether areas are hit; default false", false},
-    {"max_results", "integer", "Optional. Maximum number of hits to return; default 32", false},
-};
-
-const std::vector<ParamSpec> kIntersectPhysics2dPointParams = {
-    {"space_rid", "integer", "Required. RID of the 2D physics space to query", true},
-    {"position", "object", "Required. Query position as a Vector2 object with x and y fields, e.g. {'x': 100, 'y': 50}", true},
-    {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers are intersected; default is all layers", false},
-    {"exclude", "array", "Optional. Array of RID ids to skip during the query", false},
-    {"collide_with_bodies", "boolean", "Optional. Whether physics bodies are hit; default true", false},
-    {"collide_with_areas", "boolean", "Optional. Whether areas are hit; default false", false},
-    {"max_results", "integer", "Optional. Maximum number of hits to return; default 32", false},
+const std::vector<ParamSpec> kPhysicsQueryParams = {
+    {"dimension", "integer", "Required. Physics dimension as an integer: 2 runs the query against PhysicsServer2D with Vector2 {x, y} positions and Transform2D objects, 3 runs it against PhysicsServer3D with Vector3 {x, y, z} positions and Transform3D objects; any other value is rejected with the expected dimensions", true},
+    {"mode", "string", "Required. Query mode: 'intersect_point', 'intersect_ray', 'intersect_shape', 'cast_motion', 'collide_shape', 'rest_info', 'test_motion', 'contacts' or 'area_overlaps'; the mode decides which of the remaining parameters are required", true},
+    {"space_rid", "integer", "Required for every space query except dimension 2 intersect_ray: RID of the 2D or 3D physics space, which must be active and attached to a scene. For dimension 2 intersect_ray it may be omitted to auto-detect the World2D space of the edited scene root's SubViewport inside the editor process, which is separate from the running game's physics world", false},
+    {"shape_rid", "integer", "Required for intersect_shape, cast_motion, collide_shape and rest_info: RID of the probe shape, e.g. from create_physics_2d_circle_shape or create_physics_3d_sphere_shape", false},
+    {"body_rid", "integer", "Required for test_motion and contacts: RID of the physics body, e.g. from create_physics_2d_body, create_physics_3d_body or get_physics_node_rid", false},
+    {"area_rid", "integer", "area_overlaps: RID of a physics area attached to an Area2D/Area3D node; mutually exclusive with node_path. Server-only areas without a node cannot report overlaps", false},
+    {"node_path", "string", "area_overlaps: scene path of an Area2D (dimension 2) or Area3D (dimension 3) node in the edited scene; mutually exclusive with area_rid", false},
+    {"position", "object", "intersect_point: query point as a Vector2 {x, y} for dimension 2 or a Vector3 {x, y, z} for dimension 3", false},
+    {"from", "object", "intersect_ray and test_motion: ray origin or motion start. intersect_ray takes a Vector2 or Vector3 point; test_motion takes a Transform2D {origin, rotation, scale} or Transform3D {basis, origin}, or a plain Vector2/Vector3 position used as the transform origin, depending on dimension", false},
+    {"to", "object", "intersect_ray: ray destination as a Vector2 {x, y} for dimension 2 or a Vector3 {x, y, z} for dimension 3", false},
+    {"motion", "object", "Sweep vector for intersect_shape and cast_motion, and the motion vector for test_motion: a Vector2 {x, y} for dimension 2 or a Vector3 {x, y, z} for dimension 3; cast_motion and test_motion require it", false},
+    {"transform", "object", "intersect_shape, cast_motion, collide_shape and rest_info: placement of the probe shape, a Transform2D object with origin {x, y}, rotation and scale {x, y} for dimension 2, or a Transform3D object with basis rows and origin {x, y, z} for dimension 3; a plain Vector2/Vector3 position is also accepted as the transform origin", false},
+    {"margin", "number", "test_motion: extra collision margin around the moving body; defaults to the engine value", false},
+    {"collide_separation_ray", "boolean", "test_motion: treat separation ray shapes as collidable; default false", false},
+    {"recovery_as_collision", "boolean", "test_motion: report depenetration recovery as a collision; default false", false},
+    {"collision_mask", "integer", "Space and shape queries: layer mask (bitfield) restricting which layers are hit; default is all layers", false},
+    {"exclude", "array", "Array of RID ids to skip during the query, e.g. [12345]; for test_motion these are excluded bodies", false},
+    {"collide_with_bodies", "boolean", "Whether physics bodies are hit; default true", false},
+    {"collide_with_areas", "boolean", "Whether areas are hit; default false", false},
+    {"hit_from_inside", "boolean", "intersect_ray: whether shapes the ray starts inside of are reported; default false", false},
+    {"hit_back_faces", "boolean", "intersect_ray for dimension 3: whether back faces of double-sided geometry are hit; default false", false},
+    {"max_results", "integer", "intersect_point, intersect_shape and collide_shape: maximum number of hits or contact points to return; default 32", false},
 };
 
 const std::vector<ParamSpec> kCreatePhysics2dBodyParams = {};
@@ -108,40 +100,6 @@ const std::vector<ParamSpec> kSetPhysics2dShapeDataParams = {
 
 const std::vector<ParamSpec> kGetPhysics3dSpaceDirectStateParams = {
     {"space_rid", "integer", "Required. RID of the 3D physics space to inspect; it must be active and attached to a scene or the call fails", true},
-};
-
-const std::vector<ParamSpec> kIntersectPhysics3dRayParams = {
-    {"space_rid", "integer", "Required. RID of the 3D physics space to query; unlike the 2D ray tool there is no auto-detection, so this is mandatory", true},
-    {"from", "object", "Required. Ray origin as a Vector3 object with x, y and z fields, e.g. {'x': 0, 'y': 0, 'z': 0}", true},
-    {"to", "object", "Required. Ray destination as a Vector3 object with x, y and z fields", true},
-    {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers the ray hits; default is all layers", false},
-    {"exclude", "array", "Optional. Array of RID ids to skip during the query, e.g. [12345]", false},
-    {"collide_with_bodies", "boolean", "Optional. Whether physics bodies are hit; default true", false},
-    {"collide_with_areas", "boolean", "Optional. Whether areas are hit; default false", false},
-    {"hit_from_inside", "boolean", "Optional. Whether shapes the ray starts inside of are reported; default false", false},
-    {"hit_back_faces", "boolean", "Optional. Whether back faces of double-sided geometry are hit; default false", false},
-};
-
-const std::vector<ParamSpec> kIntersectPhysics3dShapeParams = {
-    {"space_rid", "integer", "Required. RID of the 3D physics space to query", true},
-    {"shape_rid", "integer", "Required. RID of the shape to probe with, e.g. from create_physics_3d_sphere_shape", true},
-    {"transform", "object", "Optional. Transform3D placing the shape: object with basis (array of 3 row arrays) and origin (Vector3 object)", false},
-    {"motion", "object", "Optional. Vector3 sweep distance: the shape is moved along this vector while checking for collisions, e.g. {'x': 0, 'y': 0, 'z': 50}", false},
-    {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers are intersected; default is all layers", false},
-    {"exclude", "array", "Optional. Array of RID ids to skip during the query", false},
-    {"collide_with_bodies", "boolean", "Optional. Whether physics bodies are hit; default true", false},
-    {"collide_with_areas", "boolean", "Optional. Whether areas are hit; default false", false},
-    {"max_results", "integer", "Optional. Maximum number of hits to return; default 32", false},
-};
-
-const std::vector<ParamSpec> kIntersectPhysics3dPointParams = {
-    {"space_rid", "integer", "Required. RID of the 3D physics space to query", true},
-    {"position", "object", "Required. Query position as a Vector3 object with x, y and z fields, e.g. {'x': 0, 'y': 1, 'z': 0}", true},
-    {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers are intersected; default is all layers", false},
-    {"exclude", "array", "Optional. Array of RID ids to skip during the query", false},
-    {"collide_with_bodies", "boolean", "Optional. Whether physics bodies are hit; default true", false},
-    {"collide_with_areas", "boolean", "Optional. Whether areas are hit; default false", false},
-    {"max_results", "integer", "Optional. Maximum number of hits to return; default 32", false},
 };
 
 const std::vector<ParamSpec> kCreatePhysics3dBodyParams = {};
@@ -318,31 +276,101 @@ const std::vector<ParamSpec> kAssignCollisionShapeParams = {
     {"shape_ref", "object", "Required. Shape resource reference: an object_id integer from create_collision_shape, a res:// or memory:// string, or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"} / {\"object_id\": ...} / {\"object_id_str\": ...} / {\"name\": ...}; memory:// resources are rejected, save them first with save_resource and pass the res:// path. Must be a Shape2D for CollisionShape2D and a Shape3D for CollisionShape3D, otherwise the actual class is reported", true},
 };
 
+const std::vector<std::string> kPhysicsQueryModes = {
+    "intersect_point", "intersect_ray", "intersect_shape", "cast_motion",
+    "collide_shape",   "rest_info",     "test_motion",     "contacts",
+    "area_overlaps"};
+
+inline mcp::JsonValue physics_query_schema() {
+  mcp::JsonValue schema_value = schema::build_schema(kPhysicsQueryParams);
+  mcp::JsonValue *properties = schema_value.Find("properties");
+  if (properties != nullptr && properties->IsObject()) {
+    mcp::JsonValue mode(mcp::JsonValue::object_tag);
+    mode["type"] = mcp::JsonValue("string");
+    mode["description"] = mcp::JsonValue(
+        "Query mode: intersect_point|intersect_ray|intersect_shape|cast_motion|"
+        "collide_shape|rest_info|test_motion|contacts|area_overlaps");
+    mcp::JsonValue values(mcp::JsonValue::array_tag);
+    for (const std::string &value : kPhysicsQueryModes)
+      values.PushBack(mcp::JsonValue(value));
+    mode["enum"] = std::move(values);
+    (*properties)["mode"] = std::move(mode);
+  }
+  return schema_value;
+}
+
+inline mcp::JsonValue physics_query_alias_args(const mcp::JsonValue &args,
+                                               int dimension,
+                                               const char *mode) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (args.IsObject())
+    out = args;
+  out["dimension"] = mcp::JsonValue(dimension);
+  out["mode"] = mcp::JsonValue(mode);
+  return out;
+}
+
+inline mcp::JsonValue physics_query_legacy_project(mcp::JsonValue result) {
+  if (!result.IsObject())
+    return result;
+  result.GetObject().erase("dimension");
+  result.GetObject().erase("mode");
+  return result;
+}
+
+inline ToolAlias physics_query_alias(const char *name, int dimension,
+                                     const char *mode) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = "physics_query";
+  alias.adapt_args = [dimension, mode](const mcp::JsonValue &args) {
+    return physics_query_alias_args(args, dimension, mode);
+  };
+  alias.project_result = physics_query_legacy_project;
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(51);
+  v.reserve(46);
   v.push_back(make_spec_tool(ToolSpec{
       "get_physics_2d_space_direct_state",
       "Get the direct state of a 2D physics space, the gateway for physics intersection queries. Pass the space RID and use this before the intersect_physics_2d_* tools to confirm the space is active and attached to a scene. Returns the space RID, a valid flag and the available queries (intersect_ray, intersect_point, intersect_shape, cast_motion, collide_shape, get_rest_info). Fails when the space is inactive or not in a scene",
       "Physics", {"physics", "2d", "space"}, SideEffect::None, tool_flags::kNone,
       kGetPhysics2dSpaceDirectStateParams, physics_ops::handle_2d_space_get_direct_state}));
   v.push_back(make_spec_tool(ToolSpec{
-      "intersect_physics_2d_ray",
-      "Cast a ray in 2D physics space and return the first collision hit. Omit space_rid to auto-detect the space: this resolves the World2D space of the edited scene root's SubViewport inside the editor process, which is separate from the running game's physics world, so coordinates from the game never hit anything here. from and to are required. Returns a single hit object with position, normal, collider_id, rid and shape; a null result means the query ran but hit nothing, while the separate space_get_direct_state returned null error means the direct state of that space is unavailable, for example while the physics thread is running or the space is locked. Every reply carries space_rid (int64) and auto_detected so you can verify which space was queried; unlike intersect_physics_2d_shape and intersect_physics_2d_point, this reports only the closest hit along the ray",
-      "Physics", {"physics", "2d", "ray"}, SideEffect::None, tool_flags::kNone,
-      kIntersectPhysics2dRayParams, physics_ops::handle_2d_ray_cast}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "intersect_physics_2d_shape",
-      "Intersect a 2D physics space with a shape RID and return every overlapping collider. Requires space_rid and shape_rid, where shape_rid comes from create_physics_2d_circle_shape; pass transform to place the shape, motion to sweep it along a Vector2, plus filters such as collision_mask, exclude, collide_with_bodies and collide_with_areas. Returns an array of hits, empty when nothing overlaps. Unlike intersect_physics_2d_ray, this reports all hits rather than just the closest",
-      "Physics", {"physics", "2d", "intersect", "shape"}, SideEffect::None, tool_flags::kNone,
-      kIntersectPhysics2dShapeParams, physics_ops::handle_2d_intersect_shape}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "intersect_physics_2d_point",
-      "Intersect a 2D physics space at a single point and return the colliders touching it. Requires space_rid and position; optional collision_mask, exclude, collide_with_bodies and collide_with_areas filter the query, and max_results caps the reply (default 32). Returns an array of hits, each with position, normal, collider_id, rid and shape. Use this instead of intersect_physics_2d_ray when you need everything at one spot rather than a closest hit",
-      "Physics", {"physics", "2d", "intersect", "point"}, SideEffect::None, tool_flags::kNone,
-      kIntersectPhysics2dPointParams, physics_ops::handle_2d_intersect_point}));
+      "physics_query",
+      "Run one physics query against PhysicsServer2D (dimension=2) or PhysicsServer3D (dimension=3). Required mode selects the query: intersect_point|intersect_ray|intersect_shape|cast_motion|collide_shape|rest_info|test_motion|contacts|area_overlaps. Space queries need space_rid, except dimension 2 intersect_ray which may omit it to auto-detect the edited scene viewport's World2D space; shape queries need shape_rid; intersect_point needs position; intersect_ray needs from and to; test_motion needs body_rid, from and motion; contacts needs body_rid; area_overlaps needs area_rid or node_path of an Area2D/Area3D node. Vectors use {x, y} for dimension 2 and {x, y, z} for dimension 3; test_motion from uses Transform2D {origin, rotation, scale} or Transform3D {basis, origin}. Returns result plus mode and dimension: result is the hit or null for intersect_ray, an array of hits for intersect_point and intersect_shape, {safe, unsafe} proportions for cast_motion, {points} contact-point pairs for collide_shape, the rest-info dictionary or null for rest_info, {safe, unsafe, travel, remainder, collision, collisions} for test_motion, {count, contacts} for contacts, and {bodies, areas} for area_overlaps",
+      "Physics", {"physics", "query", "2d", "3d", "intersect", "point", "ray",
+                  "shape", "cast_motion", "collide_shape", "rest_info",
+                  "test_motion", "contacts", "area_overlaps",
+                  "intersect_physics_2d_ray", "intersect_physics_2d_shape",
+                  "intersect_physics_2d_point", "intersect_physics_3d_ray",
+                  "intersect_physics_3d_shape", "intersect_physics_3d_point"},
+      SideEffect::None, tool_flags::kNone,
+      kPhysicsQueryParams, physics_ops::handle_physics_query,
+      physics_query_schema(),
+      {
+          physics_query_alias("intersect_physics_2d_point", 2,
+                              "intersect_point"),
+          physics_query_alias("intersect_physics_2d_ray", 2, "intersect_ray"),
+          physics_query_alias("intersect_physics_2d_shape", 2,
+                              "intersect_shape"),
+          physics_query_alias("intersect_physics_3d_point", 3,
+                              "intersect_point"),
+          physics_query_alias("intersect_physics_3d_ray", 3, "intersect_ray"),
+          physics_query_alias("intersect_physics_3d_shape", 3,
+                              "intersect_shape"),
+      },
+      {"{\"dimension\":3,\"mode\":\"intersect_ray\",\"space_rid\":7,\"from\":{\"x\":0,\"y\":1,\"z\":0},\"to\":{\"x\":0,\"y\":-1,\"z\":0}}",
+       "{\"dimension\":3,\"mode\":\"cast_motion\",\"space_rid\":7,\"shape_rid\":9,\"transform\":{\"origin\":{\"x\":0,\"y\":1,\"z\":0}},\"motion\":{\"x\":0,\"y\":-2,\"z\":0}}",
+       "{\"dimension\":3,\"mode\":\"test_motion\",\"body_rid\":11,\"from\":{\"origin\":{\"x\":0,\"y\":1,\"z\":0}},\"motion\":{\"x\":0,\"y\":-2,\"z\":0}}",
+       "{\"dimension\":2,\"mode\":\"contacts\",\"body_rid\":5}",
+       "{\"dimension\":3,\"mode\":\"area_overlaps\",\"node_path\":\"Area3D\"}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_physics_2d_body",
       "Create a 2D physics body in the physics server and return its RID handle. Pass the returned RID to set_physics_2d_body_mode, apply_physics_2d_body_force, apply_physics_2d_body_impulse, set_physics_2d_body_state and get_physics_2d_body_state. The body is a server-side object with no scene node, so it is driven only through these tools and nothing appears in the editor scene tree. Returns an object with the numeric RID id and an is_valid flag",
@@ -403,21 +431,6 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Get the direct state of a 3D physics space, the gateway for 3D physics intersection queries. Pass the space RID and use this before the intersect_physics_3d_* tools to confirm the space is active and attached to a scene, since 3D queries fail on inactive spaces. Returns the space RID, a valid flag and the available queries (intersect_ray, intersect_point, intersect_shape, cast_motion, collide_shape, get_rest_info)",
       "Physics", {"physics", "3d", "space"}, SideEffect::None, tool_flags::kNone,
       kGetPhysics3dSpaceDirectStateParams, physics_ops::handle_3d_space_get_direct_state}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "intersect_physics_3d_ray",
-      "Cast a ray in 3D physics space and return the first collision hit. Unlike the 2D ray tool, space_rid is required here: pass the space RID explicitly, since 3D has no auto-detection from the editor scene. Requires from and to; returns a single hit object with position, normal, collider_id, rid and shape, or null when nothing was hit",
-      "Physics", {"physics", "3d", "ray"}, SideEffect::None, tool_flags::kNone,
-      kIntersectPhysics3dRayParams, physics_ops::handle_3d_ray_cast}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "intersect_physics_3d_shape",
-      "Intersect a 3D physics space with a shape RID and return every overlapping collider. Requires space_rid and shape_rid, where shape_rid comes from create_physics_3d_sphere_shape; pass transform to place the shape, motion to sweep it along a Vector3, plus filters such as collision_mask, exclude, collide_with_bodies and collide_with_areas. Returns an array of hits, empty when nothing overlaps. Unlike intersect_physics_3d_ray, this reports all hits",
-      "Physics", {"physics", "3d", "intersect", "shape"}, SideEffect::None, tool_flags::kNone,
-      kIntersectPhysics3dShapeParams, physics_ops::handle_3d_intersect_shape}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "intersect_physics_3d_point",
-      "Intersect a 3D physics space at a single point and return the colliders touching it. Requires space_rid and position; optional collision_mask, exclude, collide_with_bodies and collide_with_areas filter the query, and max_results caps the reply (default 32). Returns an array of hits, each with position, normal, collider_id, rid and shape. Use this instead of intersect_physics_3d_ray when you need everything at one spot",
-      "Physics", {"physics", "3d", "intersect", "point"}, SideEffect::None, tool_flags::kNone,
-      kIntersectPhysics3dPointParams, physics_ops::handle_3d_intersect_point}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_physics_3d_body",
       "Create a 3D physics body in the physics server and return its RID handle. Pass the returned RID to set_physics_3d_body_mode, set_physics_3d_body_transform, apply_physics_3d_body_force, apply_physics_3d_body_impulse, apply_physics_3d_body_torque and set_physics_3d_body_state. The body is a server-side object with no scene node, driven only through these tools. Returns an object with the numeric RID id and an is_valid flag",
