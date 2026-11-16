@@ -6,7 +6,6 @@ import {
   intro,
   isCancel,
   log,
-  multiselect,
   note,
   outro,
   path as promptPath,
@@ -19,7 +18,7 @@ import { runClean } from "./commands/clean";
 import { runDeploy } from "./commands/deploy";
 import { runPackage } from "./commands/package";
 import { runTests } from "./commands/test";
-import { DEPLOY_TARGETS, DEMO_NAMES, PLATFORM_LIBS, addonDir, hostPlatform } from "./lib/config";
+import { PLATFORM_LIBS, addonDir, discoverExampleProjects, hostPlatform } from "./lib/config";
 
 const MENU_ACTIONS = ["构建", "部署", "打包", "清理", "跑测试", "查看部署状态", "退出"] as const;
 type MenuAction = (typeof MENU_ACTIONS)[number];
@@ -66,9 +65,9 @@ function formatMtime(target: string): string {
   return `✓ ${two(value.getMonth() + 1)}-${two(value.getDate())} ${two(value.getHours())}:${two(value.getMinutes())}`;
 }
 
-function statusRows(): Array<[string, string, string]> {
+function statusRows(projects: readonly string[]): Array<[string, string, string]> {
   const libraryName = PLATFORM_LIBS[hostPlatform()] ?? null;
-  return DEPLOY_TARGETS.map((projectDir): [string, string, string] => {
+  return projects.map((projectDir): [string, string, string] => {
     const targetAddonDir = addonDir(projectDir);
     const gdextension = path.join(targetAddonDir, "godot-autopilot.gdextension");
     const library = libraryName === null ? null : path.join(targetAddonDir, libraryName);
@@ -80,8 +79,8 @@ function statusRows(): Array<[string, string, string]> {
   });
 }
 
-function renderStatusTable(): string {
-  const rows = statusRows();
+function renderStatusTable(projects: readonly string[]): string {
+  const rows = statusRows(projects);
   const headers = ["工程", "gdextension", "平台库"] as const;
   const projectWidth = Math.max(displayWidth(headers[0]), ...rows.map((row) => displayWidth(row[0])));
   const gdextensionWidth = Math.max(displayWidth(headers[1]), ...rows.map((row) => displayWidth(row[1])));
@@ -101,7 +100,32 @@ function renderStatusTable(): string {
 }
 
 function printStatus(): void {
-  note(renderStatusTable(), "插件部署状态");
+  const projects = discoverExampleProjects();
+  if (projects.length === 0) {
+    note("未发现 examples/* 工程；部署与清理请在操作中输入 Godot 工程路径。", "插件部署状态");
+    return;
+  }
+  note(renderStatusTable(projects), "插件部署状态");
+}
+
+async function promptProjectDir(message: string): Promise<string | null> {
+  const raw = unwrap(
+    await promptPath({
+      message,
+      directory: true,
+      initialValue: ".",
+    }),
+  ).trim();
+  if (raw === "") {
+    log.warn("未输入工程路径，已取消");
+    return null;
+  }
+  const projectDir = path.resolve(raw);
+  if (!fs.existsSync(path.join(projectDir, "project.godot"))) {
+    log.error(`不是 Godot 工程（缺少 project.godot）：${projectDir}`);
+    return null;
+  }
+  return projectDir;
 }
 
 async function choosePreset(message: string): Promise<"Debug" | "Release"> {
@@ -126,23 +150,13 @@ async function actionBuild(): Promise<void> {
 
 async function actionDeploy(): Promise<void> {
   const presetName = await choosePreset("部署哪一版产物");
-  const names = unwrap(
-    await multiselect<string>({
-      message: "部署目标（空格多选，回车确认）",
-      options: DEMO_NAMES.map((name) => ({ value: name, label: name })),
-      initialValues: [...DEMO_NAMES],
-      required: false,
-    }),
-  );
-  if (names.length === 0) {
-    log.warn("未选择任何 demo，已取消");
-    return;
-  }
+  const projectDir = await promptProjectDir("Godot 工程目录");
+  if (projectDir === null) return;
   if (
     presetName === "Release" &&
     !unwrap(
       await promptConfirm({
-        message: "Release 部署前会清理各 demo 的 .godot 与 addons，继续？",
+        message: `Release 部署前会清理 ${path.basename(projectDir)} 的 .godot 与 addons，继续？`,
         initialValue: false,
       }),
     )
@@ -153,14 +167,10 @@ async function actionDeploy(): Promise<void> {
   const code = await runDeploy({
     release: presetName === "Release",
     debug: presetName === "Debug",
-    demos: names,
+    projects: [projectDir],
   });
-  if (code === 0) {
-    note(`部署完成（${presetName}，${names.length} 个 demo）`, "部署");
-    printStatus();
-  } else {
-    note(`部署失败（退出码 ${code}）`, "部署");
-  }
+  if (code === 0) note(`部署完成（${presetName}）\n${projectDir}`, "部署");
+  else note(`部署失败（退出码 ${code}）`, "部署");
 }
 
 async function actionPackage(): Promise<void> {
@@ -171,6 +181,7 @@ async function actionPackage(): Promise<void> {
     }),
   );
   let libsDir: string | null = null;
+  let preset: "debug" | "release" = "debug";
   if (useLibs) {
     const raw = unwrap(
       await promptPath({
@@ -188,17 +199,21 @@ async function actionPackage(): Promise<void> {
       return;
     }
     libsDir = raw;
+  } else {
+    preset = (await choosePreset("打包哪一版构建产物")) === "Release" ? "release" : "debug";
   }
-  const code = runPackage(libsDir);
+  const code = runPackage(libsDir, preset);
   if (code === 0) note("打包完成", "打包");
   else note(`打包失败（退出码 ${code}）`, "打包");
 }
 
 async function actionClean(): Promise<void> {
+  const projectDir = await promptProjectDir("要清理的 Godot 工程目录");
+  if (projectDir === null) return;
   if (
     !unwrap(
       await promptConfirm({
-        message: "清理全部 demo 的 .godot 与 addons？",
+        message: `清理 ${path.basename(projectDir)} 的 .godot 与 addons？`,
         initialValue: false,
       }),
     )
@@ -206,7 +221,7 @@ async function actionClean(): Promise<void> {
     log.warn("已取消");
     return;
   }
-  const code = runClean();
+  const code = runClean([projectDir]);
   if (code === 0) note("清理完成", "清理");
   else note(`清理失败（退出码 ${code}）`, "清理");
 }
