@@ -6,6 +6,7 @@
 namespace godot_autopilot {
 namespace analyze_ops {
 
+mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args);
 mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args);
 mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args);
 mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args);

@@ -14,41 +14,58 @@ namespace group_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kAddGroupNodeParams = {
+const std::vector<std::string> kNodeGroupActions = {"add", "remove"};
+
+const std::vector<ParamSpec> kNodeGroupParams = {
     {"node_path", "string", "Path to the scene node (string, e.g. 'Enemies/Enemy1')", true},
-    {"group_name", "string", "Group name to add the node to (string, e.g. 'enemies')", true},
+    {"group_name", "string", "Group name to add or remove (string, e.g. 'enemies')", true},
 };
 
-const std::vector<ParamSpec> kRemoveGroupNodeParams = {
-    {"node_path", "string", "Path to the scene node (string, e.g. 'Enemies/Enemy1')", true},
-    {"group_name", "string", "Group name to remove the node from (string, e.g. 'enemies')", true},
-};
+inline mcp::JsonValue node_group_alias_args_with_action(
+    const mcp::JsonValue &args, const char *action) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (args.IsObject()) {
+    out = args;
+  }
+  out["action"] = mcp::JsonValue(action);
+  return out;
+}
 
-const std::vector<ParamSpec> kHasGroupNodeParams = {
-    {"node_path", "string", "Path to the scene node (string, e.g. 'Enemies/Enemy1')", true},
-    {"group_name", "string", "Group name to check (string, e.g. 'enemies')", true},
-};
+inline ToolAlias node_group_action_alias(const char *name,
+                                         const char *canonical,
+                                         const char *action) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = canonical;
+  alias.adapt_args = [action](const mcp::JsonValue &args) {
+    return node_group_alias_args_with_action(args, action);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(3);
+  v.reserve(1);
   v.push_back(make_spec_tool(ToolSpec{
-      "add_group_node",
-      "Add a scene node to a group persistently: the membership is saved with the scene and registered with the editor undo/redo. Requires 'node_path' and 'group_name'. Idempotent — if the node is already in the group it is removed first, then re-added. Returns 'added' with node_path, group and persistent.",
-      "Group", {"group", "add"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kAddGroupNodeParams, group_ops::handle_add_node_to_group}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "remove_group_node",
-      "Remove a scene node from a group; the change is registered with the editor undo/redo. Requires 'node_path' and 'group_name'. Returns 'removed' — or an error if the node is still in the group after the operation. Calling it for a node not in the group is a safe no-op.",
-      "Group", {"group", "remove"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kRemoveGroupNodeParams, group_ops::handle_remove_node_from_group}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "has_group_node",
-      "Check whether a scene node belongs to a group. Requires 'node_path' and 'group_name'. Groups are shared across the whole scene tree and membership added by add_group_node is saved with the scene. Returns true or false — errors if the node is not found.",
-      "Group", {"group", "check"}, SideEffect::None, tool_flags::kNone,
-      kHasGroupNodeParams, group_ops::handle_has_node_in_group}));
+      "node_group",
+      "Change group membership of a scene node in the edited scene in one action tool; every action requires 'node_path' and 'group_name', is WritesScene and is registered with the editor undo/redo. action='add' adds the node to the group persistently (membership is saved with the scene) and is idempotent: an existing membership is removed first, then re-added. action='remove' removes the membership; calling it for a node not in the group is a safe no-op. The result reports 'added' or 'removed' with node_path, group and, for add, persistent=true. Use get_scene_tree(include_groups=true) to read current membership; has_group_node is a deprecated alias of that call. Deprecated aliases: add_group_node (action=add), remove_group_node (action=remove).",
+      "Group", {"group", "add", "remove", "add_group_node", "remove_group_node",
+                "has_group_node"},
+      SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kNodeGroupParams, group_ops::handle_node_group,
+      schema::build_action_schema(kNodeGroupActions, kNodeGroupParams,
+                                  "Group membership action: add|remove"),
+      {
+          node_group_action_alias("add_group_node", "node_group", "add"),
+          node_group_action_alias("remove_group_node", "node_group",
+                                  "remove"),
+      },
+      {"{\"action\":\"add\",\"node_path\":\"Enemies/Enemy1\",\"group_name\":\"enemies\"}",
+       "{\"action\":\"remove\",\"node_path\":\"Enemies/Enemy1\",\"group_name\":\"enemies\"}"}}));
   return v;
 }
 

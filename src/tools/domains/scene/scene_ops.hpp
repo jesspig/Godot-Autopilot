@@ -12,6 +12,9 @@ namespace scene_ops {
 
 std::string scene_relative_path(godot::Node *node, godot::Node *scene_root);
 
+mcp::JsonValue handle_create_scene_node(const mcp::JsonValue &args);
+mcp::JsonValue handle_edit_scene_node(const mcp::JsonValue &args);
+mcp::JsonValue handle_scene_camera(const mcp::JsonValue &args);
 mcp::JsonValue handle_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_delete(const mcp::JsonValue &args);
 mcp::JsonValue handle_rename(const mcp::JsonValue &args);
