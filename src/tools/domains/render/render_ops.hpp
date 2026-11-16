@@ -1,10 +1,32 @@
 #ifndef GODOT_AUTOPILOT_RENDER_OPS_HPP
 #define GODOT_AUTOPILOT_RENDER_OPS_HPP
 
+#include <cstdint>
 #include <mcp/JsonValue.hpp>
 
 namespace godot_autopilot {
 namespace render_ops {
+
+struct RenderRidDomain {};
+
+mcp::JsonValue handle_environment_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_instance_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_viewport_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_camera_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_canvas_item_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_light_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_particles_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_material_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_shader_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_sky_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_fog_volume_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_decal_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_reflection_probe_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_mesh_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_texture_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_inspect_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_free_rid(const mcp::JsonValue &args);
+void forget_environment_state(int64_t rid_id);
 
 mcp::JsonValue handle_canvas_item_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_canvas_item_draw_rect(const mcp::JsonValue &args);
@@ -31,8 +53,6 @@ mcp::JsonValue handle_viewport_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_viewport_set_size(const mcp::JsonValue &args);
 mcp::JsonValue handle_viewport_set_clear_mode(const mcp::JsonValue &args);
 mcp::JsonValue handle_particle_create(const mcp::JsonValue &args);
-mcp::JsonValue handle_environment_set_bg_color(const mcp::JsonValue &args);
-mcp::JsonValue handle_environment_set_ambient(const mcp::JsonValue &args);
 mcp::JsonValue handle_fog_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_shader_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_texture_create_2d(const mcp::JsonValue &args);

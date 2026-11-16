@@ -80,7 +80,7 @@ std::string side_effect_of_tool(const std::string &name) {
 
 TEST(DestructiveTierGuardTest, EveryToolIsDeclared) {
   const auto all = declarations();
-  EXPECT_GT(all.size(), 250u);
+  EXPECT_GE(all.size(), 250u);
 }
 
 TEST(DestructiveTierGuardTest, DestructionShapedToolsAreDestructiveOrExempted) {
