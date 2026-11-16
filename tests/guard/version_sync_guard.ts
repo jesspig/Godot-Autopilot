@@ -16,7 +16,7 @@ const CLI_VERSION_FILE = path.join(ROOT, "cli", "src", "version.ts");
 const SKILLS_DIR = path.join(ROOT, "skills");
 const REF_PATTERN = /github:jesspig\/Godot-Autopilot#([^\s"')]+)/g;
 const CLI_VERSION_PATTERN = /CLI_VERSION\s*=\s*"([^"]+)"/;
-const VERSION_SHAPE = /^\d+\.\d+\.\d+$/;
+const VERSION_SHAPE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const ALLOWED_NON_VERSION_REFS = new Set(["develop", "<VERSION>"]);
 
 function splitLines(text: string): string[] {
