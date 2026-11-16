@@ -72,6 +72,16 @@ mcp::JsonValue handle_create_array_mesh(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_mesh_surface_material(const mcp::JsonValue &args);
 mcp::JsonValue handle_assign_mesh_to_instance(const mcp::JsonValue &args);
 
+mcp::JsonValue handle_load_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_query_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_mesh_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_property_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_file_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_save_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_uid_set_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_import_action(const mcp::JsonValue &args);
+
 } // namespace resource_ops
 } // namespace godot_autopilot
 
