@@ -120,6 +120,7 @@ gda search scene
 gda describe create_scene_node
 gda call ping
 gda call system_status
+gda call get_editor_state --args '{"action": "info"}'
 ```
 
 `gda search` needs a live editor. `gda describe` shows the schema and

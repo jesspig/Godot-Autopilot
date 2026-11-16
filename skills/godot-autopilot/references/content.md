@@ -8,25 +8,26 @@ scene; audio bus tools act on the editor process.
 Build in order: node, TileSet, atlas source, physics layer, cells.
 
 1. `create_tilemap` adds the node with a default TileSet; the scene needs a root.
-2. `create_tilemap_tileset` creates an in-memory TileSet.
-3. `add_tilemap_atlas_source` slices a `res://` texture. `source_id` (0-255)
-   must be unused; `margin` and `spacing` are optional.
-4. `add_tilemap_physics_layer` is required before per-tile collision.
-5. `save_resource` the TileSet, then `property_set` the node's `tile_set` to the
-   saved path. Never assign `memory://` directly. Finish with
-   `save_editor_scene`.
-6. `set_tilemap_cell` / `set_tilemap_cells` place tiles; both TileMap and
-   TileMapLayer are accepted.
-7. `set_tilemap_tile_collision` takes polygon points relative to the tile center;
-   an array of arrays sets multiple polygons, an empty array clears.
+2. `create_tilemap_tileset` creates an in-memory TileSet named `name`.
+3. `update_tileset` action=add_atlas_source slices a `res://` texture.
+   `source_id` (0-255) must be unused; `margin` and `spacing` are optional.
+4. action=add_physics_layer is required before per-tile collision.
+5. `resource_save` action=save the TileSet, then `property_set` the node's
+   `tile_set` to the saved path. Never assign `memory://` directly. Finish with
+   `save_editor_scene` action=save.
+6. `set_tilemap_cells` places tiles; TileMap and TileMapLayer are accepted. Pass
+   `cells` for individual entries or `from`/`to` for a filled rectangle.
+7. `update_tileset` action=set_tile_collision takes polygon points relative to
+   the tile center; an array of arrays sets multiple polygons, an empty array
+   clears.
 
 Gotchas:
 
 - `set_cell` with only one of source id, atlas coords, or alternative `INVALID`
   silently clears the cell.
 - Oversized bulk JSON can fail as a parse error before the tool runs. For
-  map-scale fills, loop over `set_cell` with `code_execute`. `source_id: -1`
-  clears a cell.
+  map-scale fills, use the `from`/`to` rectangle form of `set_tilemap_cells`, or
+  loop over `set_cell` with `code_execute`. `source_id: -1` clears a cell.
 - Invalid bulk entries are skipped with a warnings list and a set count; read
   both.
 - A missing or unimported texture errors at atlas creation.
@@ -40,18 +41,22 @@ Gotchas:
 (value tracks need `property`, for example `position:x`);
 `insert_animation_keyframe` takes `time` and the JSON value or
 `{"method": ..., "args": [...]}`. `get_animation_list` verifies lengths and loop
-modes. `remove_animation_track` deletes by index; `remove_animation` deletes a
-clip. There is no single-key delete tool; use `code_execute`.
+modes; its action=inspect reads tracks and keys, and action=library manages
+AnimationLibrary containers. `remove_animation_track` deletes by index;
+`remove_animation` deletes a clip. There is no single-key delete tool; use
+`code_execute`.
 
-`AnimationTree`: `create_scene_animation_tree` creates an empty state machine.
-Add states with `add_animation_machine_state` and connect with
-`connect_animation_states`; `condition` names a bool parameter for automatic
-advance. Both states must exist and duplicate transitions are rejected.
+`AnimationTree`: `animation_tree` action=create creates an empty state machine
+(`parent_path`, optional `name` and `anim_player`). action=add_node adds a state
+with `state_name` and `animation`; action=connect joins `from_state` to
+`to_state`; `condition` names a bool parameter for automatic advance. Both
+states must exist and duplicate transitions are rejected.
 
-`SpriteFrames`: `create_spriteframes` creates an in-memory resource and removes
-the default animation. `add_spriteframes_animation` sets fps/loop;
-`add_spriteframes_frame` adds frames, with `hframes`/`vframes` splitting a sheet
-and `duration` scaling timing. Save, then `property_set` `sprite_frames`.
+`SpriteFrames`: `update_spriteframes` action=create creates an in-memory resource
+and removes the default animation. action=add_animation sets fps/loop;
+action=add_frame adds frames, with `hframes`/`vframes` splitting a sheet and
+`duration` scaling timing. Save with `resource_save` action=save, then
+`property_set` `sprite_frames`.
 
 Gotchas:
 
@@ -66,18 +71,18 @@ Gotchas:
 
 ## Audio
 
-Master is bus 0; setters take a zero-based `bus_index` and apply immediately.
-`get_audio_bus_layout` snapshots the layout and is the read-back for names,
-volumes, and effect chains. `set_audio_bus_volume_db`, `set_audio_bus_mute`,
-`set_audio_bus_solo`, and `set_audio_bus_bypass_effects` are the per-bus
-switches. `add_audio_bus_effect` takes an AudioEffect class name; `at_position`
-inserts, -1 appends. `set_audio_bus_layout` replaces the entire layout: get the
-object, edit it, write it back.
+Master is bus 0; `audio_bus` setters take a zero-based `bus_index` and apply
+immediately. action=get_layout snapshots the layout and is the read-back for
+names, volumes, and effect chains. action=set_volume, action=set_mute,
+action=set_solo, and action=set_bypass are the per-bus switches.
+action=add_effect takes an AudioEffect class name in `effect_type`;
+`at_position` inserts, -1 appends. action=set_layout replaces the entire layout:
+get the object, edit it, write it back.
 
-Player tools: `play_audio_player`, `stop_audio_player`,
-`set_audio_player_volume_db`, `set_audio_player_pitch_scale`,
-`get_audio_player_playback_position`, and `seek_audio_player`.
-`set_audio_device_output` / `set_audio_device_input` switch the editor device.
+Player tools: `audio_player` action=play, action=stop, action=set_volume
+(`volume_db`), action=set_pitch (`pitch_scale`), action=get_position, and
+action=seek. `audio_device` action=set_output / action=set_input switches the
+editor device.
 
 Gotchas:
 
@@ -88,19 +93,22 @@ Gotchas:
 
 ## UI theming and layout
 
-1. `create_theme_resource` creates a `.tres`; missing directories are created and
-   an existing file is never overwritten.
-2. `set_theme_color`, `set_theme_constant`, `set_theme_font_size`, and
-   `set_theme_stylebox_flat` take `path`, `theme_type`, and `varname`, then
-   load-modify-save. Run `get_theme_info` first for valid type/item pairs.
-3. `apply_theme_to_control` assigns the theme in the edited scene; finish with
-   `save_editor_scene`.
+1. `update_theme` action=create creates a `.tres`; missing directories are
+   created and an existing file is never overwritten.
+2. action=bundle takes `path` plus `colors`, `constants`, `font_sizes`, and
+   `styleboxes`, each mapping `theme_type` to `{varname: value}`, then
+   load-modify-saves once. Run `get_theme_info` first for valid type/item pairs.
+3. `update_control_layout` action=apply takes `theme_path` and `control_path`
+   and assigns the theme in the edited scene; finish with `save_editor_scene`
+   action=save.
 
-`set_control_anchor_preset` applies one of the 16 presets (`center` is 8,
-`full_rect` is 15). `keep_offsets` defaults to false, so offsets are recomputed.
+action=layout applies one of the 16 presets (`center` is 8, `full_rect` is 15)
+plus optional anchors, offsets, size flags, grow, and minimum size.
+`keep_offsets` defaults to false, so offsets are recomputed.
 
-For runtime UI, `get_game_ui_elements` returns Control rectangles; for
-short-lived HUD feedback use `capture_game_viewport` with `when`.
+For runtime UI, `get_game_ui` action=elements returns Control rectangles; for
+short-lived HUD feedback use `capture_editor_viewport` with target=game and
+`when`.
 
 Gotchas:
 
