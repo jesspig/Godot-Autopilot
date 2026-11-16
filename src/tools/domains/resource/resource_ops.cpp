@@ -43,6 +43,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <algorithm>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -2806,6 +2807,320 @@ mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(found);
   return r;
+}
+
+namespace {
+
+bool has_string_param(const mcp::JsonValue &args, const char *name) {
+  const mcp::JsonValue *value = args.Find(name);
+  return value != nullptr && value->IsString();
+}
+
+mcp::JsonValue missing_action_parameter(const std::string &action,
+                                        const char *name) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(
+      "missing required parameter for action '" + action + "': " + name);
+  return error;
+}
+
+bool resolve_resource_action(const mcp::JsonValue &args, const char *tool,
+                             std::initializer_list<const char *> allowed,
+                             std::string &out_action,
+                             mcp::JsonValue &out_error) {
+  const mcp::JsonValue *it_action = args.Find("action");
+  if (it_action == nullptr || !it_action->IsString()) {
+    out_error = mcp::JsonValue(mcp::JsonValue::object_tag);
+    out_error["error"] = mcp::JsonValue("missing required parameter: action");
+    return false;
+  }
+  out_action = it_action->GetString();
+  std::string allowed_text;
+  for (const char *candidate : allowed) {
+    if (out_action == candidate) {
+      return true;
+    }
+    if (!allowed_text.empty()) {
+      allowed_text += ", ";
+    }
+    allowed_text += candidate;
+  }
+  out_error = mcp::JsonValue(mcp::JsonValue::object_tag);
+  out_error["error"] = mcp::JsonValue(
+      "unknown action '" + out_action + "' for " + tool + " (expected " +
+      allowed_text + ")");
+  return false;
+}
+
+bool require_string_for_action(const mcp::JsonValue &args,
+                               const std::string &action, const char *name,
+                               mcp::JsonValue &error) {
+  if (has_string_param(args, name)) {
+    return true;
+  }
+  error = missing_action_parameter(action, name);
+  return false;
+}
+
+bool require_param_for_action(const mcp::JsonValue &args,
+                              const std::string &action, const char *name,
+                              mcp::JsonValue &error) {
+  if (args.Find(name) != nullptr) {
+    return true;
+  }
+  error = missing_action_parameter(action, name);
+  return false;
+}
+
+} // namespace
+
+mcp::JsonValue handle_load_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_load",
+                               {"load", "reload", "threaded_start",
+                                "threaded_status", "threaded_get"},
+                               action, error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (action == "load") {
+    return handle_load(args);
+  }
+  if (action == "reload") {
+    return handle_reload(args);
+  }
+  if (action == "threaded_start") {
+    return handle_load_threaded(args);
+  }
+  if (action == "threaded_status") {
+    return handle_load_threaded_get_status(args);
+  }
+  return handle_load_threaded_wait(args);
+}
+
+mcp::JsonValue handle_query_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(
+          args, "resource_query",
+          {"type", "exists", "types", "extensions", "dir", "uid", "deps",
+           "references", "property", "curve_baked"},
+          action, error)) {
+    return error;
+  }
+  if (action == "types") {
+    return handle_list_types(args);
+  }
+  if (action == "extensions") {
+    return handle_get_extensions(args);
+  }
+  if (action == "references") {
+    return handle_get_references(args);
+  }
+  if (action == "property") {
+    if (!require_string_for_action(args, action, "property", error)) {
+      return error;
+    }
+    return handle_get_property(args);
+  }
+  if (action == "curve_baked") {
+    if (!require_string_for_action(args, action, "name", error)) {
+      return error;
+    }
+    return handle_get_curve_baked_points(args);
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (action == "type") {
+    return handle_get_type(args);
+  }
+  if (action == "exists") {
+    return handle_exists(args);
+  }
+  if (action == "dir") {
+    return handle_list_dir(args);
+  }
+  if (action == "uid") {
+    return handle_get_uid(args);
+  }
+  return handle_get_dependencies(args);
+}
+
+mcp::JsonValue handle_create_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(
+          args, "resource_create",
+          {"create", "duplicate", "curve", "curve_points", "primitive",
+           "array"},
+          action, error)) {
+    return error;
+  }
+  if (action == "create") {
+    if (!require_string_for_action(args, action, "type", error)) {
+      return error;
+    }
+    return handle_create(args);
+  }
+  if (action == "duplicate") {
+    if (!require_string_for_action(args, action, "path", error)) {
+      return error;
+    }
+    return handle_duplicate(args);
+  }
+  if (action == "curve") {
+    if (!require_string_for_action(args, action, "name", error)) {
+      return error;
+    }
+    return handle_create_curve(args);
+  }
+  if (action == "curve_points") {
+    if (!require_string_for_action(args, action, "name", error)) {
+      return error;
+    }
+    if (!require_param_for_action(args, action, "points", error)) {
+      return error;
+    }
+    return handle_set_curve_points(args);
+  }
+  if (action == "primitive") {
+    if (!require_string_for_action(args, action, "type", error)) {
+      return error;
+    }
+    return handle_create_primitive_mesh(args);
+  }
+  if (!require_param_for_action(args, action, "vertices", error)) {
+    return error;
+  }
+  return handle_create_array_mesh(args);
+}
+
+mcp::JsonValue handle_mesh_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_mesh", {"surface_material"},
+                               action, error)) {
+    return error;
+  }
+  if (!require_param_for_action(args, action, "mesh_ref", error) ||
+      !require_param_for_action(args, action, "surface_idx", error) ||
+      !require_string_for_action(args, action, "material_path", error)) {
+    return error;
+  }
+  return handle_set_mesh_surface_material(args);
+}
+
+mcp::JsonValue handle_property_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_property", {"get", "set"},
+                               action, error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "property", error)) {
+    return error;
+  }
+  if (action == "get") {
+    return handle_get_property(args);
+  }
+  if (!require_param_for_action(args, action, "value", error)) {
+    return error;
+  }
+  return handle_set_property(args);
+}
+
+mcp::JsonValue handle_file_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(
+          args, "resource_file",
+          {"copy", "rename", "move", "remove", "create_dir"}, action,
+          error)) {
+    return error;
+  }
+  if (action == "rename") {
+    if (!has_string_param(args, "path") && !has_string_param(args, "from")) {
+      return missing_action_parameter(action, "path");
+    }
+    if (!has_string_param(args, "new_path") &&
+        !has_string_param(args, "to") &&
+        !has_string_param(args, "new_directory")) {
+      return missing_action_parameter(action, "new_path or new_directory");
+    }
+    return handle_rename(args);
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (action == "copy") {
+    if (!require_string_for_action(args, action, "dest_path", error)) {
+      return error;
+    }
+    return handle_copy(args);
+  }
+  if (action == "move") {
+    if (!require_string_for_action(args, action, "new_directory", error)) {
+      return error;
+    }
+    return handle_move(args);
+  }
+  if (action == "remove") {
+    return handle_remove(args);
+  }
+  return handle_create_directory(args);
+}
+
+mcp::JsonValue handle_save_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_save", {"save"}, action,
+                               error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  return handle_save(args);
+}
+
+mcp::JsonValue handle_uid_set_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_uid_set", {"set_uid"}, action,
+                               error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  return handle_set_uid(args);
+}
+
+mcp::JsonValue handle_import_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_import",
+                               {"reimport", "import_options"}, action,
+                               error)) {
+    return error;
+  }
+  if (action == "reimport") {
+    if (args.Find("path") == nullptr && args.Find("files") == nullptr) {
+      return missing_action_parameter(action, "path or files");
+    }
+    return handle_reimport(args);
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (!require_param_for_action(args, action, "options", error)) {
+    return error;
+  }
+  return handle_set_import_options(args);
 }
 
 
