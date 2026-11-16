@@ -24,8 +24,10 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <cmath>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace audio_ops {
@@ -1096,6 +1098,83 @@ mcp::JsonValue handle_bus_info(const mcp::JsonValue &args) {
   return r;
 }
 
+mcp::JsonValue handle_bus_metrics(const mcp::JsonValue &args) {
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  const int count = server->get_bus_count();
+  int index = 0;
+  if (const auto *index_p = args.Find("bus_index")) {
+    if (!index_p->IsInt()) {
+      return util::error_json(
+          "invalid parameter: bus_index must be an integer");
+    }
+    index = static_cast<int>(index_p->GetInt());
+  }
+  if (index < 0 || index >= count) {
+    return util::error_json("audio bus not found at index: " +
+                            std::to_string(index));
+  }
+  constexpr double kSilenceFloorDb = -200.0;
+  const int channels = server->get_bus_channels(index);
+  std::vector<double> channel_peaks;
+  channel_peaks.reserve(static_cast<size_t>(channels));
+  for (int channel = 0; channel < channels; ++channel) {
+    double db =
+        static_cast<double>(server->get_bus_peak_volume_left_db(index, channel));
+    if (!std::isfinite(db)) {
+      db = kSilenceFloorDb;
+    }
+    channel_peaks.push_back(db);
+  }
+  const double peak_left =
+      channel_peaks.empty() ? kSilenceFloorDb : channel_peaks[0];
+  const double peak_right =
+      channel_peaks.size() >= 2 ? channel_peaks[1] : peak_left;
+  mcp::JsonValue peaks(mcp::JsonValue::array_tag);
+  for (const double db : channel_peaks) {
+    peaks.PushBack(mcp::JsonValue(db));
+  }
+  const int effect_count = server->get_bus_effect_count(index);
+  mcp::JsonValue effects(mcp::JsonValue::array_tag);
+  for (int i = 0; i < effect_count; ++i) {
+    auto effect = server->get_bus_effect(index, i);
+    mcp::JsonValue entry(mcp::JsonValue::object_tag);
+    entry["index"] = mcp::JsonValue(static_cast<int64_t>(i));
+    entry["class"] = mcp::JsonValue(effect.is_valid()
+                                        ? util::to_std(effect->get_class())
+                                        : std::string());
+    effects.PushBack(std::move(entry));
+  }
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  info["bus_index"] = mcp::JsonValue(static_cast<int64_t>(index));
+  info["bus_name"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+  info["channels"] = mcp::JsonValue(static_cast<int64_t>(channels));
+  info["effect_count"] = mcp::JsonValue(static_cast<int64_t>(effect_count));
+  info["effects"] = std::move(effects);
+  info["send"] = mcp::JsonValue(
+      util::to_std(godot::String(server->get_bus_send(index))));
+  info["peak_left_db"] = mcp::JsonValue(peak_left);
+  info["peak_right_db"] = mcp::JsonValue(peak_right);
+  info["peaks_db"] = std::move(peaks);
+  info["mix_rate"] =
+      mcp::JsonValue(static_cast<double>(server->get_mix_rate()));
+  info["speaker_mode"] = mcp::JsonValue(
+      static_cast<int64_t>(server->get_speaker_mode()));
+  info["driver_name"] =
+      mcp::JsonValue(util::to_std(server->get_driver_name()));
+  info["volume_db"] =
+      mcp::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
+  info["muted"] = mcp::JsonValue(server->is_bus_mute(index));
+  info["solo"] = mcp::JsonValue(server->is_bus_solo(index));
+  info["bypass_effects"] =
+      mcp::JsonValue(server->is_bus_bypassing_effects(index));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
 mcp::JsonValue handle_input_status(const mcp::JsonValue &) {
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
@@ -1128,6 +1207,9 @@ mcp::JsonValue handle_audio_bus(const mcp::JsonValue &args) {
   if (action == "get_info") {
     return handle_bus_info(strip_audio_action(args));
   }
+  if (action == "info") {
+    return handle_bus_metrics(strip_audio_action(args));
+  }
   if (action == "set_volume") {
     return handle_bus_set_volume(strip_audio_action(args));
   }
@@ -1145,8 +1227,8 @@ mcp::JsonValue handle_audio_bus(const mcp::JsonValue &args) {
   }
   return audio_action_error(
       "unknown action '" + action +
-      "' for audio_bus (expected get_layout, set_layout, get_info, set_volume, "
-      "set_mute, set_solo, set_bypass, add_effect)");
+      "' for audio_bus (expected get_layout, set_layout, get_info, info, "
+      "set_volume, set_mute, set_solo, set_bypass, add_effect)");
 }
 
 mcp::JsonValue handle_audio_player(const mcp::JsonValue &args) {

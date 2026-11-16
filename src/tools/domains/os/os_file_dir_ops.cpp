@@ -112,6 +112,8 @@ JV handle_get_file_info(const JV &args) {
   bool exists = is_dir || is_file;
   int64_t size = 0;
   int64_t modified_time = 0;
+  std::string sha256;
+  std::string md5;
   if (is_file) {
     auto file = godot::FileAccess::open(path_gs, godot::FileAccess::READ);
     if (!file.is_null()) {
@@ -120,6 +122,8 @@ JV handle_get_file_info(const JV &args) {
     }
     modified_time =
         static_cast<int64_t>(godot::FileAccess::get_modified_time(path_gs));
+    sha256 = util::to_std(godot::FileAccess::get_sha256(path_gs));
+    md5 = util::to_std(godot::FileAccess::get_md5(path_gs));
   }
   JV inner(JV::object_tag);
   inner["path"] = JV(path);
@@ -128,6 +132,8 @@ JV handle_get_file_info(const JV &args) {
   inner["is_file"] = JV(is_file);
   inner["size"] = JV(size);
   inner["modified_time"] = JV(modified_time);
+  inner["sha256"] = JV(sha256);
+  inner["md5"] = JV(md5);
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,

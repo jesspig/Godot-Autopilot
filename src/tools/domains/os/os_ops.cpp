@@ -59,6 +59,30 @@ int64_t steady_now_ms() {
       .count();
 }
 
+JV process_status_body(godot::OS *os, int32_t pid) {
+  const bool running = os->is_process_running(pid);
+  JV info(JV::object_tag);
+  info["pid"] = JV(static_cast<int64_t>(pid));
+  info["is_running"] = JV(running);
+  if (running) {
+    info["exit_code"] = JV();
+    info["available"] = JV(false);
+    info["hint"] = JV(
+        "the process is still running; the exit code becomes readable after "
+        "it exits");
+    return info;
+  }
+  const int32_t code = os->get_process_exit_code(pid);
+  info["exit_code"] = JV(static_cast<int64_t>(code));
+  info["available"] = JV(code != -1);
+  if (code == -1) {
+    info["hint"] = JV(
+        "no exit code is available for this pid: it was not started by this "
+        "editor process or the platform does not expose it");
+  }
+  return info;
+}
+
 constexpr uint64_t kProcessSliceReadBytes = 65536;
 constexpr int64_t kProcessKillBudgetMs = 2000;
 
@@ -655,6 +679,129 @@ JV handle_os_kill(const JV &args) {
   return r;
 }
 
+JV handle_os_process_status(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_process status called");
+  auto *pid_p = args.Find("pid");
+  if (!pid_p || !pid_p->IsInt() || pid_p->GetInt() <= 0 ||
+      pid_p->GetInt() > INT32_MAX) {
+    return util::error_json(
+        "missing required parameter: pid (positive 32-bit integer)");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  JV r(JV::object_tag);
+  r["result"] = process_status_body(
+      os, static_cast<int32_t>(pid_p->GetInt()));
+  return r;
+}
+
+JV handle_os_process_exit_code(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_process exit_code called");
+  auto *pid_p = args.Find("pid");
+  if (!pid_p || !pid_p->IsInt() || pid_p->GetInt() <= 0 ||
+      pid_p->GetInt() > INT32_MAX) {
+    return util::error_json(
+        "missing required parameter: pid (positive 32-bit integer)");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  JV r(JV::object_tag);
+  r["result"] = process_status_body(
+      os, static_cast<int32_t>(pid_p->GetInt()));
+  return r;
+}
+
+JV handle_os_process_is_running(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_process is_running called");
+  auto *pid_p = args.Find("pid");
+  if (!pid_p || !pid_p->IsInt() || pid_p->GetInt() <= 0 ||
+      pid_p->GetInt() > INT32_MAX) {
+    return util::error_json(
+        "missing required parameter: pid (positive 32-bit integer)");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  const int32_t pid = static_cast<int32_t>(pid_p->GetInt());
+  JV info(JV::object_tag);
+  info["pid"] = JV(static_cast<int64_t>(pid));
+  info["is_running"] = JV(os->is_process_running(pid));
+  JV r(JV::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+JV handle_os_memory_info(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info memory_info called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  godot::Dictionary info = os->get_memory_info();
+  JV r(JV::object_tag);
+  r["result"] = VariantJson::serialize(godot::Variant(info));
+  return r;
+}
+
+JV handle_os_static_memory(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info static_memory called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  JV info(JV::object_tag);
+  info["usage"] = JV(static_cast<int64_t>(os->get_static_memory_usage()));
+  info["peak_usage"] =
+      JV(static_cast<int64_t>(os->get_static_memory_peak_usage()));
+  JV r(JV::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+JV handle_os_video_adapter(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info video_adapter called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  godot::PackedStringArray fields = os->get_video_adapter_driver_info();
+  JV arr(JV::array_tag);
+  for (int i = 0; i < fields.size(); ++i) {
+    arr.PushBack(JV(util::to_std(fields[i])));
+  }
+  JV r(JV::object_tag);
+  r["result"] = std::move(arr);
+  return r;
+}
+
+JV handle_os_cmdline_args(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info cmdline_args called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  godot::PackedStringArray args = os->get_cmdline_args();
+  JV arr(JV::array_tag);
+  for (int i = 0; i < args.size(); ++i) {
+    arr.PushBack(JV(util::to_std(args[i])));
+  }
+  JV r(JV::object_tag);
+  r["result"] = std::move(arr);
+  return r;
+}
+
 JV handle_os_move_to_trash(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "move_os_file_to_trash called");
@@ -819,9 +966,19 @@ JV handle_os_process(const JV &args) {
   if (action == "kill") {
     return handle_os_kill(strip_os_action(args));
   }
+  if (action == "status") {
+    return handle_os_process_status(strip_os_action(args));
+  }
+  if (action == "exit_code") {
+    return handle_os_process_exit_code(strip_os_action(args));
+  }
+  if (action == "is_running") {
+    return handle_os_process_is_running(strip_os_action(args));
+  }
   return os_action_error(
       "unknown action '" + action +
-      "' for os_process (expected create, execute, kill)");
+      "' for os_process (expected create, execute, kill, status, exit_code, "
+      "is_running)");
 }
 
 JV handle_os_environment(const JV &args) {
@@ -876,9 +1033,22 @@ JV handle_os_system_info(const JV &args) {
   if (action == "fonts") {
     return handle_os_get_system_fonts(strip_os_action(args));
   }
+  if (action == "memory_info") {
+    return handle_os_memory_info(strip_os_action(args));
+  }
+  if (action == "static_memory") {
+    return handle_os_static_memory(strip_os_action(args));
+  }
+  if (action == "video_adapter") {
+    return handle_os_video_adapter(strip_os_action(args));
+  }
+  if (action == "cmdline_args") {
+    return handle_os_cmdline_args(strip_os_action(args));
+  }
   return os_action_error(
       "unknown action '" + action +
-      "' for os_system_info (expected info, locale, fonts)");
+      "' for os_system_info (expected info, locale, fonts, memory_info, "
+      "static_memory, video_adapter, cmdline_args)");
 }
 
 } // namespace os_ops

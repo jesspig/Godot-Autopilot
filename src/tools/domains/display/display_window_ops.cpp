@@ -1,11 +1,16 @@
 #include "tools/domains/display/display_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/display_server.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/window.hpp>
+#include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/rect2i.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
+#include <cstdint>
 #include <string>
 #include <utility>
 
@@ -29,6 +34,50 @@ JV vec2i_to_json(const godot::Vector2i &value) {
   o["x"] = JV(static_cast<int64_t>(value.x));
   o["y"] = JV(static_cast<int64_t>(value.y));
   return o;
+}
+
+godot::Window *resolve_window(int64_t window_id) {
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return nullptr;
+  }
+  const uint64_t instance_id =
+      ds->window_get_attached_instance_id(window_id);
+  if (instance_id == 0) {
+    return nullptr;
+  }
+  auto *obj = godot::UtilityFunctions::instance_from_id(
+      static_cast<int64_t>(instance_id));
+  return godot::Object::cast_to<godot::Window>(obj);
+}
+
+godot::Window *resolve_sub_window(const JV &args, JV &error) {
+  const int wid = window_id_from_args(args);
+  if (wid == 0) {
+    error = util::error_json(
+        "window_id 0 is the editor main window; create a sub-window with "
+        "display_window action=create first");
+    return nullptr;
+  }
+  auto *window = resolve_window(wid);
+  if (!window) {
+    error = util::error_json("no window found with the given id: " +
+                             std::to_string(wid));
+    return nullptr;
+  }
+  return window;
+}
+
+bool read_bool_param(const JV &args, const char *name, bool &out,
+                     JV &error) {
+  const JV *value = args.Find(name);
+  if (value == nullptr || !value->IsBool()) {
+    error = util::error_json(std::string("missing required parameter: ") +
+                             name + " (boolean)");
+    return false;
+  }
+  out = value->GetBool();
+  return true;
 }
 
 } // namespace
@@ -65,6 +114,18 @@ JV handle_window_create(const JV &args) {
       rh = hp->GetInt();
   }
   auto *window = memnew(godot::Window);
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Window *host =
+      editor && editor->get_base_control()
+          ? editor->get_base_control()->get_window()
+          : nullptr;
+  if (!host) {
+    memdelete(window);
+    return util::error_json(
+        "editor main window not available — cannot parent the new "
+        "sub-window");
+  }
+  host->add_child(window);
   window->set_position(godot::Vector2i(rx, ry));
   window->set_size(godot::Vector2i(rw, rh));
   window->set_mode(static_cast<godot::Window::Mode>(mode));
@@ -142,6 +203,8 @@ JV handle_window_get_rect(const JV &args) {
       JV(static_cast<double>(ds->screen_get_scale(screen)));
   result["screen_position"] = vec2i_to_json(ds->screen_get_position(screen));
   result["screen_size"] = vec2i_to_json(ds->screen_get_size(screen));
+  result["vsync"] =
+      JV(static_cast<int64_t>(ds->window_get_vsync_mode(wid)));
   result["note"] = JV(
       "position and size describe the window's client area in virtual desktop "
       "coordinates; the input injection tools (warp_display_mouse, "
@@ -285,6 +348,160 @@ JV handle_window_set_title(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_window_title completed");
   return util::ok_result(JV("ok"));
+}
+
+JV handle_window_popup(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window popup called");
+  JV error;
+  auto *window = resolve_sub_window(args, error);
+  if (!window) {
+    return error;
+  }
+  auto *rp = args.Find("rect");
+  if (!rp || !rp->IsObject()) {
+    return util::error_json(
+        "missing required parameter: rect ({x, y, w, h}) for popup");
+  }
+  auto *xp = rp->Find("x");
+  auto *yp = rp->Find("y");
+  auto *wp = rp->Find("w");
+  auto *hp = rp->Find("h");
+  if (!xp || !xp->IsInt() || !yp || !yp->IsInt() || !wp || !wp->IsInt() ||
+      !hp || !hp->IsInt() || wp->GetInt() <= 0 || hp->GetInt() <= 0) {
+    return util::error_json(
+        "parameter 'rect' must be {x, y, w, h} with integer w and h above 0");
+  }
+  const godot::Rect2i rect(static_cast<int32_t>(xp->GetInt()),
+                           static_cast<int32_t>(yp->GetInt()),
+                           static_cast<int32_t>(wp->GetInt()),
+                           static_cast<int32_t>(hp->GetInt()));
+  window->popup(rect);
+  JV inner(JV::object_tag);
+  inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
+  inner["visible"] = JV(window->is_visible());
+  inner["rect"] = JV(mcp::JsonValue::Object{
+      {"x", JV(static_cast<int64_t>(rect.position.x))},
+      {"y", JV(static_cast<int64_t>(rect.position.y))},
+      {"w", JV(static_cast<int64_t>(rect.size.x))},
+      {"h", JV(static_cast<int64_t>(rect.size.y))}});
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  return r;
+}
+
+JV handle_window_popup_centered(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window popup_centered called");
+  JV error;
+  auto *window = resolve_sub_window(args, error);
+  if (!window) {
+    return error;
+  }
+  int32_t min_width = 0;
+  int32_t min_height = 0;
+  if (auto *wp = args.Find("width")) {
+    if (!wp->IsInt() || wp->GetInt() < 0) {
+      return util::error_json(
+          "parameter 'width' must be a non-negative integer");
+    }
+    min_width = static_cast<int32_t>(wp->GetInt());
+  }
+  if (auto *hp = args.Find("height")) {
+    if (!hp->IsInt() || hp->GetInt() < 0) {
+      return util::error_json(
+          "parameter 'height' must be a non-negative integer");
+    }
+    min_height = static_cast<int32_t>(hp->GetInt());
+  }
+  window->popup_centered(godot::Vector2i(min_width, min_height));
+  JV inner(JV::object_tag);
+  inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
+  inner["visible"] = JV(window->is_visible());
+  inner["min_size"] = vec2i_to_json(godot::Vector2i(min_width, min_height));
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  return r;
+}
+
+JV handle_window_set_transient(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window transient called");
+  JV error;
+  auto *window = resolve_sub_window(args, error);
+  if (!window) {
+    return error;
+  }
+  bool transient = false;
+  if (!read_bool_param(args, "transient", transient, error)) {
+    return error;
+  }
+  window->set_transient(transient);
+  JV inner(JV::object_tag);
+  inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
+  inner["transient"] = JV(window->is_transient());
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  return r;
+}
+
+JV handle_window_set_exclusive(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window exclusive called");
+  JV error;
+  auto *window = resolve_sub_window(args, error);
+  if (!window) {
+    return error;
+  }
+  bool exclusive = false;
+  if (!read_bool_param(args, "exclusive", exclusive, error)) {
+    return error;
+  }
+  window->set_exclusive(exclusive);
+  JV inner(JV::object_tag);
+  inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
+  inner["exclusive"] = JV(window->is_exclusive());
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  return r;
+}
+
+JV handle_window_set_unparent_when_invisible(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window unparent_when_invisible called");
+  JV error;
+  auto *window = resolve_sub_window(args, error);
+  if (!window) {
+    return error;
+  }
+  bool unparent = false;
+  if (!read_bool_param(args, "unparent_when_invisible", unparent, error)) {
+    return error;
+  }
+  window->set_unparent_when_invisible(unparent);
+  JV inner(JV::object_tag);
+  inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
+  inner["unparent_when_invisible"] = JV(unparent);
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  return r;
+}
+
+JV handle_window_close(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window close called");
+  JV error;
+  auto *window = resolve_sub_window(args, error);
+  if (!window) {
+    return error;
+  }
+  window->hide();
+  JV inner(JV::object_tag);
+  inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
+  inner["visible"] = JV(window->is_visible());
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  return r;
 }
 
 } // namespace display_ops

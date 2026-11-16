@@ -1018,15 +1018,21 @@ mcp::JsonValue handle_scene_camera(const mcp::JsonValue &args) {
   if (action_p == nullptr || !action_p->IsString() ||
       action_p->GetString().empty()) {
     return util::error_json(
-        "missing required parameter: action (one of: focus, set_params)");
+        "missing required parameter: action (one of: focus, set_params, "
+        "project, unproject, project_ray, behind)");
   }
   const std::string action = action_p->GetString();
   if (action == "focus")
     return handle_focus_camera_on_node(args);
   if (action == "set_params")
     return handle_set_camera_params(args);
-  return util::error_json("unknown action '" + action +
-                          "' for scene_camera — expected focus or set_params");
+  if (action == "project" || action == "unproject" ||
+      action == "project_ray" || action == "behind")
+    return handle_camera_projection(args);
+  return util::error_json(
+      "unknown action '" + action +
+      "' for scene_camera — expected focus, set_params, project, unproject, "
+      "project_ray or behind");
 }
 
 mcp::JsonValue handle_delete(const mcp::JsonValue &args) {

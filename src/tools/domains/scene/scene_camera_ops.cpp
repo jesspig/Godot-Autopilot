@@ -52,6 +52,80 @@
 
 namespace godot_autopilot {
 namespace scene_ops {
+
+namespace {
+
+bool read_vec2_field(const mcp::JsonValue &args, const char *name,
+                     godot::Vector2 &out, mcp::JsonValue &error) {
+  const mcp::JsonValue *value = args.Find(name);
+  if (value == nullptr || !value->IsObject()) {
+    error = util::error_json(std::string("missing required parameter: ") +
+                             name + " (object {x, y})");
+    return false;
+  }
+  const mcp::JsonValue *x = value->Find("x");
+  const mcp::JsonValue *y = value->Find("y");
+  if (x == nullptr || !x->IsNumber() || y == nullptr || !y->IsNumber()) {
+    error = util::error_json(std::string("parameter '") + name +
+                             "' must contain numeric x and y");
+    return false;
+  }
+  out = godot::Vector2(static_cast<float>(util::json_number(x, 0.0)),
+                       static_cast<float>(util::json_number(y, 0.0)));
+  return true;
+}
+
+bool read_vec3_field(const mcp::JsonValue &args, const char *name,
+                     godot::Vector3 &out, mcp::JsonValue &error) {
+  const mcp::JsonValue *value = args.Find(name);
+  if (value == nullptr || !value->IsObject()) {
+    error = util::error_json(std::string("missing required parameter: ") +
+                             name + " (object {x, y, z})");
+    return false;
+  }
+  const mcp::JsonValue *x = value->Find("x");
+  const mcp::JsonValue *y = value->Find("y");
+  const mcp::JsonValue *z = value->Find("z");
+  if (x == nullptr || !x->IsNumber() || y == nullptr || !y->IsNumber() ||
+      z == nullptr || !z->IsNumber()) {
+    error = util::error_json(std::string("parameter '") + name +
+                             "' must contain numeric x, y and z");
+    return false;
+  }
+  out = godot::Vector3(static_cast<float>(util::json_number(x, 0.0)),
+                       static_cast<float>(util::json_number(y, 0.0)),
+                       static_cast<float>(util::json_number(z, 0.0)));
+  return true;
+}
+
+godot::Vector2 camera2d_viewport_size(godot::EditorInterface *editor,
+                                      godot::Camera2D *cam2d) {
+  if (cam2d != nullptr) {
+    if (godot::Viewport *vp = cam2d->get_viewport()) {
+      return vp->get_visible_rect().size;
+    }
+  }
+  if (editor != nullptr) {
+    if (godot::SubViewport *vp = editor->get_editor_viewport_2d()) {
+      return vp->get_visible_rect().size;
+    }
+  }
+  return godot::Vector2(1.0f, 1.0f);
+}
+
+godot::Transform2D camera2d_canvas_transform(godot::Camera2D *cam2d,
+                                             const godot::Vector2 &viewport_size) {
+  godot::Transform2D transform;
+  transform.set_rotation_and_scale(-cam2d->get_screen_rotation(),
+                                   cam2d->get_zoom());
+  transform.set_origin(
+      viewport_size * 0.5f -
+      transform.basis_xform(cam2d->get_screen_center_position()));
+  return transform;
+}
+
+} // namespace
+
 mcp::JsonValue handle_advance_path_follow(const mcp::JsonValue &args) {
   auto *p = args.Find("path");
   if (!p || !p->IsString() || p->GetString().empty()) {
@@ -808,6 +882,134 @@ mcp::JsonValue handle_get_camera_view_rect(const mcp::JsonValue &args) {
     mapping["offset_x"] = mcp::JsonValue(static_cast<double>(origin.x));
     mapping["offset_y"] = mcp::JsonValue(static_cast<double>(origin.y));
     inner["mapping"] = std::move(mapping);
+  }
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  return r;
+}
+
+mcp::JsonValue handle_camera_projection(const mcp::JsonValue &args) {
+  const mcp::JsonValue *action_p = args.Find("action");
+  if (action_p == nullptr || !action_p->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = action_p->GetString();
+  if (action != "project" && action != "unproject" &&
+      action != "project_ray" && action != "behind") {
+    return util::error_json(
+        "unknown camera projection action '" + action +
+        "' — expected project, unproject, project_ray or behind");
+  }
+  const mcp::JsonValue *cp = args.Find("camera_path");
+  if (cp == nullptr || !cp->IsString() || cp->GetString().empty()) {
+    return util::error_json("missing required parameter: camera_path");
+  }
+  auto *editor = godot::EditorInterface::get_singleton();
+  auto *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  if (!editor || !scene_root) {
+    return util::error_json("no edited scene: open or create a scene first");
+  }
+  std::string hint;
+  godot::Node *node =
+      godot_autopilot::util::resolve_scene_node(cp->GetString(), scene_root,
+                                                &hint);
+  if (!node) {
+    return util::error_json("camera node not found: " + cp->GetString() +
+                            " — " + hint);
+  }
+  godot::Camera2D *cam2d = godot::Object::cast_to<godot::Camera2D>(node);
+  godot::Camera3D *cam3d = godot::Object::cast_to<godot::Camera3D>(node);
+  if (!cam2d && !cam3d) {
+    return util::error_json(
+        "node is not a Camera2D/Camera3D: " + cp->GetString() +
+        " (actual class: " + util::to_std(node->get_class()) + ")");
+  }
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["camera_path"] =
+      mcp::JsonValue(scene_relative_path(node, scene_root));
+  inner["camera_type"] = mcp::JsonValue(util::to_std(node->get_class()));
+  inner["space"] = mcp::JsonValue(cam2d ? "2d" : "3d");
+  if (cam2d) {
+    if (action == "project_ray") {
+      return util::error_json(
+          "project_ray requires a Camera3D; a Camera2D has no ray "
+          "representation — use action=project or action=unproject");
+    }
+    const godot::Vector2 viewport_size =
+        camera2d_viewport_size(editor, cam2d);
+    const godot::Transform2D canvas =
+        camera2d_canvas_transform(cam2d, viewport_size);
+    inner["viewport_size"] = util::vec2_to_json(viewport_size);
+    mcp::JsonValue error;
+    if (action == "project") {
+      godot::Vector2 world;
+      if (!read_vec2_field(args, "point", world, error)) {
+        return error;
+      }
+      inner["point"] = util::vec2_to_json(world);
+      inner["screen_point"] = util::vec2_to_json(canvas.xform(world));
+    } else if (action == "unproject") {
+      godot::Vector2 screen;
+      if (!read_vec2_field(args, "screen_point", screen, error)) {
+        return error;
+      }
+      inner["screen_point"] = util::vec2_to_json(screen);
+      inner["world_point"] =
+          util::vec2_to_json(canvas.affine_inverse().xform(screen));
+    } else {
+      godot::Vector2 world;
+      if (!read_vec2_field(args, "point", world, error)) {
+        return error;
+      }
+      inner["point"] = util::vec2_to_json(world);
+      inner["behind"] = mcp::JsonValue(false);
+    }
+  } else {
+    mcp::JsonValue error;
+    if (action == "project") {
+      godot::Vector3 world;
+      if (!read_vec3_field(args, "point", world, error)) {
+        return error;
+      }
+      inner["point"] = util::vec3_to_json(world);
+      inner["screen_point"] =
+          util::vec2_to_json(cam3d->unproject_position(world));
+      inner["behind"] = mcp::JsonValue(cam3d->is_position_behind(world));
+    } else if (action == "unproject") {
+      godot::Vector2 screen;
+      if (!read_vec2_field(args, "screen_point", screen, error)) {
+        return error;
+      }
+      double depth = 1.0;
+      if (const mcp::JsonValue *depth_p = args.Find("depth")) {
+        if (!depth_p->IsNumber() || util::json_number(depth_p, 0.0) <= 0.0) {
+          return util::error_json(
+              "parameter 'depth' must be a number greater than 0");
+        }
+        depth = util::json_number(depth_p, 1.0);
+      }
+      inner["screen_point"] = util::vec2_to_json(screen);
+      inner["depth"] = mcp::JsonValue(depth);
+      inner["world_point"] = util::vec3_to_json(
+          cam3d->project_position(screen, static_cast<float>(depth)));
+    } else if (action == "project_ray") {
+      godot::Vector2 screen;
+      if (!read_vec2_field(args, "screen_point", screen, error)) {
+        return error;
+      }
+      inner["screen_point"] = util::vec2_to_json(screen);
+      inner["origin"] =
+          util::vec3_to_json(cam3d->project_ray_origin(screen));
+      inner["normal"] =
+          util::vec3_to_json(cam3d->project_ray_normal(screen));
+    } else {
+      godot::Vector3 world;
+      if (!read_vec3_field(args, "point", world, error)) {
+        return error;
+      }
+      inner["point"] = util::vec3_to_json(world);
+      inner["behind"] = mcp::JsonValue(cam3d->is_position_behind(world));
+    }
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
