@@ -11,6 +11,7 @@ mcp::JsonValue handle_audio_player(const mcp::JsonValue &args);
 mcp::JsonValue handle_audio_device(const mcp::JsonValue &args);
 mcp::JsonValue handle_audio_capture(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_info(const mcp::JsonValue &args);
+mcp::JsonValue handle_bus_metrics(const mcp::JsonValue &args);
 mcp::JsonValue handle_input_status(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args);
