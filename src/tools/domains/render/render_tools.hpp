@@ -274,11 +274,38 @@ inline ToolAlias render_environment_alias(const char *name,
   return alias;
 }
 
+const std::vector<ParamSpec> kCreateRenderMaterialParams = {};
+const std::vector<ParamSpec> kCreateRenderSkyParams = {};
+const std::vector<ParamSpec> kCreateRenderReflectionProbeParams = {};
+const std::vector<ParamSpec> kCreateRenderDecalParams = {};
+
+const std::vector<ParamSpec> kCreateRenderShaderParams = {
+    {"code", "string", "Shader source code (optional); can be replaced later with set_render_shader_code", false},
+};
+
+const std::vector<ParamSpec> kRestartParticlesParams = {
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
+};
+
+const std::vector<ParamSpec> kSetParticlesParamsParams = {
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
+    {"emitting", "boolean", "Emit particles, true starts and false stops emission", false},
+    {"amount", "integer", "Particle amount, number of particles in the system", false},
+    {"lifetime", "number", "Particle lifetime in seconds; controls how long each particle stays alive (default: 1.0)", false},
+    {"one_shot", "boolean", "One-shot emission, true emits once then stops (default: false)", false},
+    {"speed_scale", "number", "Speed scale multiplier for particle playback (default: 1.0)", false},
+    {"explosiveness", "number", "Explosiveness ratio 0.0-1.0, higher values emit particles together at the start (default: 0.0)", false},
+};
+
+const std::vector<ParamSpec> kGetParticlesStateParams = {
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(21);
+  v.reserve(29);
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "render_environment",
       "Create and configure a server-side Environment RID for background, ambient light, glow, SSR, tone mapping, SDFGI and volumetric fog (None side effect). action selects the operation: 'create' calls environment_create and returns result.rid; 'set_params' applies a nested params object whose optional bg, ambient, glow, ssr, tonemap, sdfgi and volumetric_fog groups use the same fields as the former dedicated environment tools, and groups omitted from params keep their stored values; 'set_sky' attaches sky_rid with environment_set_sky; 'get' returns the stored params. Attach the environment to a scenario with set_render_scenario_environment. Example: {\"action\": \"create\"} then {\"action\": \"set_params\", \"environment_rid\": 7, \"params\": {\"bg\": {\"mode\": 1, \"color\": {\"r\": 0.1, \"g\": 0.2, \"b\": 0.4, \"a\": 1}}, \"glow\": {\"enabled\": true, \"level\": 0.85}}}.",
@@ -620,6 +647,46 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {},
       {},
       {"find_render_node_from_rid rid=123"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_render_material",
+      "Create a server-side material and return its RID as result.rid. Set parameters with render_material action=set_param and assign via set_render_mesh_surface_material. Returns an error if the RenderingServer is unavailable.",
+      "Render", {"render", "material", "create"}, SideEffect::None, tool_flags::kNone,
+      kCreateRenderMaterialParams, render_ops::handle_material_create}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_render_shader",
+      "Create a server-side shader and return its RID as result.rid. Optional code sets the source immediately; set_render_shader_code replaces it later. Returns an error if the RenderingServer is unavailable.",
+      "Render", {"render", "shader", "create"}, SideEffect::None, tool_flags::kNone,
+      kCreateRenderShaderParams, render_ops::handle_shader_create}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_render_sky",
+      "Create a server-side sky and return its RID as result.rid. Assign a material with set_render_sky_material. Returns an error if the RenderingServer is unavailable.",
+      "Render", {"render", "sky"}, SideEffect::None, tool_flags::kNone,
+      kCreateRenderSkyParams, render_ops::handle_sky_create}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_render_reflection_probe",
+      "Create a server-side reflection probe and return its RID as result.rid. Returns an error if the RenderingServer is unavailable.",
+      "Render", {"render", "reflection_probe"}, SideEffect::None, tool_flags::kNone,
+      kCreateRenderReflectionProbeParams, render_ops::handle_reflection_probe_create}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_render_decal",
+      "Create a server-side decal and return its RID as result.rid. Returns an error if the RenderingServer is unavailable.",
+      "Render", {"render", "decal"}, SideEffect::None, tool_flags::kNone,
+      kCreateRenderDecalParams, render_ops::handle_decal_create}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "restart_particles",
+      "Restart a particle node in the edited scene from the beginning, even while emitting. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node. Returns 'ok'. Errors if the node is missing or is not a particle node.",
+      "Render", {"render", "particles", "restart"}, SideEffect::WritesScene, tool_flags::kMutating,
+      kRestartParticlesParams, render_ops::handle_node_particles_restart}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_particles_params",
+      "Set playback parameters on a particle node in the edited scene. Optional fields: emitting, amount, lifetime, one_shot, speed_scale and explosiveness; only supplied fields are applied. Returns 'ok'. Errors if the node is missing, not a particle node, or a value has the wrong type.",
+      "Render", {"render", "particles", "params"}, SideEffect::WritesScene, tool_flags::kMutating,
+      kSetParticlesParamsParams, render_ops::handle_node_particles_set_params}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_particles_state",
+      "Get the playback state of a particle node in the edited scene. Returns type plus emitting, amount, lifetime, one_shot, speed_scale and explosiveness in result. Read-only.",
+      "Render", {"render", "particles", "state"}, SideEffect::None, tool_flags::kNone,
+      kGetParticlesStateParams, render_ops::handle_node_particles_get_state}));
   return v;
 }
 
