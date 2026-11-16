@@ -1,15 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
 import {
+  collectUsedThemeIds,
   loadThemes,
-  nextAvailableDir,
   pickTheme,
   renderBrief,
   renderProjectGodot,
   runJam,
+  sampleItems,
+  sampleTheme,
+  scanJamProjects,
+  slugifyProjectName,
   validateThemes,
+  type GameJamSample,
+  type GameJamTheme,
 } from "../../devtools/commands/jam";
 
 let tmp: string;
@@ -39,163 +46,591 @@ function captureStdout(): { read: () => string; restore: () => void } {
   };
 }
 
-describe("game jam generator", () => {
-  test("loads the preset themes without duplicate ids", () => {
+function makeRawTheme(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: "probe_2026_probe",
+    theme: "PROBE",
+    organizer: "Probe",
+    event: "Probe Jam",
+    edition: "2026",
+    year: 2026,
+    source_url: "https://example.com/probe",
+    source_title: "Probe Jam 2026 theme",
+    source_kind: "official",
+    rules_url: "https://example.com/probe/rules",
+    verified_at: "2026-11-17",
+    tags: ["genre:puzzle"],
+    design_constraints: ["游戏必须是双人合作模式"],
+    keywords: ["方向一", "方向二", "方向三", "方向四", "方向五"],
+    concept_ideas: ["点子一", "点子二", "点子三", "点子四", "点子五"],
+    ...overrides,
+  };
+}
+
+function makeTheme(overrides: Partial<GameJamTheme> = {}): GameJamTheme {
+  const raw = makeRawTheme(overrides as Record<string, unknown>);
+  return {
+    id: String(raw.id),
+    theme: String(raw.theme),
+    organizer: String(raw.organizer),
+    event: String(raw.event),
+    edition: String(raw.edition),
+    year: Number(raw.year),
+    source: `${String(raw.event)} ${String(raw.edition)}`,
+    source_url: String(raw.source_url),
+    source_title: String(raw.source_title),
+    source_kind: "official",
+    rules_url: String(raw.rules_url),
+    verified_at: String(raw.verified_at),
+    tags: raw.tags as string[],
+    design_constraints: raw.design_constraints as string[],
+    keywords: raw.keywords as string[],
+    concept_ideas: raw.concept_ideas as string[],
+    ...overrides,
+  };
+}
+
+function makeSample(theme: GameJamTheme): GameJamSample {
+  return {
+    draw_id: "20261117T000000000Z-0001",
+    drawn_at: "2026-11-17T00:00:00.000Z",
+    keywords: theme.keywords.slice(0, 3),
+    concept_ideas: theme.concept_ideas.slice(0, 3),
+  };
+}
+
+function writeIntakeFixture(themeId: string): string {
+  const intakeDir = path.join(tmp, themeId, "project");
+  fs.mkdirSync(intakeDir, { recursive: true });
+  fs.writeFileSync(path.join(intakeDir, "project.godot"), 'config/name="project"\n', "utf8");
+  fs.writeFileSync(path.join(intakeDir, "GAMEJAM.md"), "# fixture\n", "utf8");
+  fs.writeFileSync(
+    path.join(intakeDir, "jam.json"),
+    `${JSON.stringify(
+      {
+        schema_version: 2,
+        kind: "intake",
+        draw_id: "draw-fixture",
+        drawn_at: "2026-11-17T00:00:00.000Z",
+        theme_id: themeId,
+        sampled: {
+          keywords: ["方向一", "方向二", "方向三"],
+          concept_ideas: ["点子一", "点子二", "点子三"],
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  return intakeDir;
+}
+
+describe("game jam themes", () => {
+  test("loads a 50-theme v2 bank with unique ids and complete fields", () => {
     const themes = loadThemes();
     const ids = themes.map((theme) => theme.id);
-    expect(themes.length).toBeGreaterThanOrEqual(4);
+    expect(themes.length).toBe(50);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ["shift", "visibility", "built_to_scale", "stuck_in_a_loop"]) {
-      expect(ids).toContain(id);
+    for (const theme of themes) {
+      expect(theme.source_url).toMatch(/^https?:\/\//u);
+      expect(theme.keywords.length).toBeGreaterThanOrEqual(5);
+      expect(theme.concept_ideas.length).toBeGreaterThanOrEqual(5);
+      expect(theme.organizer.length).toBeGreaterThan(0);
+      expect(theme.year).toBeGreaterThanOrEqual(2000);
     }
   });
 
-  test("renders every theme field into the brief", () => {
-    const theme = loadThemes().find((item) => item.id === "shift");
-    expect(theme).toBeDefined();
-    if (theme === undefined) return;
+  test("validates v2 theme data", () => {
+    expect(validateThemes({ schema_version: 2, themes: [makeRawTheme()] })).toHaveLength(1);
+    expect(() => validateThemes({ themes: [makeRawTheme()] })).toThrow(/schema_version/);
+    expect(() =>
+      validateThemes({ schema_version: 2, themes: [{ ...makeRawTheme(), source_url: undefined }] }),
+    ).toThrow(/source_url/);
+    expect(() =>
+      validateThemes({ schema_version: 2, themes: [{ ...makeRawTheme(), source_url: "ftp://x" }] }),
+    ).toThrow(/http or https/);
+    expect(() =>
+      validateThemes({ schema_version: 2, themes: [{ ...makeRawTheme(), year: 1999 }] }),
+    ).toThrow(/year/);
+    expect(() =>
+      validateThemes({ schema_version: 2, themes: [makeRawTheme(), makeRawTheme()] }),
+    ).toThrow(/duplicate/);
+    expect(() =>
+      validateThemes({
+        schema_version: 2,
+        themes: [{ ...makeRawTheme(), keywords: ["一", "二"] }],
+      }),
+    ).toThrow(/keywords/);
+    expect(() =>
+      validateThemes({
+        schema_version: 2,
+        themes: [{ ...makeRawTheme(), keywords: ["一", "一", "三", "四", "五"] }],
+      }),
+    ).toThrow(/duplicates/);
+    expect(() =>
+      validateThemes({
+        schema_version: 2,
+        themes: [{ ...makeRawTheme(), source_title: "bad\nline" }],
+      }),
+    ).toThrow(/single line/);
+  });
+});
+
+describe("brief rendering", () => {
+  test("renders only the sampled subset and design constraints", () => {
+    const theme = makeTheme();
+    const sample = makeSample(theme);
     const template = [
       "# {{theme}}",
-      "",
-      "> 来源：{{source}}",
-      "",
+      "> {{source}}（<{{source_url}}>） · {{organizer}} · {{year}}",
       "{{keywords}}",
-      "",
       "{{concept_ideas}}",
+      "{{design_constraints_section}}",
       "",
     ].join("\n");
-    const brief = renderBrief(template, theme);
-    expect(brief).toContain("# SHIFT");
-    expect(brief).toContain("GitHub Game Off 2026");
-    if (theme.source_url !== undefined) expect(brief).toContain(theme.source_url);
-    for (const keyword of theme.keywords) expect(brief).toContain(`- ${keyword}`);
-    for (const idea of theme.concept_ideas) expect(brief).toContain(`- ${idea}`);
+    const brief = renderBrief(template, theme, sample);
+    expect(brief).toContain("# PROBE");
+    expect(brief).toContain("Probe Jam 2026");
+    expect(brief).toContain(theme.source_url);
+    expect(brief).toContain("方向一");
+    expect(brief).not.toContain("方向五");
+    expect(brief).toContain("点子一");
+    expect(brief).not.toContain("点子五");
+    expect(brief).toContain("## 创意约束");
+    expect(brief).toContain("双人合作");
   });
 
-  test("renders a minimal Godot project", () => {
-    const theme = loadThemes().find((item) => item.id === "visibility");
-    expect(theme).toBeDefined();
-    if (theme === undefined) return;
-    const project = renderProjectGodot(theme);
+  test("omits the constraints section when the jam has none", () => {
+    const theme = makeTheme({ design_constraints: [] });
+    const template = "{{theme}}\n{{source}}\n{{source_url}}\n{{organizer}}\n{{year}}\n{{keywords}}\n{{concept_ideas}}\n{{design_constraints_section}}\n";
+    expect(renderBrief(template, theme, makeSample(theme))).not.toContain("## 创意约束");
+  });
+
+  test("rejects missing and unknown placeholders", () => {
+    const theme = makeTheme();
+    const sample = makeSample(theme);
+    expect(() => renderBrief("{{theme}}", theme, sample)).toThrow(/missing/);
+    expect(() =>
+      renderBrief(
+        "{{theme}}{{source}}{{source_url}}{{organizer}}{{year}}{{keywords}}{{concept_ideas}}{{design_constraints_section}}{{nope}}",
+        theme,
+        sample,
+      ),
+    ).toThrow(/unknown/);
+  });
+});
+
+describe("sampling", () => {
+  test("samples 3 to 5 unique items from the source array", () => {
+    const items = ["一", "二", "三", "四", "五", "六", "七", "八"];
+    const low = sampleItems(items, () => 0);
+    const high = sampleItems(items, () => 0.999);
+    expect(low).toHaveLength(3);
+    expect(high).toHaveLength(5);
+    expect(new Set(low).size).toBe(low.length);
+    for (const item of low) expect(items).toContain(item);
+  });
+
+  test("uses different random sequences to produce different variants", () => {
+    const theme = makeTheme();
+    const first = sampleTheme(theme, () => 0.1, () => new Date("2026-11-17T00:00:00Z"));
+    const second = sampleTheme(theme, () => 0.9, () => new Date("2026-11-17T00:00:01Z"));
+    expect(first.draw_id).not.toBe(second.draw_id);
+    expect(first.keywords).not.toEqual(second.keywords);
+  });
+
+  test("renders a minimal Godot project with the requested name", () => {
+    const project = renderProjectGodot("Neon Shift");
     expect(project).toContain("config_version=5");
-    expect(project).toContain('config/name="VISIBILITY"');
+    expect(project).toContain('config/name="Neon Shift"');
     expect(project).toContain('renderer/rendering_method="gl_compatibility"');
   });
 
-  test("creates project.godot and GAMEJAM.md", () => {
-    const target = path.join(tmp, "shift");
-    const code = runJam({ theme: "shift", out: target, list: false, json: false });
-    expect(code).toBe(0);
-    expect(fs.existsSync(path.join(target, "project.godot"))).toBe(true);
-    expect(fs.existsSync(path.join(target, "GAMEJAM.md"))).toBe(true);
-    const brief = fs.readFileSync(path.join(target, "GAMEJAM.md"), "utf8");
-    expect(brief).toContain("# SHIFT");
-    expect(brief).toContain("## 评审维度");
-    expect(brief).toContain("Godot 4.x");
-    expect(fs.readFileSync(path.join(target, "project.godot"), "utf8")).toContain(
-      'config/name="SHIFT"',
+  test("derives ASCII slugs and leaves non-ASCII names to --slug", () => {
+    expect(slugifyProjectName("Neon Shift")).toBe("neon-shift");
+    expect(slugifyProjectName("Café  Rush")).toBe("cafe-rush");
+    expect(slugifyProjectName("霓虹")).toBe("");
+  });
+});
+
+describe("intake and project creation", () => {
+  test("draws an intake with a sampled brief and refreshes it on redraw", () => {
+    const theme = loadThemes()[0];
+    const firstCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "draw",
+          theme: theme.id,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+          random: () => 0.1,
+          now: () => new Date("2026-11-17T00:00:00Z"),
+        }),
+      ).toBe(0);
+    } finally {
+      firstCapture.restore();
+    }
+    const first = JSON.parse(firstCapture.read()) as {
+      theme_id: string;
+      intake_path: string;
+      sampled_keyword_count: number;
+      sampled_concept_idea_count: number;
+    };
+    expect(first.theme_id).toBe(theme.id);
+    expect(first.sampled_keyword_count).toBeGreaterThanOrEqual(3);
+    expect(first.sampled_keyword_count).toBeLessThanOrEqual(5);
+    const intakeDir = path.join(tmp, theme.id, "project");
+    const briefBefore = fs.readFileSync(path.join(intakeDir, "GAMEJAM.md"), "utf8");
+    const metadataBefore = JSON.parse(
+      fs.readFileSync(path.join(intakeDir, "jam.json"), "utf8"),
+    ) as { kind: string; draw_id: string };
+    expect(metadataBefore.kind).toBe("intake");
+    expect(fs.readFileSync(path.join(intakeDir, "project.godot"), "utf8")).toContain(
+      'config/name="project"',
     );
+
+    const secondCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "draw",
+          theme: theme.id,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+          random: () => 0.9,
+          now: () => new Date("2026-11-17T00:00:01Z"),
+        }),
+      ).toBe(0);
+    } finally {
+      secondCapture.restore();
+    }
+    const briefAfter = fs.readFileSync(path.join(intakeDir, "GAMEJAM.md"), "utf8");
+    const metadataAfter = JSON.parse(
+      fs.readFileSync(path.join(intakeDir, "jam.json"), "utf8"),
+    ) as { draw_id: string };
+    expect(briefAfter).not.toBe(briefBefore);
+    expect(metadataAfter.draw_id).not.toBe(metadataBefore.draw_id);
   });
 
-  test("rejects an unknown theme without creating a directory", () => {
-    const target = path.join(tmp, "unknown");
-    const code = runJam({ theme: "not_a_theme", out: target, list: false, json: false });
-    expect(code).toBe(2);
-    expect(fs.existsSync(target)).toBe(false);
-  });
-
-  test("does not overwrite an explicit output directory", () => {
-    const target = path.join(tmp, "existing");
-    fs.mkdirSync(target);
-    const sentinel = path.join(target, "sentinel.txt");
+  test("refuses to overwrite a non-intake directory", () => {
+    const theme = loadThemes()[0];
+    const intakeDir = path.join(tmp, theme.id, "project");
+    fs.mkdirSync(intakeDir, { recursive: true });
+    const sentinel = path.join(intakeDir, "sentinel.txt");
     fs.writeFileSync(sentinel, "keep", "utf8");
-    const code = runJam({ theme: "visibility", out: target, list: false, json: false });
-    expect(code).toBe(1);
+    expect(
+      runJam({
+        action: "draw",
+        theme: theme.id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        random: () => 0.1,
+        now: () => new Date("2026-11-17T00:00:00Z"),
+      }),
+    ).toBe(1);
     expect(fs.readFileSync(sentinel, "utf8")).toBe("keep");
-    expect(fs.existsSync(path.join(target, "project.godot"))).toBe(false);
   });
 
-  test("adds a numeric suffix when the default directory is taken", () => {
-    const first = nextAvailableDir(tmp, "shift");
-    fs.mkdirSync(first);
-    expect(first).toBe(path.join(tmp, "shift"));
-    expect(nextAvailableDir(tmp, "shift")).toBe(path.join(tmp, "shift-2"));
-  });
-
-  test("prefers themes that are not present yet", () => {
-    const themes = loadThemes();
-    const unused = themes[themes.length - 1];
-    if (unused === undefined) return;
-    const used = new Set(
-      themes.filter((theme) => theme.id !== unused.id).map((theme) => theme.id),
-    );
-    expect(pickTheme(themes, used, () => 0).id).toBe(unused.id);
-  });
-
-  test("validates theme data", () => {
-    const valid = {
-      themes: [
-        {
-          id: "probe",
-          theme: "PROBE",
-          source: "test",
-          keywords: ["one"],
-          concept_ideas: ["idea"],
-        },
-      ],
-    };
-    expect(validateThemes(valid)).toHaveLength(1);
-    expect(() => validateThemes({ themes: [] })).toThrow(/at least one/);
-    expect(() => validateThemes({ themes: [valid.themes[0], valid.themes[0]] })).toThrow(
-      /duplicate/,
-    );
-    expect(() =>
-      validateThemes({ themes: [{ ...valid.themes[0], id: "Bad-Id" }] }),
-    ).toThrow(/must match/);
-    expect(() =>
-      validateThemes({ themes: [{ ...valid.themes[0], keywords: [] }] }),
-    ).toThrow(/keywords/);
-  });
-
-  test("lists themes as JSON", () => {
+  test("creates a named project from the intake without design doc templates", () => {
+    const theme = loadThemes()[0];
+    const now = () => new Date("2026-11-17T00:00:00Z");
+    expect(
+      runJam({
+        action: "draw",
+        theme: theme.id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        random: () => 0.1,
+        now,
+      }),
+    ).toBe(0);
     const capture = captureStdout();
     try {
-      const code = runJam({ theme: null, out: null, list: true, json: true });
-      expect(code).toBe(0);
+      expect(
+        runJam({
+          action: "create",
+          theme: theme.id,
+          name: "Neon Shift",
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+          now,
+        }),
+      ).toBe(0);
     } finally {
       capture.restore();
     }
-    const parsed = JSON.parse(capture.read()) as {
-      ok: boolean;
-      themes: Array<{ id: string; theme: string; source: string; source_url?: string }>;
-    };
-    expect(parsed.ok).toBe(true);
-    expect(parsed.themes.length).toBeGreaterThanOrEqual(4);
-    const shift = parsed.themes.find((theme) => theme.id === "shift");
-    expect(shift?.source_url).toContain("github.blog");
-  });
-
-  test("prints a machine-readable generation result", () => {
-    const target = path.join(tmp, "json-result");
-    const capture = captureStdout();
-    try {
-      const code = runJam({ theme: "visibility", out: target, list: false, json: true });
-      expect(code).toBe(0);
-    } finally {
-      capture.restore();
-    }
-    const parsed = JSON.parse(capture.read()) as {
-      ok: boolean;
-      id: string;
-      theme: string;
-      source: string;
+    const created = JSON.parse(capture.read()) as {
       path: string;
+      slug: string;
+      hash8: string;
       relative_path: string;
     };
-    expect(parsed.ok).toBe(true);
-    expect(parsed.id).toBe("visibility");
-    expect(parsed.theme).toBe("VISIBILITY");
-    expect(parsed.path).toBe(target);
-    expect(fs.existsSync(parsed.path)).toBe(true);
+    const expectedHash = crypto
+      .createHash("sha256")
+      .update(`Neon Shift\n${now().toISOString()}`)
+      .digest("hex")
+      .slice(0, 8);
+    expect(created.slug).toBe("neon-shift");
+    expect(created.hash8).toBe(expectedHash);
+    expect(created.path).toBe(path.join(tmp, theme.id, `neon-shift-${expectedHash}`));
+    expect(fs.readFileSync(path.join(created.path, "project.godot"), "utf8")).toContain(
+      'config/name="Neon Shift"',
+    );
+    const metadata = JSON.parse(
+      fs.readFileSync(path.join(created.path, "jam.json"), "utf8"),
+    ) as { kind: string; sampled: { keywords: string[] }; name: string };
+    expect(metadata.kind).toBe("project");
+    expect(metadata.name).toBe("Neon Shift");
+    expect(metadata.sampled.keywords.length).toBeGreaterThanOrEqual(3);
+    expect(fs.existsSync(path.join(created.path, "docs"))).toBe(false);
+  });
+
+  test("retries the hash when the same name is created twice", () => {
+    const theme = loadThemes()[0];
+    const now = () => new Date("2026-11-17T00:00:00Z");
+    runJam({
+      action: "draw",
+      theme: theme.id,
+      name: null,
+      slug: null,
+      out: null,
+      json: false,
+      examplesDir: tmp,
+      random: () => 0.1,
+      now,
+    });
+    const paths: string[] = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const capture = captureStdout();
+      try {
+        expect(
+          runJam({
+            action: "create",
+            theme: theme.id,
+            name: "Neon Shift",
+            slug: null,
+            out: null,
+            json: true,
+            examplesDir: tmp,
+            now,
+          }),
+        ).toBe(0);
+      } finally {
+        capture.restore();
+      }
+      paths.push((JSON.parse(capture.read()) as { path: string }).path);
+    }
+    expect(paths[0]).not.toBe(paths[1]);
+  });
+
+  test("requires an ASCII slug for non-ASCII names", () => {
+    const theme = loadThemes()[0];
+    runJam({
+      action: "draw",
+      theme: theme.id,
+      name: null,
+      slug: null,
+      out: null,
+      json: false,
+      examplesDir: tmp,
+      random: () => 0.1,
+      now: () => new Date("2026-11-17T00:00:00Z"),
+    });
+    expect(
+      runJam({
+        action: "create",
+        theme: theme.id,
+        name: "霓虹",
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        now: () => new Date("2026-11-17T00:00:00Z"),
+      }),
+    ).toBe(2);
+    expect(
+      runJam({
+        action: "create",
+        theme: theme.id,
+        name: "霓虹",
+        slug: "neon",
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        now: () => new Date("2026-11-17T00:00:00Z"),
+      }),
+    ).toBe(0);
+  });
+
+  test("refuses an existing explicit output directory", () => {
+    const theme = loadThemes()[0];
+    runJam({
+      action: "draw",
+      theme: theme.id,
+      name: null,
+      slug: null,
+      out: null,
+      json: false,
+      examplesDir: tmp,
+      random: () => 0.1,
+      now: () => new Date("2026-11-17T00:00:00Z"),
+    });
+    const out = path.join(tmp, "custom");
+    fs.mkdirSync(out);
+    const sentinel = path.join(out, "sentinel.txt");
+    fs.writeFileSync(sentinel, "keep", "utf8");
+    expect(
+      runJam({
+        action: "create",
+        theme: theme.id,
+        name: "Neon Shift",
+        slug: null,
+        out,
+        json: false,
+        examplesDir: tmp,
+        now: () => new Date("2026-11-17T00:00:00Z"),
+      }),
+    ).toBe(1);
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("keep");
+  });
+
+  test("reports a missing intake as a usage error", () => {
+    const theme = loadThemes()[0];
+    expect(
+      runJam({
+        action: "create",
+        theme: theme.id,
+        name: "Neon Shift",
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        now: () => new Date("2026-11-17T00:00:00Z"),
+      }),
+    ).toBe(2);
+  });
+});
+
+describe("collection", () => {
+  test("scans projects, marks used themes, lists projects and writes an index", () => {
+    const theme = loadThemes()[0];
+    const now = () => new Date("2026-11-17T00:00:00Z");
+    runJam({
+      action: "draw",
+      theme: theme.id,
+      name: null,
+      slug: null,
+      out: null,
+      json: false,
+      examplesDir: tmp,
+      random: () => 0.1,
+      now,
+    });
+    runJam({
+      action: "create",
+      theme: theme.id,
+      name: "Neon Shift",
+      slug: null,
+      out: null,
+      json: false,
+      examplesDir: tmp,
+      now,
+    });
+    const projects = scanJamProjects(tmp);
+    expect(projects).toHaveLength(1);
+    expect(collectUsedThemeIds(projects).has(theme.id)).toBe(true);
+    expect(pickTheme(loadThemes(), collectUsedThemeIds(projects), () => 0).id).not.toBe(
+      theme.id,
+    );
+
+    const listCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "list",
+          theme: null,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+        }),
+      ).toBe(0);
+    } finally {
+      listCapture.restore();
+    }
+    const listed = JSON.parse(listCapture.read()) as {
+      themes: Array<{
+        id: string;
+        used: boolean;
+        source_url: string;
+        design_constraints: string[];
+      }>;
+    };
+    expect(listed.themes.find((item) => item.id === theme.id)?.used).toBe(true);
+    expect(listed.themes[0]?.source_url).toMatch(/^https?:\/\//u);
+    expect(Array.isArray(listed.themes[0]?.design_constraints)).toBe(true);
+
+    const projectsCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "projects",
+          theme: null,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+        }),
+      ).toBe(0);
+    } finally {
+      projectsCapture.restore();
+    }
+    const listedProjects = JSON.parse(projectsCapture.read()) as {
+      projects: Array<{ name: string; theme_id: string }>;
+    };
+    expect(listedProjects.projects).toHaveLength(1);
+    expect(listedProjects.projects[0]?.name).toBe("Neon Shift");
+
+    expect(
+      runJam({
+        action: "index",
+        theme: null,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+      }),
+    ).toBe(0);
+    const index = fs.readFileSync(path.join(tmp, "INDEX.md"), "utf8");
+    expect(index).toContain("Neon Shift");
+    expect(index).toContain(theme.theme);
+  });
+
+  test("creates a project from a fixture intake without loading theme data", () => {
+    const themeId = "fixture_2026_theme";
+    writeIntakeFixture(themeId);
+    const metadata = JSON.parse(
+      fs.readFileSync(path.join(tmp, themeId, "project", "jam.json"), "utf8"),
+    ) as { kind: string };
+    expect(metadata.kind).toBe("intake");
   });
 });

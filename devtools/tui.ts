@@ -102,7 +102,7 @@ function renderStatusTable(projects: readonly string[]): string {
 function printStatus(): void {
   const projects = discoverExampleProjects();
   if (projects.length === 0) {
-    note("未发现 examples/* 工程；部署与清理请在操作中输入 Godot 工程路径。", "插件部署状态");
+    note("未发现 examples/ 下的工程；部署与清理请在操作中输入 Godot 工程路径。", "插件部署状态");
     return;
   }
   note(renderStatusTable(projects), "插件部署状态");

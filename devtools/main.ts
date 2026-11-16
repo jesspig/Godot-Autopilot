@@ -20,7 +20,10 @@ const USAGE = [
   "  package-check <zip>",
   "  test                     [--preset debug|release] [--single <用例名>]",
   "  audit-tools              [--json|--baseline|--target] [--report [--json] [--out <file>]]",
-  "  jam                      [--theme <id> | --list] [--out <dir>] [--json]",
+  "  jam                      [--theme <id|theme>] [--json]",
+  "  jam create               --theme <id|theme> --name <name> [--slug <slug>] [--out <dir>] [--json]",
+  "  jam list                 [--projects] [--json]",
+  "  jam index                [--json]",
   "  tui",
 ].join("\n");
 
@@ -162,23 +165,60 @@ function parseTest(args: string[]): TestOptions {
 }
 
 function parseJam(args: string[]): JamOptions {
-  const options: JamOptions = { theme: null, out: null, list: false, json: false };
-  for (let index = 0; index < args.length; index += 1) {
+  const options: JamOptions = {
+    action: "draw",
+    theme: null,
+    name: null,
+    slug: null,
+    out: null,
+    json: false,
+  };
+  let cursor = 0;
+  const subcommand = args[0];
+  if (subcommand === "create" || subcommand === "list" || subcommand === "index") {
+    options.action = subcommand;
+    cursor = 1;
+  }
+  let projects = false;
+  for (let index = cursor; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--json") options.json = true;
-    else if (arg === "--list") options.list = true;
-    else if (arg === "--theme" || arg === "--out") {
+    else if (arg === "--list") {
+      if (options.action !== "draw") throw new UsageError("jam: --list is only valid for jam");
+      options.action = "list";
+    } else if (arg === "--projects") {
+      if (options.action !== "list") {
+        throw new UsageError("jam: --projects requires jam list");
+      }
+      projects = true;
+    } else if (
+      arg === "--theme" ||
+      arg === "--name" ||
+      arg === "--slug" ||
+      arg === "--out"
+    ) {
       const value = args[index + 1];
       if (value === undefined || value === "" || value.startsWith("-")) {
         throw new UsageError(`jam: argument ${arg}: expected one argument`);
       }
       if (arg === "--theme") options.theme = value;
+      else if (arg === "--name") options.name = value;
+      else if (arg === "--slug") options.slug = value;
       else options.out = value;
       index += 1;
     } else throw new UsageError(`jam: unrecognized argument: ${arg}`);
   }
-  if (options.list && (options.theme !== null || options.out !== null)) {
-    throw new UsageError("jam: --list cannot be combined with --theme or --out");
+  if (projects) options.action = "projects";
+  if (options.action === "draw") {
+    if (options.name !== null || options.slug !== null || options.out !== null) {
+      throw new UsageError("jam: only --theme and --json are valid when drawing a theme");
+    }
+  } else if (options.action === "create") {
+    if (options.theme === null || options.name === null) {
+      throw new UsageError("jam create: --theme and --name are required");
+    }
+  } else if (options.theme !== null || options.name !== null || options.slug !== null || options.out !== null) {
+    throw new UsageError(`jam ${options.action}: --theme, --name, --slug and --out are not valid`);
   }
   return options;
 }
