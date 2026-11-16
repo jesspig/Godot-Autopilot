@@ -14,568 +14,612 @@ namespace render_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kCreateRenderCanvasItemParams = {};
+const std::vector<ParamSpec> kCreateRenderScenarioParams = {};
 
-const std::vector<ParamSpec> kAddRenderCanvasItemRectParams = {
-    {"canvas_item_rid", "integer", "RID of the canvas item, from create_render_canvas_item", true},
-    {"rect", "object", "Rectangle as {position: {x, y}, size: {x, y}}; example: {position: {x: 10, y: 20}, size: {x: 100, y: 50}}", true},
-    {"color", "object", "Fill color {r, g, b, a}, each in 0.0-1.0; example: {r: 1, g: 0.5, b: 0, a: 1}", true},
-    {"antialiased", "boolean", "Antialias the rectangle edges (default: false)", false},
-};
-
-const std::vector<ParamSpec> kAddRenderCanvasItemCircleParams = {
-    {"canvas_item_rid", "integer", "RID of the canvas item, from create_render_canvas_item", true},
-    {"position", "object", "Circle center {x, y}; example: {x: 50, y: 50}", true},
-    {"color", "object", "Fill color {r, g, b, a}, each in 0.0-1.0; example: {r: 1, g: 0, b: 0, a: 1}", true},
-    {"radius", "number", "Circle radius in pixels (default: 1.0)", false},
-    {"antialiased", "boolean", "Antialias the circle edges (default: false)", false},
-};
-
-const std::vector<ParamSpec> kAddRenderCanvasItemTextureRectParams = {
-    {"canvas_item_rid", "integer", "RID of the canvas item, from create_render_canvas_item", true},
-    {"texture_rid", "integer", "RID of the texture to draw, from create_render_texture_from_image", true},
-    {"rect", "object", "Destination rectangle {position: {x, y}, size: {x, y}}; example: {position: {x: 0, y: 0}, size: {x: 100, y: 100}}", true},
-    {"tile", "boolean", "Tile the texture inside the rect (default: false)", false},
-    {"modulate", "object", "Tint color {r, g, b, a}, each in 0.0-1.0; white leaves the texture unchanged", false},
-    {"transpose", "boolean", "Swap the texture's x and y axes (default: false)", false},
-};
-
-const std::vector<ParamSpec> kAddRenderCanvasItemLineParams = {
-    {"canvas_item_rid", "integer", "RID of the canvas item, from create_render_canvas_item", true},
-    {"from", "object", "Line start point {x, y}; example: {x: 0, y: 0}", true},
-    {"to", "object", "Line end point {x, y}; example: {x: 100, y: 100}", true},
-    {"color", "object", "Line color {r, g, b, a}, each in 0.0-1.0", true},
-    {"width", "number", "Line width in pixels (default: -1.0, use project setting)", false},
-    {"antialiased", "boolean", "Antialias the line (default: false)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderCanvasItemTransformParams = {
-    {"canvas_item_rid", "integer", "RID of the canvas item, from create_render_canvas_item", true},
-    {"x", "number", "Local X axis scale (default: 1.0)", false},
-    {"y", "number", "Local Y axis scale (default: 1.0)", false},
-    {"origin_x", "number", "Origin X offset in pixels (default: 0.0)", false},
-    {"origin_y", "number", "Origin Y offset in pixels (default: 0.0)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderCanvasItemVisibleParams = {
-    {"canvas_item_rid", "integer", "RID of the canvas item, from create_render_canvas_item", true},
-    {"visible", "boolean", "Visibility state, true shows and false hides (default: true)", false},
+const std::vector<ParamSpec> kSetRenderScenarioEnvironmentParams = {
+    {"scenario_rid", "integer", "RID of the render scenario, from create_render_scenario", true},
+    {"environment_rid", "integer", "RID of the environment to attach, from render_environment action=create or an external source", true},
 };
 
 const std::vector<ParamSpec> kGetRenderCanvasItemRidParams = {
     {"path", "string", "Node path of a CanvasItem node in the edited scene; example: '/root/Node2D/Sprite' (leading slash and root/ prefix are tolerated)", true},
 };
 
-const std::vector<ParamSpec> kCreateRenderScenarioParams = {};
-
-const std::vector<ParamSpec> kSetRenderScenarioEnvironmentParams = {
-    {"scenario_rid", "integer", "RID of the render scenario, from create_render_scenario", true},
-    {"environment_rid", "integer", "RID of the environment to attach; must come from an external source (e.g. code_execute), as no create tool exists", true},
-};
-
-const std::vector<ParamSpec> kCreateRenderCameraParams = {};
-
-const std::vector<ParamSpec> kSetRenderCameraTransformParams = {
-    {"camera_rid", "integer", "RID of the render camera, from create_render_camera", true},
-    {"origin_x", "number", "Camera origin X (default: 0.0); example: 1.5", false},
-    {"origin_y", "number", "Camera origin Y (default: 0.0); example: 2.0", false},
-    {"origin_z", "number", "Camera origin Z (default: 0.0); example: -10.0", false},
-};
-
-const std::vector<ParamSpec> kSetRenderCameraPerspectiveParams = {
-    {"camera_rid", "integer", "RID of the render camera, from create_render_camera", true},
-    {"fovy_degrees", "number", "Vertical field of view in degrees (default: 75); example: 60", false},
-    {"z_near", "number", "Near clip distance, keep small but positive (default: 0.01)", false},
-    {"z_far", "number", "Far clip distance, objects beyond it are culled (default: 4000)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderCameraOrthogonalParams = {
-    {"camera_rid", "integer", "RID of the render camera, from create_render_camera", true},
-    {"size", "number", "Orthogonal viewport size in units (default: 10)", false},
-    {"z_near", "number", "Near clip distance, keep small but positive (default: 0.01)", false},
-    {"z_far", "number", "Far clip distance, objects beyond it are culled (default: 4000)", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderLightParams = {
-    {"type", "string", "Light type: directional (sun-like, parallel rays), omni (point light), or spot (cone light); default: directional", false},
-};
-
-const std::vector<ParamSpec> kSetRenderLightParamParams = {
-    {"light_rid", "integer", "RID of the render light, from create_render_light", true},
-    {"param", "number", "Light parameter index: 0=energy, 1=specular, 2=range, 3=size, 4=attenuation", true},
-    {"value", "number", "Parameter value; units depend on param, e.g. range is in meters", true},
-};
-
-const std::vector<ParamSpec> kSetRenderLightColorParams = {
-    {"light_rid", "integer", "RID of the render light, from create_render_light", true},
-    {"color", "object", "Light color {r, g, b, a}, each in 0.0-1.0; alpha is ignored, example: {r: 1, g: 0.9, b: 0.7, a: 1}", true},
-};
-
-const std::vector<ParamSpec> kCreateRenderMeshParams = {};
-
-const std::vector<ParamSpec> kAddRenderMeshSurfaceParams = {
-    {"mesh_rid", "integer", "RID of the render mesh, from create_render_mesh", true},
-    {"primitive", "integer", "Primitive type: 0=points, 1=lines, 2=line_strip, 3=triangle_strip, 4=triangle_fan, 5=triangles (default: 5)", false},
-    {"arrays", "object", "Surface arrays; keys: vertices and normals (arrays of {x, y, z} objects), tangents (flat array of floats, 4 per vertex), colors (array of {r, g, b, a} objects), uvs (array of {x, y} objects) and indices (array of integers)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderMeshSurfaceMaterialParams = {
-    {"mesh_rid", "integer", "RID of the render mesh, from create_render_mesh", true},
-    {"surface", "integer", "Surface index, 0-based in add_render_mesh_surface call order; example: 0 for the first surface", true},
-    {"material_rid", "integer", "RID of the material to assign, from create_render_material", true},
-};
-
-const std::vector<ParamSpec> kCreateRenderMaterialParams = {};
-
-const std::vector<ParamSpec> kSetRenderMaterialParamParams = {
-    {"material_rid", "integer", "RID of the render material, from create_render_material", true},
-    {"parameter", "string", "Material parameter name; example: 'albedo_color'", true},
-    {"value", "json", "Parameter value as JSON; plain numbers/strings/bools also work", true},
-    {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderViewportParams = {};
-
-const std::vector<ParamSpec> kSetRenderViewportSizeParams = {
-    {"viewport_rid", "integer", "RID of the render viewport, from create_render_viewport", true},
-    {"width", "integer", "Viewport width in pixels (default: 640)", false},
-    {"height", "integer", "Viewport height in pixels (default: 480)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderViewportClearModeParams = {
-    {"viewport_rid", "integer", "RID of the render viewport, from create_render_viewport", true},
-    {"clear_mode", "number", "Clear mode: 0=always, 1=never, 2=only_next_frame (default: 0)", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderParticlesParams = {
-    {"mode", "integer", "Particle mode: 0=2D, 1=3D (default: 1)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentBgColorParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"color", "object", "Background color {r, g, b, a}, each in 0.0-1.0; example: {r: 0.1, g: 0.2, b: 0.4, a: 1}", true},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentAmbientLightParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"color", "object", "Ambient light color {r, g, b, a}, each in 0.0-1.0", true},
-    {"source", "number", "Ambient source: 0=bg, 1=disabled, 2=color, 3=sky (default: 0)", false},
-    {"energy", "number", "Ambient light energy, scales brightness (default: 1.0)", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderFogVolumeParams = {
-    {"shape", "number", "Fog volume shape: 0=ellipsoid, 1=cone, 2=cylinder, 3=box, 4=world (default: 0); can be changed later with set_render_fog_volume_shape", false},
-    {"size", "object", "Fog volume size {x, y, z}; example: {x: 4, y: 2, z: 4}", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderShaderParams = {
-    {"code", "string", "Shader source code (optional); can be replaced later with set_render_shader_code", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderTextureFromImageParams = {
-    {"image_path", "string", "Image file path; accepts res://, user:// or absolute paths (relative paths are not supported); example: 'res://icon.svg'", true},
-};
-
-const std::vector<ParamSpec> kSetRenderShaderCodeParams = {
-    {"shader_rid", "integer", "RID of the shader, from create_render_shader", true},
-    {"code", "string", "Shader source code; must be a full shader file, not a snippet", true},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentGlowParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"enabled", "boolean", "Enable glow (default: true)", false},
-    {"level", "number", "Glow level strength (default: 0.85)", false},
-    {"intensity", "number", "Glow intensity (default: 0.8)", false},
-    {"strength", "number", "Glow strength (default: 1.0)", false},
-    {"mix", "number", "Glow mix with scene (default: 0.05)", false},
-    {"bloom_threshold", "number", "Bloom threshold (default: 0.0)", false},
-    {"blend_mode", "integer", "Glow blend mode: 0=additive, 1=screen, 2=softlight, 3=replace, 4=mix", false},
-    {"hdr_bleed_threshold", "number", "HDR bleed threshold (default: 0.5)", false},
-    {"hdr_bleed_scale", "number", "HDR bleed scale (default: 2.0)", false},
-    {"hdr_luminance_cap", "number", "HDR luminance cap (default: 2.0)", false},
-    {"glow_map_strength", "number", "Glow map strength (default: 1.0)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentSsrParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"enabled", "boolean", "Enable screen-space reflections (default: true)", false},
-    {"max_steps", "integer", "Maximum reflection steps (default: 64)", false},
-    {"fade_in", "number", "Fade-in distance (default: 0.1)", false},
-    {"fade_out", "number", "Fade-out distance (default: 0.1)", false},
-    {"depth_tolerance", "number", "Depth tolerance (default: 0.1)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentTonemapParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"tone_mapper", "integer", "Tone mapper: 0=linear, 1=reinhard, 2=filmic, 3=aces (default: 0)", false},
-    {"exposure", "number", "Exposure, higher values brighten the image (default: 1.0)", false},
-    {"white", "number", "White reference in ev; higher values darken highlights (default: 1.0)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentSdfgiParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"enabled", "boolean", "Enable SDFGI (default: true)", false},
-    {"cascades", "integer", "Number of cascades, 1-8 (default: 4)", false},
-    {"min_cell_size", "number", "Minimum cell size in meters (default: 0.1)", false},
-    {"y_scale", "integer", "Y scale mode: 0=50%, 1=25%, 2=12.5% (default: 0)", false},
-    {"use_occlusion", "boolean", "Use occlusion culling (default: true)", false},
-    {"bounce_feedback", "number", "Bounce feedback (default: 0.5)", false},
-    {"read_sky", "boolean", "Read sky for lighting (default: true)", false},
-    {"energy", "number", "GI energy (default: 1.0)", false},
-    {"normal_bias", "number", "Normal bias (default: 1.0)", false},
-    {"probe_bias", "number", "Probe bias (default: 1.0)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderEnvironmentVolumetricFogParams = {
-    {"environment_rid", "integer", "RID of the render environment; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"enabled", "boolean", "Enable volumetric fog (default: true)", false},
-    {"density", "number", "Fog density, higher makes fog thicker (default: 0.05)", false},
-    {"albedo", "object", "Fog albedo color {r, g, b, a}, each in 0.0-1.0", false},
-    {"emission", "object", "Fog emission color {r, g, b, a}, each in 0.0-1.0", false},
-    {"emission_energy", "number", "Emission energy (default: 1.0)", false},
-    {"anisotropy", "number", "Light anisotropy, 0.0 scatters evenly (default: 0.0)", false},
-    {"length", "number", "Fog length, controls spatial scale (default: 0.0)", false},
-    {"detail_spread", "number", "Detail spread (default: 0.0)", false},
-    {"gi_inject", "number", "GI injection (default: 0.0)", false},
-    {"temporal_reprojection", "boolean", "Temporal reprojection smooths flickering (default: false)", false},
-    {"temporal_reprojection_amount", "number", "Temporal reprojection amount (default: 0.5)", false},
-    {"ambient_inject", "number", "Ambient injection (default: 0.0)", false},
-    {"sky_affect", "number", "Sky affect (default: 0.0)", false},
-};
-
-const std::vector<ParamSpec> kCreateRenderSkyParams = {};
-
-const std::vector<ParamSpec> kSetRenderSkyMaterialParams = {
-    {"sky_rid", "integer", "RID of the sky, from create_render_sky", true},
-    {"material_rid", "integer", "RID of the material to assign, from create_render_material", true},
-};
-
-const std::vector<ParamSpec> kSetRenderParticlesEmittingParams = {
-    {"particles_rid", "integer", "RID of the particle system, from create_render_particles", true},
-    {"emitting", "boolean", "Emit particles, true starts and false stops emission (default: true)", false},
-};
-
-const std::vector<ParamSpec> kRestartRenderParticlesParams = {
-    {"particles_rid", "integer", "RID of the particle system, from create_render_particles", true},
-};
-
-const std::vector<ParamSpec> kSetRenderParticlesLifetimeParams = {
-    {"particles_rid", "integer", "RID of the particle system, from create_render_particles", true},
-    {"lifetime", "number", "Particle lifetime in seconds; controls how long each particle stays alive (default: 1.0)", false},
-};
-
-const std::vector<ParamSpec> kRestartParticlesParams = {
-    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
-};
-
-const std::vector<ParamSpec> kSetParticlesParamsParams = {
-    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
-    {"emitting", "boolean", "Emit particles, true starts and false stops emission", false},
-    {"amount", "integer", "Particle amount, number of particles in the system", false},
-    {"lifetime", "number", "Particle lifetime in seconds; controls how long each particle stays alive (default: 1.0)", false},
-    {"one_shot", "boolean", "One-shot emission, true emits once then stops (default: false)", false},
-    {"speed_scale", "number", "Speed scale multiplier for particle playback (default: 1.0)", false},
-    {"explosiveness", "number", "Explosiveness ratio 0.0-1.0, higher values emit particles together at the start (default: 0.0)", false},
-};
-
-const std::vector<ParamSpec> kGetParticlesStateParams = {
-    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
-};
-
-const std::vector<ParamSpec> kCreateRenderReflectionProbeParams = {};
-
-const std::vector<ParamSpec> kCreateRenderDecalParams = {};
-
-const std::vector<ParamSpec> kSetRenderFogVolumeShapeParams = {
-    {"fog_rid", "integer", "RID of the fog volume, from create_render_fog_volume", true},
-    {"shape", "integer", "Fog volume shape: 0=ellipsoid, 1=cone, 2=cylinder, 3=box, 4=world", true},
-};
-
-const std::vector<ParamSpec> kSetRenderInstanceVisibleParams = {
-    {"instance_rid", "integer", "RID of the render instance; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"visible", "boolean", "Visibility state, true shows and false hides (default: true)", false},
-};
-
-const std::vector<ParamSpec> kSetRenderInstanceLayerMaskParams = {
-    {"instance_rid", "integer", "RID of the render instance; must come from an external source (e.g. code_execute), as no create tool exists", true},
-    {"mask", "integer", "Layer mask bitfield; bit n selects layer n+1, example: 1 for layer 1, 3 for layers 1 and 2", true},
-};
-
-const std::vector<ParamSpec> kSetRenderShaderParameterGlobalParams = {
-    {"name", "string", "Global shader parameter name; the shader must declare a matching parameter with the global keyword", true},
-    {"value", "json", "Parameter value as JSON; plain numbers/strings/bools also work", true},
-    {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
-};
-
 const std::vector<ParamSpec> kFindRenderNodeFromRidParams = {
     {"rid", "integer", "RID to resolve, e.g. from get_render_canvas_item_rid; returns is_valid and matching nodes for debugging", true},
 };
+
+const std::vector<ParamSpec> kRenderEnvironmentParams = {
+    {"environment_rid", "integer", "RID of the environment; required for set_params, set_sky and get, from action=create or an external source", false},
+    {"params", "object", "Only with action=set_params: nested groups bg {mode (0=clear_color, 1=color, 2=sky, 3=canvas, 4=keep, 5=camera_feed), color, energy, exposure}, ambient {color, source (0=bg, 1=disabled, 2=color, 3=sky), energy, sky_contribution, reflection_source (0=bg, 1=disabled, 2=sky)}, glow {enabled, level, intensity, strength, mix, bloom_threshold, blend_mode, hdr_bleed_threshold, hdr_bleed_scale, hdr_luminance_cap, glow_map_strength}, ssr {enabled, max_steps, fade_in, fade_out, depth_tolerance}, tonemap {tone_mapper (0=linear, 1=reinhard, 2=filmic, 3=aces), exposure, white}, sdfgi {enabled, cascades, min_cell_size, y_scale, use_occlusion, bounce_feedback, read_sky, energy, normal_bias, probe_bias} and volumetric_fog {enabled, density, albedo, emission, emission_energy, anisotropy, length, detail_spread, gi_inject, temporal_reprojection, temporal_reprojection_amount, ambient_inject, sky_affect}; groups omitted from params keep their stored values", false},
+    {"sky_rid", "integer", "Only with action=set_sky: RID of the sky to attach, from render_sky action=create", false},
+};
+
+const std::vector<ParamSpec> kRenderInstanceParams = {
+    {"instance_rid", "integer", "RID of the instance; required for attach, set_transform, set_visible, set_layer_mask and free, from action=create or an external source", false},
+    {"base_rid", "integer", "Only with action=create: RID of the resource to instance, e.g. a mesh from render_mesh action=create or a particles RID", false},
+    {"scenario_rid", "integer", "Only with action=create or attach: RID of the scenario; optional on create (an empty RID leaves the instance unattached)", false},
+    {"transform", "object", "Optional Transform3D object {origin: {x,y,z}, basis: {x: {x,y,z}, y: ..., z: ...}} or {origin, rotation: {x,y,z} in degrees}", false},
+    {"origin", "object", "Transform origin {x, y, z}; alternative to origin_x/origin_y/origin_z", false},
+    {"basis", "object", "Transform basis {x: {x,y,z}, y: {x,y,z}, z: {x,y,z}}; alternative to rotation", false},
+    {"rotation", "object", "Euler rotation {x, y, z} in degrees; converted to a basis", false},
+    {"origin_x", "number", "Origin X (default: 0.0)", false},
+    {"origin_y", "number", "Origin Y (default: 0.0)", false},
+    {"origin_z", "number", "Origin Z (default: 0.0)", false},
+    {"rotation_x", "number", "Euler rotation X in degrees (default: 0.0)", false},
+    {"rotation_y", "number", "Euler rotation Y in degrees (default: 0.0)", false},
+    {"rotation_z", "number", "Euler rotation Z in degrees (default: 0.0)", false},
+    {"visible", "boolean", "Only with action=set_visible: visibility state, true shows and false hides (default: true)", false},
+    {"mask", "integer", "Only with action=set_layer_mask: layer mask bitfield; bit n selects layer n+1, example: 1 for layer 1, 3 for layers 1 and 2", false},
+};
+
+const std::vector<ParamSpec> kRenderViewportParams = {
+    {"viewport_rid", "integer", "RID of the viewport; required for every action except create, from action=create or an external source", false},
+    {"camera_rid", "integer", "Only with action=attach_camera: RID of a camera from render_camera action=create", false},
+    {"scenario_rid", "integer", "Only with action=set_scenario: RID of a scenario from create_render_scenario", false},
+    {"canvas_rid", "integer", "Only with action=attach_canvas: RID of a canvas", false},
+    {"rect", "object", "Only with action=attach_to_screen: target rectangle {x, y, width, height}; omitted or zero size maps the whole screen", false},
+    {"screen", "integer", "Only with action=attach_to_screen: screen index (default: 0)", false},
+    {"width", "integer", "Only with action=set_size: viewport width in pixels (default: 640)", false},
+    {"height", "integer", "Only with action=set_size: viewport height in pixels (default: 480)", false},
+    {"clear_mode", "number", "Only with action=set_clear_mode: 0=always, 1=never, 2=only_next_frame (default: 0)", false},
+};
+
+const std::vector<ParamSpec> kRenderCameraParams = {
+    {"camera_rid", "integer", "RID of the render camera; required for transform, perspective and orthogonal, from action=create", false},
+    {"transform", "object", "Only with action=transform: Transform3D object {origin: {x,y,z}, basis: {x: {x,y,z}, y: ..., z: ...}} or {origin, rotation: {x,y,z} in degrees}", false},
+    {"origin", "object", "Only with action=transform: camera origin {x, y, z}; alternative to origin_x/origin_y/origin_z", false},
+    {"basis", "object", "Only with action=transform: basis {x: {x,y,z}, y: {x,y,z}, z: {x,y,z}}; alternative to rotation", false},
+    {"rotation", "object", "Only with action=transform: Euler rotation {x, y, z} in degrees; converted to a basis", false},
+    {"origin_x", "number", "Only with action=transform: camera origin X (default: 0.0); example: 1.5", false},
+    {"origin_y", "number", "Only with action=transform: camera origin Y (default: 0.0); example: 2.0", false},
+    {"origin_z", "number", "Only with action=transform: camera origin Z (default: 0.0); example: -10.0", false},
+    {"rotation_x", "number", "Only with action=transform: Euler rotation X in degrees (default: 0.0)", false},
+    {"rotation_y", "number", "Only with action=transform: Euler rotation Y in degrees (default: 0.0)", false},
+    {"rotation_z", "number", "Only with action=transform: Euler rotation Z in degrees (default: 0.0)", false},
+    {"fovy_degrees", "number", "Only with action=perspective: vertical field of view in degrees (default: 75); example: 60", false},
+    {"size", "number", "Only with action=orthogonal: orthogonal viewport size in units (default: 10)", false},
+    {"z_near", "number", "Near clip distance, keep small but positive (default: 0.01)", false},
+    {"z_far", "number", "Far clip distance, objects beyond it are culled (default: 4000)", false},
+};
+
+const std::vector<ParamSpec> kRenderCanvasItemParams = {
+    {"canvas_item_rid", "integer", "RID of the canvas item; required for every action except create, from action=create", false},
+    {"rect", "object", "Rectangle {position: {x, y}, size: {x, y}}; used by add_rect and add_texture_rect", false},
+    {"color", "object", "Color {r, g, b, a}, each in 0.0-1.0; used by add_rect, add_circle and add_line", false},
+    {"antialiased", "boolean", "Antialias the shape edges (default: false)", false},
+    {"position", "object", "Only with action=add_circle: circle center {x, y}", false},
+    {"radius", "number", "Only with action=add_circle: circle radius in pixels (default: 1.0)", false},
+    {"texture_rid", "integer", "Only with action=add_texture_rect or add_polygon: texture RID from render_texture action=create_from_image", false},
+    {"tile", "boolean", "Only with action=add_texture_rect: tile the texture inside the rect (default: false)", false},
+    {"modulate", "object", "Only with action=add_texture_rect: tint color {r, g, b, a}; white leaves the texture unchanged", false},
+    {"transpose", "boolean", "Only with action=add_texture_rect: swap the texture's x and y axes (default: false)", false},
+    {"from", "object", "Only with action=add_line: line start point {x, y}", false},
+    {"to", "object", "Only with action=add_line: line end point {x, y}", false},
+    {"width", "number", "Only with action=add_line: line width in pixels (default: -1.0, use project setting)", false},
+    {"points", "array", "Only with action=add_polygon: convex polygon points as an array of {x, y} objects", false},
+    {"colors", "array", "Only with action=add_polygon: per-point colors as an array of {r, g, b, a} objects", false},
+    {"uvs", "array", "Only with action=add_polygon: optional per-point UVs as an array of {x, y} objects", false},
+    {"x", "number", "Only with action=set_transform: local X axis scale (default: 1.0)", false},
+    {"y", "number", "Only with action=set_transform: local Y axis scale (default: 1.0)", false},
+    {"origin_x", "number", "Only with action=set_transform: origin X offset in pixels (default: 0.0)", false},
+    {"origin_y", "number", "Only with action=set_transform: origin Y offset in pixels (default: 0.0)", false},
+    {"visible", "boolean", "Only with action=set_visible: visibility state, true shows and false hides (default: true)", false},
+};
+
+const std::vector<ParamSpec> kRenderLightParams = {
+    {"light_rid", "integer", "RID of the render light; required for set_param and set_color, from action=create", false},
+    {"type", "string", "Only with action=create: light type directional (sun-like, parallel rays), omni (point light) or spot (cone light); default: directional", false},
+    {"param", "number", "Only with action=set_param: light parameter index 0=energy, 1=specular, 2=range, 3=size, 4=attenuation", false},
+    {"value", "number", "Only with action=set_param: parameter value; units depend on param, e.g. range is in meters", false},
+    {"color", "object", "Only with action=set_color: light color {r, g, b, a}; alpha is ignored, example: {r: 1, g: 0.9, b: 0.7, a: 1}", false},
+};
+
+const std::vector<ParamSpec> kRenderParticlesParams = {
+    {"particles_rid", "integer", "RID of a server-side particle system; locator for set_emitting, restart and set_lifetime, from action=create", false},
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; alternative locator for set_emitting, restart, set_params and get_state; example: 'Level1/Sparks'", false},
+    {"mode", "integer", "Only with action=create: particle mode 0=2D, 1=3D (default: 1)", false},
+    {"emitting", "boolean", "Emit particles, true starts and false stops emission (default: true)", false},
+    {"lifetime", "number", "Particle lifetime in seconds; controls how long each particle stays alive (default: 1.0)", false},
+    {"amount", "integer", "Only with action=set_params: particle amount, number of particles in the system", false},
+    {"one_shot", "boolean", "Only with action=set_params: one-shot emission, true emits once then stops (default: false)", false},
+    {"speed_scale", "number", "Only with action=set_params: speed scale multiplier for particle playback (default: 1.0)", false},
+    {"explosiveness", "number", "Only with action=set_params: explosiveness ratio 0.0-1.0, higher values emit particles together at the start (default: 0.0)", false},
+};
+
+const std::vector<ParamSpec> kRenderMaterialParams = {
+    {"material_rid", "integer", "RID of the render material; required for set_param, from action=create", false},
+    {"parameter", "string", "Only with action=set_param: material parameter name; example: 'albedo_color'", false},
+    {"value", "json", "Only with action=set_param: parameter value as JSON; plain numbers/strings/bools also work", false},
+    {"type_hint", "string", "Only with action=set_param: type hint (e.g. Vector2, Color, int, float)", false},
+};
+
+const std::vector<ParamSpec> kRenderShaderParams = {
+    {"shader_rid", "integer", "RID of the shader; required for set_code, from action=create", false},
+    {"code", "string", "Shader source code; optional on create and required for set_code; must be a full shader file, not a snippet", false},
+    {"name", "string", "Only with action=set_global_param: global shader parameter name; the shader must declare a matching parameter with the global keyword", false},
+    {"value", "json", "Only with action=set_global_param: parameter value as JSON; plain numbers/strings/bools also work", false},
+    {"type_hint", "string", "Only with action=set_global_param: type hint (e.g. Vector2, Color, int, float)", false},
+};
+
+const std::vector<ParamSpec> kRenderSkyParams = {
+    {"sky_rid", "integer", "RID of the sky; required for set_material, from action=create", false},
+    {"material_rid", "integer", "Only with action=set_material: RID of the material to assign, from render_material action=create", false},
+};
+
+const std::vector<ParamSpec> kRenderFogVolumeParams = {
+    {"fog_rid", "integer", "RID of the fog volume; required for set_shape, from action=create", false},
+    {"shape", "number", "Fog volume shape 0=ellipsoid, 1=cone, 2=cylinder, 3=box, 4=world; optional on create and required for set_shape", false},
+    {"size", "object", "Only with action=create: fog volume size {x, y, z}; example: {x: 4, y: 2, z: 4}", false},
+};
+
+const std::vector<ParamSpec> kRenderDecalParams = {};
+
+const std::vector<ParamSpec> kRenderReflectionProbeParams = {};
+
+const std::vector<ParamSpec> kRenderMeshParams = {
+    {"mesh_rid", "integer", "RID of the render mesh; required for add_surface and set_surface_material, from action=create", false},
+    {"primitive", "integer", "Only with action=add_surface: primitive type 0=points, 1=lines, 2=line_strip, 3=triangle_strip, 4=triangle_fan, 5=triangles (default: 5)", false},
+    {"arrays", "object", "Only with action=add_surface: surface arrays; keys vertices and normals (arrays of {x, y, z} objects), tangents (flat array of floats, 4 per vertex), colors (array of {r, g, b, a} objects), uvs (array of {x, y} objects) and indices (array of integers)", false},
+    {"surface", "integer", "Only with action=set_surface_material: surface index, 0-based in add_surface call order", false},
+    {"material_rid", "integer", "Only with action=set_surface_material: RID of the material to assign, from render_material action=create", false},
+};
+
+const std::vector<ParamSpec> kRenderTextureParams = {
+    {"image_path", "string", "Only with action=create_from_image: image file path; accepts res://, user:// or absolute paths (relative paths are not supported); example: 'res://icon.svg'", false},
+};
+
+const std::vector<ParamSpec> kRenderInspectParams = {
+    {"material_rid", "integer", "Only with action=material_get_param: RID of the material to inspect", false},
+    {"parameter", "string", "Only with action=material_get_param: parameter name; example: 'albedo_color'", false},
+    {"shader_rid", "integer", "Only with action=shader_get_code or shader_get_param_list: RID of the shader to inspect", false},
+    {"mesh_rid", "integer", "Only with action=mesh_surface_get_arrays: RID of the mesh to inspect", false},
+    {"surface", "integer", "Only with action=mesh_surface_get_arrays: 0-based surface index", false},
+    {"texture_rid", "integer", "Only with action=texture_2d_get: RID of the texture to read back as PNG", false},
+    {"name", "string", "Only with action=global_shader_parameter_get or global_shader_parameter_remove: global parameter name", false},
+};
+
+const std::vector<ParamSpec> kFreeRenderRidParams = {
+    {"rid", "integer", "RID to free, from any render create action; example: 123", true},
+};
+
+const std::vector<std::string> kRenderEnvironmentActions = {
+    "create", "set_params", "set_sky", "get"};
+const std::vector<std::string> kRenderInstanceActions = {
+    "create", "attach", "set_transform", "set_visible", "set_layer_mask", "free"};
+const std::vector<std::string> kRenderViewportActions = {
+    "create", "attach_camera", "set_scenario", "attach_canvas",
+    "attach_to_screen", "set_size", "set_clear_mode", "capture_texture"};
+const std::vector<std::string> kRenderCameraActions = {
+    "create", "transform", "perspective", "orthogonal"};
+const std::vector<std::string> kRenderCanvasItemActions = {
+    "create", "add_rect", "add_circle", "add_line", "add_texture_rect",
+    "add_polygon", "set_transform", "set_visible"};
+const std::vector<std::string> kRenderLightActions = {
+    "create", "set_param", "set_color"};
+const std::vector<std::string> kRenderParticlesActions = {
+    "create", "set_emitting", "restart", "set_lifetime", "set_params",
+    "get_state"};
+const std::vector<std::string> kRenderMaterialActions = {"create", "set_param"};
+const std::vector<std::string> kRenderShaderActions = {
+    "create", "set_code", "set_global_param"};
+const std::vector<std::string> kRenderSkyActions = {"create", "set_material"};
+const std::vector<std::string> kRenderFogVolumeActions = {"create", "set_shape"};
+const std::vector<std::string> kRenderDecalActions = {"create"};
+const std::vector<std::string> kRenderReflectionProbeActions = {"create"};
+const std::vector<std::string> kRenderMeshActions = {
+    "create", "add_surface", "set_surface_material"};
+const std::vector<std::string> kRenderTextureActions = {"create_from_image"};
+const std::vector<std::string> kRenderInspectActions = {
+    "material_get_param", "shader_get_code", "shader_get_param_list",
+    "mesh_surface_get_arrays", "texture_2d_get",
+    "global_shader_parameter_get", "global_shader_parameter_list",
+    "global_shader_parameter_remove"};
+
+inline mcp::JsonValue render_action_args(const mcp::JsonValue &args,
+                                         const char *action) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue(action);
+  return out;
+}
+
+inline mcp::JsonValue render_environment_group_args(const mcp::JsonValue &args,
+                                                    const char *group) {
+  mcp::JsonValue group_values(mcp::JsonValue::object_tag);
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first == "environment_rid" || entry.first == "action" ||
+          entry.first == "params" || entry.first == "confirm") {
+        continue;
+      }
+      group_values[entry.first] = entry.second;
+    }
+  }
+  mcp::JsonValue params(mcp::JsonValue::object_tag);
+  params[group] = std::move(group_values);
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (const mcp::JsonValue *environment = args.Find("environment_rid")) {
+    out["environment_rid"] = *environment;
+  }
+  out["action"] = mcp::JsonValue("set_params");
+  out["params"] = std::move(params);
+  return out;
+}
+
+inline ToolAlias render_alias(const char *name, const char *canonical,
+                              const char *action) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = canonical;
+  alias.adapt_args = [action](const mcp::JsonValue &args) {
+    return render_action_args(args, action);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
+
+inline ToolAlias render_environment_alias(const char *name,
+                                          const char *group) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = "render_environment";
+  alias.adapt_args = [group](const mcp::JsonValue &args) {
+    return render_environment_group_args(args, group);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(52);
+  v.reserve(21);
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_environment",
+      "Create and configure a server-side Environment RID for background, ambient light, glow, SSR, tone mapping, SDFGI and volumetric fog (None side effect). action selects the operation: 'create' calls environment_create and returns result.rid; 'set_params' applies a nested params object whose optional bg, ambient, glow, ssr, tonemap, sdfgi and volumetric_fog groups use the same fields as the former dedicated environment tools, and groups omitted from params keep their stored values; 'set_sky' attaches sky_rid with environment_set_sky; 'get' returns the stored params. Attach the environment to a scenario with set_render_scenario_environment. Example: {\"action\": \"create\"} then {\"action\": \"set_params\", \"environment_rid\": 7, \"params\": {\"bg\": {\"mode\": 1, \"color\": {\"r\": 0.1, \"g\": 0.2, \"b\": 0.4, \"a\": 1}}, \"glow\": {\"enabled\": true, \"level\": 0.85}}}.",
+      "Render", {"render", "environment", "bg", "ambient", "glow", "ssr", "tonemap", "sdfgi", "volumetric_fog", "set_render_environment_bg_color", "set_render_environment_ambient_light", "set_render_environment_glow", "set_render_environment_ssr", "set_render_environment_tonemap", "set_render_environment_sdfgi", "set_render_environment_volumetric_fog"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderEnvironmentParams, render_ops::handle_environment_action,
+      schema::build_action_schema(
+          kRenderEnvironmentActions, kRenderEnvironmentParams,
+          "create: create an environment RID; set_params: apply nested bg/ambient/glow/ssr/tonemap/sdfgi/volumetric_fog groups; set_sky: attach a sky RID; get: return the stored params"),
+      {},
+      {"render_environment action=create",
+       "render_environment action=set_params environment_rid=7 params={\"bg\":{\"mode\":1,\"color\":{\"r\":0.1,\"g\":0.2,\"b\":0.4,\"a\":1}},\"glow\":{\"enabled\":true}}",
+       "render_environment action=set_sky environment_rid=7 sky_rid=8"}},
+      {
+          render_environment_alias("set_render_environment_bg_color", "bg"),
+          render_environment_alias("set_render_environment_ambient_light",
+                                   "ambient"),
+          render_environment_alias("set_render_environment_glow", "glow"),
+          render_environment_alias("set_render_environment_ssr", "ssr"),
+          render_environment_alias("set_render_environment_tonemap",
+                                   "tonemap"),
+          render_environment_alias("set_render_environment_sdfgi", "sdfgi"),
+          render_environment_alias("set_render_environment_volumetric_fog",
+                                   "volumetric_fog"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_instance",
+      "Create and control a RenderingServer instance that makes a mesh or another RID renderable (None side effect). action selects the operation: 'create' calls instance_create2(base_rid, scenario_rid) and returns result.rid, with scenario_rid optional; 'attach' moves the instance to scenario_rid; 'set_transform' builds a Transform3D from optional transform/origin/basis objects or rotation/origin_x/y/z with Euler degrees; 'set_visible' toggles visibility; 'set_layer_mask' sets the mask bitfield; 'free' calls free_rid and invalidates the RID in the store. Example: {\"action\": \"create\", \"base_rid\": 12, \"scenario_rid\": 3} or {\"action\": \"set_transform\", \"instance_rid\": 9, \"origin\": {\"x\": 0, \"y\": 1, \"z\": -4}, \"rotation\": {\"x\": 0, \"y\": 180, \"z\": 0}}.",
+      "Render", {"render", "instance", "set_render_instance_visible", "set_render_instance_layer_mask"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderInstanceParams, render_ops::handle_instance_action,
+      schema::build_action_schema(
+          kRenderInstanceActions, kRenderInstanceParams,
+          "create: instance a base RID into a scenario; attach: move the instance to another scenario; set_transform: set origin, basis or Euler rotation; set_visible: toggle visibility; set_layer_mask: set the layer mask; free: free the instance RID"),
+      {},
+      {"render_instance action=create base_rid=12 scenario_rid=3",
+       "render_instance action=set_transform instance_rid=9 origin={\"x\":0,\"y\":1,\"z\":-4} rotation={\"x\":0,\"y\":180,\"z\":0}}",
+       "render_instance action=free instance_rid=9"}},
+      {
+          render_alias("set_render_instance_visible", "render_instance",
+                       "set_visible"),
+          render_alias("set_render_instance_layer_mask", "render_instance",
+                       "set_layer_mask"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_viewport",
+      "Create and wire a server-side Viewport RID and optionally capture its texture as PNG (None side effect). action selects the operation: 'create' returns result.rid; 'attach_camera' binds camera_rid; 'set_scenario' binds scenario_rid; 'attach_canvas' binds canvas_rid; 'attach_to_screen' maps the viewport to the screen with optional rect {x, y, width, height} and screen; 'set_size' sets width and height; 'set_clear_mode' sets 0=always, 1=never, 2=only_next_frame; 'capture_texture' forces a draw, reads viewport_get_texture plus texture_2d_get, retries after one more rendered frame when the image is still empty, and returns result {format: 'png', data, width, height}; a still-empty texture returns code viewport_texture_not_ready. Example: {\"action\": \"create\"} then {\"action\": \"capture_texture\", \"viewport_rid\": 11}.",
+      "Render", {"render", "viewport", "create_render_viewport", "set_render_viewport_size", "set_render_viewport_clear_mode", "capture"},
+      SideEffect::None, tool_flags::kCaptureImage,
+      kRenderViewportParams, render_ops::handle_viewport_action,
+      schema::build_action_schema(
+          kRenderViewportActions, kRenderViewportParams,
+          "create: create a viewport RID; attach_camera: bind a camera; set_scenario: bind a scenario; attach_canvas: bind a canvas; attach_to_screen: map to a screen rectangle; set_size: resize the render target; set_clear_mode: select the clear mode; capture_texture: read the viewport texture back as PNG"),
+      {},
+      {"render_viewport action=create",
+       "render_viewport action=set_size viewport_rid=11 width=640 height=480",
+       "render_viewport action=capture_texture viewport_rid=11"}},
+      {
+          render_alias("create_render_viewport", "render_viewport", "create"),
+          render_alias("set_render_viewport_size", "render_viewport",
+                       "set_size"),
+          render_alias("set_render_viewport_clear_mode", "render_viewport",
+                       "set_clear_mode"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_camera",
+      "Create and configure a server-side 3D camera (None side effect). action selects the operation: 'create' returns result.rid; 'transform' accepts a Transform3D via transform/origin/basis objects or rotation/origin_x/y/z Euler degrees; 'perspective' sets fovy_degrees, z_near and z_far; 'orthogonal' sets size, z_near and z_far. Example: {\"action\": \"transform\", \"camera_rid\": 4, \"origin\": {\"x\": 0, \"y\": 2, \"z\": -8}, \"rotation\": {\"x\": -10, \"y\": 0, \"z\": 0}}.",
+      "Render", {"render", "camera", "create_render_camera", "set_render_camera_transform", "set_render_camera_perspective", "set_render_camera_orthogonal"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderCameraParams, render_ops::handle_camera_action,
+      schema::build_action_schema(
+          kRenderCameraActions, kRenderCameraParams,
+          "create: create a camera RID; transform: set origin, basis or Euler rotation; perspective: set a frustum projection; orthogonal: set an orthogonal projection"),
+      {},
+      {"render_camera action=create",
+       "render_camera action=transform camera_rid=4 origin={\"x\":0,\"y\":2,\"z\":-8} rotation={\"x\":-10,\"y\":0,\"z\":0}",
+       "render_camera action=perspective camera_rid=4 fovy_degrees=60"}},
+      {
+          render_alias("create_render_camera", "render_camera", "create"),
+          render_alias("set_render_camera_transform", "render_camera",
+                       "transform"),
+          render_alias("set_render_camera_perspective", "render_camera",
+                       "perspective"),
+          render_alias("set_render_camera_orthogonal", "render_camera",
+                       "orthogonal"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_canvas_item",
+      "Create and draw on a server-side 2D canvas item (None side effect). action selects the operation: 'create' returns result.rid; 'add_rect', 'add_circle', 'add_line', 'add_texture_rect' and 'add_polygon' append draw commands (points and colors arrays for polygons); 'set_transform' sets the 2D transform; 'set_visible' toggles visibility. Use get_render_canvas_item_rid to obtain the RID of an edited-scene CanvasItem node. Example: {\"action\": \"create\"} then {\"action\": \"add_rect\", \"canvas_item_rid\": 5, \"rect\": {\"position\": {\"x\": 0, \"y\": 0}, \"size\": {\"x\": 64, \"y\": 32}}, \"color\": {\"r\": 1, \"g\": 0.5, \"b\": 0, \"a\": 1}}.",
+      "Render", {"render", "canvas", "create_render_canvas_item", "add_render_canvas_item_rect", "add_render_canvas_item_circle", "add_render_canvas_item_line", "add_render_canvas_item_texture_rect", "set_render_canvas_item_transform", "set_render_canvas_item_visible"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderCanvasItemParams, render_ops::handle_canvas_item_action,
+      schema::build_action_schema(
+          kRenderCanvasItemActions, kRenderCanvasItemParams,
+          "create: create a canvas item RID; add_rect/add_circle/add_line/add_texture_rect/add_polygon: append draw commands; set_transform: set the 2D transform; set_visible: toggle visibility"),
+      {},
+      {"render_canvas_item action=create",
+       "render_canvas_item action=add_polygon canvas_item_rid=5 points=[{\"x\":0,\"y\":0},{\"x\":32,\"y\":0},{\"x\":16,\"y\":32}] colors=[{\"r\":1,\"g\":0,\"b\":0,\"a\":1}]",
+       "render_canvas_item action=set_visible canvas_item_rid=5 visible=false"}},
+      {
+          render_alias("create_render_canvas_item", "render_canvas_item",
+                       "create"),
+          render_alias("add_render_canvas_item_rect", "render_canvas_item",
+                       "add_rect"),
+          render_alias("add_render_canvas_item_circle", "render_canvas_item",
+                       "add_circle"),
+          render_alias("add_render_canvas_item_line", "render_canvas_item",
+                       "add_line"),
+          render_alias("add_render_canvas_item_texture_rect",
+                       "render_canvas_item", "add_texture_rect"),
+          render_alias("set_render_canvas_item_transform", "render_canvas_item",
+                       "set_transform"),
+          render_alias("set_render_canvas_item_visible", "render_canvas_item",
+                       "set_visible"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_light",
+      "Create and configure a server-side light (None side effect). action selects the operation: 'create' creates a directional, omni or spot light and returns result.rid; 'set_param' sets a numeric parameter (0=energy, 1=specular, 2=range, 3=size, 4=attenuation); 'set_color' sets the light color, alpha is ignored. Example: {\"action\": \"create\", \"type\": \"omni\"} then {\"action\": \"set_param\", \"light_rid\": 6, \"param\": 0, \"value\": 2.0}.",
+      "Render", {"render", "light", "create_render_light", "set_render_light_param", "set_render_light_color"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderLightParams, render_ops::handle_light_action,
+      schema::build_action_schema(
+          kRenderLightActions, kRenderLightParams,
+          "create: create a directional/omni/spot light RID; set_param: set a numeric light parameter; set_color: set the light color"),
+      {},
+      {"render_light action=create type=omni",
+       "render_light action=set_param light_rid=6 param=0 value=2.0"}},
+      {
+          render_alias("create_render_light", "render_light", "create"),
+          render_alias("set_render_light_param", "render_light", "set_param"),
+          render_alias("set_render_light_color", "render_light", "set_color"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_particles",
+      "Create and control server-side particle systems or edited-scene particle nodes (None side effect except scene writes for node actions). action selects the operation: 'create' creates a server particle system (mode 0=2D, 1=3D) and returns result.rid; 'set_emitting' starts or stops emission; 'restart' restarts the emission cycle; 'set_lifetime' sets particle lifetime in seconds; 'set_params' sets emitting, amount, lifetime, one_shot, speed_scale and explosiveness on a particle node; 'get_state' reads the playback state of a particle node. Server actions use particles_rid, node actions use path. Example: {\"action\": \"create\", \"mode\": 1} or {\"action\": \"get_state\", \"path\": \"Level1/Sparks\"}.",
+      "Render", {"render", "particles", "create_render_particles", "set_render_particles_emitting", "restart_render_particles", "set_render_particles_lifetime", "restart_particles", "set_particles_params", "get_particles_state"},
+      SideEffect::None, tool_flags::kMutating,
+      kRenderParticlesParams, render_ops::handle_particles_action,
+      schema::build_action_schema(
+          kRenderParticlesActions, kRenderParticlesParams,
+          "create: create a server particle system RID; set_emitting: toggle emission; restart: restart emission; set_lifetime: set server particle lifetime; set_params: write node playback parameters; get_state: read node playback state"),
+      {},
+      {"render_particles action=create mode=1",
+       "render_particles action=set_emitting particles_rid=8 emitting=false",
+       "render_particles action=get_state path=Level1/Sparks"}},
+      {
+          render_alias("create_render_particles", "render_particles", "create"),
+          render_alias("set_render_particles_emitting", "render_particles",
+                       "set_emitting"),
+          render_alias("restart_render_particles", "render_particles",
+                       "restart"),
+          render_alias("set_render_particles_lifetime", "render_particles",
+                       "set_lifetime"),
+          render_alias("restart_particles", "render_particles", "restart"),
+          render_alias("set_particles_params", "render_particles", "set_params"),
+          render_alias("get_particles_state", "render_particles", "get_state"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_material",
+      "Create a server-side material and set its parameters (None side effect). action selects the operation: 'create' returns result.rid; 'set_param' writes a named parameter from a JSON value, with type_hint controlling Variant deserialization (e.g. Vector2, Color, int, float) and the value matching the shader's declared parameter type. Example: {\"action\": \"create\"} then {\"action\": \"set_param\", \"material_rid\": 3, \"parameter\": \"albedo_color\", \"value\": {\"r\": 1, \"g\": 0, \"b\": 0, \"a\": 1}, \"type_hint\": \"Color\"}.",
+      "Render", {"render", "material", "create_render_material", "set_render_material_param"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderMaterialParams, render_ops::handle_material_action,
+      schema::build_action_schema(
+          kRenderMaterialActions, kRenderMaterialParams,
+          "create: create a material RID; set_param: write a named material parameter"),
+      {},
+      {"render_material action=create",
+       "render_material action=set_param material_rid=3 parameter=albedo_color value={\"r\":1,\"g\":0,\"b\":0,\"a\":1} type_hint=Color"}},
+      {
+          render_alias("create_render_material", "render_material", "create"),
+          render_alias("set_render_material_param", "render_material",
+                       "set_param"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_shader",
+      "Create a server-side shader, replace its code and set global shader parameters (None side effect). action selects the operation: 'create' creates a shader and optionally applies code, returning result.rid; 'set_code' replaces the shader source, which must be a full shader file; 'set_global_param' writes a global shader parameter declared with the global keyword, with type_hint controlling Variant deserialization. Example: {\"action\": \"create\", \"code\": \"shader_type canvas_item;\"} or {\"action\": \"set_global_param\", \"name\": \"wind\", \"value\": {\"x\": 1, \"y\": 0}}.",
+      "Render", {"render", "shader", "create_render_shader", "set_render_shader_code", "set_render_shader_parameter_global"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderShaderParams, render_ops::handle_shader_action,
+      schema::build_action_schema(
+          kRenderShaderActions, kRenderShaderParams,
+          "create: create a shader RID with optional code; set_code: replace the shader source; set_global_param: write a global shader parameter"),
+      {},
+      {"render_shader action=create code=shader_type canvas_item;",
+       "render_shader action=set_global_param name=wind value={\"x\":1,\"y\":0}"}},
+      {
+          render_alias("create_render_shader", "render_shader", "create"),
+          render_alias("set_render_shader_code", "render_shader", "set_code"),
+          render_alias("set_render_shader_parameter_global", "render_shader",
+                       "set_global_param"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_sky",
+      "Create a server-side sky and assign its material (None side effect). action selects the operation: 'create' returns result.rid; 'set_material' assigns a material RID from render_material action=create to define the sky appearance. Attach the sky to an environment with render_environment action=set_sky. Example: {\"action\": \"create\"} then {\"action\": \"set_material\", \"sky_rid\": 8, \"material_rid\": 3}.",
+      "Render", {"render", "sky", "create_render_sky", "set_render_sky_material"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderSkyParams, render_ops::handle_sky_action,
+      schema::build_action_schema(
+          kRenderSkyActions, kRenderSkyParams,
+          "create: create a sky RID; set_material: assign a material to the sky"),
+      {},
+      {"render_sky action=create",
+       "render_sky action=set_material sky_rid=8 material_rid=3"}},
+      {
+          render_alias("create_render_sky", "render_sky", "create"),
+          render_alias("set_render_sky_material", "render_sky", "set_material"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_fog_volume",
+      "Create a server-side fog volume and change its shape (None side effect). action selects the operation: 'create' creates a fog volume with optional shape and size and returns result.rid; 'set_shape' changes the shape later (0=ellipsoid, 1=cone, 2=cylinder, 3=box, 4=world). Combine with an environment that has volumetric fog enabled. Example: {\"action\": \"create\", \"shape\": 3, \"size\": {\"x\": 4, \"y\": 2, \"z\": 4}}.",
+      "Render", {"render", "fog", "create_render_fog_volume", "set_render_fog_volume_shape"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderFogVolumeParams, render_ops::handle_fog_volume_action,
+      schema::build_action_schema(
+          kRenderFogVolumeActions, kRenderFogVolumeParams,
+          "create: create a fog volume RID with optional shape and size; set_shape: change the fog volume shape"),
+      {},
+      {"render_fog_volume action=create shape=3 size={\"x\":4,\"y\":2,\"z\":4}",
+       "render_fog_volume action=set_shape fog_rid=10 shape=0"}},
+      {
+          render_alias("create_render_fog_volume", "render_fog_volume",
+                       "create"),
+          render_alias("set_render_fog_volume_shape", "render_fog_volume",
+                       "set_shape"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_decal",
+      "Create a server-side decal that projects a texture onto nearby surfaces (None side effect). action='create' returns result.rid; instance the decal with render_instance action=create to place it in a scenario. Example: {\"action\": \"create\"}.",
+      "Render", {"render", "decal", "create_render_decal"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderDecalParams, render_ops::handle_decal_action,
+      schema::build_action_schema(kRenderDecalActions, kRenderDecalParams,
+                                  "create: create a decal RID"),
+      {},
+      {"render_decal action=create"}},
+      {
+          render_alias("create_render_decal", "render_decal", "create"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_reflection_probe",
+      "Create a server-side reflection probe that captures surrounding geometry and lights for reflective materials (None side effect). action='create' returns result.rid; instance the probe with render_instance action=create to place it in a scenario. Example: {\"action\": \"create\"}.",
+      "Render", {"render", "reflection_probe", "create_render_reflection_probe"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderReflectionProbeParams, render_ops::handle_reflection_probe_action,
+      schema::build_action_schema(kRenderReflectionProbeActions,
+                                  kRenderReflectionProbeParams,
+                                  "create: create a reflection probe RID"),
+      {},
+      {"render_reflection_probe action=create"}},
+      {
+          render_alias("create_render_reflection_probe",
+                       "render_reflection_probe", "create"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_mesh",
+      "Create a server-side mesh, add surfaces from vertex arrays and assign surface materials (None side effect). action selects the operation: 'create' returns result.rid; 'add_surface' appends a surface built from vertices, normals, tangents, colors, uvs and indices with an optional primitive type; 'set_surface_material' assigns a material RID to a 0-based surface. A mesh alone is not visible; instance it with render_instance action=create. Example: {\"action\": \"create\"} then {\"action\": \"add_surface\", \"mesh_rid\": 12, \"arrays\": {\"vertices\": [{\"x\": 0, \"y\": 0, \"z\": 0}]}}.",
+      "Render", {"render", "mesh", "create_render_mesh", "add_render_mesh_surface", "set_render_mesh_surface_material"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderMeshParams, render_ops::handle_mesh_action,
+      schema::build_action_schema(
+          kRenderMeshActions, kRenderMeshParams,
+          "create: create a mesh RID; add_surface: append a surface from vertex arrays; set_surface_material: assign a material to a surface"),
+      {},
+      {"render_mesh action=create",
+       "render_mesh action=add_surface mesh_rid=12 arrays={\"vertices\":[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0},{\"x\":0,\"y\":1,\"z\":0}]}",
+       "render_mesh action=set_surface_material mesh_rid=12 surface=0 material_rid=3"}},
+      {
+          render_alias("create_render_mesh", "render_mesh", "create"),
+          render_alias("add_render_mesh_surface", "render_mesh", "add_surface"),
+          render_alias("set_render_mesh_surface_material", "render_mesh",
+                       "set_surface_material"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "render_texture",
+      "Create a server-side 2D texture from an image file (None side effect). action='create_from_image' loads image_path (res://, user:// or absolute; relative paths are not supported) and returns result.rid for use with render_canvas_item action=add_texture_rect or add_polygon. Example: {\"action\": \"create_from_image\", \"image_path\": \"res://icon.svg\"}.",
+      "Render", {"render", "texture", "create_render_texture_from_image"},
+      SideEffect::None, tool_flags::kNone,
+      kRenderTextureParams, render_ops::handle_texture_action,
+      schema::build_action_schema(kRenderTextureActions, kRenderTextureParams,
+                                  "create_from_image: create a 2D texture RID from an image file"),
+      {},
+      {"render_texture action=create_from_image image_path=res://icon.svg"}},
+      {
+          render_alias("create_render_texture_from_image", "render_texture",
+                       "create_from_image"),
+      })));
   v.push_back(make_spec_tool(ToolSpec{
-      "create_render_canvas_item",
-      "Create a server-side 2D canvas item and return its RID as result.rid. Use this to build custom 2D drawing independent of scene nodes, then draw shapes with add_render_canvas_item_rect, add_render_canvas_item_circle, add_render_canvas_item_texture_rect or add_render_canvas_item_line and control visibility with set_render_canvas_item_visible. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "canvas", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderCanvasItemParams, render_ops::handle_canvas_item_create}));
+      "render_inspect",
+      "Read back RenderingServer objects without mutating them (None side effect). action selects the operation: 'material_get_param' reads a named material parameter (material_rid, parameter); 'shader_get_code' returns the shader source (shader_rid); 'shader_get_param_list' parses uniform declarations from the shader source and returns parameters with name, type, hint and global (shader_rid); 'mesh_surface_get_arrays' returns the vertex arrays of a mesh surface (mesh_rid, surface); 'texture_2d_get' reads a texture back as PNG (texture_rid); 'global_shader_parameter_get' reads a global parameter by name; 'global_shader_parameter_list' lists every global parameter; 'global_shader_parameter_remove' removes one by name. Example: {\"action\": \"texture_2d_get\", \"texture_rid\": 14} or {\"action\": \"shader_get_param_list\", \"shader_rid\": 8}.",
+      "Render", {"render", "inspect", "material", "shader", "mesh", "texture", "readback", "global_shader_parameter"},
+      SideEffect::None, tool_flags::kCaptureImage,
+      kRenderInspectParams, render_ops::handle_inspect_action,
+      schema::build_action_schema(
+          kRenderInspectActions, kRenderInspectParams,
+          "material_get_param: read a material parameter; shader_get_code: read shader source; shader_get_param_list: list shader uniforms; mesh_surface_get_arrays: read mesh surface arrays; texture_2d_get: read a texture back as PNG; global_shader_parameter_get/list/remove: manage global shader parameters"),
+      {},
+      {"render_inspect action=material_get_param material_rid=3 parameter=albedo_color",
+       "render_inspect action=global_shader_parameter_list",
+       "render_inspect action=texture_2d_get texture_rid=14"}}));
   v.push_back(make_spec_tool(ToolSpec{
-      "add_render_canvas_item_rect",
-      "Add a filled rectangle draw command to a canvas item. Pass the RID from create_render_canvas_item, a rect object {position: {x, y}, size: {x, y}} and a color object {r, g, b, a}; antialiased is optional and defaults to false. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "canvas", "draw", "rect"}, SideEffect::None, tool_flags::kNone,
-      kAddRenderCanvasItemRectParams, render_ops::handle_canvas_item_draw_rect}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_render_canvas_item_circle",
-      "Add a filled circle draw command to a canvas item. Pass the RID from create_render_canvas_item, a center position {x, y} and a color {r, g, b, a}; radius defaults to 1.0 and antialiased to false. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "canvas", "draw", "circle"}, SideEffect::None, tool_flags::kNone,
-      kAddRenderCanvasItemCircleParams, render_ops::handle_canvas_item_draw_circle}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_render_canvas_item_texture_rect",
-      "Draw a texture inside a rectangle on a canvas item. Pass the RID from create_render_canvas_item, the texture RID from create_render_texture_from_image and a destination rect; tile, modulate and transpose are optional. Modulate tints the drawn texture. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "canvas", "draw", "texture"}, SideEffect::None, tool_flags::kNone,
-      kAddRenderCanvasItemTextureRectParams, render_ops::handle_canvas_item_draw_texture}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_render_canvas_item_line",
-      "Add a line draw command to a canvas item. Pass the RID from create_render_canvas_item, start point from, end point to and a color; width defaults to -1 (project setting) and antialiased to false. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "canvas", "draw", "line"}, SideEffect::None, tool_flags::kNone,
-      kAddRenderCanvasItemLineParams, render_ops::handle_canvas_item_draw_line}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_canvas_item_transform",
-      "Set the 2D transform of a canvas item: x and y scale the local axes, origin_x and origin_y offset the position. Pass the RID from create_render_canvas_item. All parameters are optional and default to identity. Returns 'ok'. Errors if canvas_item_rid is missing.",
-      "Render", {"render", "canvas", "transform"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderCanvasItemTransformParams, render_ops::handle_canvas_item_set_transform}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_canvas_item_visible",
-      "Set the visibility state of a canvas item, not a toggle. Pass the RID from create_render_canvas_item; visible defaults to true. Hide the item to remove its draw commands from the canvas temporarily; set it back to true to restore drawing. Returns 'ok'. Errors if canvas_item_rid is missing.",
-      "Render", {"render", "canvas", "visible"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderCanvasItemVisibleParams, render_ops::handle_canvas_item_set_visible}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_render_canvas_item_rid",
-      "Get the canvas item RID of a CanvasItem node in the edited scene, the reverse of find_render_node_from_rid. Pass a node path (leading slash and root/ prefix are tolerated). Returns result.rid for use with the add_render_canvas_item_* draw tools. Errors if the node is missing or is not a CanvasItem.",
-      "Render", {"render", "rid", "bridge"}, SideEffect::None, tool_flags::kNone,
-      kGetRenderCanvasItemRidParams, render_ops::handle_canvas_item_get_rid}));
+      "free_render_rid",
+      "Free any RenderingServer RID and invalidate it in the render RID store (Destructive, requires confirm=true). Pass rid from any render create action; the call runs RenderingServer::free_rid, erases the RID from the render store and drops stored environment params. Example: {\"rid\": 123, \"confirm\": true}.",
+      "Render", {"render", "free", "rid", "release"},
+      SideEffect::Destructive, tool_flags::kNone,
+      kFreeRenderRidParams, render_ops::handle_free_rid,
+      {},
+      {},
+      {"free_render_rid rid=123 confirm=true"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_render_scenario",
-      "Create a server-side 3D scenario and return its RID as result.rid. A scenario hosts 3D cameras, lights, meshes and fog; use it to assemble a custom render scene outside the node tree. Pass the RID to set_render_scenario_environment to attach an environment. Returns an error if the RenderingServer is unavailable.",
+      "Create a server-side 3D scenario and return its RID as result.rid. A scenario hosts 3D instances, cameras, lights and fog; attach an environment with set_render_scenario_environment and instance meshes with render_instance action=create. Returns an error if the RenderingServer is unavailable.",
       "Render", {"render", "scenario", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderScenarioParams, render_ops::handle_scenario_create}));
+      kCreateRenderScenarioParams, render_ops::handle_scenario_create,
+      {},
+      {},
+      {"create_render_scenario"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_render_scenario_environment",
-      "Attach an environment to a 3D scenario to drive background, ambient light, fog and post-processing. Pass the scenario RID from create_render_scenario; the environment RID must come from an external source (e.g. code_execute), as no create tool exists. Returns 'ok'. Errors if a required parameter is missing.",
+      "Attach an environment to a 3D scenario to drive background, ambient light, fog and post-processing. Pass the scenario RID from create_render_scenario and an environment RID from render_environment action=create (external RIDs are also accepted). Returns 'ok'. Errors if a required parameter is missing.",
       "Render", {"render", "scenario", "environment"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderScenarioEnvironmentParams, render_ops::handle_scenario_set_environment}));
+      kSetRenderScenarioEnvironmentParams, render_ops::handle_scenario_set_environment,
+      {},
+      {},
+      {"set_render_scenario_environment scenario_rid=3 environment_rid=7"}}));
   v.push_back(make_spec_tool(ToolSpec{
-      "create_render_camera",
-      "Create a server-side 3D camera and return its RID as result.rid. Configure its projection with set_render_camera_perspective or set_render_camera_orthogonal and place it with set_render_camera_transform. Cameras work with a scenario RID from create_render_scenario to define the viewpoint of a custom render scene. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "camera", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderCameraParams, render_ops::handle_camera_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_camera_transform",
-      "Set the 3D camera position. Pass the RID from create_render_camera; only the origin is applied, rotation and scale stay at identity, so the camera always looks down -Z. Combine with set_render_camera_perspective or set_render_camera_orthogonal to define the view frustum. Returns 'ok'. Errors if camera_rid is missing.",
-      "Render", {"render", "camera", "transform"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderCameraTransformParams, render_ops::handle_camera_set_transform}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_camera_perspective",
-      "Set a perspective (frustum) projection on a camera. Pass the RID from create_render_camera; fovy_degrees defaults to 75, z_near to 0.01 and z_far to 4000. Use it for natural 3D scenes where objects shrink with distance. Returns 'ok'. Errors if camera_rid is missing.",
-      "Render", {"render", "camera", "perspective"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderCameraPerspectiveParams, render_ops::handle_camera_set_perspective}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_camera_orthogonal",
-      "Set an orthogonal projection on a camera, typically for 2D-like or UI rendering. Pass the RID from create_render_camera; size defaults to 10, z_near to 0.01 and z_far to 4000. Objects keep their size regardless of distance. Returns 'ok'. Errors if camera_rid is missing.",
-      "Render", {"render", "camera", "orthogonal"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderCameraOrthogonalParams, render_ops::handle_camera_set_orthogonal}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_light",
-      "Create a server-side light and return its RID as result.rid. type selects directional, omni or spot and defaults to directional. Pair with set_render_light_param and set_render_light_color. Use it to light custom 3D scenes assembled from server-side RIDs. Returns an error on unknown light types or if the RenderingServer is unavailable.",
-      "Render", {"render", "light", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderLightParams, render_ops::handle_light_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_light_param",
-      "Set a numeric parameter on a light. Pass the RID from create_render_light, a param index (0=energy, 1=specular, 2=range, 3=size, 4=attenuation) and a float value. Which parameters apply depends on the light type, e.g. range only affects omni and spot lights. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "light", "param"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderLightParamParams, render_ops::handle_light_set_param}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_light_color",
-      "Set the color of a light. Pass the RID from create_render_light and a color {r, g, b, a}; alpha is ignored. Combine with set_render_light_param to control energy and range. Lights tint the surfaces they illuminate. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "light", "color"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderLightColorParams, render_ops::handle_light_set_color}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_mesh",
-      "Create a server-side mesh to hold geometry, returning its RID as result.rid. A mesh owns one or more surfaces built with add_render_mesh_surface; assign per-surface materials with set_render_mesh_surface_material. A mesh alone is not visible; it needs to be instanced into a scenario. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "mesh", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderMeshParams, render_ops::handle_mesh_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_render_mesh_surface",
-      "Add a surface built from vertex arrays to a mesh. Pass the RID from create_render_mesh; primitive defaults to triangles and arrays may hold vertices, normals, tangents, colors, uvs and indices. Surfaces are indexed from 0 in call order. Returns 'ok'. Errors if mesh_rid is missing.",
-      "Render", {"render", "mesh", "surface"}, SideEffect::None, tool_flags::kNone,
-      kAddRenderMeshSurfaceParams, render_ops::handle_mesh_add_surface}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_mesh_surface_material",
-      "Assign a material to one surface of a mesh. Pass the RID from create_render_mesh, a 0-based surface index (in add_render_mesh_surface call order) and a material RID from create_render_material. Each surface can have its own material. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "mesh", "material"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderMeshSurfaceMaterialParams, render_ops::handle_mesh_set_material}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_material",
-      "Create a server-side material and return its RID as result.rid. Materials feed shader parameters into surfaces; set them with set_render_material_param and assign via set_render_mesh_surface_material. Note that no tool attaches a shader to a material, so the material only takes effect with external shader setup (e.g. code_execute). Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "material", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderMaterialParams, render_ops::handle_material_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_material_param",
-      "Set a named parameter on a material. Pass the RID from create_render_material, the parameter name and a JSON value; type_hint controls Variant deserialization (e.g. Vector2, Color, int, float). The value must match the shader's declared parameter type. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "material", "param"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderMaterialParamParams, render_ops::handle_material_set_param}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_viewport",
-      "Create a server-side viewport and return its RID as result.rid. Configure it with set_render_viewport_size and set_render_viewport_clear_mode. Note that no tool can attach a camera or canvas to a viewport, so standalone viewports cannot be rendered; the RID is useful mainly for external composition. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "viewport", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderViewportParams, render_ops::handle_viewport_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_viewport_size",
-      "Set the pixel size of a viewport. Pass the RID from create_render_viewport; width defaults to 640 and height to 480. It determines the resolution of the viewport's render target. Change it at runtime to resize the target. Returns 'ok'. Errors if viewport_rid is missing.",
-      "Render", {"render", "viewport", "size"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderViewportSizeParams, render_ops::handle_viewport_set_size}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_viewport_clear_mode",
-      "Set how a viewport clears its background each frame. Pass the RID from create_render_viewport; clear_mode is 0=always, 1=never, 2=only_next_frame and defaults to 0. Never clearing keeps the previous frame, useful for persistent drawing. Returns 'ok'. Errors if viewport_rid is missing.",
-      "Render", {"render", "viewport", "clear"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderViewportClearModeParams, render_ops::handle_viewport_set_clear_mode}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_particles",
-      "Create a server-side particle system and return its RID as result.rid. mode selects 2D (0) or 3D (1) and defaults to 3D. Pair with set_render_particles_emitting, set_render_particles_lifetime and restart_render_particles. Note that no tool instantiates the system into a scenario, so visible emission requires external setup (e.g. code_execute). Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "particle", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderParticlesParams, render_ops::handle_particle_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_bg_color",
-      "Set the background color of an environment. Pass the environment RID from an external source (e.g. code_execute); no create tool exists. Requires a color {r, g, b, a}. It takes effect when the environment background mode is set to color. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "environment", "bg"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentBgColorParams, render_ops::handle_environment_set_bg_color}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_ambient_light",
-      "Set the ambient light of an environment. Pass the environment RID from an external source (e.g. code_execute); source selects 0=bg, 1=disabled, 2=color, 3=sky and energy scales brightness. Ambient light fills shadows so unlit surfaces stay visible. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "environment", "ambient"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentAmbientLightParams, render_ops::handle_environment_set_ambient}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_fog_volume",
-      "Create a server-side volumetric fog volume and return its RID as result.rid. shape and size may be set at creation, or later with set_render_fog_volume_shape. Fog volumes add localized volumetric fog in 3D scenes when combined with an environment that has volumetric fog enabled. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "fog", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderFogVolumeParams, render_ops::handle_fog_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_shader",
-      "Create a server-side shader and return its RID as result.rid. Optional code sets the shader source immediately; set_render_shader_code replaces it later. Note that no tool can attach a shader to a material, so the shader RID is mainly useful for testing. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "shader", "create"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderShaderParams, render_ops::handle_shader_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_texture_from_image",
-      "Create a server-side 2D texture from an image file and return its RID as result.rid. image_path accepts res://, user:// or absolute paths; relative paths are not supported. Pass the RID to add_render_canvas_item_texture_rect. Returns an error if the image fails to load.",
-      "Render", {"render", "texture"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderTextureFromImageParams, render_ops::handle_texture_create_2d}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_shader_code",
-      "Set the source code of a shader. Pass the RID from create_render_shader and the shader code as a string. It replaces any code set at creation time; compilation happens on the server side. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "shader"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderShaderCodeParams, render_ops::handle_shader_set_code}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_glow",
-      "Configure glow (bloom) post-processing on an environment. Pass the environment RID from an external source (e.g. code_execute); all parameters are optional, see schema for meanings and defaults. Glow makes bright areas bleed into their surroundings. Returns 'ok'. Errors if environment_rid is missing.",
-      "Render", {"render", "environment"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentGlowParams, render_ops::handle_environment_set_glow}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_ssr",
-      "Configure screen-space reflections on an environment. Pass the environment RID from an external source (e.g. code_execute); all parameters are optional, see schema for meanings and defaults. SSR reflects visible geometry onto reflective surfaces without cubemaps. Returns 'ok'. Errors if environment_rid is missing.",
-      "Render", {"render", "environment"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentSsrParams, render_ops::handle_environment_set_ssr}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_tonemap",
-      "Configure tone mapping and exposure on an environment. Pass the environment RID from an external source (e.g. code_execute); tone_mapper, exposure and white are optional, see schema for meanings. Tone mapping maps HDR scene colors to the display range. Returns 'ok'. Errors if environment_rid is missing.",
-      "Render", {"render", "environment"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentTonemapParams, render_ops::handle_environment_set_tonemap}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_sdfgi",
-      "Configure SDFGI global illumination on an environment. Pass the environment RID from an external source (e.g. code_execute); all parameters are optional, see schema for meanings and defaults. SDFGI provides GI for large outdoor scenes. Returns 'ok'. Errors if environment_rid is missing.",
-      "Render", {"render", "environment"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentSdfgiParams, render_ops::handle_environment_set_sdfgi}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_environment_volumetric_fog",
-      "Configure volumetric fog on an environment. Pass the environment RID from an external source (e.g. code_execute); all parameters are optional, see schema for meanings and defaults. It fills the scene with light-scattering fog, e.g. mist or smoke. Returns 'ok'. Errors if environment_rid is missing.",
-      "Render", {"render", "environment"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderEnvironmentVolumetricFogParams, render_ops::handle_environment_set_volumetric_fog}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_sky",
-      "Create a server-side sky and return its RID as result.rid. Assign a material with set_render_sky_material. Note that no tool can attach a sky to an environment, so the sky RID is mainly useful for testing. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "sky"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderSkyParams, render_ops::handle_sky_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_sky_material",
-      "Set the material of a sky. Pass the sky RID from create_render_sky and a material RID from create_render_material. The material defines the sky appearance, e.g. a procedural sky or panorama texture. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "sky"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderSkyMaterialParams, render_ops::handle_sky_set_material}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_particles_emitting",
-      "Set whether a particle system is emitting. Pass the RID from create_render_particles; emitting defaults to true. To restart playback from the beginning, use restart_render_particles instead. Emitting alone does not restart a finished emission; combine with set_render_particles_lifetime to control duration. Returns 'ok'. Errors if particles_rid is missing.",
-      "Render", {"render", "particles"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderParticlesEmittingParams, render_ops::handle_particles_set_emitting}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "restart_render_particles",
-      "Restart a particle system from the beginning, even if it is currently emitting. Pass the RID from create_render_particles. Unlike set_render_particles_emitting, this forces a fresh emission cycle. Use it to replay bursts, e.g. explosions or one-shot effects. Returns 'ok'. Errors if particles_rid is missing.",
-      "Render", {"render", "particles"}, SideEffect::None, tool_flags::kNone,
-      kRestartRenderParticlesParams, render_ops::handle_particles_restart}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_particles_lifetime",
-      "Set the lifetime of a particle system in seconds, controlling how long each emitted particle stays alive. Pass the RID from create_render_particles; lifetime defaults to 1.0. Pair with set_render_particles_emitting and restart_render_particles to control playback. Returns 'ok'. Errors if particles_rid is missing.",
-      "Render", {"render", "particles"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderParticlesLifetimeParams, render_ops::handle_particles_set_lifetime}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_reflection_probe",
-      "Create a server-side reflection probe and return its RID as result.rid. A reflection probe captures surrounding geometry and lights to feed reflective materials. Use it to add local reflections to custom 3D scenes, though no tool instantiates the probe into a scenario. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "reflection_probe"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderReflectionProbeParams, render_ops::handle_reflection_probe_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_render_decal",
-      "Create a server-side decal and return its RID as result.rid. A decal projects a texture onto nearby surfaces, e.g. bullet holes or signs. Note that no tool instantiates the decal into a scenario, so its use is currently limited. Returns an error if the RenderingServer is unavailable.",
-      "Render", {"render", "decal"}, SideEffect::None, tool_flags::kNone,
-      kCreateRenderDecalParams, render_ops::handle_decal_create}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_fog_volume_shape",
-      "Set the shape of a fog volume after creation. Pass the fog RID from create_render_fog_volume; the same shape can also be supplied at creation. Different shapes suit different fog layouts, e.g. ellipsoid for clouds. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "fog"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderFogVolumeShapeParams, render_ops::handle_fog_volume_set_shape}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_instance_visible",
-      "Set the visibility state of a rendering instance, not a toggle. The instance RID must come from an external source (e.g. code_execute), as no create tool exists; visible defaults to true. Use it to show or hide a server-side object in the rendered scene. Returns 'ok'. Errors if instance_rid is missing.",
-      "Render", {"render", "instance"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderInstanceVisibleParams, render_ops::handle_instance_set_visible}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_instance_layer_mask",
-      "Set the layer mask of a rendering instance, controlling which camera layers see it. The instance RID must come from an external source (e.g. code_execute), as no create tool exists; mask is a bitfield. Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "instance"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderInstanceLayerMaskParams, render_ops::handle_instance_set_layer_mask}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_render_shader_parameter_global",
-      "Set a global shader parameter available to all shaders. The shader must declare a parameter with the same name using the global keyword. type_hint controls Variant deserialization (e.g. Vector2, Color, int, float). Returns 'ok'. Errors if a required parameter is missing.",
-      "Render", {"render", "shader"}, SideEffect::None, tool_flags::kNone,
-      kSetRenderShaderParameterGlobalParams, render_ops::handle_global_shader_parameter_set}));
+      "get_render_canvas_item_rid",
+      "Get the canvas item RID of a CanvasItem node in the edited scene, the reverse of find_render_node_from_rid. Pass a node path (leading slash and root/ prefix are tolerated). Returns result.rid for use with render_canvas_item actions. Errors if the node is missing or is not a CanvasItem.",
+      "Render", {"render", "rid", "bridge"}, SideEffect::None, tool_flags::kNone,
+      kGetRenderCanvasItemRidParams, render_ops::handle_canvas_item_get_rid,
+      {},
+      {},
+      {"get_render_canvas_item_rid path=/root/Node2D/Sprite"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "find_render_node_from_rid",
       "Check whether an RID is valid and find edited-scene nodes that use it, mainly for debugging render RIDs. Returns rid, is_valid and, when matching nodes exist, a nodes array with node_path and type entries. It is the reverse of get_render_canvas_item_rid. Returns 'ok' even for invalid RIDs.",
       "Render", {"utility", "debug", "render"}, SideEffect::None, tool_flags::kNone,
-      kFindRenderNodeFromRidParams, render_ops::handle_resolve_rid}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "restart_particles",
-      "Restart a particle node in the edited scene from the beginning, even if it is currently emitting. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node. Unlike setting emitting alone, this forces a fresh emission cycle. Use it to replay bursts, e.g. explosions or one-shot effects. Returns 'ok'. Errors if the node is missing or is not a particle node.",
-      "Render", {"render", "particles", "restart"}, SideEffect::WritesScene, tool_flags::kMutating,
-      kRestartParticlesParams, render_ops::handle_node_particles_restart}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_particles_params",
-      "Set playback parameters on a particle node in the edited scene. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node; all value parameters are optional and only the given ones are applied: emitting toggles emission, amount sets the particle count, lifetime sets seconds per particle, one_shot selects single-burst emission, speed_scale scales playback speed and explosiveness sets the burst ratio. Returns 'ok'. Errors if the node is missing, is not a particle node, or a value has the wrong type.",
-      "Render", {"render", "particles", "params"}, SideEffect::WritesScene, tool_flags::kMutating,
-      kSetParticlesParamsParams, render_ops::handle_node_particles_set_params}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_particles_state",
-      "Get the playback state of a particle node in the edited scene. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node. Returns type plus emitting, amount, lifetime, one_shot, speed_scale and explosiveness in 'result'. Read-only and never marks the scene dirty. Errors if the node is missing or is not a particle node.",
-      "Render", {"render", "particles", "state"}, SideEffect::None, tool_flags::kNone,
-      kGetParticlesStateParams, render_ops::handle_node_particles_get_state}));
+      kFindRenderNodeFromRidParams, render_ops::handle_resolve_rid,
+      {},
+      {},
+      {"find_render_node_from_rid rid=123"}}));
   return v;
 }
 

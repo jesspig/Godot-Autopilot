@@ -2,33 +2,153 @@
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"
+#include "util/rid_registry.hpp"
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <cstdint>
 #include <mcp/JsonValue.hpp>
 #include <string>
+#include <unordered_map>
 
 namespace godot_autopilot {
 namespace render_ops {
 
 using JV = mcp::JsonValue;
 
-JV handle_environment_set_bg_color(const JV &args) {
-  auto *it_env = args.Find("environment_rid");
-  auto *it_color = args.Find("color");
-  if (!it_env || !it_env->IsNumber()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing required parameter: environment_rid");
-    return r;
-  }
-  if (!it_color || !it_color->IsObject()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing required parameter: color");
-    return r;
-  }
+namespace {
 
+std::unordered_map<int64_t, JV> &environment_states() {
+  static std::unordered_map<int64_t, JV> states;
+  return states;
+}
+
+JV &environment_state(int64_t id) {
+  JV &state = environment_states()[id];
+  if (!state.IsObject()) {
+    state = JV(JV::object_tag);
+  }
+  return state;
+}
+
+bool is_environment_group(const std::string &name) {
+  return name == "bg" || name == "ambient" || name == "glow" ||
+         name == "ssr" || name == "tonemap" || name == "sdfgi" ||
+         name == "volumetric_fog";
+}
+
+JV environment_group_or_empty(int64_t id, const char *group) {
+  auto it = environment_states().find(id);
+  if (it == environment_states().end()) {
+    return JV(JV::object_tag);
+  }
+  const JV *value = it->second.Find(group);
+  if (!value || !value->IsObject()) {
+    return JV(JV::object_tag);
+  }
+  return *value;
+}
+
+void merge_environment_group(JV &target, const JV &incoming) {
+  for (const auto &entry : incoming.GetObject()) {
+    target[entry.first] = entry.second;
+  }
+}
+
+JV delegated_environment_call(const JV &group, const JV &rid_value) {
+  JV call = group;
+  call["environment_rid"] = rid_value;
+  return call;
+}
+
+JV apply_environment_bg(godot::RenderingServer *rs, const godot::RID &env,
+                       const JV &group) {
+  if (const JV *mode = group.Find("mode"); mode && mode->IsInt()) {
+    rs->environment_set_background(
+        env, static_cast<godot::RenderingServer::EnvironmentBG>(
+                 static_cast<int>(mode->GetInt())));
+  }
+  if (const JV *color = group.Find("color"); color && color->IsObject()) {
+    rs->environment_set_bg_color(env, util::json_to_color(*color));
+  }
+  const bool has_energy = group.Find("energy") != nullptr;
+  const bool has_exposure = group.Find("exposure") != nullptr;
+  if (has_energy || has_exposure) {
+    float energy =
+        static_cast<float>(util::json_number(group.Find("energy"), 1.0));
+    float exposure =
+        static_cast<float>(util::json_number(group.Find("exposure"), 1.0));
+    rs->environment_set_bg_energy(env, energy, exposure);
+  }
+  return JV();
+}
+
+JV apply_environment_ambient(godot::RenderingServer *rs, const godot::RID &env,
+                             const JV &group) {
+  godot::Color color(1.0f, 1.0f, 1.0f, 1.0f);
+  if (const JV *value = group.Find("color"); value && value->IsObject()) {
+    color = util::json_to_color(*value);
+  }
+  int source = 0;
+  if (const JV *value = group.Find("source"); value && value->IsInt()) {
+    source = static_cast<int>(value->GetInt());
+  }
+  float energy =
+      static_cast<float>(util::json_number(group.Find("energy"), 1.0));
+  float sky_contribution =
+      static_cast<float>(util::json_number(group.Find("sky_contribution"), 0.0));
+  int reflection_source = 0;
+  if (const JV *value = group.Find("reflection_source");
+      value && value->IsInt()) {
+    reflection_source = static_cast<int>(value->GetInt());
+  }
+  rs->environment_set_ambient_light(
+      env, color,
+      static_cast<godot::RenderingServer::EnvironmentAmbientSource>(source),
+      energy, sky_contribution,
+      static_cast<godot::RenderingServer::EnvironmentReflectionSource>(
+          reflection_source));
+  return JV();
+}
+
+JV apply_environment_group(godot::RenderingServer *rs, const godot::RID &env,
+                           const JV &rid_value, const std::string &name,
+                           const JV &group) {
+  JV call = delegated_environment_call(group, rid_value);
+  if (name == "bg") {
+    return apply_environment_bg(rs, env, group);
+  }
+  if (name == "ambient") {
+    return apply_environment_ambient(rs, env, group);
+  }
+  if (name == "glow") {
+    return handle_environment_set_glow(call);
+  }
+  if (name == "ssr") {
+    return handle_environment_set_ssr(call);
+  }
+  if (name == "tonemap") {
+    return handle_environment_set_tonemap(call);
+  }
+  if (name == "sdfgi") {
+    return handle_environment_set_sdfgi(call);
+  }
+  return handle_environment_set_volumetric_fog(call);
+}
+
+} // namespace
+
+JV handle_environment_action(const JV &args) {
+  const JV *action_p = args.Find("action");
+  if (!action_p || !action_p->IsString()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("missing required parameter: action");
+    return r;
+  }
+  const std::string action = action_p->GetString();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "set_render_environment_bg_color called");
+                            "render_environment action=" + action);
+
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -36,54 +156,107 @@ JV handle_environment_set_bg_color(const JV &args) {
     return r;
   }
 
-  godot::RID env = util::rid_from_json(*it_env);
-  godot::Color c = util::json_to_color(*it_color);
+  if (action == "create") {
+    godot::RID rid = rs->environment_create();
+    int64_t id = util::rid_store<RenderRidDomain>().store(rid);
+    environment_state(id);
+    return util::ok_result(util::rid_to_json(rid));
+  }
 
-  rs->environment_set_bg_color(env, c);
-  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "set_render_environment_bg_color completed");
+  const JV *rid_p = args.Find("environment_rid");
+  if (!rid_p || !rid_p->IsNumber()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("missing required parameter for action '" + action +
+                    "': environment_rid");
+    return r;
+  }
+  godot::RID env = util::rid_from_json(*rid_p);
+  if (!env.is_valid()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("environment_rid is not a valid RID for action '" + action +
+                    "': " + std::to_string(rid_p->GetInt()));
+    return r;
+  }
+  const int64_t env_id = static_cast<int64_t>(rid_p->GetInt());
+
+  if (action == "set_params") {
+    const JV *params_p = args.Find("params");
+    if (!params_p || !params_p->IsObject()) {
+      JV r(JV::object_tag);
+      r["error"] = JV("missing required parameter for action 'set_params': "
+                      "params (object with optional bg, ambient, glow, ssr, "
+                      "tonemap, sdfgi and volumetric_fog groups)");
+      return r;
+    }
+    for (const auto &entry : params_p->GetObject()) {
+      if (!is_environment_group(entry.first)) {
+        JV r(JV::object_tag);
+        r["error"] = JV("unknown environment params group: " + entry.first);
+        return r;
+      }
+      if (!entry.second.IsObject()) {
+        JV r(JV::object_tag);
+        r["error"] =
+            JV("environment params group must be an object: " + entry.first);
+        return r;
+      }
+    }
+    for (const auto &entry : params_p->GetObject()) {
+      JV merged = environment_group_or_empty(env_id, entry.first.c_str());
+      merge_environment_group(merged, entry.second);
+      JV applied =
+          apply_environment_group(rs, env, *rid_p, entry.first, merged);
+      if (applied.IsObject() && applied.Find("error") != nullptr) {
+        return applied;
+      }
+      environment_state(env_id)[entry.first] = std::move(merged);
+    }
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    return r;
+  }
+
+  if (action == "set_sky") {
+    const JV *sky_p = args.Find("sky_rid");
+    if (!sky_p || !sky_p->IsNumber()) {
+      JV r(JV::object_tag);
+      r["error"] =
+          JV("missing required parameter for action 'set_sky': sky_rid");
+      return r;
+    }
+    godot::RID sky = util::rid_from_json(*sky_p);
+    if (!sky.is_valid()) {
+      JV r(JV::object_tag);
+      r["error"] = JV("sky_rid is not a valid RID: " +
+                      std::to_string(sky_p->GetInt()));
+      return r;
+    }
+    rs->environment_set_sky(env, sky);
+    environment_state(env_id)["sky_rid"] = *sky_p;
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    return r;
+  }
+
+  if (action == "get") {
+    JV params(JV::object_tag);
+    auto it = environment_states().find(env_id);
+    if (it != environment_states().end()) {
+      params = it->second;
+    }
+    JV inner(JV::object_tag);
+    inner["rid"] = JV(env_id);
+    inner["params"] = std::move(params);
+    return util::ok_result(std::move(inner));
+  }
+
   JV r(JV::object_tag);
-  r["result"] = JV("ok");
+  r["error"] = JV("unknown action for render_environment: " + action);
   return r;
 }
 
-JV handle_environment_set_ambient(const JV &args) {
-  auto *it_env = args.Find("environment_rid");
-  auto *it_color = args.Find("color");
-  if (!it_env || !it_env->IsNumber()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing required parameter: environment_rid");
-    return r;
-  }
-  if (!it_color || !it_color->IsObject()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing required parameter: color");
-    return r;
-  }
-
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "set_render_environment_ambient_light called");
-  auto *rs = godot::RenderingServer::get_singleton();
-  if (!rs) {
-    JV r(JV::object_tag);
-    r["error"] = JV("RenderingServer not available");
-    return r;
-  }
-
-  godot::RID env = util::rid_from_json(*it_env);
-  godot::Color c = util::json_to_color(*it_color);
-  auto *src = args.Find("source");
-  auto source = static_cast<godot::RenderingServer::EnvironmentAmbientSource>(
-      src ? static_cast<int>(src->GetInt()) : 0);
-  auto *en = args.Find("energy");
-  float energy = static_cast<float>(util::json_number(en, 1.0));
-
-  rs->environment_set_ambient_light(env, c, source, energy);
-  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "set_render_environment_ambient_light completed");
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  return r;
+void forget_environment_state(int64_t rid_id) {
+  environment_states().erase(rid_id);
 }
 
 JV handle_environment_set_glow(const JV &args) {
