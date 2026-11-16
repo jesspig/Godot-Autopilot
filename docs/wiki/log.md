@@ -1,6 +1,10 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-16；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-17；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+
+## 2026-11-17
+
+- **Game Jam 生成器与 e2e 抽题（`feature/gamejam-generator`，本地未提交）**：新增 `bun run gda-dev-tools jam [--theme <id> | --list] [--out <dir>] [--json]`，从 `devtools/data/gamejam/themes.json` 抽题并渲染 `devtools/templates/gamejam/brief.md`，生成 `examples/<id>/{project.godot,GAMEJAM.md}`；题库 12 个主题（4 个用户给定 + 8 个联网收录：WAVES / BUBBLE / TINY CREATURES / DEPTHS / TRISKAIDEKAPHOBIA / COUNT DOWN / MASK / TRUST NO ONE）；默认优先未用主题、冲突加后缀、显式目录不覆盖。`gda-e2e-testing` 在未给工程路径时先抽题再开发，收到路径则不抽题；新增 `gda status --project <project-dir> --json` 的工程目标校验，报告增加主题/来源与 1.1 Game Jam 六项验收。程序化测试不依赖 `jam` 抽题；生成器自身单测在临时目录覆盖。验证：`bun run typecheck` 通过，`bun test cli/tests` 36 文件 / 336 项（313 pass + 23 skip + 0 fail），`jam --list` / 生成冒烟通过。完整 e2e 需用户在 Godot 中打开新工程，未声称跑通。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 
 ## 2026-11-16
 
