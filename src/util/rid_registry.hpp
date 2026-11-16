@@ -25,6 +25,8 @@ public:
     return godot::RID();
   }
 
+  bool erase(int64_t id) { return map.erase(id) > 0; }
+
 private:
   std::unordered_map<int64_t, godot::RID> map;
 };
