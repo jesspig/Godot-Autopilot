@@ -51,9 +51,9 @@ resource:
 | C++（MCP `server_info`、`system_status.version`） | `configure_file(src/core/version.hpp.in → <build>/generated/version.hpp @ONLY)` 用完整 `GDA_VERSION` 生成字符串宏；`server_context.cpp` / `register_all.cpp` 包含 `<version.hpp>` 引用 |
 | `devtools/lib/config.ts` | `ADDON_VERSION = fs.readFileSync(path.join(PROJECT_ROOT, "VERSION"), "utf8").trim()`，用于打包产物名 |
 
-升版流程：只改 `VERSION` 文件内容即可（重新 configure 后生效）。
+升版流程：递增规则见 [`AGENTS.md`](../../AGENTS.md)「版本号规则」（固定 `0.y.x`，默认只增 `x`；只有用户明确要求才增 `y`）；同步根 `VERSION`、`cli/src/version.ts` 与 `cli/assets/skills.json`，随后重新 configure。发布前去掉 `-dev` 后缀需用户明确许可。
 
-开发期 `VERSION` 可带 `-dev` 后缀（当前 `0.3.4-dev`），`GDA_VERSION`、CLI `CLI_VERSION` 与 `gda status` 原样显示该后缀，用于区分开发版与正式版。发布前必须把后缀去掉（改成纯 `0.3.4`）并同步 `cli/src/version.ts` 与 `cli/assets/skills.json`；`.github/workflows/release.yml` 的 validate 会校验 tag 与 `VERSION` 完全一致，带后缀无法发布。
+开发期 `VERSION` 可带 `-dev` 后缀（当前 `0.3.4-dev`），`GDA_VERSION`、CLI `CLI_VERSION` 与 `gda status` 原样显示该后缀，用于区分开发版与正式版。`.github/workflows/release.yml` 的 validate 会校验 tag 与 `VERSION` 完全一致，带后缀无法发布。
 
 ### 版本与 LTO 的单一事实源与 CI 断言
 
