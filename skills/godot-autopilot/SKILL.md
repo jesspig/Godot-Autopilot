@@ -50,10 +50,16 @@ recalled signature is a common source of silent failures.
 Tool names are snake_case and usually verb-first, but segment counts vary and
 names change as the toolset grows. Discovery is mandatory.
 
+The live catalog carries 252 canonical tools. Another 325 deprecated aliases
+still resolve through `call_tool` and `batch_execute`, but they stay out of
+`search_tools` and `gda tools list`. The aliases are deprecated from the 0.4.x
+line and are removed in the 0.6.x line: always call the canonical tool with its
+action. The alias notes in `references/tools.md` map common old names.
+
 ```bash
 gda search "tilemap cell"
 gda describe set_tilemap_cells
-gda call set_tilemap_cells --args '{"path": "Level", "cells": []}'
+gda call set_tilemap_cells --args '{"node_path": "Level", "cells": [{"x": 0, "y": 0, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}]}'
 ```
 
 1. `gda search <query>` searches the live server by name, description, category,
@@ -63,7 +69,7 @@ gda call set_tilemap_cells --args '{"path": "Level", "cells": []}'
 3. `gda call <name> --args '<json>'` or `--args-file <path>` executes one tool
    against the live editor.
 4. `gda tools list` prints every directly callable tool when you need the full
-   inventory.
+   inventory. Deprecated aliases are not listed.
 
 Discovery is live-only; there is no offline catalog. Start an editor with
 `gda start --project <dir>` when no instance is running. Search by the object
@@ -71,6 +77,10 @@ first ("tilemap cell", "animation track", "import sidecar"), then add a verb onl
 when the result is too broad. Retry with synonyms before concluding a tool is
 missing: tile/cell, sprite/texture, log/output, delete/remove/erase,
 create/add/new.
+
+Many tools group related operations under a required `action` (or `mode` for
+`create_scene_node` and `physics_query`). Read the enum in `gda describe` instead
+of remembering separate one-operation names.
 
 ## Task routing
 
@@ -85,7 +95,7 @@ call.
 | Scenes, nodes, properties, signals, undo | `references/scene-system.md` | `get_scene_tree` and `property_get` |
 | GDScript lifecycle, execution channels, reload | `references/scripting.md` | Check `@tool` and pick the channel |
 | Resources, imports, rename/move, UID | `references/resources.md` | Inspect dependencies before moving |
-| Run the game, inject input, debug, logs | `references/runtime.md` | `get_game_status` and the error watermark |
+| Run the game, inject input, debug, logs | `references/runtime.md` | `get_game_state` action=status and the error watermark |
 | TileMap, animation, audio, UI theming | `references/content.md` | Inspect the existing resource before editing |
 | C#, csproj, build loop, reflection bridge | `references/csharp.md` | Probe `dotnet_environment`, then build |
 | Servers, RIDs, physics, navigation | `references/servers.md` | Verify the RID lifecycle and thread |
@@ -96,7 +106,7 @@ call.
 |---|---|---|
 | A property write has no effect | `references/scene-system.md` | Read it back; check owner and value shape |
 | A saved scene is missing a node | `references/scene-system.md` | Check parent, owner, and save target |
-| The game ignores injected input | `references/runtime.md` | `get_game_status`; align input to frames |
+| The game ignores injected input | `references/runtime.md` | `get_game_state` action=status; align input to frames |
 | A script does not run in the editor | `references/scripting.md` | Add `@tool` or use an editor channel |
 | A C# change is not applied | `references/csharp.md` | Rebuild and read `diagnostics.instantiable` |
 | A resource path breaks after a rename | `references/resources.md` | Check UID, dependencies, and references |
@@ -117,8 +127,8 @@ With native MCP tools, pass `confirm: true` in the arguments object. File and
 scene writes (`writes_file`, `writes_config`, `writes_scene`) do not require
 confirmation, but they still change project content: read the target back after
 every write. Never work around a confirmation error by switching to a different
-tool with the same effect. Treat `destructive` and `game_runtime` annotations as
-a stop-and-review signal, not a formality.
+tool with the same effect, including a deprecated alias. Treat `destructive` and
+`game_runtime` annotations as a stop-and-review signal, not a formality.
 
 ## Watch the engine state
 
@@ -129,37 +139,39 @@ not know.
 - Read `new_errors_since_last_call` after every call. A non-zero value means new
   errors were recorded; pull the real log lines, fix or explain them, then
   continue. The counter is one-shot and resets when read.
-- While a game runs, `get_debugger_errors` and `get_debugger_output` carry its
-  errors and prints. Without a running game, `get_debugger_log` reads the editor
-  output and engine log, and `get_game_log_entries` reads the on-disk log after
-  the session ends.
+- While a game runs, `get_debugger_stream` with action=errors and action=output
+  carries its errors and prints. Without a running game, action=log reads the
+  editor output and engine log, and `get_game_log_entries` reads the on-disk log
+  after the session ends.
 - When the problem is inside the plugin itself (confirmation denials, timeouts,
-  dropped responses), read `get_plugin_log`.
-- Prefer observed output — a log line, a screenshot, a read-back — over assuming
+  dropped responses), read `get_plugin_log` or `get_debugger_stream` action=log
+  with source=plugin.
+- Prefer observed output - a log line, a screenshot, a read-back - over assuming
   a call did what its name suggests. `ok` only means the call went through.
 
 ## The change/observe/verify loop
 
 1. Change the project through tools, or orchestrate a deterministic sequence
    with `batch_execute` or `code_execute`.
-2. Observe with a screenshot (`capture_editor_viewport`,
-   `capture_game_viewport`), a read-back (`property_get`, `get_scene_tree`,
-   `get_resource_property`), or output (`get_debugger_log`, and while a game
-   runs `get_debugger_errors` / `get_debugger_output`).
+2. Observe with a screenshot (`capture_editor_viewport`, and with target=game for
+   the running game), a read-back (`property_get`, `get_scene_tree`,
+   `resource_property` action=get), or output (`get_debugger_stream` action=log,
+   and while a game runs action=errors or action=output).
 3. Diagnose from the observation, fix, and observe again until the result
    matches the intent.
 4. Confirm the fix with the error watermark at zero, then run the relevant
-   validation tool (`validate_scene_file`, inline GDScript tests, or a game
-   probe) before declaring success.
+   validation tool (`analyze_project` action=validate_scene, inline GDScript
+   tests, or a game probe) before declaring success.
 
 ## References
 
-- `references/setup.md` — install, start, connect, skills, `--prune`.
-- `references/tools.md` — CLI protocol, confirmation, errors, limits, docs CLI.
-- `references/scene-system.md` — scenes, nodes, properties, signals, undo.
-- `references/scripting.md` — GDScript lifecycle and execution channels.
-- `references/resources.md` — resources, imports, rename/move, UID.
-- `references/runtime.md` — running the game, input, logs, debugging.
-- `references/content.md` — tilemap, animation, audio, UI theming.
-- `references/csharp.md` — C# build loop and reflection bridge.
-- `references/servers.md` — RIDs, physics, navigation, rendering.
+- `references/setup.md` - install, start, connect, skills, `--prune`.
+- `references/tools.md` - CLI protocol, confirmation, errors, limits, docs CLI,
+  alias window.
+- `references/scene-system.md` - scenes, nodes, properties, signals, undo.
+- `references/scripting.md` - GDScript lifecycle and execution channels.
+- `references/resources.md` - resources, imports, rename/move, UID.
+- `references/runtime.md` - running the game, input, logs, debugging.
+- `references/content.md` - tilemap, animation, audio, UI theming.
+- `references/csharp.md` - C# build loop and reflection bridge.
+- `references/servers.md` - RIDs, physics, navigation, rendering.

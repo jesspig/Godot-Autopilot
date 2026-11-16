@@ -1,6 +1,10 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-13；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-16；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+
+## 2026-11-16
+
+- **工具面压缩收口（T-25 文档，`feature/tool-surface-closeout` 本地未推送）**：catalog 459→**252**（246 域 + 5 元 + `system_status`）、生产别名 **325**、schema **235/17**、能力矩阵 561 行 mapped 315 / missing 0；35 个域文件（新增 Image、Mesh）。重写 [overview.md](overview.md) 工具面与 [modules/tools_ops_a.md](modules/tools_ops_a.md) / [modules/tools_ops_b.md](modules/tools_ops_b.md)（按 canonical action 工具列表，旧名只留别名列与迁移说明），[tool_surface_baseline.md](tool_surface_baseline.md) 改为最终 252 基线，新增 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md) 压缩段；五语 README 的 badge/描述改为 252 并换用 canonical 示例名，非 EN/ZH 版标注以 EN 为准。旧名残留与相对链接已自查；本轮未编译、未测试，真实引擎 e2e 留待 T-26。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
 
 ## 2026-11-14
 

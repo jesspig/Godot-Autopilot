@@ -1,6 +1,6 @@
 # 调用协议与文档 CLI
 
-本篇是跨域调用知识：通道、CLI 面、引擎文档、confirm、错误与限制。领域行为见其它参考。
+本篇是跨域调用知识：通道、CLI 面、引擎文档、confirm、错误、限制与工具面。领域行为见其它参考。
 
 ## 通道
 
@@ -13,7 +13,7 @@
 ```bash
 gda search "tilemap cell"
 gda describe set_tilemap_cells
-gda call set_tilemap_cells --args '{"path": "Level", "cells": []}'
+gda call set_tilemap_cells --args '{"node_path": "Level", "cells": [{"x": 0, "y": 0, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}]}'
 gda tools list
 ```
 
@@ -34,6 +34,64 @@ gda tools list
 | 3 | 用法错误：未知命令、flag 或参数格式错误 |
 
 stdout 是 JSON，诊断进 stderr。退出 2 表示通道不可用；禁止在此后编造结果。
+
+## 工具面与弃用别名
+
+- live catalog 有 252 个 canonical 工具；`gda tools list` 与 `search_tools` 只暴露这些。`get_tool_detail` 也能解析别名，但返回 canonical 工具详情并附替换字段。
+- 另有 325 个弃用别名，经 `call_tool`、`batch_execute` 与 CLI 的 `gda call` 解析到 canonical 工具。别名不进搜索索引，也不进 catalog，因此按名称搜索每个能力只返回一个条目。
+- 每个别名的响应顶层带替换信息：deprecated_alias、canonical_name、deprecated_since、alias_removal_version。这些字段只作提示；分支必须基于 canonical 工具，而不是别名。
+- 别名自 0.4.x 起标记弃用，将在 0.6.x 移除。迁移就是改用下面的 canonical 工具加 action，不要等到移除。`gda tools list` 找不到某工具时，按对象搜索并调用 canonical 名称。
+- 别名仍走确认门：高风险别名同样返回 `confirmation_required`，不能用来绕过确认。
+
+常见替换：
+
+```bash
+gda describe resource_query
+gda call resource_query --args '{"action": "references", "path": "res://assets/icon.png"}'
+gda call get_game_state --args '{"action": "status"}'
+```
+
+| 弃用别名 | Canonical 调用 |
+|---|---|
+| `get_game_status` | `get_game_state` action=status |
+| `capture_game_viewport` | `capture_editor_viewport` target=game |
+| `get_debugger_log` / `get_debugger_errors` / `get_debugger_output` | `get_debugger_stream` action=log / errors / output |
+| `validate_scene_file` | `analyze_project` action=validate_scene |
+| `verify_scene_saved` | `get_scene_tree` verify=true |
+| `load_resource` / `reload_resource` | `resource_load` action=load / reload |
+| `save_resource` | `resource_save` action=save |
+| `create_resource` / `duplicate_resource` | `resource_create` action=create / duplicate |
+| `get_resource_type` / `get_resource_dependencies` / `get_resource_references` / `get_resource_uid` | `resource_query` action=type / deps / references / uid |
+| `get_resource_property` / `set_resource_property` | `resource_property` action=get / set |
+| `rename_resource_file` / `move_resource_file` / `remove_resource_file` / `copy_resource_file` | `resource_file` action=rename / move / remove / copy |
+| `write_file` / `read_file` / `find_in_files` | `os_file_write` action=write / `os_file_text` action=read / find |
+| `create_editor_scene` / `open_editor_scene` / `close_editor_scene` / `reload_editor_scene` / `play_editor_current_scene` / `stop_editor_playing` | `editor_scene_control` action=create / open / close / reload / play / stop |
+| `save_editor_scene_as` / `save_editor_scenes` | `save_editor_scene` action=save_as / save_all |
+| `get_editor_selection` / `get_editor_edited_scene_root` | `get_editor_state` action=selection / root |
+| `set_editor_selection` | `editor_selection_set` action=set |
+| `scan_editor_file_system` / `get_editor_file_system_status` | `get_editor_files` action=scan / status |
+| `instantiate_scene` / `build_nodes_from_spec` | `create_scene_node` mode=scene / spec |
+| `rename_scene_node` / `reparent_node` | `edit_scene_node` action=rename / reparent |
+| `add_group_node` / `remove_group_node` / `has_group_node` | `node_group` action=add / remove，或 `get_scene_tree` include_groups=true |
+| `set_tilemap_cell` | `set_tilemap_cells` 的 `cells` 条目 |
+| `add_tilemap_atlas_source` / `add_tilemap_physics_layer` / `set_tilemap_tile_collision` | `update_tileset` action=add_atlas_source / add_physics_layer / set_tile_collision |
+| `create_spriteframes` / `add_spriteframes_animation` / `add_spriteframes_frame` | `update_spriteframes` action=create / add_animation / add_frame |
+| `create_scene_animation_tree` / `add_animation_machine_state` / `connect_animation_states` | `animation_tree` action=create / add_node / connect |
+| `get_audio_bus_layout` / `set_audio_bus_volume_db` / `add_audio_bus_effect` | `audio_bus` action=get_layout / set_volume / add_effect |
+| `play_audio_player` / `set_audio_player_volume_db` / `seek_audio_player` | `audio_player` action=play / set_volume / seek |
+| `set_audio_device_output` / `set_audio_device_input` | `audio_device` action=set_output / set_input |
+| `create_theme_resource` / `set_theme_item_bundle` / `set_theme_color` / `set_theme_stylebox_flat` | `update_theme` action=create / bundle |
+| `set_control_anchor_preset` / `apply_theme_to_control` | `update_control_layout` action=layout / apply |
+| `queue_game_input` / `wait_game_input` / `sequence_game_inputs` | `game_input` action=queue / wait / sequence |
+| `execute_game_script` | `game_script` action=execute，并传 `script_action` |
+| `set_scene_tree_pause` / `is_scene_tree_paused` / `reload_scene_tree_current_scene` | `game_scene_tree` action=set_pause / is_paused / reload_current_scene |
+| `get_nav_2d_map_path` / `get_nav_3d_map_path` | `nav_query` mode=path_query，dimension=2 / 3 |
+| `get_nav_3d_map_closest_point_to_segment` | `nav_query` mode=closest_point_to_segment，dimension=3 |
+| `intersect_physics_2d_ray` / `intersect_physics_3d_ray` | `physics_query` mode=intersect_ray，dimension=2 / 3 |
+| `create_render_camera` / `create_render_light` / `create_render_mesh` / `create_render_canvas_item` | `render_camera` / `render_light` / `render_mesh` / `render_canvas_item` action=create |
+| `csharp_list_members` / `csharp_get_property` | `csharp_member` action=list / get |
+
+完整规则对每个别名都相同：调用 canonical 工具，并按上表传 action、mode 或参数。
 
 ## 引擎文档 CLI
 
@@ -56,11 +114,11 @@ gda docs sync
 
 高风险副作用在执行前返回结构化 `confirmation_required`。审查描述与目标后，用 `--confirm`（CLI）或 `confirm: true`（MCP）重试。类别为 `destructive`（删除已存在对象）、`process`（控制 OS 进程）、`code_execute`（运行任意 GDScript）与 `game_runtime`（进入运行中的游戏）。
 
-文件、配置与场景写入不需要确认，但仍改变内容：每次写入后读回目标。禁止换一个效果相同的工具绕过确认，也禁止把高风险调用藏进 batch。
+文件、配置与场景写入不需要确认，但仍改变内容：每次写入后读回目标。禁止换一个效果相同的工具绕过确认，也禁止把高风险调用藏进 batch。弃用别名与 canonical 工具走同一确认门。
 
 ## batch 与 code 执行
 
-- `batch_execute` 顺序执行 `operations` 列表（最多 256 条）。每项有 `tool` 与可选 `args`；`stop_on_error` 默认 true，`rollback_on_error` 可选。用于确定性序列。
+- `batch_execute` 顺序执行 `operations` 列表（最多 256 条）。每项有 `tool` 与可选 `args`；`stop_on_error` 默认 true，`rollback_on_error` 可选。用于确定性序列；每项可用 canonical 工具或弃用别名。
 - `code_execute` 在编辑器里运行 GDScript，用于循环、数学与计算值。没有行首 `func ` 时把源码包进一个入口函数；有 `func ` 时保留源码并用 `function_name`。`timeout_ms` 默认 5000，上限由 schema 决定。
 - 判据：少量已有调用 → `batch_execute`；循环、数学、条件或超大 payload → `code_execute`。
 
@@ -97,3 +155,4 @@ gda docs sync
 | 退出 3 | 未知命令、flag 或 JSON 格式错误 | `gda --help`；校验 `--args` JSON |
 | `confirmation_required` | 高风险调用未确认 | 审查目标后加 `--confirm` |
 | `main_thread_timeout` | 编辑器主线程超出预算 | 先读状态再重试 |
+| 熟悉的工具名找不到 | 该名是弃用别名，已移除或未列入清单 | 按对象搜索；调用 canonical 工具并传 action |

@@ -12,15 +12,16 @@
 | [engine-behavior-checklist.md](engine-behavior-checklist.md) | 引擎行为验收清单：D-01 蒸馏落点、A 类迁移对照表、e2e 抽查建议 | — |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
 | [security_contract.md](security_contract.md) | T0 安全边界与并发契约：MCP 可信客户端与 REST 令牌认证、监听、授权三档、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
-| [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：451 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、33 个域 `*_tools.hpp`、`register_all.cpp` |
-| [tool_surface_baseline.md](tool_surface_baseline.md) | 工具面基线：451 域 + `system_status` + 7 元的静态审计、严格冗余候选、目标计数与能力矩阵 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
+| [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：246 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、35 个域 `*_tools.hpp`、`register_all.cpp` |
+| [tool_surface_baseline.md](tool_surface_baseline.md) | 工具面最终基线：catalog 252（246 域 + 5 元 + `system_status`）、35 个域文件、生产别名 325、schema 235/17、能力矩阵 561 行缺失 0，含历史 459 对比 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
 | [tool_surface_conventions.md](tool_surface_conventions.md) | 工具面别名约定：隐藏别名、参数适配、结果投影、弃用字段、冲突与目录/搜索排除 | `tool_spec.hpp`、`tool_registry.hpp`、`dispatch.cpp`、`tool_catalog.cpp` |
+| [tool_surface_report.md](tool_surface_report.md) | T-24 最终审计：catalog 459→252、生产别名 325、schema 235/17、能力矩阵 561 行缺失 0、按域与副作用分布、未验证的引擎 e2e | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、统一埋点门面（monitor/monitor_env/perf_sampler）、日志与本地持久化（日志/trace 双目录、脱敏）、配置常量、集中根与工程级存储布局、遗留数据兼容 | `src/core/` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
 | [modules/ports.md](modules/ports.md) | 端口与实例登记：一个端口承载 MCP 与 REST 两个端点、端口解析优先级与候选序列、显式与自动分配的失败差异、实例登记结构与全局索引、CLI 发现链与两级存活校验、控制面端口与实例端口的分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |
 | [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、统一执行入口（导出拦截→工具存在→参数校验→授权→派发→信封）、授权三档、ToolSpec 派生、元工具与动态工具、schema 统计、契约缺口与遍历排除 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline/tool_execute/argument_validator/authorization） |
-| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，222 工具） | `src/tools/domains/*/*_ops.cpp` |
-| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/C# 桥/瓦片等 20 模块，229 工具；A 222 + B 229 = 451） | `src/tools/domains/*/*_ops.cpp` |
+| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/编辑器 15 域，133 个 canonical 工具；action 表 + 旧名别名列） | `src/tools/domains/*/*_ops.cpp` |
+| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/图像/网格/瓦片等 20 域，113 个 canonical 工具；A 133 + B 113 = 246） | `src/tools/domains/*/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
 | [modules/skills.md](modules/skills.md) | 技能卡与 references：目录结构、词数预算、构建管线、guard 规则、MCP 资源 12、安装与 `--prune` | `skills/`、`skills-zh/`、`cli/scripts/build-skills-asset.ts`、`tools/embed_skills.ts`、`tests/guard/skills_guard.ts` |
 | [modules/cli.md](modules/cli.md) | CLI 载体（gda）：Bun + TS 源码直跑、命令参考、五级寻址链、两套注册表与集中根位置、IPC 通道、生命周期与重启、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |

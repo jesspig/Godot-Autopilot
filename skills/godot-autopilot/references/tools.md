@@ -1,8 +1,8 @@
 # Calling Protocol and Docs CLI
 
 This reference is the cross-domain calling knowledge: channels, the CLI
-surface, engine docs, confirmation, errors, and limits. Domain behavior lives in
-the other references.
+surface, engine docs, confirmation, errors, limits, and the tool surface. Domain
+behavior lives in the other references.
 
 ## Channels
 
@@ -18,7 +18,7 @@ the other references.
 ```bash
 gda search "tilemap cell"
 gda describe set_tilemap_cells
-gda call set_tilemap_cells --args '{"path": "Level", "cells": []}'
+gda call set_tilemap_cells --args '{"node_path": "Level", "cells": [{"x": 0, "y": 0, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}]}'
 gda tools list
 ```
 
@@ -47,6 +47,74 @@ Exit codes:
 
 Stdout is JSON; diagnostics go to stderr. Exit 2 means the channel is down;
 never report a fabricated result after it.
+
+## Tool surface and deprecated aliases
+
+- The live catalog carries 252 canonical tools; `gda tools list` and
+  `search_tools` expose only those. `get_tool_detail` also resolves an alias, but
+  returns the canonical tool detail plus the replacement fields.
+- Another 325 deprecated aliases resolve to a canonical tool through
+  `call_tool`, `batch_execute`, and the CLI's `gda call`. They are hidden from
+  search and the catalog so a name search returns one entry per capability.
+- Every alias carries the replacement fields in its response:
+  deprecated_alias, canonical_name, deprecated_since, alias_removal_version. The
+  fields are informational; branch on the canonical tool, not the alias.
+- Aliases are deprecated from the 0.4.x line and are removed in the 0.6.x line. Migration means calling the canonical tool with the action below, not
+  waiting for removal. If a tool is missing from `gda tools list`, search by
+  object and call the canonical name.
+- Alias calls keep the confirmation gate: a high-risk alias still returns
+  `confirmation_required` and is never a bypass.
+
+Common replacements:
+
+```bash
+gda describe resource_query
+gda call resource_query --args '{"action": "references", "path": "res://assets/icon.png"}'
+gda call get_game_state --args '{"action": "status"}'
+```
+
+| Deprecated alias | Canonical call |
+|---|---|
+| `get_game_status` | `get_game_state` action=status |
+| `capture_game_viewport` | `capture_editor_viewport` target=game |
+| `get_debugger_log` / `get_debugger_errors` / `get_debugger_output` | `get_debugger_stream` action=log / errors / output |
+| `validate_scene_file` | `analyze_project` action=validate_scene |
+| `verify_scene_saved` | `get_scene_tree` verify=true |
+| `load_resource` / `reload_resource` | `resource_load` action=load / reload |
+| `save_resource` | `resource_save` action=save |
+| `create_resource` / `duplicate_resource` | `resource_create` action=create / duplicate |
+| `get_resource_type` / `get_resource_dependencies` / `get_resource_references` / `get_resource_uid` | `resource_query` action=type / deps / references / uid |
+| `get_resource_property` / `set_resource_property` | `resource_property` action=get / set |
+| `rename_resource_file` / `move_resource_file` / `remove_resource_file` / `copy_resource_file` | `resource_file` action=rename / move / remove / copy |
+| `write_file` / `read_file` / `find_in_files` | `os_file_write` action=write / `os_file_text` action=read / find |
+| `create_editor_scene` / `open_editor_scene` / `close_editor_scene` / `reload_editor_scene` / `play_editor_current_scene` / `stop_editor_playing` | `editor_scene_control` action=create / open / close / reload / play / stop |
+| `save_editor_scene_as` / `save_editor_scenes` | `save_editor_scene` action=save_as / save_all |
+| `get_editor_selection` / `get_editor_edited_scene_root` | `get_editor_state` action=selection / root |
+| `set_editor_selection` | `editor_selection_set` action=set |
+| `scan_editor_file_system` / `get_editor_file_system_status` | `get_editor_files` action=scan / status |
+| `instantiate_scene` / `build_nodes_from_spec` | `create_scene_node` mode=scene / spec |
+| `rename_scene_node` / `reparent_node` | `edit_scene_node` action=rename / reparent |
+| `add_group_node` / `remove_group_node` / `has_group_node` | `node_group` action=add / remove, or `get_scene_tree` include_groups=true |
+| `set_tilemap_cell` | `set_tilemap_cells` with a `cells` entry |
+| `add_tilemap_atlas_source` / `add_tilemap_physics_layer` / `set_tilemap_tile_collision` | `update_tileset` action=add_atlas_source / add_physics_layer / set_tile_collision |
+| `create_spriteframes` / `add_spriteframes_animation` / `add_spriteframes_frame` | `update_spriteframes` action=create / add_animation / add_frame |
+| `create_scene_animation_tree` / `add_animation_machine_state` / `connect_animation_states` | `animation_tree` action=create / add_node / connect |
+| `get_audio_bus_layout` / `set_audio_bus_volume_db` / `add_audio_bus_effect` | `audio_bus` action=get_layout / set_volume / add_effect |
+| `play_audio_player` / `set_audio_player_volume_db` / `seek_audio_player` | `audio_player` action=play / set_volume / seek |
+| `set_audio_device_output` / `set_audio_device_input` | `audio_device` action=set_output / set_input |
+| `create_theme_resource` / `set_theme_item_bundle` / `set_theme_color` / `set_theme_stylebox_flat` | `update_theme` action=create / bundle |
+| `set_control_anchor_preset` / `apply_theme_to_control` | `update_control_layout` action=layout / apply |
+| `queue_game_input` / `wait_game_input` / `sequence_game_inputs` | `game_input` action=queue / wait / sequence |
+| `execute_game_script` | `game_script` action=execute with `script_action` |
+| `set_scene_tree_pause` / `is_scene_tree_paused` / `reload_scene_tree_current_scene` | `game_scene_tree` action=set_pause / is_paused / reload_current_scene |
+| `get_nav_2d_map_path` / `get_nav_3d_map_path` | `nav_query` mode=path_query with dimension=2 / 3 |
+| `get_nav_3d_map_closest_point_to_segment` | `nav_query` mode=closest_point_to_segment, dimension=3 |
+| `intersect_physics_2d_ray` / `intersect_physics_3d_ray` | `physics_query` mode=intersect_ray, dimension=2 / 3 |
+| `create_render_camera` / `create_render_light` / `create_render_mesh` / `create_render_canvas_item` | `render_camera` / `render_light` / `render_mesh` / `render_canvas_item` action=create |
+| `csharp_list_members` / `csharp_get_property` | `csharp_member` action=list / get |
+
+The same rule covers every alias: call the canonical tool and pass the action,
+mode, or parameters shown above.
 
 ## Engine documentation CLI
 
@@ -84,19 +152,21 @@ GDScript), and `game_runtime` (reaches into the running game).
 
 File, config, and scene writes do not require confirmation, but they change
 content: read the target back. Never switch to another tool with the same effect
-to bypass confirmation, and never hide a high-risk call inside a batch.
+to bypass confirmation, and never hide a high-risk call inside a batch. A
+deprecated alias runs the same gate as its canonical tool.
 
 ## Batch and code execution
 
 - `batch_execute` runs an ordered `operations` list (at most 256). Each operation
   has `tool` and optional `args`; `stop_on_error` defaults to true and
-  `rollback_on_error` is optional. Use it for deterministic sequences.
+  `rollback_on_error` is optional. Use it for deterministic sequences. An
+  operation may use a canonical tool or a deprecated alias.
 - `code_execute` runs GDScript in the editor for loops, math, and computed
   values. Without a line-start `func ` it wraps the source in one entry
   function; with `func ` it preserves the source and uses `function_name`.
   `timeout_ms` defaults to 5000 and is capped by the schema.
-- Decision rule: a handful of existing calls → `batch_execute`; loops, math,
-  conditions, or very large payloads → `code_execute`.
+- Decision rule: a handful of existing calls -> `batch_execute`; loops, math,
+  conditions, or very large payloads -> `code_execute`.
 
 ## Errors and the watermark
 
@@ -128,6 +198,7 @@ call is closing evidence that the fix produced no new errors.
 is the URI authority. `gda prompts list|get` renders registered prompts.
 `gda call --async` plus `gda tasks list|get|wait|cancel|clean` manages locally
 recorded tasks.
+
 ## Limits
 
 - Default operation timeout is 5000 ms; the schema reports the current cap.
@@ -144,3 +215,4 @@ recorded tasks.
 | Exit 3 | Unknown command, flag, or malformed JSON | `gda --help`; validate the `--args` JSON |
 | `confirmation_required` | High-risk call without confirmation | Review the target, then `--confirm` |
 | `main_thread_timeout` | Editor main thread missed its budget | Read state before retrying |
+| A familiar tool name is not found | The name is a deprecated alias, already removed or not listed | Search by object; call the canonical tool with its action |

@@ -1,133 +1,115 @@
 ---
 type: 基线文档
 title: 工具面基线
-description: ST-03 中间快照（308 catalog / 302 域 / 5 元）与 T-01 严格冗余基线的静态审计记录
+description: 工具面最终静态基线：catalog 252（246 域 + 5 元 + system 1）、别名 325、schema 235/17、能力矩阵 561 行缺失 0
 tags:
   - 工具面
   - 基线
   - 审计
-timestamp: "2026-11-16T06:00:00+08:00"
+timestamp: "2026-11-16T13:38:53+08:00"
 resource: devtools/commands/tool-audit.ts
 ---
 
 # 工具面基线
 
-> 审计日期：2026-11-16。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json) 中找到来源。
-
-> ST-06 最终候选：catalog 252 = 域 246 + 元 5 + system 1，生产别名 319（含被实名工具遮蔽的历史别名），schema 235/17，能力矩阵缺失 0。下文的 459 计数与域分布表是 T-01 历史基线，最终收口计数由 T-25 重写。
+> 审计日期：2026-11-16。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成，汇总报告见 [tool_surface_report.md](tool_surface_report.md) 与 T-24 的 `audit-report.json`；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json)、[tool_surface_target.json](../../tests/data/tool_surface_target.json) 与 [capability_matrix.json](../../tests/data/capability_matrix.json) 中找到来源。
 
 ## 数据来源与命令
 
-- 域工具：`src/tools/domains/*/*_tools.hpp` 的 451 个 `ToolSpec` 块。
-- 系统与元工具：`src/tools/base/register_all.cpp` 的 `system_status` 与 7 个 `kMeta` 工具。
+- 域工具：`src/tools/domains/*/*_tools.hpp` 的 246 个 `ToolSpec` 块，分布在 35 个域文件。
+- 系统与元工具：`src/tools/base/register_all.cpp` 的 `system_status` 与 5 个 `kMeta` 工具。
 - 基线：`bun run gda-dev-tools audit-tools --baseline` → [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json)。
 - 目标：`bun run gda-dev-tools audit-tools --target` → [tool_surface_target.json](../../tests/data/tool_surface_target.json) 与 [capability_matrix.json](../../tests/data/capability_matrix.json)。
 - 查看：`bun run gda-dev-tools audit-tools --json` 直接输出完整基线。
 
-## 基线计数
+## 基线计数（最终）
 
 | 指标 | 数值 | 来源 |
 | --- | ---: | --- |
-| catalog 总数 | 459 | `catalog_total` |
-| 域工具 | 451 | `domain_total` |
-| 元工具 | 7 | `meta_total` |
-| `system_status` | 1 | `system_total` |
-| 域文件数 | 33 | `domain_count` |
-| 严格冗余候选 | 32 | `strict_redundant_count` |
-| 生产别名 | 0 | `alias_count` |
-| schema 非空 | 393 | `schema_non_empty` |
-| schema 空 | 66 | `schema_empty` |
-| 能力矩阵域行 | 451 | `capability_matrix.rows` |
-| 能力矩阵系统/元行 | 8 | `capability_matrix.meta_rows` |
+| catalog 总数 | 252 | `catalog.total` / `catalog_total` |
+| 域工具 | 246 | `catalog.domain` / `domain_total` |
+| 元工具 | 5 | `catalog.meta` / `meta_total` |
+| `system_status` | 1 | `catalog.system` / `system_total` |
+| 域文件数 | 35 | `catalog.domain_count` / `domain_count` |
+| 生产别名 | 325 | `alias_count` |
+| schema 非空 | 235 | `parameter_schema.non_empty` / `schema_non_empty` |
+| schema 空 | 17 | `parameter_schema.empty` / `schema_empty` |
+| 能力矩阵域行 | 561 | `capability_matrix.row_count` |
+| 含系统/元的 catalog 行 | 567 | `capability_matrix.catalog_row_count` |
+| `mapped` | 315 | `capability_matrix.mapped_count` |
+| `kept` | 252 | `capability_matrix.kept_count` |
+| `missing` | 0 | `capability_matrix.missing_count` |
 
-## 域分布
+- 252 落在验收区间 250–300 内；schema 空 = 未声明参数且无 action schema 的工具（17 个）。
+- 325 个别名不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析；契约见 [tool_surface_conventions.md](tool_surface_conventions.md)。其中 8 条与实名工具重名（Render 的 5 个 `create_render_*` 与 `get_particles_state`/`restart_particles`/`set_particles_params`），按冲突策略实名工具优先、别名被遮蔽；审计仍按 325 条定义计数。
+- 能力矩阵按“工具行”计数，别名按“别名条目”计数，两者口径不同，不可直接相减。
 
-| 域 | 当前 | 有效目标 | 计划目标 | 合并组 |
-| --- | ---: | ---: | ---: | --- |
-| Analysis | 3 | 1 | 1 | analyze_project |
-| Animation | 11 | 6 | 6 | animation_clip / animation_track / animation_player / animation_tree |
-| Audio | 24 | 13 | 13 | audio_bus / audio_player / audio_device / audio_capture / audio_wav |
-| Capture | 2 | 2 | 2 | capture_editor_viewport / review_scene_visually |
-| C# | 6 | 3 | 3 | csharp_member / csharp_event / dotnet |
-| Config | 17 | 11 | 11 | config_read / config_write / autoload |
-| Debug | 15 | 9 | 10 | debug_info / debug_stack / debug_log / debug_visual / debug_physics_fps / debug_monitors |
-| Debugger | 6 | 4 | 4 | debugger_stream / debugger_plugin_log / debugger_game_log / debugger_session |
-| Display | 25 | 14 | 14 | display_info / display_clipboard / display_dialog / display_mouse / display_tts / display_window / display_screen |
-| Docs | 4 | 1 | 1 | get_docs_class |
-| Editor | 33 | 24 | 24 | editor_state / editor_ui / editor_files / editor_scene_control / editor_save / editor_selection / editor_undo / editor_ui_action / editor_config / editor_inspect / editor_csharp / editor_script / editor_breakpoints / editor_session / editor_info |
-| Game | 19 | 13 | 13 | game_state / game_job / game_ui / game_evidence / game_script / game_input / game_tween / game_localization |
-| GridMap | 5 | 4 | 4 | create_gridmap / gridmap_item / set_gridmap_cells / get_gridmap_used_cells |
-| Group | 3 | 1 | 1 | node_group |
-| Input | 15 | 7 | 7 | input_state / input_action / input_key / input_mouse / input_text / input_gamepad |
-| InputMap | 9 | 5 | 5 | get_input_map_actions / set_input_map_action_bundle / erase_input_map / save_input_map |
-| Log | 1 | 1 | 1 | get_game_log_entries |
-| Nav | 15 | 6 | 6 | create_navigation / nav_query / nav_control |
-| OS | 23 | 11 | 11 | process / env / time / system / file / file_manager / alert / path |
-| Physics | 51 | 32 | 32 | body / area / space / joint / shape / query / soft_body / debug / bundle |
-| Properties | 7 | 6 | 6 | property_get / property_set / set_node_transform / property_get_list / signal |
-| Render | 52 | 30 | 30 | environment / instance / viewport / camera / canvas / light / particles / resource / inspect / free |
-| Resources | 34 | 20 | 20 | load / query / create / property / file / save / uid / import / curve / mesh |
-| Scene | 15 | 9 | 9 | get_scene_tree / create_scene_node / edit_scene_node / delete_scene_node / camera / instantiate |
-| SceneTree | 8 | 1 | 1 | game_scene_tree |
-| Scripts | 11 | 6 | 6 | query / file / attach / execute / call |
-| SpriteFrames | 3 | 2 | 2 | update / get |
-| Testing | 2 | 1 | 1 | run_tests |
-| Text | 10 | 4 | 4 | font / shaped / query |
-| Theme | 10 | 4 | 4 | info / update_theme / update_layout |
-| TileMap | 5 | 3 | 3 | create / set_cells / tileset |
-| Tileset | 3 | 1 | 1 | update_tileset |
-| Tween | 4 | 2 | 2 | game_tween / editor_preview |
+## 域分布（35 个域文件，246 工具）
 
-- 域当前合计 451；有效目标合计 257，计划目标合计 258。
-- 净新增 6 项：`pack_scene`、`animation_runtime`、`bake_navigation_mesh`、`astar_path`、`image_ops`、`mesh_ops`。
-- 目标 catalog = 257 + 6 + `system_status` 1 + 元工具 5 = 269；计划声明值 270，执行期允许 250–300。
-- Debug 差异：D-08 记当前 16，按域文件实测 15；Category 计数 16 是因为 `get_debug_object_info` 位于 physics 域但 Category 为 Debug。D-07 删除 6 项后有效目标为 9。
-
-## 副作用分布（域工具）
-
-| SideEffect | 数量 |
+| 域 | 工具数 |
 | --- | ---: |
-| None | 276 |
-| WritesScene | 43 |
-| ModifiesWindow | 42 |
-| WritesFile | 27 |
-| WritesConfig | 18 |
-| GameRuntime | 18 |
-| Process | 10 |
-| CodeExecute | 7 |
-| Destructive | 6 |
-| ShowsAlert | 4 |
+| Physics | 46 |
+| Render | 29 |
+| Editor | 16 |
+| Nav | 14 |
+| OS | 12 |
+| Animation | 10 |
+| Resources | 10 |
+| Scripts | 10 |
+| Game | 9 |
+| Config | 8 |
+| Display | 8 |
+| Scene | 7 |
+| Debug | 6 |
+| Input | 6 |
+| Properties | 6 |
+| Audio | 5 |
+| Debugger | 4 |
+| GridMap | 4 |
+| Image | 4 |
+| InputMap | 4 |
+| Mesh | 4 |
+| Text | 3 |
+| Theme | 3 |
+| TileMap | 3 |
+| Tween | 3 |
+| Capture | 2 |
+| C# | 2 |
+| Analysis | 1 |
+| Docs | 1 |
+| Group | 1 |
+| Log | 1 |
+| SceneTree | 1 |
+| SpriteFrames | 1 |
+| Testing | 1 |
+| Tileset | 1 |
+| **合计** | **246** |
 
-## 严格冗余候选（32）
+category 口径为 28 类、求和 252（含元与系统）：域与 category 并非一一对应——`Image`/`Mesh` 域工具归 Resources 类，`C#` 域归 Scripts 类，`GridMap`/`Tileset` 归 TileMap 类，`SceneTree` 归 Scene 类，`Log` 域的 `get_game_log_entries` 归 System 类；完整表见 [overview.md](overview.md) 的「MCP 工具面」。
 
-| 组 | 数量 | 旧工具 |
-| --- | ---: | --- |
-| Audio | 3 | get_audio_device_inputs / get_audio_bus_count / get_audio_bus_name |
-| Debug | 6 | get_debug_monitor / get_debug_monitor_catalog / get_debug_object_count / get_debug_memory_usage / get_debug_node_count / get_debug_custom_monitor_names |
-| Docs | 2 | get_docs_method / get_docs_property |
-| Theme | 5 | set_theme_color / set_theme_constant / set_theme_font_size / set_theme_stylebox_flat / set_control_anchor_preset |
-| TileMap/GridMap | 2 | set_tilemap_cell / set_gridmap_cell |
-| InputMap | 4 | add_input_map_action / add_input_map_action_event / set_input_map_action_deadzone / has_input_map_action |
-| Resource/Script/Property | 4 | has_resource_dependency / move_resource_file / load_script / set_properties_batch |
-| Scene/Editor/Game/Meta | 6 | get_scene_snapshot / get_scene_node_screen_rect / verify_scene_saved / capture_game_viewport / ping / list_categories |
+## 副作用分布
 
-- 逐条参数适配与结果投影见 [capability_matrix.json](../../tests/data/capability_matrix.json) 的 `rows` 与 `meta_rows`；32 项均已登记 `status=mapped`，尚未从 catalog 删除。
-- 矩阵域行 451、系统/元行 8，合计 459；域工具名唯一，系统/元工具名与域工具无重名。
+| SideEffect | catalog（252） | 域工具（246） |
+| --- | ---: | ---: |
+| None | 151 | 147 |
+| WritesScene | 29 | 29 |
+| ModifiesWindow | 20 | 20 |
+| WritesFile | 14 | 14 |
+| WritesConfig | 8 | 8 |
+| Destructive | 7 | 7 |
+| Process | 7 | 7 |
+| GameRuntime | 7 | 7 |
+| CodeExecute | 5 | 3 |
+| ShowsAlert | 4 | 4 |
 
-## 副作用低报审查（启发式）
+- catalog 与域工具口径仅两处不同：None 151/147、CodeExecute 5/3；差异来自 5 个元工具与 `system_status`（catalog 比域工具多 4 个 None、2 个 CodeExecute）。
+- 需 `confirm=true` 的高风险档 Destructive、Process、CodeExecute、GameRuntime 合计 26 个 catalog 工具，默认安全姿态未放宽。
 
-以下 8 条工具当前 `SideEffect::None`，但名称含删除、运行、播放、复制等强动作语义，需在对应合并任务中复核；这是审查候选，不是已确认缺陷。
+## 历史基线（已被本页取代）
 
-| 工具 | 域 | 当前档位 |
-| --- | --- | --- |
-| play_audio_player | Audio | None |
-| stop_audio_player | Audio | None |
-| stop_audio_input_capture | Audio | None |
-| remove_physics_3d_body_collision_exception | Physics | None |
-| restart_render_particles | Render | None |
-| duplicate_resource | Resources | None |
-| run_gdscript_tests | Testing | None |
-| run_gdscript_test_files | Testing | None |
+- T-01 严格冗余基线：catalog 459（451 域 + 7 元 + `system_status`）、33 个域文件、别名 0、schema 393/66、严格冗余候选 32。
+- ST-03 中间快照：catalog 308（302 域 + 5 元 + `system_status`），catalog 内新增 6 个工具（`pack_scene`、`animation_runtime`、`bake_navigation_mesh`、`astar_path`、`image_ops`、`mesh_ops`）。
+- 上述历史数字只用于压缩前后对比，完整演进见 [tool_surface_report.md](tool_surface_report.md) 与 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)；当前口径一律以本页「基线计数（最终）」为准。
 
 ## 相关文件
 
@@ -136,3 +118,5 @@ resource: devtools/commands/tool-audit.ts
 - 基线数据：[tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json)
 - 目标数据：[tool_surface_target.json](../../tests/data/tool_surface_target.json)
 - 能力矩阵：[capability_matrix.json](../../tests/data/capability_matrix.json)
+- 别名契约：[tool_surface_conventions.md](tool_surface_conventions.md)
+- 最终报告：[tool_surface_report.md](tool_surface_report.md)
