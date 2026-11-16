@@ -14,7 +14,7 @@ resource: devtools/commands/tool-audit.ts
 
 > 审计日期：2026-11-16。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json) 中找到来源。
 
-> ST-03 中间快照：catalog 308 = 域 302 + 元 5 + system 1，生产别名 209，schema 284/24，能力矩阵缺失 0。下文的 459 计数与域分布表是 T-01 历史基线，最终收口计数由 T-25 重写。
+> ST-04 中间快照：catalog 268 = 域 262 + 元 5 + system 1，生产别名 263，schema 247/21，能力矩阵缺失 0。下文的 459 计数与域分布表是 T-01 历史基线，最终收口计数由 T-25 重写。
 
 ## 数据来源与命令
 

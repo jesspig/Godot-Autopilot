@@ -60,14 +60,9 @@ struct Exemption {
 inline constexpr Exemption kDestructiveExemptions[] = {
     {"erase_input_map",
      "clears a project setting; project content is versioned (write tier)"},
-    {"remove_group_node",
-     "removes the group membership only; the node object itself is left "
-     "untouched and the change is registered with the editor undo/redo"},
     {"remove_physics_3d_body_collision_exception",
      "removes a relation entry between two physics bodies; no object is "
      "destroyed"},
-    {"remove_resource_file",
-     "deletes a file on disk; project content is versioned (write tier)"},
 };
 
 struct ToolDeclaration {

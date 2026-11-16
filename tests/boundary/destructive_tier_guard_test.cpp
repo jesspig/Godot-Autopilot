@@ -80,7 +80,7 @@ std::string side_effect_of_tool(const std::string &name) {
 
 TEST(DestructiveTierGuardTest, EveryToolIsDeclared) {
   const auto all = declarations();
-  EXPECT_GT(all.size(), 300u);
+  EXPECT_GT(all.size(), 250u);
 }
 
 TEST(DestructiveTierGuardTest, DestructionShapedToolsAreDestructiveOrExempted) {
@@ -113,9 +113,10 @@ TEST(DestructiveTierGuardTest, EveryExemptionNamesARegisteredTool) {
 }
 
 TEST(DestructiveTierGuardTest, ExemptionLookupIsCaseSensitiveAndExact) {
-  EXPECT_NE(side_effect_policy::find_exemption("remove_resource_file"),
+  EXPECT_NE(side_effect_policy::find_exemption("erase_input_map"),
             nullptr);
-  EXPECT_EQ(side_effect_policy::find_exemption("remove_resource"), nullptr);
+  EXPECT_EQ(side_effect_policy::find_exemption("erase_input_map_action"),
+            nullptr);
   EXPECT_EQ(side_effect_policy::find_exemption("delete_display_window"),
             nullptr);
 }
@@ -181,7 +182,7 @@ TEST(DestructiveTierGuardTest, ReviewedDestructiveToolsKeepTheirTier) {
 }
 
 TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
-  EXPECT_EQ(side_effect_of_tool("remove_resource_file"), "writes_file");
+  EXPECT_EQ(side_effect_of_tool("resource_file"), "writes_file");
   EXPECT_EQ(side_effect_of_tool("os_file_write"), "writes_file");
   EXPECT_EQ(side_effect_of_tool("erase_input_map"), "writes_config");
   EXPECT_EQ(side_effect_of_tool("update_autoloads"), "writes_config");
@@ -189,12 +190,12 @@ TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("execute_script"), "code_execute");
   EXPECT_EQ(side_effect_of_tool("game_script"), "game_runtime");
   EXPECT_EQ(side_effect_of_tool("property_set"), "writes_scene");
-  EXPECT_EQ(side_effect_of_tool("spawn_node_bundle"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("scene_camera"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("create_scene_node"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("signal_connect"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("set_tilemap_cells"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("attach_script_to_node"), "writes_scene");
-  EXPECT_EQ(side_effect_of_tool("add_group_node"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("node_group"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("os_environment"), "process");
   EXPECT_EQ(side_effect_of_tool("get_os_unique_id"), "process");
   EXPECT_EQ(side_effect_of_tool("get_os_user_data_dir"), "process");
@@ -225,8 +226,8 @@ TEST(DestructiveTierGuardTest, GuardAcceptsDeclaredDestructiveTools) {
 TEST(DestructiveTierGuardTest, ExemptionMechanismSuppressesTheFinding) {
   std::vector<side_effect_policy::ToolDeclaration> tools;
   side_effect_policy::ToolDeclaration suspect;
-  suspect.name = "remove_resource_file";
-  suspect.description = "Delete a resource file from disk.";
+  suspect.name = "erase_input_map";
+  suspect.description = "Erase an action from the input map.";
   tools.push_back(suspect);
   ASSERT_NE(side_effect_policy::find_exemption(suspect.name), nullptr);
   EXPECT_TRUE(side_effect_policy::destructive_suspects(tools).empty());
