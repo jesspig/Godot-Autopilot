@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-11-17T02:19:35+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource:
   - README.md
   - README.zh-CN.md
@@ -67,7 +67,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 （`System` 5 = 3 个元工具（`call_tool`/`batch_execute`/`code_execute`）+ `system_status` + `get_game_log_entries`（Log 域，归 System 类），`Meta` 2 = `search_tools`/`get_tool_detail`；域文件口径的 35 个域计数见 [tool_surface_report.md](./tool_surface_report.md)「按域计数」。）
 
-**生产别名 325** 不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析到 canonical，统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；schema 统计 235 非空 + 17 空（空 = 无参数且无 action schema）；能力矩阵 561 域行 / 567 catalog 行，mapped 315、kept 252、missing 0。`system_status`（端口/版本/运行时长，`SpecTool`）经 `call_tool` 调用，不直接注册为 MCP 工具。`ping` 是 `system_status` 的别名。
+**生产别名 325** 不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析到 canonical，统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；schema 统计 235 非空 + 17 空（空 = 无参数且无 action schema）；能力矩阵 561 域行 / 567 catalog 行，mapped 315、kept 252、missing 0。`system_status`（端口/版本/运行时长，`SpecTool`）经 `call_tool` 调用，不直接注册为 MCP 工具。`ping` 是 `system_status` 的别名。只读工具回显 `"none"`（`side_effect_name(SideEffect::None)`）；`code_execute`/`batch_execute` 声明为 `code_execute`（`SideEffect::CodeExecute`）。
 
 ### 提示词模板：12 个（7 通用 + 5 调试）
 
@@ -141,7 +141,7 @@ godot-self-driving/
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 27 个文件（7 cpp + 20 hpp）
 │   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
 ├── skills/                     # 插件技能卡源（1 张入口卡 + 9 篇 references；共 10 个 .md）
-├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 39 个 .ts（37 个测试文件运行 345 项：322 pass + 23 skip）
+├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 37 个 .test.ts（运行 348 项：325 pass + 23 skip）
 ├── tests/                      # 单元/边界/集成 gtest 目标 + support/ 夹具 + guard/ 源码守卫（含 no_python_guard）+ probe/ 传输探针（数值见 tests.md 数值核算总表）
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，scripts.gda-dev-tools → devtools/main.ts，零运行时依赖）
@@ -180,26 +180,7 @@ flowchart LR
 
 ## 关键数字速查
 
-| 项 | 值 |
-|---|---|
-| MCP 端口 / 端点 | 20000–29999 随机分配并持久化 / `/mcp`（环境变量 `GODOT_AUTOPILOT_PORT` 覆盖；默认仅绑定 `127.0.0.1`，非环回 host 启动时拒绝） |
-| 工具总数 | catalog 252 = 246 领域 + 5 元 + `system_status`；35 个域文件 / 28 个 category；生产别名 325（0.4.0 弃用、0.6.0 移除） |
-| 提示词 / 资源 | 12 模板（7 通用 + 5 调试）/ 15 引擎与调试资源 + 21 skills 资源 |
-| 派发预算 | 主线程等待三档：默认 27000 ms / 健康探针 5000 ms / 长阻塞 29000 ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS` / `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS` / `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`，后者可下调至 `[1000, 29000]`） |
-| `code_execute` 超时 | `timeout_ms` 上界 = `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`，默认环境下 27000 ms；schema `maximum` 与提示词同源 |
-| side_effect | 只读工具回显 `"none"`（`side_effect_name(SideEffect::None)`）；`code_execute`/`batch_execute` 声明为 `code_execute`（`SideEffect::CodeExecute`） |
-| 守卫 | 以 [测试体系](tests.md) 数值核算总表为准（2026-11-13 新增 `no_python_guard` 与自测项） |
-| 日志类别 | 5（System / Transport / Tools / Resources / Prompts） |
-| 引擎目标 | Godot 4.7（`.gdextension` 的 `compatibility_minimum`） |
-
-## 文档一致性核查（速览）
-
-- 端口自动分配（20000–29999，按工程持久化）、`/mcp`、`GODOT_AUTOPILOT_PORT`：`README.md`（英）/ `README.zh-CN.md`、AGENTS.md、代码三方一致 ✓
-- 工具总数：五语 README 口径为 badge `tools-252` 与 **252 tools**（246 域工具 + 5 元工具 + `system_status`，数量随版本增长以 `search_tools` 查到的为准），与 wiki 实测 catalog 252 一致；325 个生产别名不占 catalog；`ToolRegistry`/catalog 口径自洽（registry 252 = 246 域 + `system_status` + 5 元）✓
-- CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag 双格式 `v*.*.*` / `[0-9]*.*.*` 触发 Release，另支持 `workflow_dispatch` 手动指定 tag），AGENTS.md 声称属实 ✓
-- 目标引擎 4.7：README 前提“Godot 4.7+”与 `.gdextension` 的 `compatibility_minimum`、AGENTS.md 口径一致 ✓
-- 安装入口：五语 README 指向根 `INSTALL.md`；安装脚本的 tag 双格式与 `sha256sums.txt` 口径见 [build.md](./build.md) 与 [modules/cli.md](./modules/cli.md) ✓
-- 详细对照见 [modules/core.md](./modules/core.md) 的"不一致点"章节
+数值（工具总数、schema 基线、单元/集成用例数、ctest 注册点、CLI 单测数、守卫等）以 [tests.md](tests.md)「数值核算总表」为唯一权威，本页不复制。端口与端点、派发预算、`code_execute` 超时等硬事实见上文各对应小节。
 
 ## 相关页面
 

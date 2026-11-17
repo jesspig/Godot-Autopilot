@@ -7,7 +7,7 @@ tags:
   - 核心层
   - 线程模型
   - 存储布局
-timestamp: "2026-11-14T15:09:44+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource: src/core/
 ---
 
@@ -15,7 +15,7 @@ resource: src/core/
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-11-14（0.3.2 移除 REST 与授权门后的核心层事实；目录与文件数以当前源码为准）
+> 审计日期：2026-11-17（0.3.2 移除 REST 与授权门后的核心层事实；目录与文件数以当前源码为准）
 > 目录布局：`src/core/` 分根目录（基座与线程模型）、`transport/`（HTTP 与端口）、`observability/`（日志/轨迹/监控/脱敏）、`storage/`（集中根/工程目录/实例登记）；共 31 个业务 `.cpp`（不含 header-only 与版本模板）。
 ## 模块简介
 
@@ -31,9 +31,9 @@ resource: src/core/
 | `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（内存缓冲，含可选 `detail` 诊断行与 `trace_id`/`span_id` 关联字段），单例 | 全部模块、`McpLogDock`、log 类资源、`LogPersist`（增量落盘） |
 | `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化（10-21 起落在**工程级**存储目录 `<集中根>/projects/<项目名>-<哈希>/` 下）：`logs/gda-<stamp>.log`（人类可读全量含 detail）与 `traces/trace-<stamp>.jsonl`（结构化事件）+ `traces/images/`（仅脱敏关闭时图片落盘）；两目录各保留最近 20 文件 / 50MB；`write_trace_now(line)`（09-29 新增）与 `flush_on_main_thread()` 的批量 trace 追加**统一到同一条持锁通道** `append_trace_payload()`（`std::ofstream` + `std::ios::app` 追加，取代原先不持锁的 Godot `FileAccess` + `seek_end` 追加），供 dispatch 超时等关键观测绕过缓冲区落盘；截图**不在 transport 线程落盘**——`store_trace_image` 只解码并入主线程图片缓冲（`enqueue_trace_image`），由 `flush_on_main_thread` 末尾的 `flush_trace_images()` 统一落盘，缓冲溢出丢最旧并累加 `dropped_trace_images`；09-21 起暴露健康计数（`dropped_log_lines`/`dropped_trace_lines`/`dropped_trace_images`/`bytes_written`/`flush_failures`/`rotations`/`pruned_files`）与 `health_summary()`/`trace_dir()`，溢出/写失败/rotate/prune 均发 `kind=persist_health` 事件 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显；dispatch 超时经 `write_trace_now` 直写）、`McpLogDock`（Open Traces 打开 `trace_dir()`） |
 | `TraceRecorder` | `trace_recorder.cpp/hpp`（09-20 新增） | 进程内 trace 事件环形缓冲（容量 20000）：`record`/`query_recent`/`query_by_trace`/`query_by_request`/`query_since`/`next_seq`；09-21 起新增 `enum class TraceKind`（15 值）与 `trace_kind_name()`，`TraceEvent` 追加 `kind/name/request_id/correlation_id/phase/state/monotonic_ns/thread_id/attrs/error_type/stack/bytes`（`to_json_line` 在原键序之后追加，jsonl schema v2），敏感键剥离改为大小写不敏感通用集合；纯函数含 id 生成、参数脱敏、`sanitize_text`、`monotonic_now_ns`/`current_thread_id`、FNV-1a 哈希、base64 解码、JSON 行格式化 | `monitor`（统一写入）、`SpecTool::execute`、`dispatch`、`tool_invoke`、`LogPersist` |
-| `sanitize_policy` | `sanitize_policy.cpp/hpp`（09-20 新增，header 内含原子缓存） | 脱敏开关全局缓存：`enabled()`/`set_enabled()` 供热路径读取，`initialize()` 按 env > config > 默认 true 解析 | `main.cpp`（入口初始化）、`McpConfigDock`（复选框切换）、`SpecTool::execute`/`tool_invoke`/`LogPersist::store_trace_image` |
-| `monitor`（统一埋点门面） | `monitor.hpp/cpp`（09-21 新增，纯 std，可被 MCP SDK worker 线程调用） | 统一埋点入口：`emit/tool_call/lifecycle/data_flow/ui_action/security/state/error_event/perf` 写入便捷函数、`begin_request/end_request/note_protocol_error/note_notification/note_client/note_transport` 协议侧钩子、`RequestRegistry`（request_id→trace/span 关联表，上限 4096、FIFO 淘汰）、`RequestScope`/`push_request`/`pop_request`/`current_request_id`、`Counters`/`counters()`、`sanitize_field`/`json_escape`/`build_attrs`、`request_id_text(RequestId)`、`persist_health`、`LockProbe`（锁等待超过阈值才记录，否则零开销） | `tool_spec`/`dispatch`/`tool_invoke`、`server_context`、`main.cpp`、`autopilot_tools`、`runtime_ops`、`resource_handlers`/`debugger_resources`、`mcp_log_dock`/`mcp_config_dock` |
-| `monitor_env` | `monitor_env.cpp`（09-21 新增） | `environment_snapshot()`（**仅主线程**）——会话开始写 `kind=snapshot` 事件，含 gda_version/Godot 版本/OS 名与版本/处理器数/对象数/编辑器模式/场景路径与根节点/port/desensitize/show_time/allow/session_nonce | `main.cpp`（`_enter_tree`） |
+| `sanitize_policy` | `sanitize_policy.cpp/hpp`（09-20 新增，header 内含原子缓存） | 脱敏开关全局缓存：`enabled()`/`set_enabled()` 供热路径读取，`initialize()` 按 env > config > 默认 true 解析 | `main.cpp`（入口初始化）、`SpecTool::execute`/`tool_invoke`/`LogPersist::store_trace_image` |
+| `monitor`（统一埋点门面） | `monitor.hpp/cpp`（09-21 新增，纯 std，可被 MCP SDK worker 线程调用） | 统一埋点入口：`emit/tool_call/lifecycle/data_flow/ui_action/security/state/error_event/perf` 写入便捷函数、`begin_request/end_request/note_protocol_error/note_notification/note_client/note_transport` 协议侧钩子、`RequestRegistry`（request_id→trace/span 关联表，上限 4096、FIFO 淘汰）、`RequestScope`/`push_request`/`pop_request`/`current_request_id`、`Counters`/`counters()`、`sanitize_field`/`json_escape`/`build_attrs`、`request_id_text(RequestId)`、`persist_health`、`LockProbe`（锁等待超过阈值才记录，否则零开销） | `tool_spec`/`dispatch`/`tool_invoke`、`server_context`、`main.cpp`、`autopilot_tools`、`runtime_ops`、`resource_handlers`/`debugger_resources`、`mcp_log_dock` |
+| `monitor_env` | `monitor_env.cpp`（09-21 新增） | `environment_snapshot()`（**仅主线程**）——会话开始写 `kind=snapshot` 事件，含 gda_version/Godot 版本/OS 名与版本/处理器数/对象数/编辑器模式/场景路径与根节点/port/desensitize/show_time/session_nonce | `main.cpp`（`_enter_tree`） |
 | `perf_sampler` | `perf_sampler.hpp/cpp`（09-21 新增） | 主线程周期采样（默认 5s，env `GODOT_AUTOPILOT_PERF_INTERVAL_MS`）写 `kind=perf` 事件（帧时间均值/最大、FPS、近似 `cpu_frame_time_ms`、内存、对象/节点数、队列深度/拒绝数/锁等待、吞吐/错误率/平均延迟）；并做请求超时看门狗（默认 60s，env `GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`，超时发 `kind=execution_state, state=timed_out`）；`set_queue(const CommandQueue*)` 由 `main.cpp` 注入以读队列统计 | `main.cpp`（`_enter_tree` 注入队列、`_process` 每帧 tick） |
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
 | 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回；画布空间即 `Control::get_global_rect()`/`get_global_transform()` 所在空间，注入的 `InputEventMouseButton.position` 为窗口客户区坐标（引擎侧经 `get_final_transform()` 反变换）——`src/core/editor_coords.hpp:12-17`；10-11 起增逆换算 `window_point_to_viewport`（行列式绝对值 < 1e-9 回退输入原值，树内暂无游戏侧调用方，单元测试 `coords_inverse_test` 直测）） | 游戏侧 `run_ui_click` 注入坐标换算与 `get_game_ui_elements` 窗口字段（见[入口与运行时](entry_runtime.md)） |
@@ -42,14 +42,14 @@ resource: src/core/
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
 | `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
-| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化：**工程级** `config.json`（端口偏好 `port`）与**全局级** `config.json`（`show_time` Show timestamps 开关持久化，默认 true；`desensitize` 脱敏开关持久化，默认 true；`allow` 能力授权列表，默认空=拒绝；`auth_mode` 授权模式，默认空=严格模式，取值 `strict` / `legacy`）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源 | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）与 Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive / Allow process 复选框（`load_allow`/`save_allow`，10-21 补 process）及 Desensitize data 复选框（`load_desensitize`/`save_desensitize`）与 Authorization mode 下拉（`load_auth_mode`/`save_auth_mode`，10-22 新增）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`authorization::capability_enabled`（经注册的 AllowProvider 每次调用读取）与 `authorization::current_auth_mode`（经注册的 AuthModeProvider 每次调用读取）、`sanitize_policy::initialize`（环境变量未设置时） |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化：**工程级** `config.json`（端口偏好 `port`）与**全局级** `config.json`（`show_time` 时间戳开关与 `desensitize` 脱敏开关，均默认 true；`allow`/`auth_mode` 键已随 0.3.2 授权门移除）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源 | `ServerContext` 端口解析（`load_port`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`sanitize_policy::initialize`（无 `GODOT_AUTOPILOT_DESENSITIZE` 时读 `load_desensitize`） |
 | `HomeResolver` | `gda_home.cpp/hpp`（10-21 新增） | 家目录**集中根**解析：显式覆写环境变量 `GODOT_AUTOPILOT_HOME` → 平台环境变量（Windows `USERPROFILE` / POSIX `HOME`）→ 派生兜底（Windows 由 `%APPDATA%` 上溯两级；POSIX 由数据目录 `XDG_DATA_HOME` 或 `$HOME/.local/share` 上溯两级）→ 结果校验（形状校验 + 必须是已存在目录，首个通过者胜出，全不通过则返回空串并记 Warning） | `ProjectStore::root_dir`、`ServerContext::write_instance_record`（写 `gda_home` 字段） |
 | `ProjectStore` | `project_store.cpp/hpp`（10-21 新增） | 存储布局解析：集中根目录名 `GDA_HOME_DIR_NAME`（`.godot-autopilot`）、工程目录名 `<工程目录名>-<路径 FNV-1a 哈希前 8 位>`（工程名经非法字符替换并截断 40 字符）、全局配置路径、工程级配置路径、全局实例索引路径、工程级实例目录 | `StoragePaths`、`InstanceRegistry`、`api_token`（令牌文件路径） |
 | `StoragePaths` | `storage_paths.cpp/hpp`（10-21 新增） | 语义化存储路径门面：全局配置、工程目录、工程配置、`logs/`、`traces/`、`captures/` 六个目录的绝对路径 | `LogPersist`（日志/轨迹落盘）、`capture_ops`（截图落盘）、`PluginConfig` |
 | `InstanceRegistry` | `instance_registry.cpp/hpp`（10-21 新增） | 实例登记：单实例记录读写删 + **全局索引重建**（遍历全部工程目录下的实例文件汇总写回 `<集中根>/instances.json`）；记录含 `instance_id`/`port`/`pid`/`project_path`/`api_token`/`endpoints`/`gda_home`/`started_at`/`version` | `ServerContext::write_instance_record` / `remove_instance_record`、CLI 侧发现链 |
-| `LegacyStore` | `legacy_store.cpp/hpp`（10-21 新增） | 遗留数据兼容：旧目录 `user://godot_autopilot` 定位、配置项**回退选取**（新路径缺键时取旧路径并标记来源）、按相对路径分类（全局配置 / 日志 / 轨迹 / 截图）、**复制式**导入规划与执行（不覆盖已存在目标、不删除源） | `PluginConfig`（回退读取）、`McpConfigDock`（导入入口） |
+| `LegacyStore` | `legacy_store.cpp/hpp`（10-21 新增） | 遗留数据兼容：旧目录 `user://godot_autopilot` 定位、配置项**回退选取**（新路径缺键时取旧路径并标记来源）、按相对路径分类（全局配置 / 日志 / 轨迹 / 截图）、**复制式**导入规划与执行（不覆盖已存在目标、不删除源） | `PluginConfig`（回退读取）；复制式导入入口已随 0.3.2 `McpConfigDock` 移除，`plan_import`/`import_legacy_data` 当前无调用点 |
 | `PortResolver` | `port_resolver.cpp/hpp`（10-21 新增） | 端口分配：显式（环境变量）/ 配置偏好 / 自动分配三级判定 + `[20000, 29999]` 随机候选序列（0.3.2 起不优先 9527） | `ServerContext::bind_transport` |
-| `InstanceGuard` | `instance_guard.cpp/hpp`（10-21 新增） | 同工程实例守卫：启动前（**绑定端口之前**）判定「同一工程是否已有存活实例」——进程存活（Windows `OpenProcess` + `GetExitCodeProcess`，权限不足时保守判存活；POSIX `kill(pid, 0)`）与端口占用（临时套接字 `bind`，不设 `SO_REUSEADDR`）**两条同时成立**才算冲突；命中即拒绝启动（不监听端口、不写登记）并给出含端口/进程号与豁免开关 `GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE=1` 的提示（`conflict_message`，不含令牌等敏感信息）；工程路径比较忽略分隔符风格与尾斜杠，Windows 下忽略大小写 | `ServerContext` 启动前检查、`McpConfigDock` 状态区显示 `last_error_` |
+| `InstanceGuard` | `instance_guard.cpp/hpp`（10-21 新增） | 同工程实例守卫：启动前（**绑定端口之前**）判定「同一工程是否已有存活实例」——进程存活（Windows `OpenProcess` + `GetExitCodeProcess`，权限不足时保守判存活；POSIX `kill(pid, 0)`）与端口占用（临时套接字 `bind`，不设 `SO_REUSEADDR`）**两条同时成立**才算冲突；命中即拒绝启动（不监听端口、不写登记）并给出含端口/进程号与豁免开关 `GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE=1` 的提示（`conflict_message`，不含令牌等敏感信息）；工程路径比较忽略分隔符风格与尾斜杠，Windows 下忽略大小写 | `ServerContext` 启动前检查 |
 | `TransportLifecycle` | `transport_lifecycle.hpp`（header-only，10-21 新增） | 线程退出契约的纯逻辑判定：阶段先判完成再执行、停止标志阻断新任务、预算比较为独占、超预算 worker 在优雅关闭时挂起、终态关闭改为 join 而非挂起、只收割已完成的 worker、挂起容器收割后清空 | `http_transport.cpp`（连接工作线程的有界等待与卸载前收割） |
 | `PortRecovery` | `port_recovery.hpp`（header-only，10-21 新增） | 同工程残留登记的甄别与提示：同工程路径比较（忽略分隔符风格）、区分陈旧与存活记录、跳过当前进程自己的记录、生成不含令牌的残留提示 | `InstanceGuard` 绑定前的残留清理 |
 | 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`）、`log_persist.cpp`（trace `session_start` 头的 `gda_version`） |
@@ -124,7 +124,7 @@ resource: src/core/
 ### sanitize_policy（命名空间函数，09-20 新增）
 
 - `bool enabled()` / `void set_enabled(bool)` — 进程内原子缓存，热路径（`SpecTool::execute`/`tool_invoke`/`LogPersist::store_trace_image`）直接读取
-- `void initialize()` — 解析优先级：`GODOT_AUTOPILOT_DESENSITIZE` 环境变量（`0`/`false`/`off` 判为关闭，其余非空值判为开启）> `PluginConfig::load_desensitize()`（`desensitize` 键，缺省 true）> 默认 `true`；仅在 `_enter_tree` 调用一次，之后由 MCP Config 面板的 "Desensitize data" 复选框实时改写并持久化
+- `void initialize()` — 解析优先级：`GODOT_AUTOPILOT_DESENSITIZE` 环境变量（`0`/`false`/`off` 判为关闭，其余非空值判为开启）> `PluginConfig::load_desensitize()`（`desensitize` 键，缺省 true）> 默认 `true`；仅在 `_enter_tree` 调用一次，运行期无面板开关，改环境变量或配置需重启编辑器生效
 
 ### monitor（统一埋点门面，09-21 新增）
 
@@ -138,7 +138,7 @@ resource: src/core/
 
 ### monitor_env（`environment_snapshot()`，09-21 新增）
 
-- `environment_snapshot()`（**仅主线程**）— 会话开始采集并写一条 `kind=snapshot` 事件：`gda_version`、Godot 版本、OS 名与版本、处理器数、对象数、编辑器模式、场景路径与根节点、`port`、`desensitize`、`show_time`、`allow`、`session_nonce`；由 `main.cpp` 的 `_enter_tree` 在 `init_session()` 之后调用
+- `environment_snapshot()`（**仅主线程**）— 会话开始采集并写一条 `kind=snapshot` 事件：`gda_version`、Godot 版本、OS 名与版本、处理器数、对象数、编辑器模式、场景路径与根节点、`port`、`desensitize`、`show_time`、`session_nonce`；由 `main.cpp` 的 `_enter_tree` 在 `init_session()` 之后调用
 
 ### perf_sampler（`perf_sampler`，09-21 新增）
 
@@ -197,7 +197,7 @@ MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）�
 - 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()`/`resolve_host()` 解析端口与主机并写 Transport 日志；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
 - `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
 - `void stop()` — 幂等关闭 `server_`/`transport_`，清空 dispatch handler 与 active registry；析构函数对非空资源兜底调用
-- `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；供配置面板运行时改端口（配置面板 Apply 后立即生效，无需重启编辑器）
+- `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；0.3.2 配置面板（`McpConfigDock`）移除后 `src/` 内已无调用点，保留为编程入口
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", GDA_VERSION}`（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
 - 缓存提示（`server_context.cpp:95-103`）：MCP 2026-07-28 规范要求六类 cacheable 结果携带缓存提示，协商到 2026 era 的客户端会按必填字段校验；`ttlMs=0` 表示"立即过期"，仅满足字段声明，客户端仍每次重新拉取，行为与未声明时一致
@@ -216,13 +216,7 @@ MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）�
 - `bool save_show_time(bool show)` — 写回全局级 `{"show_time": bool}`（同经 `save_config_value` 合并写回）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
 - `bool load_desensitize()` — 读全局级 `desensitize` 键（09-20 新增；10-21 起同款回退）；文件不存在/解析失败/非布尔时返回 `true`（脱敏默认开启）
 - `bool save_desensitize(bool value)` — 写回全局级 `{"desensitize": bool}`（同经 `save_config_value` 合并写回）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
-- `std::string load_allow()` — 读全局级 `allow` 键（逗号分隔能力列表；10-21 起同款回退）；文件不存在/解析失败/非字符串时返回空串
-- `bool save_allow(const std::string &allow)` — 写回全局级 `{"allow": string}`（同经 `save_config_value` 合并写回）
-- `std::string load_auth_mode()` — 读全局级 `auth_mode` 键（**授权模式**，10-22 新增；同款旧路径回退）；文件不存在/解析失败/非字符串时返回空串（空串按未设置处理，回落严格模式）
-- `bool save_auth_mode(const std::string &mode)` — 写回全局级 `{"auth_mode": string}`（同经 `save_config_value` 合并写回）；取值只认 `strict` / `legacy`，非法取值在授权判定侧回落严格模式并告警
-- **AllowProvider 桥接（09-13 下午起）**：`plugin_config.cpp` 的静态对象在构造时调用 `authorization::set_allow_provider(&PluginConfig::load_allow)`，使 `capability_enabled` 在无 `GODOT_AUTOPILOT_ALLOW` 环境变量时改读配置——每次调用实时读取，故配置改动下一次工具调用即生效
-- **AuthModeProvider 桥接（10-22 新增）**：同一静态对象另调用 `authorization::set_auth_mode_provider(&PluginConfig::load_auth_mode)`；`authorization::current_auth_mode()` 的取值优先级为 `GODOT_AUTOPILOT_AUTH_MODE` 环境变量 > 该 provider（配置 `auth_mode` 键）> 严格模式，**每次授权判定实时读取**，非法取值回落严格模式并记一条 Warning（同值只记一次）
-- 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）与 "Allow code_execute" / "Allow game_runtime" / "Allow user tools" / "Allow write" / "Allow destructive" 复选框（`load_allow`/`save_allow`）及 "Desensitize data" 复选框（`load_desensitize`/`save_desensitize`，勾选同时经 `sanitize_policy::set_enabled` 立即生效）、"Authorization mode" 下拉（`load_auth_mode`/`save_auth_mode`，切换后下一次工具调用即生效）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）、`authorization`（能力门的 AllowProvider 与 AuthModeProvider）、`sanitize_policy::initialize`（无 `GODOT_AUTOPILOT_DESENSITIZE` 时读取 `desensitize`）
+- 0.3.2 起 `load_allow`/`save_allow`/`load_auth_mode`/`save_auth_mode` 与 AllowProvider/AuthModeProvider 桥接已随授权门整体删除，`PluginConfig` 只剩上述端口与开关持久化
 
 ## 数据存储布局（集中根与工程目录，10-21 新增）
 
@@ -274,10 +268,9 @@ MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）�
 | 场景 | 行为 |
 |---|---|
 | 配置项读取 | 新路径**缺该键**时回退读旧路径同键，并在日志中**注明来源**（含旧路径，每个键只记一次：`Plugin config value read from legacy path`）；新路径有该键则以新路径为准，旧值被忽略。回退选取由 `LegacyStore::select_config_value` 实现：新路径能解析且含该键即用它，新路径解析失败才退到旧路径 |
-| 数据文件（日志 / 轨迹 / 截图） | **不自动迁移**；只能通过控制面板的**复制式导入**入口显式导入 |
-| 控制面板导入 | 按钮 `Import Legacy Data (copy to new dir, old data kept)`——**只复制不覆盖**（目标已存在则跳过并计入 `skipped_existing`）、**不删除旧数据**、不支持的相对路径计入 `skipped_unsupported`；执行结果以摘要文本回显（复制数 / 跳过数 / 失败数） |
+| 数据文件（日志 / 轨迹 / 截图） | **不自动迁移**；复制式导入入口（`Import Legacy Data` 按钮）已随 0.3.2 `McpConfigDock` 移除，`LegacyStore::plan_import` / `import_legacy_data` 保留实现但当前无调用点——需要迁移旧数据时手工复制（**只复制不覆盖**、不删除旧数据） |
 
-导入的**相对路径分类**（`LegacyStore::classify_relative_path`）：`config.json` → 全局配置目录；`logs/` `traces/` `captures/` 下的文件 → 对应工程目录；其余相对路径归为不支持（`skipped_unsupported`）不复制。面板在启动时检测旧目录是否有内容，无内容时禁用导入按钮并提示 `No legacy data found at <path>`。
+导入的**相对路径分类**（`LegacyStore::classify_relative_path`）：`config.json` → 全局配置目录；`logs/` `traces/` `captures/` 下的文件 → 对应工程目录；其余相对路径归为不支持（`skipped_unsupported`）不复制。
 
 不支持自动搬迁的理由：旧目录可能很大（日志与轨迹按会话累积），且用户可能仍在别的 Godot 版本里读它；静默搬运会同时打断两边。
 
@@ -285,7 +278,7 @@ MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）�
 
 ```mermaid
 flowchart LR
-    Client[MCP Client] -->|POST /mcp 端口 9527| HTTP[SDK HTTP 线程]
+    Client[MCP Client] -->|POST /mcp 端口 20000–29999 自动分配| HTTP[SDK HTTP 线程]
     HTTP -->|queue.submit() 返回 future| Q[CommandQueue 互斥队列]
     Q -->|_process 每帧 drain| Main[Godot 主线程]
     Main --> API[Godot API / 场景 / 引擎]
@@ -300,7 +293,7 @@ flowchart LR
 
 ## 生命周期（插件 ↔ ServerContext）
 
-1. `GDExtensionEntryPoint`（`main.cpp:319-392`）：`MODULE_INITIALIZATION_LEVEL_SCENE` 在非编辑器进程调用 `game_bridge::register_listener()`（桥接类注册与消息捕获）；`MODULE_INITIALIZATION_LEVEL_EDITOR` 先 `debugger_ops::register_classes()`、再依次 `ClassDB::register_class` 注册 5 个类（`McpLogDock`、`McpConfigDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，`main.cpp:346-350`），最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
+1. `GDExtensionEntryPoint`（`main.cpp`）：`MODULE_INITIALIZATION_LEVEL_SCENE` 在非编辑器进程调用 `game_bridge::register_listener()`（桥接类注册与消息捕获）；`MODULE_INITIALIZATION_LEVEL_EDITOR` 先 `debugger_ops::register_classes()`（2 个调试器捕获类）、再依次 `ClassDB::register_class` 注册 4 个类（`McpLogDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，`main.cpp:431-434`），最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
 2. `_enter_tree`：`monitor::lifecycle("plugin_enter_tree")` → `s_queue.open()`（`main.cpp:113`）→ `perf_sampler::set_queue(&queue())` → `sanitize_policy::initialize()` + `LogPersist::init_session()`（09-21 起重置日志/轨迹游标）→ `monitor::environment_snapshot()`（写 `kind=snapshot`）→ `runtime_ops::set_editor_queue(&queue())` 注入队列（`main.cpp:141-142`，**在 `s_queue.open()` 之后**）→ 记 `tools_singleton_registered` lifecycle + Log Dock/输出捕获/调试器插件 → `new ServerContext(queue)` 并 `start()`（成功发 `server_ready` lifecycle）→ Config Dock → `add_export_plugin(ExportGuard)` → 记 `plugin_ready`；`gda_cmdline_mode()` 为真时跳过 UI/服务器（`GDA_FORCE_HEADLESS=1` 反向禁用 cmdline 模式，语义与变量名相反）
 3. `_process`：每帧 `perf_sampler::tick(delta)` + `LogPersist::flush_on_main_thread()` + `s_queue.drain()` + Dock 轮询
 4. `_exit_tree`：`ServerContext::stop()` + delete → 注销各组件，末尾再 `flush_on_main_thread()` 收尾（`main.cpp:315`）
@@ -315,9 +308,9 @@ flowchart LR
 - 运行时改端口：`ServerContext::restart(uint16_t)` 仍在实现中，但 0.3.2 起配置面板 Apply 已删除，无 UI 调用点
 - `GDA_FORCE_HEADLESS`：值为 `1` 时**禁用** cmdline 模式（强制建 UI/启服务器，语义与变量名相反；`main.cpp:52-60` 读取）
 - `GODOT_AUTOPILOT_HOME`（10-21 新增）：**家目录集中根的显式覆写**（指向家目录本身，根目录名 `.godot-autopilot` 由其拼出）；形状不合法时记 Warning。插件侧优先级最高，CLI 侧亦识别（但 CLI 只做两级解析，不做存在性校验）
-- `GODOT_AUTOPILOT_API_TOKEN`（10-21 新增）：REST 端点的 Bearer 令牌**外部注入入口**；一旦设置即完全覆盖令牌文件（既用于校验，也用于签发）
+- `GODOT_AUTOPILOT_API_TOKEN`（10-21 新增）：REST 端点的 Bearer 令牌**外部注入入口**；一旦设置即完全覆盖令牌文件（既用于校验，也用于签发）。**待确认**：页头标注 REST / API token 已于 0.3.2 移除，本条是否仍适用未核实
 - `GODOT_AUTOPILOT_DESENSITIZE`（09-20 新增）：脱敏开关的最高优先级来源，`0`/`false`/`off` 关闭、其余非空值开启；未设置时读**全局级** `config.json` 的 `desensitize` 键（10-21 起路径迁至集中根，新路径缺键时回退旧路径），再默认开启（`sanitize_policy::initialize`，仅在入口读取一次）
-- `GODOT_AUTOPILOT_AUTH_MODE`（10-22 新增）：**授权模式**的最高优先级来源，取值只认 `strict`（默认，写类与危险类默认拒绝）与 `legacy`（写类默认放行、等同 0.2.7 行为，危险类与破坏类仍默认拒绝）；未设置时读**全局级** `config.json` 的 `auth_mode` 键，再默认严格模式；取值非法时回落严格模式并记一条 Warning，**不得静默放宽**（判定见 [T0 安全边界与并发契约](../security_contract.md) §3.1.3）
+- `GODOT_AUTOPILOT_AUTH_MODE`（10-22 新增）：**授权模式**的最高优先级来源，取值只认 `strict`（默认，写类与危险类默认拒绝）与 `legacy`（写类默认放行、等同 0.2.7 行为，危险类与破坏类仍默认拒绝）；未设置时读**全局级** `config.json` 的 `auth_mode` 键，再默认严格模式；取值非法时回落严格模式并记一条 Warning，**不得静默放宽**（判定见 [T0 安全边界与并发契约](../security_contract.md) §3.1.3）。**待确认**：0.3.2 已移除授权门与 `GODOT_AUTOPILOT_AUTH_MODE`（见 [release-notes/0.3.2.md](../../release-notes/0.3.2.md)），本条为 0.3.2 前历史口径，是否仍适用未核实
 - `GODOT_AUTOPILOT_PERF_INTERVAL_MS`（09-21 新增）：`perf_sampler` 采样周期毫秒数，默认 `5000`
 - `GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`（09-21 新增）：`perf_sampler` 请求超时看门狗阈值毫秒数，默认 `60000`
 - `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`（09-29 新增）：dispatch 主线程等待默认预算毫秒数，默认 `27000`（须低于传输硬上限 30000，保证超时错误能送达客户端）

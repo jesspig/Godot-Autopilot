@@ -9,7 +9,7 @@ tags:
   - TypeScript
   - MCP
   - IPC
-timestamp: "2026-11-17T02:19:35+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource:
   - cli/
   - package.json
@@ -313,7 +313,7 @@ resource:
 
 ## 与技能书阶梯的关系
 
-三级调用阶梯（[`godot-autopilot-tools/SKILL.md`](../../../skills/godot-autopilot-tools/SKILL.md)）：
+三级调用阶梯（[`godot-autopilot/SKILL.md`](../../../skills/godot-autopilot/SKILL.md)）：
 
 1. **原生 MCP 工具**（客户端 harness 直连）
 2. **GDA CLI**（本载体；`bunx`、全局安装、独立二进制是同一载体的三种分发方式）
@@ -333,7 +333,7 @@ resource:
 
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
-| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 30 文件；`bun test cli/tests` 实测 275 项（252 pass / 23 skip，2026-11-14） | `bun test cli/tests` |
+| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 37 文件；`bun test cli/tests` 实测 348 项（325 pass / 23 skip，2026-11-17） | `bun test cli/tests` |
 | ctest `cli_unit` | [`tests/CMakeLists.txt`](../../../tests/CMakeLists.txt) | 直接执行 `bun test cli/tests` | bun 缺失时由 CMake 注册 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`cli/tests/contract.test.ts`](../../../cli/tests/contract.test.ts) | CLI 载体 mock conformance | bun 驱动 gda CLI；bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.ts`](../../../tests/guard/version_sync_guard.ts) | 全部版本钉与 `VERSION` 同值 | 扫描 `skills/` 全部文本文件 + 根 `README*.md` 的每一处版本钉，另含 `VERSION` 与 `CLI_VERSION` 两个值源 |

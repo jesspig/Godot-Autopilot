@@ -6,13 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-10-23T02:39:34+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径**：以 [测试体系](../tests.md)「数值核算总表」为唯一权威（10-28 收口实测：ctest 注册点 928 / 非 L2 881 / L1 871 / L2 47）；本页各批次记录中的计数均为交付当时值，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径**：以 [测试体系](../tests.md)「数值核算总表」为唯一权威；本页各批次记录中的计数均为交付当时值，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 
@@ -117,26 +117,20 @@ resource: src/
 
 - **执行预算与超时治理**：`kLongBlocking` 由「无限等待」改为长阻塞预算档（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS` = 29000，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`）；`code_execute` 的 `timeout_ms` 上界取 `min(27000, 生效长阻塞派发预算)`（`code_exec_ops::max_timeout_ms()` 单一来源，schema `maximum` 与提示词同源）；`CommandQueue::execute_sync` 在 `src/` 内已无调用点，资源 / 提示词 / 动态工具 / 游戏通道的等待全部改走带预算的 `submit_tracked_bounded`；新增 `code_execute` 协作式执行期超时（`code="exec_timeout"`）与游戏侧 eval 超时 / 取消（`eval_timeout` / `eval_cancelled`）；无编辑器队列时返回 `queue_unavailable` 结构化错误。
 - **工具契约强制**：`code_execute` 与 `batch_execute` 的 `side_effect` 由 `None` 改为 `CodeExecute`——**`batch_execute` 由此受 `code_execute` 能力门保护，属对外行为变更**；能力门判定去掉工具名特判，只按 `side_effect` 统一判定；`side_effect_name(None)` 由空串改为 `"none"`，任何工具的 `side_effect` 都非空（单元测试 + L2 双层断言锁定）。
-- **主线程契约守卫**：新增 `tests/guard/main_thread_guard.py` 并注册 ctest 用例；trace 截图落盘与轨迹写盘统一到主线程持锁通道；`ExportGuard` 改实例级标志并补齐异常安全复位，导出期拒绝覆盖工具调用 / MCP 资源 / MCP 提示词三类入口。
+- **主线程契约守卫**：新增 `tests/guard/main_thread_guard.py`（后改 `.ts`）并注册 ctest 用例；trace 截图落盘与轨迹写盘统一到主线程持锁通道；`ExportGuard` 改实例级标志并补齐异常安全复位，导出期拒绝覆盖工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **发布产物完整性**：新增 `scripts/test_package_integrity.py`（三平台库 / C# 桥源码 / gdextension 条目 / 无 `.pdb`）并接入 CI 构建后与发布前；`addons.zip` 纳入 C# 桥源码并统一两条打包路径口径。
 - **CLI 中危修复**：启动就绪探测失败终止进程并清理 pending 日志；登记表比较统一 `path.resolve` 且握手状态可失效；顶层 `error` 信封映射为工具失败；移除未实现的 `--quiet`；`stop` 支持 `--id` / `--port` 并复用统一选择器校验。
 - **知识库收敛**：安全契约页两条与代码冲突的断言（`FileAccess` 落盘线程、`call_tool` 是否写 trace）按修复后事实重写；退役整页指向已删除目录的示例工程页；本页补记 10-11 / 10-12 / 10-16 / 10-18 / 10-19 五个缺失批次。
 - 详见 [changelog/2026-10-20-log.md](../changelog/2026-10-20-log.md) 与 [T0 安全边界与并发契约](../security_contract.md)。
 
-## 已交付：控制面二期（0.3.0 内完成）
+## 已交付后移除：控制面二期（0.3.0 交付，0.3.2 移除）
 
-控制面二期随提交 `4aeee67` 进入 CLI，命令总数 12→**14**；E-1a / E-1b / E-1c 三项均落地：
-
-- **E-1a `gda restart`**：定位规则与 `stop` 完全一致（位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一），只作用于 CLI 本地注册表里的实例；流程为「优雅停止（`--force` 才强杀）→ 固定等待 10 秒（**不受 `--wait` 影响**）→ 从注册表移除旧条目 → 按原端口 / 原 headless / 原 godot 路径重新拉起 → 输出 `previous` 与新实例视图」。停止阶段超时**不启动替代实例**，避免同一工程同时开两个编辑器（扩展加载期可能静默崩溃）。
-- **E-1b 多实例路由**：`/i/<实例 ID 或端口>/api[/…]` 与 `/i/<ref>/mcp` 精确转发；缺省 `/api/...` 与 `/mcp` 在唯一活跃实例时自动转发，多个活跃返回 **409 `instance_ambiguous`**（附 `candidates`），零个返回 **503 `no_active_instance`**；目标不可达 **503 `instance_unavailable`**，上游连接失败 **502 `upstream_unreachable`**，上游超时 **504 `upstream_timeout`**。
-- **E-1c 双面转发**：控制面默认 `127.0.0.1:9700`，`--bind` 只接受环回地址；`GET /control/health` 免认证，`GET /control/instances` 需 Bearer 且**不返回 `apiToken`**，其余路由全部需认证；令牌文件 `<集中根>/control.token`（32 字节随机值的十六进制、`0600`，已存在则复用）；转发时丢弃客户端 `Authorization` 与逐跳头并注入目标实例令牌，响应加 `X-GDA-Instance` 并边到边流式透传（MCP SSE 可直接穿过）。
-- **不做项（明确决定）**：不提供 HTTP 启停端点，控制面只做只读查询与转发；启停仍只在 CLI 侧（`start` / `stop` / `restart`）。理由是把本机进程控制暴露成 HTTP 端点，会让任何能访问该端口的客户端获得启停编辑器的能力，风险大于收益。
-- **验证与口径**：`bun test cli/tests` 实测 **255 pass / 2 skip / 0 fail**（257 项 / 16 文件，Windows 跳过 2 项，193→257）；路由与认证细节见 [CLI 载体](../modules/cli.md)「控制面（`gda serve`）」，端口分工见 [端口与实例登记](../modules/ports.md)「控制面端口」。
+0.3.0 随提交 `4aeee67` 交付控制面二期（命令总数 12→14）：E-1a `gda restart`、E-1b 多实例路由（`/i/<实例 ID|端口>/api|mcp` 精确转发）、E-1c 控制面 `gda serve`（默认 `127.0.0.1:9700`，`/control/health` 免认证、`/control/instances` 需 Bearer，令牌文件 `<集中根>/control.token`）。0.3.2 起 REST 面整体移除，`gda serve` / `gda api` / `gda endpoints` 与控制面端口不复存在（[端口与实例登记](../modules/ports.md)「控制面端口（已移除）」、[CLI 载体](../modules/cli.md)「控制面（已移除）」）；`gda restart` 保留——定位规则与 `stop` 完全一致，停止阶段固定等待 10 秒（不受 `--wait` 影响）、超时不拉起替代实例，避免同工程双开。历史口径仅保留在 [changelog/2026-10-23-log.md](../changelog/2026-10-23-log.md)。
 
 ## 遗留：P3 待规划
 
-- **客户端桥接深化**：一键配置已交付——配置面板现支持 20 个客户端（09-16 由 8 扩至 20，见[支撑模块](../modules/support.md)），对标 godot-ai 的 attach 桥与"Configure all"全家桶仍余 stdio bridge、状态点探测差距
-- **AssetLib 上架**：当前经 GitHub Release zip 分发（`uv run main.py package`），未进 Godot Asset Library
+- **客户端桥接深化**：配置面板与 `client_config_gen` 已随 0.3.2 移除，MCP 配置改由 `gda status --json` 的 `mcp_url` 生成；对标 godot-ai 的 attach 桥与"Configure all"全家桶仍余 stdio bridge、状态点探测差距
+- **AssetLib 上架**：当前经 GitHub Release zip 分发（`bun run gda-dev-tools package`），未进 Godot Asset Library
 
 ## 出站链接
 

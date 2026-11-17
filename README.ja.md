@@ -1,13 +1,13 @@
 # Godot Autopilot
 
 [![ライセンス](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![最新リリース](https://img.shields.io/github/v/release/jesspig/Godot-Autopilot)](https://github.com/jesspig/Godot-Autopilot/releases)
 [![ビルド](https://github.com/jesspig/Godot-Autopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions)
+[![リリースワークフロー](https://github.com/jesspig/Godot-Autopilot/actions/workflows/release.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions/workflows/release.yml)
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![プラットフォーム](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![プロトコル](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
 ![ツール](https://img.shields.io/badge/tools-252-brightgreen)
-
-**Status: beta**
 
 > **AIエージェントがGodotゲームのビルド、プレイテスト、デバッグをエディターの内部から行います。**
 
@@ -15,27 +15,13 @@
 
 > 本翻訳は英語版 [README.md](README.md) を正とします。
 
-Godot Autopilot (GDA) は、プラグインとして**Godotエディターの内部**に常駐する [MCP](https://modelcontextprotocol.io/) サーバーです。インストールすると、AIコーディングアシスタント（Claude Code、Cursor、Codex、OpenCode など）が、ユーザーと同じようにプロジェクトを操作できるようになります。シーンの構築、プロパティの調整、ゲームの実行、ボタンの押下、スクリーンショットの撮影、ログの読み取りを行い、その結果を見ながら反復改善します。
-
-ブリッジプロセスも、エラーをチャット欄にコピー＆ペーストする手間も不要です。グラフィカルなエディターセッションでは、サーバーはプロジェクトを開くと起動し、閉じると停止します。
-
-## エンドツーエンドデモ
-
-エンドツーエンドテスト中に、AIがゲームキャラクターをリアルタイムで操作している様子：
+Godot Autopilot (GDA) は、プラグインとして**Godotエディターの内部**に常駐する [MCP](https://modelcontextprotocol.io/) サーバーです。インストールすると、AIコーディングアシスタント（Claude Code、Cursor、Codex、OpenCode など）が、ユーザーと同じようにプロジェクトを操作できるようになります。シーンの構築、プロパティの調整、ゲームの実行、ボタンの押下、スクリーンショットの撮影、ログの読み取りを行い、その結果を見ながら反復改善します。ブリッジプロセスも、エラーをチャット欄にコピー＆ペーストする手間も不要です。グラフィカルなエディターセッションでは、サーバーはプロジェクトを開くと起動し、閉じると停止します。
 
 ![デモ 001](assets/demo-001.gif)
 
-## できること
+エディターからゲーム実行までのループ全体をカバーする **252個のツール** を備えています（正確な数はバージョンごとに増えていきます。`search_tools` でエージェントに確認してください）。完全なツール面は [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md) を参照してください。
 
-エディターからゲーム実行までのループ全体をカバーする **252個のツール** を備えています（正確な数はバージョンごとに増えていきます。`search_tools` でエージェントに確認してください）。主な機能は次のとおりです：
-
-- **シーンの構築** — ノードの作成、名前変更、移動、削除、プロパティの読み書き、シグナルの接続、GridMap による 3D ブロックレベルの構築ができます（例：`create_scene_node`、`property_set`、`signal_connect`、`get_editor_ui`；GridMap：`create_gridmap`、`set_gridmap_cells`）。
-- **見た目・サウンド・操作感** — メッシュとマテリアル、ライトと環境、オーディオ再生、アニメーションとトゥイーン、UIテーマ、タイルマップを扱えます（例：`create_animation`、`tween_editor_property`、`game_tween`、`audio_player`、`set_tilemap_cells`）。
-- **物理とナビゲーション** — レイ／シェイプキャスト、リジッドボディ、ナビゲーションマップと経路クエリ（例：`physics_query`、`create_nav_3d_map`、`nav_query`）。
-- **手を動かす：入力とUIの自動化** — キー、マウス、ゲームパッドのシミュレート、エディターコントロールの名前指定クリック、エディターショートカットの実行、実行中のゲーム内ボタンのクリックができます（例：`input_mouse`、`get_editor_ui`、`editor_ui_action`、`click_game_ui_element`）。
-- **スクリプトとデバッグ** — エディター内またはゲーム内での GDScript の実行、長時間実行するゲームスクリプトのバックグラウンドジョブとしての起動、プラグイン／ゲーム／スクリプトエラーのログの読み取りができます（例：`execute_script`、`game_script`、`get_plugin_log`）。
-- **プロジェクトと知識** — プロジェクトのファイルとディレクトリーの読み取り・検索・コピー、プロジェクト設定の確認、エンジン内蔵 API ドキュメントのオフライン検索ができます（例：`os_file_text`、`os_file_manager`、`os_file_write`、`get_project_settings`、`get_docs_class`）。
-- **プレイと目視による検証** — 現在のシーンの起動、タイミングを指定した入力シーケンスの注入、エディターとゲームのスクリーンショット撮影、変更前後の差分比較ができます（例：`editor_scene_control`、`game_input`、`capture_editor_viewport`、`review_scene_visually`）。
+スキルブックは **1 枚の入口スキルカードと 9 篇の references**。位置づけとして、MCP は主要な製品チャネルであり、スキルは体験レイヤーです。呼び出しガイドは、MCP が停止している場合に GDA CLI へフォールバックします。詳細は [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md) と [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) を参照してください。
 
 ## クイックスタート
 
@@ -43,85 +29,23 @@ Godot Autopilot (GDA) は、プラグインとして**Godotエディターの内
 
 1. **インストール** — Godot プロジェクトのルートでワンクリックスクリプトを実行するか、手動でのリリースインストールとソースビルドの手順については [INSTALL.md](INSTALL.md) に従ってください。
    - macOS/Linux:
+
      ```bash
      curl -fsSL https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scripts/install.sh \
        | bash -s -- --project "$PWD" --skills
      ```
+
    - Windows PowerShell:
+
      ```powershell
      & ([scriptblock]::Create((irm https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scripts/install.ps1))) `
        -Project (Get-Location).Path -Skills
      ```
+
    スクリプトは `gda` CLI をインストールし、`project.godot` を検出してプラグインをインストールし、必要に応じてスキルブックもインストールします。
 2. **プロジェクトを開く** — グラフィカルなエディターセッションでは、サーバーが自動的に起動し、初回起動時に空いているループバックポートをバインドします（プロジェクトごとに永続化され、`20000–29999` から選択）。ヘッドレス／コマンドラインのエディターセッションではサーバーは起動しません。
 3. **AIクライアントを接続する** — `gda status --json` を実行し、その `mcp_url` をクライアントの MCP 設定に追加します（または URL をエージェントに渡して設定を生成させます）。Streamable HTTP をサポートする MCP クライアントであれば接続できます。例として Claude Code、Codex、Cursor、OpenCode、Copilot などがあります。
 4. **何かを作ってもらう** — 例：「走ってジャンプできるプレイヤーキャラクターを作って、プレイテストして、おかしいところを直して」。
-
-高リスクツール（`destructive`、`process`、`code_execute`、`game_runtime`）には `confirm=true` が必要です。グローバルな許可リストはありません。
-
-## AIエージェントを使ったインストール
-
-同じマシンでシェルを実行できるエージェントに、次を送信してください：
-
-```text
-Read https://github.com/jesspig/Godot-Autopilot/blob/master/INSTALL.md and install it.
-```
-
-エージェントは Godot プロジェクトを特定し、CLI とプラグインをインストールし、スキルブックをグローバルに置くかプロジェクト専用にするかを確認し、`gda status --json` で接続を検証して、MCP URL を報告します。エージェント向けの完全なルールは [INSTALL.md](INSTALL.md) にあります。
-
-## スキルブック
-
-プラグインには **1 枚の入口スキルカードと 9 篇の references**（セットアップ、ツール、シーン、スクリプティング、リソース、ランタイム、コンテンツ、C#、サーバー）が付属しています。次のいずれか1つのスコープでインストールします：
-
-```bash
-# Global: shared by all Godot projects
-gda install skills
-
-# Project-only: kept with this project
-gda install skills --path "<project>/.agents/skills"
-
-# Chinese editions
-gda install skills --zh
-gda install skills --path "<project>/.agents/skills" --zh
-
-# Remove retired book directories from an older install
-gda install skills --prune
-```
-
-デフォルトのインストール先は `~/.agents/skills` です。このディレクトリーを読み込まないクライアントでは、`--path <client-skills-dir>` を使用できます。`--prune` は古いインストールに残る退役スキルディレクトリーを削除します。指定しない場合は報告のみです。入口カードは、エージェントを場当たり的な操作に任せず、呼び出しプロトコルを教え、適切な reference へ振り分けます。位置づけとして、MCP は主要な製品チャネルであり、スキルは体験レイヤーです。呼び出しガイドは、MCP が停止している場合に GDA CLI へフォールバックします。
-
-プラグインにはエディターパネルが1つ付属しています：
-
-- **Log** — プラグイン専用のログ。レベル／カテゴリーフィルターと検索を備え、問題のある呼び出しを追跡しやすくします。
-
-## エージェントの操作方法
-
-ツール名を覚える必要はありません。エージェントはシンプルなループに従います：
-
-1. **探索** — `search_tools` で候補を探し、`get_tool_detail` でパラメーターを確認します（名前を推測しないでください）。
-2. **実行** — 1ステップなら `call_tool`、まとめて実行するなら `batch_execute` を使用します。
-3. **検証** — 結果をスクリーンショットに撮り、前回のキャプチャと比較し、修正して繰り返します。
-
-## コマンドラインからのアクセス
-
-チャットクライアントよりもターミナルを使いたいですか？GDA CLI は、シェルから実行中の GDA インスタンスを操作します。MCP クライアントの統合は不要です。Bun + TypeScript 製で、ソースから実行でき、**実行時依存関係はゼロ**、ビルド手順もありません。
-
-`bunx` で単発実行できます（PowerShell では `#` がコメントの開始になるため、引用符で囲みます）：
-
-```bash
-bunx "github:jesspig/Godot-Autopilot#develop" ping
-```
-
-または一度グローバルにインストールして、`gda` コマンドを使用します：
-
-```bash
-bun install -g github:jesspig/Godot-Autopilot#develop
-gda ping
-```
-
-コマンドファミリー：**呼び出し** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**ライフサイクル** — `list` / `start` / `stop` / `restart` / `logs`；**オフラインとアセット** — `skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`。
-
-**Bun** が必要です。Bun も Node もないマシンでは、代わりに Releases ページのスタンドアロン `gda` バイナリを使用してください（完全なリファレンスは [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) を参照）。
 
 ## 安全上の注意
 
@@ -131,8 +55,10 @@ gda ping
 
 - [INSTALL.md](INSTALL.md) — ワンクリックスクリプト、手動でのリリースインストール、ソースビルド、エージェント向けの手順。
 - [docs/wiki/index.md](docs/wiki/index.md) — プロジェクトの知識ベース：アーキテクチャ、モジュール、テスト、規約。
+- [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md) — ツール面、エイリアス、schema、ケイパビリティ行列のベースライン。
 - [docs/wiki/build.md](docs/wiki/build.md) — ビルド、デプロイ、パッケージング。
 - [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) — CLI の完全なリファレンス。
+- [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md) — スキルブックと `gda install skills`。
 - [tests/README.md](tests/README.md) — テストの構成とコマンド。
 
 ## ライセンス

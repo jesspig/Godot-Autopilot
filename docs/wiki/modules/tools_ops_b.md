@@ -7,7 +7,7 @@ tags:
   - 领域工具
   - B组
   - action
-timestamp: "2026-11-16T13:38:53+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource: src/tools/domains/
 ---
 
@@ -21,7 +21,7 @@ resource: src/tools/domains/
 - 别名统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；命中时结果顶层附 `deprecated_alias`、`canonical_name`、`alias_removal_version`、`deprecated_since`，契约见 [tool_surface_conventions.md](../tool_surface_conventions.md)。
 - 审计的 325 条别名定义含 8 条与实名工具重名（`create_render_decal`、`create_render_material`、`create_render_reflection_probe`、`create_render_shader`、`create_render_sky`、`get_particles_state`、`restart_particles`、`set_particles_params`），按冲突策略实名工具优先、别名被遮蔽；这些名字是本页 Render 的 canonical 工具，不再列入别名列，故表内别名条目数少于 325。
 - action 工具的动作枚举由 schema 给出，action 专用参数为可选、由 handler 按动作校验；每个工具至少一条示例在 `ToolSpec.examples`，经 `get_tool_detail` 读取。
-- `game_*` / `game_scene_tree` / `game_tween` 等运行时工具需游戏由编辑器启动且加载 godot-autopilot 扩展，并受 `game_runtime` 授权门与 `confirm=true` 约束；Renderer 工具全程使用 RID 整数句柄；Image/Mesh 产物默认留在内存并可注册为 `memory://<name>`。
+- `game_*` / `game_scene_tree` / `game_tween` 等运行时工具需游戏由编辑器启动且加载 godot-autopilot 扩展，并受 `game_runtime` 高风险档 `confirm=true` 约束；Renderer 工具全程使用 RID 整数句柄；Image/Mesh 产物默认留在内存并可注册为 `memory://<name>`。
 
 ## Debug（6）
 

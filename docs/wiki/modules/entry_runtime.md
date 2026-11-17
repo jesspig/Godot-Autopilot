@@ -214,11 +214,12 @@ resource:
 
 ## 4. 与现有文档对照
 
-- AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:196-216）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
-- AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
-- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）；09-29 起 `dispatch` 为跨线程调用设主线程等待预算（默认 27000ms、健康探针 5000ms、长阻塞 29000ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调）），超时取消并返回 `main_thread_timeout`（见 §1.6）。
-- AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
-- `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
+对照对象是 2026-09-25 精简前的 `AGENTS.md`；现行 `AGENTS.md` 只保留最小入口，逐条对应已失效，以本页正文与当前源码为准（见 [index.md](../index.md)「编写规则」）。
+
+- **严格说 `ServerContext` 不是入口点启动的**：`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:196-216）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。编辑器侧类确在 EDITOR 级别注册；运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程。
+- `_process()` 中 `s_queue.drain()` 之前依次执行 `perf_sampler::tick(delta)`（09-21 起，周期采样与请求超时看门狗）与 `LogPersist::flush_on_main_thread()`（09-20 起，本地持久化写盘同走主线程、不排队列）；09-29 起 `dispatch` 为跨线程调用设主线程等待预算（默认 27000ms、健康探针 5000ms、长阻塞 29000ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调）），超时取消并返回 `main_thread_timeout`（见 §1.6）。
+- 桥接层 `error_result` 与工具侧 `{"error": "..."}` 同构；差异是桥接响应额外带布尔 `ok` 字段。
+- `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）是本页桥接 op 在 MCP 工具侧的封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
 
 不一致点汇总：
 

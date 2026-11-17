@@ -7,7 +7,7 @@ tags:
   - 端口
   - 实例登记
   - 发现链
-timestamp: "2026-11-13T02:40:00+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource:
   - src/core/transport/port_resolver.cpp
   - src/core/transport/port_recovery.hpp
@@ -261,6 +261,6 @@ CLI 的目标解析是一条**五级优先链**，每一级都记录来源（`so
 
 - [核心模块](core.md) —— 集中根与工程级存储布局、根目录解析
 - [CLI 载体](cli.md) —— 命令参考、五级寻址链与 IPC 通道
-- [工具注册表](tools_registry.md) —— 统一执行入口与授权三档
+- [工具注册表](tools_registry.md) —— 注册管线、meta/full 工具面与 dispatch 预算
 - [T0 安全边界与并发契约](../security_contract.md) —— 环回绑定与端口解析
 - [测试体系](../tests.md) —— 数值核算总表

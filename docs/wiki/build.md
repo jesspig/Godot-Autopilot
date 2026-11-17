@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-11-17T02:19:35+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -167,23 +167,23 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 ## CMake 目标
 
-`add_library(godot-autopilot SHARED ...)` 共 **115 个 .cpp**（源清单由 `cmake/sources/*.cmake` 聚合，见下）：
+`add_library(godot-autopilot SHARED ...)` 共 **117 个 .cpp**（115 个由 `cmake/sources/*.cmake` 清单聚合 + 根 `add_library()` 直列 2，见下）：
 
 | 目录 | 数量 | 目录 | 数量 |
 |---|---:|---|---:|
-| `src/main.cpp` | 1 | `src/tools/` | 59 |
+| `src/main.cpp` | 1 | `src/tools/` | 61 |
 | `src/core/` | 31（含 editor_readiness / editor_coords / log_persist / trace_recorder / sanitize_policy / monitor / monitor_env / perf_sampler / gda_home / project_store / instance_registry / storage_paths / legacy_store / port_resolver / api_token / http_transport / http_route_table / http_stream_registry / godot_transport / mcp_http_shim / ipc_endpoint / ipc_framing / ipc_transport） | `src/util/` | 7（含 scene_verify；skill_gen + skill_content_generated 构建期嵌入薄胶水） |
 | `src/resources/` | 3 | `src/ui/` | 1 |
 | `src/prompts/` | 9 | `src/runtime/` | 4（含 09-18 新增 game_bridge_verify） |
 
-（分项求和 1 + 59 + 31 + 7 + 3 + 1 + 9 + 4 = 115，与磁盘逐行核对一致；磁盘 `src/**/*.cpp` 共 115 个，全部已登记。）
+（分项求和 1 + 61 + 31 + 7 + 3 + 1 + 9 + 4 = 117，与磁盘逐行核对一致；磁盘 `src/**/*.cpp` 共 117 个，全部已登记——`image_ops.cpp` / `mesh_ops.cpp` 两个新域实现直接列在根 `CMakeLists.txt` 的 `add_library()` 里，未走清单文件。）
 
 - **源清单聚合机制（10-21 引入）**：`add_library` 的源清单不再直接写在根 `CMakeLists.txt` 里，而是拆到 `cmake/sources/` 下的若干清单文件，由根 `CMakeLists.txt` 依次 `include` 后拼成目标源列表——`gda_core.cmake`（基础业务源）、`api_core.cmake` / `api_contract.cmake` / `api_storage.cmake` / `api_transport.cmake` / `api_cli.cmake`（各并行分支独占维护的新增编译单元；0.3.2 移除 REST 面后多数清单已清空，文件保留以维持登记位）；`tests/CMakeLists.txt` 侧对应 `gda_unit_sources.cmake` 与 `api_unit_*.cmake`。目的是让并行开发同一插件的多个分支各自登记新增 `.cpp`，避免在同一文件里产生归并冲突。`cmake/sources/api_probe.cmake` 另定义一个可运行的传输探针目标 `gda_mcp_transport_probe`（**不注册为 ctest 用例**，由验收阶段按需执行）。
 
 - **skill 内容嵌入头**：技能正文存于仓库根 `skills/` 标准目录（1 张入口卡 + 9 篇 references，共 10 个 .md，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.ts`（Bun 执行）生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)` 保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
 - 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
-- MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:94`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
+- MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:100`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
 - **Unity 构建已接线生效**：`set_target_properties(godot-autopilot PROPERTIES UNITY_BUILD ${GDA_UNITY_ENABLED} UNITY_BUILD_BATCH_SIZE ${GDA_UNITY_BATCH})`（`CMakeLists.txt`，add_library 之后）——实测 Debug batch=8（16 核）；此前仅 BuildOptimization.cmake 计算参数、未挂到 target；
 - `option(GDA_ENABLE_TESTS ... OFF)`，开启后 `add_subdirectory(tests)`（详见 [tests.md](./tests.md)）。
 
@@ -296,7 +296,7 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 | `GODOT_AUTOPILOT_PORT` | 覆盖端口（10-21 起为**第一优先级**：环境变量 ＞ 工程级配置偏好 ＞ 自动分配） | 运行时 `std::getenv`（`src/core/server_context.cpp`）；显式指定时绑定失败**不自动换端口**，直接启动失败 |
 | `GODOT_AUTOPILOT_HOST` | 读取监听地址；默认 `127.0.0.1`，非环回地址由 `ServerContext::start()` 拒绝 | 运行时 `std::getenv`（`src/core/server_context.cpp`） |
 | `GODOT_AUTOPILOT_HOME` | 覆写插件数据的家目录集中根（10-21 新增） | 插件侧：`HomeResolver::gda_home()` 的第 1 级来源（形状校验，不做存在性校验）；CLI 侧：`gdaHome()` 的第 1 级来源 |
-| `GODOT_AUTOPILOT_API_TOKEN` | 覆写 REST 面的 Bearer 令牌（10-21 新增） | 插件侧：`ApiAuth::load_token()` / `issue_token()` 的第 1 级来源；设置后不再签发也不写令牌文件 |
+| `GODOT_AUTOPILOT_API_TOKEN` | 覆写 REST 面的 Bearer 令牌（10-21 新增）。**待确认**：0.3.2 已移除 REST `/api` 与 API token（见 [release-notes/0.3.2.md](../release-notes/0.3.2.md)），本行是否仍适用未核实 | 插件侧：`ApiAuth::load_token()` / `issue_token()` 的第 1 级来源；设置后不再签发也不写令牌文件 |
 | `GODOT_AUTOPILOT_CLI_HOME` | 覆写 CLI 的 state dir（10-21 新增） | CLI 侧：`registry.ts` 的 `stateDir()` 第 1 级来源 |
 | `GODOT_AUTOPILOT_USERDATA` | 覆写 CLI 解析 Godot userdata 目录的位置 | CLI 侧：`platform.ts` 的 `userDataBase()` 第 1 级来源（仅影响 CLI 寻址链的旧路径回退） |
 | `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` | 强制编译/链接并行度 | CACHE（`-D`）优先，其次进程环境变量 |
@@ -307,23 +307,11 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 
 CLI 载体（`cli/`）为 Bun + TypeScript 源码直跑，**不参与 `gda-dev-tools build`/`deploy`/`package` 构建流水线**。本地开发只需 Bun：
 
-- 跑测试：`bun test cli/tests`（275 项：252 pass / 23 skip，秒级）
+- 跑测试：`bun test cli/tests`（37 文件 348 项：325 pass / 23 skip，秒级）
 - 类型检查：`bun x tsc -p cli/tsconfig.json --noEmit`
 - 手动调用：`bun cli/bin/gda.ts --help`
 
 CI 经 ctest `cli_unit`（封装 `bun test`）与 `cli_contract`（CLI 载体契约）接入，Bun 由 CI 环境提供；bun 缺失时两测试打印 SKIP 并退出 0。详见 [modules/cli.md](./modules/cli.md)。
-
-## 与 AGENTS.md / README 对照
-
-逐条核对结论（一致，另有一处精度补充）：
-
-- `bun run gda-dev-tools build` / `--release` 语义、手动 `cmake --preset` 命令 ✓（**精度补充**：手动命令绕过 `resolvePreset`，无 ninja 时须改写 `debug-portable` / `release-portable`，见「预设」小节）；
-- "依赖以 `third_party/` 子模块随仓库检出" ✓（`cmake/Dependencies.cmake` 的 `gda_require_submodule` 缺依赖即 FATAL_ERROR，`.gitmodules` 锁定 commit）；
-- "添加新 .cpp 时必须在 `add_library()` 中加入" ✓（Unity 构建只编译列出的文件）；**精度补充**：`skills/` 下 .md 为内容数据文件，经生成头机制（`skill_gen.cmake` + `tools/embed_skills.ts`）进入编译，不进 add_library；
-- 依赖版本 `godot-cpp 10.0.0-stable`（`507ed9d`）/ `mcp-cpp-sdk 0.3.11`（`93e18ef`）、git submodule 检出 ✓（`cmake/Dependencies.cmake` + `.gitmodules`，含 `GODOTCPP_API_VERSION "4.7"` FORCE 与 `MCP_WITH_OPENSSL "OFF"` FORCE）；
-- 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；**精度补充**：MSVC 分支的 `/Zc:lambda` 是 clang-cl 路径不需要的符合性开关，仅为让 MSVC 接受 clang 已接受的写法而加（见「MSVC lambda 捕获差异」小节）；
-- 优化自适应（sccache/ccache、LTO、Unity、生成器自适应 + Ninja 作业池）✓；**精度补充**：「生成器自适应」覆盖的不只是能否 configure，还包括多配置生成器下的产物路径（`artifactDir`）与 ctest 配置维度（preset `configuration`）；AGENTS.md 与实现一致：仅 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道，`GDA_UNITY_BUILD`/`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
-- **文档一致性**：五个语言版本 README 的工具数口径为 badge `tools-452+` 与“Over 452 tools”（451 域工具 + `system_status`；数量随版本增长，以 `search_tools` 查到的为准），与 wiki 实测的 [overview.md](./overview.md) 口径一致——wiki 另计的 458/459（MCP 可达 / catalog-index）含 7 元工具与 `system_status`，README 未列这两个数字属“域工具 vs 全量口径”差异；README 的安装入口指向根 `INSTALL.md`，构建说明指向 [build.md](./build.md) 与 [tests/README.md](../../tests/README.md)，`--package` / `--debug` 参数以本页命令速查表为准。
 
 ## 关联页面
 

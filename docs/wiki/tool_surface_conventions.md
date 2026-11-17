@@ -7,7 +7,7 @@ tags:
   - 别名
   - 弃用
   - ToolSpec
-timestamp: "2026-11-16T04:49:31+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource: src/tools/base/tool_spec.hpp
 ---
 
@@ -69,5 +69,5 @@ resource: src/tools/base/tool_spec.hpp
 ## 验证
 
 - 单元测试：[alias_resolution_test.cpp](../../tests/unit/alias_resolution_test.cpp)，覆盖改名、参数改名、单值到数组、结果投影、confirm 透传、冲突拒绝、catalog/search 排除与 `get_tool_detail` 元数据。
-- 静态基线：[tool_surface_baseline.md](tool_surface_baseline.md) 的 `alias_count`；当前生产别名为 0，32 项旧名映射见 [capability_matrix.json](../../tests/data/capability_matrix.json)。
+- 静态基线：[tool_surface_baseline.md](tool_surface_baseline.md) 的 `alias_count`；当前生产别名 **325**（统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`），旧名到 canonical 的完整映射见 [capability_matrix.json](../../tests/data/capability_matrix.json)。
 - 执行命令：`bun run gda-dev-tools audit-tools --json`、`bun run gda-dev-tools test --single AliasResolution`。
