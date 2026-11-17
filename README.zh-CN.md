@@ -7,6 +7,8 @@
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
 ![工具数](https://img.shields.io/badge/tools-252-brightgreen)
 
+**Status: beta**
+
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
 [English](README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)

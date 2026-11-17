@@ -7,6 +7,8 @@
 [![Protocol](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
 ![Tools](https://img.shields.io/badge/tools-252-brightgreen)
 
+**Status: beta**
+
 > **Let an AI agent build, playtest, and debug your Godot game — from inside the editor.**
 
 **English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
@@ -53,8 +55,6 @@ Requires **Godot 4.7+** and a graphical editor session.
 3. **Connect your AI client** — run `gda status --json` and add its `mcp_url` to your client's MCP configuration (or hand the URL to your agent and ask it to generate the config). Any MCP client that supports Streamable HTTP can connect; examples include Claude Code, Codex, Cursor, OpenCode, and Copilot.
 4. **Ask for something** — e.g. “create a player character that can run and jump, then playtest it and fix what looks wrong.”
 
-High-risk tools (`destructive`, `process`, `code_execute`, `game_runtime`) require `confirm=true`; there is no global allow list.
-
 ## Install with an AI agent
 
 Send this to an agent that has shell access on the same machine:
@@ -84,7 +84,7 @@ gda install skills --path "<project>/.agents/skills" --zh
 gda install skills --prune
 ```
 
-The default target is `~/.agents/skills`. Clients that do not read that directory can use `--path <client-skills-dir>`. `--prune` removes retired skill directories from an older install; without it the command only reports them. The skill card teaches the calling protocol and routes to the matching reference instead of leaving the agent to improvise. Positioning: MCP is the primary product channel; skills are the experience layer, and the calling guide falls back to the GDA CLI when MCP is down.
+The default target is `~/.agents/skills`. Clients that do not read that directory can use `--path <client-skills-dir>`. `--prune` removes retired skill directories from an older install; without it the command only reports them. The skill card teaches the calling protocol and routes to the matching reference instead of leaving the agent to improvise; the calling guide falls back to the GDA CLI when MCP is down.
 
 One editor panel comes with the plugin:
 

@@ -7,6 +7,8 @@
 [![プロトコル](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
 ![ツール](https://img.shields.io/badge/tools-252-brightgreen)
 
+**Status: beta**
+
 > **AIエージェントがGodotゲームのビルド、プレイテスト、デバッグをエディターの内部から行います。**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | **日本語** | [한국어](README.ko.md)

@@ -7,6 +7,8 @@
 [![協定](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
 ![工具數](https://img.shields.io/badge/tools-252-brightgreen)
 
+**Status: beta**
+
 > **讓 AI 代理在編輯器內部建置、試玩與除錯你的 Godot 遊戲。**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | **繁體中文** | [日本語](README.ja.md) | [한국어](README.ko.md)

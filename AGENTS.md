@@ -1,55 +1,26 @@
 # AGENTS.md
 
-Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（`127.0.0.1:<port>/mcp`，端口由插件首次启动在 20000–29999 随机分配并持久化）暴露给 AI 客户端。C++17 + godot-cpp + mcp-cpp-sdk，工具经 `ToolSpec` 数据化注册。
-
-本页是最小上下文入口；项目事实与文档规则见 `docs/wiki/index.md`。
+Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（`127.0.0.1:<port>/mcp`，端口首次启动在 20000–29999 随机分配并持久化）暴露给 AI 客户端。C++17 + godot-cpp + mcp-cpp-sdk，工具经 `ToolSpec` 数据化注册。项目事实与文档规则见 `docs/wiki/index.md`。
 
 ## 命令
 
-- 构建部署：`bun run gda-dev-tools build` + `bun run gda-dev-tools deploy`（子命令：`build` / `deploy` / `package` / `package-check` / `clean` / `test` / `jam` / `tui`；`deploy`/`clean` 下 `--project <dir>`（可重复；省略时递归发现 `examples/` 下的比赛最终项目并跳过 intake 与 e2e 沙盒），`package` 下 `--libs-dir <dir>` / `--preset debug|release`；`jam` 抽题并生成 `examples/<theme_id>/project/` intake，`jam create` 创建 `<slug>-<hash8>` 比赛最终项目，`jam e2e [--reset]` 创建/刷新/重置固定沙盒 `examples/e2e`，`jam list [--projects]` / `jam index` 查看与收藏；`tui` 需交互式终端，非 TTY 退出 2）
-- Devtools（Bun/TS）：全部开发命令统一走 `bun run gda-dev-tools <子命令>`；Python 入口已删除，`no_python_guard` 守卫拦截 `*.py` / `uv run` / `python main.py` / CMake Python 查找回退
-- 手动构建：`cmake --preset debug && cmake --build --preset debug`
-- 快速验证：`ctest --preset debug`（全量默认门：单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖；`--single <用例名>` 单跑）
-- CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
-- 升版同步根 `VERSION`、`cli/src/version.ts` 与 `cli/assets/skills.json`，随后重新 configure；发布时另同步 README 版本钉；递增规则见下节
+- 构建部署：`bun run gda-dev-tools build` + `bun run gda-dev-tools deploy`；子命令 `package` / `package-check` / `clean` / `test` / `jam` / `tui` 及参数见 `docs/wiki/build.md`。
+- 手动构建：`cmake --preset debug && cmake --build --preset debug`；无 ninja 时改用 `debug-portable` / `release-portable`。
+- 快速验证：`ctest --preset debug`（单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖）；CLI 单测 `bun test cli/tests`。
+- 升版同步根 `VERSION`、`cli/src/version.ts`、`cli/assets/skills.json`，随后重新 configure。
 
-## 版本号规则
+## 硬约束
 
-- 发布版本号固定为 `0.y.x`：`y` 为 minor，`x` 为 patch；不得引入 `1.x` 或其他 major。
-- 版本号可带 `-dev` 后缀（如 `0.3.4-dev`），表示当前处于开发中；目标发布版本是去掉 `-dev` 的同一版本号。
-- 默认只递增 `x`，无论是否包含破坏性更新；只有用户明确要求更新 `y` 时才允许递增 `y`，否则绝对禁止改动 `y`。
-- 未经用户明确允许，禁止移除 `-dev` 后缀、打 tag 或执行发布；发布相关操作仍需逐项确认。
-- 版本落点与发布校验见 `docs/wiki/build.md`「版本号单一来源」。
+- 所有 Godot API 必须经 `CommandQueue` 在主线程执行（`submit()` / 带预算入口）；直接调用必崩，`main_thread_guard` 在 ctest 拦截。`execute_sync()` 是无界等待，禁止新增调用。
+- 新增 `.cpp` 双登记：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`；`domains/*/*_ops.cpp` 由 glob 自动纳入。漏根登记只在运行时暴露，漏测试登记会静默失去覆盖。详见 `.agents/skills/cpp-registration/SKILL.md`。
+- `third_party/` 依赖是 git submodule，构建前须已检出；缺失即 configure 报错，不做网络回退。
+- 源码禁止注释（仅 `// namespace` 结尾标记）；`comment_guard` 在 ctest 拦截。
+- 默认安全姿态不可静默放宽：仅绑环回、脱敏默认开、高风险工具需 `confirm=true`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
+- 数值一律以运行时统计为准，唯一口径见 `docs/wiki/tests.md`「数值核算总表」。
+- CLI 为 Bun+TS 源码直跑（零运行时依赖、无构建步骤）；发布另产 5 平台二进制与 `sha256sums.txt`。技能书为 1 张入口卡 + 9 篇 references，EN/ZH parity 由守卫校验。
 
-## 每次在场的硬约束
+## 版本与提交
 
-- **所有 Godot API 必须经 `CommandQueue` 在主线程执行**（`submit()` / 带预算的等待入口）；直接调用必崩，`main_thread_guard` 在 ctest 阶段静态拦截，编译通过不算过。`execute_sync()` 已无调用点且是无界等待，不得新增调用。
-- **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/domains/*/*_ops.cpp` 由 glob 自动纳入，只需登记非 `*_ops.cpp` 的源文件）。**漏登根 `CMakeLists.txt` 后果最重**：该编译单元不进插件产物，问题只在运行时暴露（插件加载后工具异常，定位困难）；**漏登 `GDA_UNIT_BUSINESS_SOURCES` 仅在有 L1/集成用例引用其符号时才在链接期报错**，无引用时完全静默（等于没有覆盖）。详见 [.agents/skills/cpp-registration/SKILL.md](.agents/skills/cpp-registration/SKILL.md)。
-- **依赖是 `third_party/` 下的 git submodule**：构建前必须已检出（`git clone --recurse-submodules`，或 `git submodule update --init --recursive`），缺失则 configure 直接报错，不做网络回退。
-- **构建生成器双路径**：CMake 预设按 ninja 可用性自适应——有 ninja 用 `debug`/`release`，无则用 `debug-portable`/`release-portable`（共用 `build/{debug,release}`）；`bun run gda-dev-tools` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己补 `-portable` 后缀。见 [build.md](docs/wiki/build.md)「预设」。
-- **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
-- **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、高风险工具需 `confirm`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
-- **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
-- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书为 1 张入口卡 + 9 篇 references，EN/ZH 自包含、不含版本钉（`version_sync_guard` 反向守卫，`skills_guard` 校验 EN/ZH parity 与 CLI 契约）。
-
-## 三层文档分工
-
-| 层 | 位置 | 承载 |
-|---|---|---|
-| 入口 | 本文件 | 命令与硬约束 —— 保持最小、少变更 |
-| 事实 | `docs/wiki/` | 陈述性事实：架构、模块行为、数值口径、历史结论与坑 |
-
-- 一个知识只有一个权威落点，其它位置改成引用。
-- 写入前判据：只是让人知道现状 → wiki；每次会话都必须在场且稳定 → 本页。
-
-## 协作
-
-- 文档与汇报一律不写 git 工作树/远端状态（未提交、未推送、未打 tag）；它们不构成知识。
-- `git status` 的大量 `M` 多为 CRLF 伪变更（仓库无 `.gitattributes`），核查一律以 `git diff HEAD` 为准。
-- 提交信息 `<type>(<scope>): <中文描述>`，scope 用中文功能域，按功能域拆分提交。
-- 多代理并行时子代理只写代码不编译，主代理统一 configure/build 再分批测（并行编译会锁）；单元/边界测试禁调已注册 handler。
-- 面向 MCP 客户端的技能卡与 references（`godot-autopilot`）在构建期由 `skills/` 模板嵌入并经 MCP 资源暴露；磁盘安装由 `gda install skills [--path] [--prune]` 完成（默认 `~/.agents/skills`，项目级为 `<project>/.agents/skills`）。
-
-## 知识库入口
-
-`docs/wiki/index.md`（页面索引、三层分工细则、编写规则、维护步骤）；安全与并发契约见 `docs/wiki/security_contract.md`。
+- 版本固定 `0.y.x`，默认只递增 `x`；`y` 仅在用户明确要求时递增。`-dev` 后缀表示开发中，未经许可不得移除、打 tag 或发布。
+- 提交信息 `<type>(<scope>): <中文描述>`，按功能域拆分。`git status` 的 CRLF 伪变更不作准，核查用 `git diff HEAD`。
+- 文档与汇报不写 git 工作树/远端状态；知识落点与维护规则见 `docs/wiki/index.md`。多代理并行时子代理只写代码不编译，主代理统一构建后分批测。
