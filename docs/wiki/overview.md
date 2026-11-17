@@ -37,7 +37,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 - **进程内 GDExtension**：插件随编辑器启动而启动、随编辑器关闭而停止，无独立桥接进程（`src/main.cpp` 的 `GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 中创建并启动 `ServerContext`）。
 - **产物名**：`godot-autopilot`（`.dll` / `.so` / `.dylib` + `.gdextension`），部署目录为目标 Godot 工程的 `addons/godot-autopilot/`。
-- **示例工程（可选）**：仓库不再内置示例；`bun run gda-dev-tools deploy --project <dir>` 可把插件部署到任意 Godot 工程，未传 `--project` 时递归发现 `examples/` 下的最终项目并跳过 intake。`bun run gda-dev-tools jam` 抽题并生成 `examples/<theme_id>/project/` intake，`jam create` 再创建 `<slug>-<hash8>` 最终项目，供 e2e 开发轮次与本地收藏使用；程序化测试不依赖它抽题，只有生成器自身单测在临时目录覆盖。详见 [gamejam.md](gamejam.md)。
+- **示例工程（可选）**：仓库不再内置示例；`bun run gda-dev-tools deploy --project <dir>` 可把插件部署到任意 Godot 工程，未传 `--project` 时递归发现 `examples/` 下的比赛最终项目并跳过 intake 与 e2e 沙盒。`bun run gda-dev-tools jam` 抽题并生成 `examples/<theme_id>/project/` intake，`jam create` 再创建 `<slug>-<hash8>` 比赛最终项目，供本地收藏使用；`jam e2e` 管理固定沙盒 `examples/e2e`，供端到端测试每轮重置。程序化测试不依赖它抽题，只有生成器自身单测在临时目录覆盖。详见 [gamejam.md](gamejam.md)。
 
 ## 核心能力
 

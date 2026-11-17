@@ -13,7 +13,7 @@ resource: tests/
 
 # 测试体系（tests/）
 
-> 审计日期：2026-11-17（Game Jam 生成器 v2：新增 `cli/tests/jam_projects.test.ts`，CLI TS 实测 37 文件 / 345 项（322 pass + 23 skip + 0 fail）；`jam` 只由 Agent e2e 抽题调用，程序化测试不依赖它抽题）
+> 审计日期：2026-11-17（Game Jam 生成器 v2 与 `jam e2e`：新增 `cli/tests/jam_projects.test.ts` 与 e2e 沙盒用例，CLI TS 实测 37 文件 / 348 项（325 pass + 23 skip + 0 fail）；`jam` 由比赛开发与 Agent e2e 共同调用，程序化测试不依赖它抽题）
 >
 > 审计日期：2026-11-14（T-22/T-24 文档收口：测试表按实测重算——单元 52 文件 / 568 用例、边界 19 文件 / 190、集成 10 文件 / 88；移除 REST 与授权门已删测试行，补登 6 个实际存在的单测文件）2026-11-14（安装链路与文档：移除 `atomgit_release_guard`、新增 `install_docs_guard` / `zip_layout_guard`、CLI 单测 275、版本守卫扫描 `INSTALL*.md`）2026-11-14（T-03：search_tools 新增 limit 的 5 组集成用例；T-06：技能书发现契约断言改为 gda search/describe/tools list；注册点 935）2026-11-13（T-01 依赖升级：`register_all_test.cpp` 的重注册用例改按 SDK 0.3.11 语义断言「同 server 重注册抛 `McpError`」，数量不变；完整数值重基线与总表更新由 T-02 执行）2026-11-09（**随测试体系四层化重构逐项重基线**——L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool`）整体删除（提交 `c023a5c`，2026-11-09），口径由「L1/L2 双层」改为「程序化四层（单元 / 集成 / 回归属性 / 守卫）+ Agent e2e」；本轮实测：单元测试 **875** 不变（75 文件）、集成层 **109**（12 文件）、守卫与脚本项 **10**、ctest 注册总数 **994 = 875 + 109 + 10**（`ctest -N` 实测，证据 `.handoff/evidence/T-08/ctest-N-after.txt`），同提交独立 worktree 全量 ctest **100% 通过**（`.handoff/evidence/T-08/manifest.md`）；CLI TS 单测 **296** 项 / 18 文件不变；脚本编排收敛为默认门语义（提交 `bf31e8a` / `8997db9`）。被删章节的历史结论以一行迁移说明指回 changelog 或 git 历史，见「历史口径迁移」）
 
@@ -283,7 +283,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 - `skills_guard_self_test`（同一脚本 `--self-test`）：注入未知册、旧关键词、未知命令、未知 status 字段、多文件与缺册反例，验证护栏本身能报错；Bun 可用时与 `skills_guard` 一起注册。
 - 守卫自测项：`migration_guard_self_test` / `comment_guard_self_test` / `no_python_guard_self_test` / `main_thread_guard_self_test` / `tool_domain_guard_self_test` / `skills_guard_self_test`——以注入违规样本的方式验证源码/技能守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
 - `cli_contract`（`cli/tests/contract.test.ts`）：CLI 契约 mock conformance，详见「回归属性清单」的 CLI wire 形状行；仓库内不写盘（图片落临时目录）。
-- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 37 文件 345 项（2026-11-17 实测 322 pass / 23 skip / 0 fail；文件清单见「数值核算总表」CLI 行；参数化循环在运行期展开，运行期项数以 `bun test cli/tests` 实测为准）。
+- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 37 文件 348 项（2026-11-17 实测 325 pass / 23 skip / 0 fail；文件清单见「数值核算总表」CLI 行；参数化循环在运行期展开，运行期项数以 `bun test cli/tests` 实测为准）。
 - 上述守卫与脚本项与两层 gtest 目标合为默认门：`ctest --preset debug`（或 `bun run gda-dev-tools test`）**无过滤全跑**——引擎轨删除后不再需要 `-E "^gda_runner_|^pool_"` 之类的排除模式。
 
 ## 数值核算总表
@@ -302,7 +302,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 集成 | 88（10 个 `*_test.cpp`） | 命令：`grep -cE "^TEST(_F)?\(" tests/integration/*_test.cpp`（2026-11-14 实测 88） | 一致 |
 | 守卫与脚本项 | 16（含 `install_docs_guard` / `zip_layout_guard`、`cli_contract` / `cli_unit`） | 命令：`ctest --preset debug -N -L guard` 与 `ctest --preset debug -N -L cli`；证据：`tests/CMakeLists.txt` 的 `add_test` 注册 | 一致 |
 | ctest 注册总数 | 864 = 568 + 190 + 88 + 16 + 2（单元 + 边界 + 集成 + 守卫 + CLI） | 命令：`ctest --preset debug -N`（`Total Tests: 864`）；全量 ctest 通过 | 一致 |
-| CLI TS 单测 | 37 个测试文件 / 345 项（322 pass + 23 skip + 0 fail，2026-11-17 实测口径；含 `jam.test.ts`、`jam_projects.test.ts`） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts`；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
+| CLI TS 单测 | 37 个测试文件 / 348 项（325 pass + 23 skip + 0 fail，2026-11-17 实测口径；含 `jam.test.ts`、`jam_projects.test.ts`） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts`；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
 | 技能卡 | EN 10 文件；EN+ZH 源共 20 文件（各 1 张入口卡 SKILL.md + 9 篇 references） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 1 个技能目录 | 一致 |
 | MCP skills 资源 | 12（1 目录 + 1 技能 + 10 文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
 | add_library 源文件 | 115 个 `.cpp`（main 1 / core 31 / tools 59 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 命令：`find src -name "*.cpp" | wc -l`（2026-11-09 实测 115）；根 `CMakeLists.txt` 经 `cmake/sources/*.cmake` 聚合 | 一致 |
