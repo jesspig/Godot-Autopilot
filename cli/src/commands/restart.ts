@@ -5,6 +5,7 @@ import { isAlive, stopForce, stopGraceful } from "../process";
 import type { InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 import { instanceView, start } from "./start";
+import { collectTaskStorePoisoning, gracefulRestartSuggestion } from "./stop-diagnosis";
 import {
   DEFAULT_STOP_WAIT_SEC,
   parseWaitSec,
@@ -42,10 +43,11 @@ async function restart(positional: string[], opts: GlobalOptions): Promise<numbe
     }
     const gone = await waitUntilDead(entry.pid, stopWaitSec);
     if (!gone) {
+      const poisoned = method === "graceful" && collectTaskStorePoisoning(entry);
       throw new CliError(
         ExitCode.Transport,
         `instance ${entry.id} (pid ${entry.pid}) is still running after ${stopWaitSec}s; refusing to start a replacement to avoid two editors on the same project`,
-        "retry with --force, or stop it manually before running gda restart again",
+        gracefulRestartSuggestion(poisoned),
       );
     }
   }
