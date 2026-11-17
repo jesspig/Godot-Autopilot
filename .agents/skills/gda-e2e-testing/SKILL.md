@@ -1,50 +1,56 @@
 ---
 name: gda-e2e-testing
-description: "以任意 Godot 工程（或 examples/<主题>/<项目>）为场地，用 GDA 完成一轮端到端开发或验收；未给工程路径时先抽 Game Jam 题、读题、命名并创建项目，再按主题开发；产出问题记录、优化建议与递归闭环证据；触发词：端到端测试、e2e、game jam、抽题、跑一轮验收、验收 demo、用 GDA 开发这个 demo、测试 GDA 工具表现、递归优化闭环、指定某个 demo 做端到端。"
+description: "以任意 Godot 工程或固定沙盒 examples/e2e 为场地，用 GDA 完成一轮端到端测试，产出问题记录、优化建议与递归闭环证据；触发词：端到端测试、e2e、跑一轮验收、验收 demo、测试 GDA 工具表现、递归优化闭环、指定某个 demo 做端到端；不用于开发游戏、参加 Game Jam（走 gda-gamejam）。"
 ---
 
 # Godot 工程端到端验收
 
-读取目标 Godot 工程（未给路径时先抽题、读题、命名并创建项目），用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。
+读取目标 Godot 工程，用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。本轮只记录，不修复；修复留给报告产出后的独立分析会话。
+
+## 本轮边界：只记录，不修复
+
+- 报告侧唯一产物是 `report/<YYYY-MM-DD_HH-MM>/` 下的 `report.md`、`evidence.md`、`img/`。
+- 工程侧只允许修改 `examples/e2e`（或用户指定的工程）与 `build/`、部署产生的 `addons/` 等构建产物。
+- 不修改 `src/`、`devtools/`、`cli/`、`tests/`、`skills/`、`docs/wiki/`、`AGENTS.md`、`VERSION`、构建与测试配置。
+- 不运行修复、不应用补丁、不提交 git；不调用 `gda-e2e-analysis`，不写 `analysis.md`。
+- 开工记录 `git status --porcelain` 基线；收尾比对，除被忽略目录外不得出现新的跟踪文件改动。
+- 问题只记录现象、影响、复现步骤与证据；根因与修复由后续分析会话负责。
 
 ## 输入
 
-- 识别工程标识：接受绝对路径、相对路径，或 `examples/<主题>/<项目>` 写法。
+- 识别工程标识：接受绝对路径、相对路径，或 `examples/e2e` 写法。
 - 接收可选的本轮聚焦目标，例如「只验证场景与脚本工具」；未给出时按工程的任务书完整推进。
-- 未收到工程路径时，按以下顺序开局：
-  1. 在仓库根执行 `bun run gda-dev-tools jam --json`，抽取一个 Game Jam 主题并生成 intake；记录 `theme_id`、`theme`、`source`、`intake_path`、`draw_id`。
-  2. 读取 `intake_path/GAMEJAM.md` 与 `intake_path/jam.json`，理解主题、随机抽样、创意约束与评审维度。
-  3. 基于本次抽样构思 2–3 个项目名与概念，选定一个展示名和 ASCII slug。
-  4. 执行 `bun run gda-dev-tools jam create --theme <theme_id> --name "<项目名>" --slug "<slug>" --json`，取返回的 `path` 作为 `<project-dir>`。
-  5. 生成失败时停止并报告；不得手工创建项目目录。
-- 收到工程路径时：直接使用该工程，不抽题、不创建。
-- Game Jam 抽题只服务端到端测试；程序化测试（ctest、bun test、单元/集成/守卫）不依赖 `jam` 抽题或 `examples/` 生成物；仅生成器自身的单测在临时目录覆盖它。
+- 未收到工程路径时，使用固定沙盒 `examples/e2e`：
+  1. 若 Godot 正打开 `examples/e2e`，先请用户关闭编辑器；不自行关闭或重启 Godot。
+  2. 每个新轮次先重置：`bun run gda-dev-tools jam e2e --reset --json`；只有用户明确要求继续上一轮时才跳过重置。
+  3. 读取返回的 `path` 作为 `<project-dir>`，并读取 `<project-dir>/GAMEJAM.md` 与 `jam.json`。
+  4. 创建/重置成功后立即执行 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>`，确保插件已安装且为当前构建。
+  5. 请用户打开 `<project-dir>` 并启用插件，再进入前置检查。
+- 收到工程路径时：直接使用该工程，不重新抽题；若路径就是 `examples/e2e`，仍按新轮次先重置（用户明确要求续跑时除外）。
 
 ## 1. 校验输入
 
 1. 规范化到绝对路径 `<project-dir>`。
 2. 校验 `project.godot`；缺失时报错并停止。
-3. 抽题轮次必须确认 `<project-dir>` 不是 `examples/<主题>/project` 这个 intake；intake 只用于读题，不在其中开发。
-4. 若存在 `<project-dir>/GAMEJAM.md`，它是本轮任务书；`docs/` 缺失不降级为只读验收。
-5. 校验 `docs/`；存在时按第 2 节读取；缺失且无 `GAMEJAM.md` 时只做运行与观测验收，并在报告中注明无项目文档。
+3. 校验 `docs/`；存在时按第 2 节读取；缺失且无 `GAMEJAM.md` 时只做运行与观测验收，并在报告中注明无项目文档。存在 `GAMEJAM.md` 时按开发型推进，不因 `docs/` 缺失降级。
 
 ## 2. 读任务书
 
 按顺序读取；后读文档不覆盖先读文档的硬约束：
 
-1. `GAMEJAM.md`：Game Jam 主题、本次随机抽取的方向与概念灵感、创意约束、评审维度、提交要求与建议（存在时必读；作品说明文档的要求以它为准）。
-2. `jam.json`：主题与来源元数据、抽样快照、创建信息；用于报告溯源。
+1. `GAMEJAM.md`（存在时）：主题、抽样、创意约束、提交要求与评审维度；它是本轮开发任务书。
+2. `jam.json`（存在时）：主题、来源、抽样快照与工程元数据，用于报告溯源。
 3. `docs/README.md`：项目说明与阅读路径。
 4. `docs/test/test-plan.md`：任务性质、测试约定、证据要求、问题格式、终止条件。
 5. `docs/test/acceptance.md`：验收清单。
-6. 按 test-plan 的阅读路径补读与本轮相关的页面。
-7. 若 `report/<工程名>/` 最近一轮存在 `analysis.md`，只读取其中的「待下一轮端到端验证项」，作为本轮附加观察点；文件缺失时继续执行，不阻塞，不改变 test-plan。
+6. 按 test-plan 的阅读路径补读 `docs/gdd/`、`docs/tech/`、`docs/art/` 中与本轮相关的页面。
+7. 若 `report/` 最近一轮存在 `analysis.md`，且该轮报告对应本工程，只读取其中的「待下一轮端到端验证项」，作为本轮附加观察点；文件缺失或无法确认对应关系时继续执行，不阻塞，不改变 test-plan。
 
-`GAMEJAM.md` 存在时，其创意约束、提交要求与六项评审维度是本轮验收的一部分；`docs/` 为空时仍按开发型推进，不降级。作品说明文档的文件名、格式与内容完全按 `GAMEJAM.md` 执行，本技能不额外约束。
+`GAMEJAM.md` 用于确定本轮开发范围；报告只评估 GDA 工具表现，不把游戏设计质量写成 `Q`。
 
 判定任务形态：
 
-- 开发型：工程为空或 `GAMEJAM.md`/文档要求从零实现。除生成器创建的起始工程外，仅经 GDA 创建和修改工程文件。
+- 开发型：工程为空或文档要求从零实现。仅经 GDA 创建和修改工程文件。
 - 验收型：工程已建成且 test-plan 要求只读运行与核对。保持工程文件只读。
 
 优先遵循工程文档的项目约定；与本技能默认流程冲突时，以工程文档为准，并在报告中记录冲突。
@@ -57,8 +63,8 @@ description: "以任意 Godot 工程（或 examples/<主题>/<项目>）为场�
 
 只读取：
 
-- `<project-dir>/` 下的文档、素材、`project.godot`、`GAMEJAM.md`、`jam.json`、作品说明文档（若存在，按 `GAMEJAM.md` 的要求）、`*.tscn`、`*.tres`、`*.gd`，用于只读核对。
-- 本轮 `report/<工程名>/<YYYY-MM-DD-HH-mm>/` 下的报告、证据与截图。
+- `<project-dir>/` 下的文档、素材、`project.godot`、`*.tscn`、`*.tres`、`*.gd`，用于只读核对。
+- 本轮 `report/<YYYY-MM-DD_HH-MM>/` 下的报告、证据与截图。
 - GDA 工具返回的日志、轨迹、错误信息。
 - `<project-dir>/.agents/skills/godot-autopilot-*`（若存在），仅用于查工具用法。
 
@@ -70,9 +76,7 @@ description: "以任意 Godot 工程（或 examples/<主题>/<项目>）为场�
 
 把文件搜索与通配扫描限定在 `<project-dir>/` 与本轮报告目录内；不使用仓库根递归搜索。
 
-只执行 `bun run gda-dev-tools jam`（仅抽题阶段一次）、`bun run gda-dev-tools jam create`（仅创建阶段一次）、`bun run gda-dev-tools jam index`（收尾一次）、`bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>` 完成抽题、创建、构建、部署与索引；读取命令输出，不读 `devtools/` 或源码实现。
-
-`jam` 生成的 intake（`examples/<主题>/project/`）只用于读题；最终工程由 `jam create` 生成。`jam create` 生成的 `project.godot`、`GAMEJAM.md`、`jam.json` 是唯一允许在 GDA 之外创建的工程文件；其余工程文件与提交材料一律通过 GDA 创建与编辑。
+只执行 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>` 完成构建与部署；读取命令输出，不读 `devtools/` 或源码实现。
 
 遇到工具失败、行为异常或疑似缺陷时：
 
@@ -80,15 +84,11 @@ description: "以任意 Godot 工程（或 examples/<主题>/<项目>）为场�
 2. 不读源码定位根因。
 3. 在报告中标记「待分析」，留给后续根因分析阶段。
 
-以下动作只在报告产出后的分析阶段执行；本轮出现时立即停止：打开 `src/`、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/`；查看 GDA 的 git 历史或实现；修改 GDA 源码或技能文件。
+以下动作只在报告产出后的分析阶段执行；本轮出现时立即停止：打开 `src/`、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/`；查看 GDA 的 git 历史或实现；修改 GDA 源码或技能文件；应用修复、补丁或配置变更。
 
 ## 3. 前置检查
 
-1. 确认 `<project-dir>/addons/godot-autopilot/` 已部署。缺失时在仓库根执行：
-   - `bun run gda-dev-tools build`
-   - `bun run gda-dev-tools deploy --project <project-dir>`
-2. 请用户在 Godot 编辑器中打开 `<project-dir>` 并启用插件；不自行启动或重启 Godot。编辑器若仍打开其他工程，先请用户切换或重新打开。
-3. 在仓库根执行带工程目标的固定 CLI 探针序列（只读，不修改配置；`gda` 指本仓库 CLI，见 `cli/bin/gda.ts`）：
+1. 先在仓库根执行固定的 CLI 探针序列（只读，不修改配置；`gda` 指本仓库 CLI，见 `cli/bin/gda.ts`）：
 
    | 顺序 | 命令 | 通过判据 |
    |---|---|---|
@@ -99,29 +99,30 @@ description: "以任意 Godot 工程（或 examples/<主题>/<项目>）为场�
    任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda status --project <project-dir> --json` / `gda list` 的输出（实例、端口、`mcp_url` 与 `live`），再按下列判据分流，不自行启动或重启 Godot：
    - `status.project` 与 `<project-dir>` 不一致 → 工程目标不匹配，停止并请用户打开正确工程；不对另一个编辑器继续操作；
    - CLI 成功而后续 MCP 工具调用失败 → 客户端路径问题（客户端连接、协议或授权），GDA 本体可用；
-   - CLI 与客户端都失败且 `gda status --json` / `gda list` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
-4. `system_status` 必须返回 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
-5. 记录基线：开始时间、主题/来源/项目名（若本轮抽题）、本次抽样快照（`jam.json` 的 `sampled`）、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`。
-6. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。被授权门拒绝时，记录「轨迹不可得」及原因，继续执行，不推测。
-7. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
+   - CLI 与客户端都失败且 `gda status --project <project-dir> --json` / `gda list` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
+2. 固定沙盒 `examples/e2e` 在创建/重置后已执行 `build` + `deploy`；外部工程若缺少 `<project-dir>/addons/godot-autopilot/`，在仓库根执行：
+   - `bun run gda-dev-tools build`
+   - `bun run gda-dev-tools deploy --project <project-dir>`
+3. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
+4. 记录基线：开始时间、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`、`git status --porcelain`；若本轮由 `jam e2e` 抽题，记录主题、来源、`draw_id` 与 `jam.json` 的抽样快照。
+5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。被授权门拒绝时，记录「轨迹不可得」及原因，继续执行，不推测。
+6. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
 
 ## 4. 执行
 
-1. 按工程的 test-plan 或 `GAMEJAM.md` 推进；两者都没有时按「搭 → 写 → 看 → 定」四拍推进：先搭场景与调整，再写脚本与挂载，再运行调试，据结果进入下一轮。`GAMEJAM.md` 的提交要求以模板为准，本技能不额外规定文档或结构。
-2. 开发中始终遵守 `GAMEJAM.md` 的「创意约束」；它与模板建议冲突时，以创意约束为准。
-3. 单环只做一个功能增量，不合并多个功能。
-4. 每环开始前记录基线：同条件截图、读回值或日志。
-5. 每环的「看」必须产生证据：结构类用编辑器截图，运行类用游戏截图，逻辑类用读回值或日志。
-6. 改动后用与基线相同的条件复测，记录行为差异；不只写「通过」，必须提供基线 vs 改动后的可比证据。
-7. 失败时区分「改动无效」与「引入回归」；回退引入回归的改动，只回滚本环。
-8. 本环验收项全过才进入下一环。
-9. 当场微调手感与数值问题并复验；不带病进入下一环。
-10. 存在本轮聚焦目标时优先覆盖该目标，同时交付一个可运行、可复验的增量。
-11. `GAMEJAM.md` 存在时，按六项评审维度留证：Overall（可运行与完整度）、Gameplay（核心循环与输入反馈）、Graphics（截图）、Audio（音频节点/播放证据）、Innovation（机制说明）、Theme Interpretation（机制与主题对应）。自动试玩不能替代人工试玩，报告中注明。
+1. 按工程的 test-plan 推进；无 test-plan 时按「搭 → 写 → 看 → 定」四拍推进：先搭场景与调整，再写脚本与挂载，再运行调试，据结果进入下一轮。
+2. 单环只做一个功能增量，不合并多个功能。
+3. 每环开始前记录基线：同条件截图、读回值或日志。
+4. 每环的「看」必须产生证据：结构类用编辑器截图，运行类用游戏截图，逻辑类用读回值或日志。
+5. 改动后用与基线相同的条件复测，记录行为差异；不只写「通过」，必须提供基线 vs 改动后的可比证据。
+6. 失败时区分「改动无效」与「引入回归」；回退引入回归的改动，只回滚本环。
+7. 本环验收项全过才进入下一环。
+8. 当场微调手感与数值问题并复验；不带病进入下一环。
+9. 存在本轮聚焦目标时优先覆盖该目标，同时交付一个可运行、可复验的增量。
 
 ## 5. 过程记录
 
-1. 开始执行前创建本轮目录（见第 8 节）与其中的 `report.md`，写入标题、基本信息（含主题、来源、项目名、抽样快照摘要与工程路径）与「执行过程」标题。
+1. 开始执行前创建本轮目录（见第 8 节）与其中的 `report.md`，写入标题、基本信息与「执行过程」标题。
 2. 每环结束立即在「执行过程」追加一段：环号、目标、基线证据、关键动作、改动后证据、行为差异、截图相对路径、发现的问题。
 3. 随做随写报告；不凭印象补写。
 4. 不抄录全量调用序列；只摘录支撑结论的关键事件（工具名、参数摘要、ok、error_code、duration_ms、request_id）。
@@ -146,7 +147,7 @@ description: "以任意 Godot 工程（或 examples/<主题>/<项目>）为场�
 
 从资深使用者与开发者视角评估 GDA；记录不足与良好表现；不找茬、不夸大。把影响推进的负面表现登记为第 4 节的带编号问题条目；第 3 节只做归纳，不留无法追溯的结论。
 
-Game Jam 六项评审维度的设计未达标不计入 GDA 问题 `Q` 编号；只有影响 GDA 使用、工具行为或证据采集的才登记为 `Q`。
+登记前先过门槛：只登记影响真实推进、可复现的问题；有简单绕过且不影响结果的不登记；问题数量不是 KPI。
 
 按以下维度选用；无发现的维度跳过；不凑数：
 
@@ -182,7 +183,7 @@ Game Jam 六项评审维度的设计未达标不计入 GDA 问题 `Q` 编号；�
 
 ## 8. 报告
 
-- 把本轮目录设为 `report/<工程名>/<YYYY-MM-DD-HH-mm>/`；`<工程名>` 取 `jam.json` 的 `slug`（如 `examples/game_off_2026_shift/neon-shift-1a2b3c4d` → `neon-shift`）；取本地开始时间；目录已存在时追加 `-2`、`-3`，不覆盖已有轮次。
+- 把本轮目录设为 `report/<YYYY-MM-DD_HH-MM>/`；取本地开始时间；目录已存在时追加 `-2`、`-3`，不覆盖已有轮次。
 - 在本轮目录写 `report.md`（目录已带时间，文件名固定）。
 - 在本轮目录写 `img/`（截图）与 `evidence.md`（关键事件摘录）；其他本轮产物同样放本轮目录，不写入共享目录。
 - 只写 `report.md`、`evidence.md`、`img/`；不创建、不改写 `analysis.md`；本轮结束后不再改写这些文件。
@@ -190,14 +191,13 @@ Game Jam 六项评审维度的设计未达标不计入 GDA 问题 `Q` 编号；�
 - 按以下结构写报告：
 
 ```markdown
-# <工程名> 端到端测试报告
+# 端到端测试报告
 - 开始时间 / 结束时间 / GDA 版本 / Godot 版本 / git HEAD / 任务类型 / 完成度
-- 项目名 / 主题 / 赛事与来源 / 本次抽样摘要 / 工程路径（若本轮由 `jam` 抽题；外部工程写「无」）
+- 项目名 / 工程路径 / 主题 / 来源 / 抽样摘要 / draw_id（若本轮由 `jam e2e` 抽题；外部工程写「无」）
 - 轨迹：`<集中根>/projects/...`（关键事件见 `evidence.md`）
 - 日志：`<集中根>/projects/...`
 
 ## 1. 结论摘要
-## 1.1 Game Jam 验收（有 GAMEJAM.md 时；六项维度 + 证据）
 ## 2. 执行过程（每环一段，随做随写）
 ## 3. GDA 工具表现评估（按选用的维度）
 ## 4. 问题记录（Q1、Q2…；类型 + 可复用性 + 五要素 + trace 引用 + 截图）
@@ -206,19 +206,6 @@ Game Jam 六项评审维度的设计未达标不计入 GDA 问题 `Q` 编号；�
 ## 7. 通用事实 vs 本工程偶然现象
 ## 8. 证据索引（截图、trace/log 路径、未覆盖项）
 ```
-
-Game Jam 验收表建议格式：
-
-| 维度 | 结论 | 证据 |
-|---|---|---|
-| Overall | 可运行 / 完整度 | 游戏截图、运行状态 |
-| Gameplay | 核心循环是否可玩 | 输入注入结果、读回值 |
-| Graphics | 画面是否可辨 | 游戏截图 |
-| Audio | 是否有音效/音乐 | 音频节点、播放证据 |
-| Innovation | 机制新意 | 设计说明 + 机制证据 |
-| Theme Interpretation | 主题如何落到机制 | 机制与主题对应说明 |
-
-设计未达标只写入 1.1，不占用 `Q` 编号；影响 GDA 使用的才进入第 4 节。六项验收的设计依据引用 `GAMEJAM.md` 与工程实现，并注明该轮抽样是子集。存在「创意约束」时，在 1.1 增加一行，写明约束内容与遵守证据。
 
 按以下规则写优化建议：
 
@@ -235,7 +222,7 @@ Game Jam 验收表建议格式：
 本轮只执行「在线探索」与「证据沉淀」；把「离线评估」与「部署改进」留给后续轮次，并在执行前取得用户明确授权。
 
 - 用真实开发动作、轨迹与报告完成在线探索与证据沉淀。
-- 把 `report/` 下所有工程的轮目录作为证据池，跨轮累积；每轮目录自包含报告、截图、关键事件摘录、对照证据与后续 `analysis.md`（若存在）；不新建索引文件。
+- 把 `report/` 下的所有轮目录作为证据池，跨轮累积；每轮目录自包含报告、截图、关键事件摘录、对照证据与后续 `analysis.md`（若存在）；不新建索引文件。
 - 每轮结束向证据池新增一条可回放记录：本轮 `report.md`、`evidence.md`、关键对照（Q 编号与基线/改动后差异）、`analysis.md`（若存在）。历史证据不足时，由后续分析阶段用最小复现代替回放，并在报告中注明。
 - 在报告第 7 节区分：
   - GDA 通用事实：换工程仍成立，写明复现条件。
@@ -246,8 +233,8 @@ Game Jam 验收表建议格式：
 只通过文件系统与后续流程配合；不依赖任何其他技能。
 
 - 接收输入：`<project-dir>/`、`GAMEJAM.md`、`jam.json`、`docs/`、同一工程的历史轮目录。
-- 写出输出：`report/<工程名>/<YYYY-MM-DD-HH-mm>/report.md`、同目录 `evidence.md`、`img/`；每环的基线/改动后对照证据。收尾执行 `bun run gda-dev-tools jam index` 刷新 `examples/INDEX.md`，把本项目登记进本地收藏索引。
-- 若同工程最近一轮存在 `analysis.md`，只读取「待下一轮端到端验证项」。
+- 写出输出：`report/<YYYY-MM-DD_HH-MM>/report.md`、同目录 `evidence.md`、`img/`；每环的基线/改动后对照证据。
+- 若 `report/` 最近一轮存在 `analysis.md` 且对应本工程，只读取「待下一轮端到端验证项」。
 - 不写 `analysis.md`；不修改已有轮目录中的文件。
 - 按 `Q<n>` 编号问题、`S<n>` 编号建议；标注问题类型与可复用性（通用/本工程）。
 - 提供可回放的报告、证据与对照材料，供后续离线评估；不复制完整轨迹。
@@ -255,12 +242,10 @@ Game Jam 验收表建议格式：
 
 ## 10. 禁止事项
 
-- 禁止绕过 GDA 手动编辑任何 Godot 工程文件（`*.tscn`、`*.tres`、`*.gd`、`project.godot` 等）；`jam` 生成的 intake 与 `jam create` 生成的最终工程骨架除外，生成后不得再手改。
-- 禁止在 intake（`examples/<主题>/project/`）里开发、部署或打开 Godot；intake 只用于读题。
-- 禁止手工创建最终项目目录或手工拼 `<slug>-<hash>`；必须使用 `jam create`。
-- 禁止在 e2e 开发过程中再次调用 `jam` 或 `jam create`，禁止切换主题；一轮只抽一次题、只创建一个项目。
-- 禁止主动重启 Godot；引擎崩溃时停止并如实记录。
-- 禁止更新 `docs/wiki/`、`AGENTS.md` 或技能文件；禁止修改 GDA 源码。
+- 禁止绕过 GDA 手动编辑任何 Godot 工程文件（`*.tscn`、`*.tres`、`*.gd`、`project.godot` 等）。
+- 禁止主动重启 Godot；重置 `examples/e2e` 前先请用户关闭编辑器；引擎崩溃时停止并如实记录。
+- 禁止更新 `docs/wiki/`、`AGENTS.md` 或技能文件；禁止修改 GDA 源码、构建配置或测试配置。
+- 禁止在本轮修复工具问题、应用补丁或运行修改命令；修复留给分析会话。
 - 禁止编造、夸大或凭印象补写工具表现与调用记录。
 - 禁止为凑评估维度硬评，禁止把理论上的「最好有」写成优化建议。
 - 禁止提交 git。
@@ -275,15 +260,14 @@ Game Jam 验收表建议格式：
 
 收尾前逐项核对：
 
-- 轮目录名为 `YYYY-MM-DD-HH-mm`（零填充），可按目录名排序取最新；
+- 轮目录名为 `YYYY-MM-DD_HH-MM`（零填充），可按目录名排序取最新；
 - 本轮目录包含 `report.md`、`img/`、`evidence.md`，报告内截图引用均为相对路径；
-- 报告 8 节齐全（含 1.1 Game Jam 验收，若本轮抽题），问题均有证据；
-- 若本轮抽题：报告已记录项目名、主题、来源、抽样摘要与工程路径，1.1 的六项维度已验收或注明未覆盖，创意约束已说明遵守证据；
-- 本轮只抽一次题，开发过程中未再次调用 `jam` 或 `jam create`，未在 intake 中开发；
-- 收尾已执行 `jam index`，`examples/INDEX.md` 包含本项目；
+- 报告 8 节齐全，问题均有证据；
 - 问题编号唯一、类型与可复用性标注齐全，写入边界未被越界；
 - 每环有基线 vs 改动后的成对对照证据，引入回归的改动已回退；
 - 证据池已登记本轮可回放材料；
+- 新轮次已重置 `examples/e2e`（用户明确要求续跑时除外），并在创建/重置后执行 `build` + `deploy`；
+- 本轮未修改任何工具源码、文档或技能；`git status --porcelain` 与开工基线相比，除被忽略目录外无新增跟踪文件改动；
 - 本轮未读取 GDA 源码、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/`；疑似缺陷均标记「待分析」；
 - 截图文件存在且报告中标注对应环号与验收项；
 - 原始轨迹/日志路径已记录，关键事件已写入 `evidence.md`；
