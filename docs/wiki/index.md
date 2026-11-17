@@ -8,6 +8,7 @@
 |---|---|---|
 | [overview.md](overview.md) | 项目定位、整体架构、技术栈、目录结构、命名体系 | 全仓库 |
 | [build.md](build.md) | 构建/部署/打包流程、CMake 模块、产物清单、环境变量 | `CMakeLists.txt`、`cmake/`、`devtools/` |
+| [gamejam.md](gamejam.md) | 比赛开发与 e2e 用 Game Jam 题库 v2、随机抽样、创意约束、intake 与项目创建、固定 e2e 沙盒、本地收藏 | `devtools/commands/jam.ts`、`devtools/data/gamejam/`、`devtools/templates/gamejam/` |
 | [tests.md](tests.md) | 测试体系（程序化四层 + Agent e2e）、数值统计 | `tests/` |
 | [engine-behavior-checklist.md](engine-behavior-checklist.md) | 引擎行为验收清单：D-01 蒸馏落点、A 类迁移对照表、e2e 抽查建议 | — |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
@@ -57,5 +58,6 @@
 - frontmatter 必含 `type`/`title`/`description`/`tags`/`timestamp`/`resource`，例外页仅 `index.md`、`log.md`、`changelog/*-log.md`。
 - 每页至少 1 条相对链接指向仓库内真实文件；`changelog/*` 是历史记录页，只保证"新增条目至少 1 条相对链接"，不回溯补链。
 - 只改受影响页；被取代的描述直接删除，不留"已废弃"" formerly"之类标记。
+- 不记录 git 工作树与远端状态（未提交 / 未推送 / 未打 tag）；它们随操作必然变化，不构成可复用知识，任何位置都不写。
 - 数值一律以运行时统计为准，口径以 [tests.md](tests.md) 的"数值核算总表"为准。
 - 各页的"与 AGENTS.md 对照"表属审计记录，其中引用的 AGENTS.md 条目是 **2026-09-25 精简前**的版本（当时该文件承载架构与计数）；现行 `AGENTS.md` 只保留最小入口内容，不再逐条对应，遇到此类表格按"历史结论"读、以当前源码与本页正文为准。

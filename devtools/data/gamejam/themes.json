@@ -1,0 +1,1931 @@
+{
+  "schema_version": 2,
+  "themes": [
+    {
+      "id": "brackeys_2026_2_trust_no_one",
+      "theme": "TRUST NO ONE",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2026.2",
+      "year": 2026,
+      "source_url": "https://itch.io/jam/brackeys-16",
+      "source_title": "Brackeys Game Jam 2026.2",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-16",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:trust",
+        "genre:social-deduction",
+        "mood:paranoid"
+      ],
+      "keywords": [
+        "信任：相信别人会按你说的做，但你没有证据",
+        "背叛：合作收益很高，背叛收益更高",
+        "偏执：每个人都可能是敌人，包括你自己",
+        "证据：你只能依据不完整的信息做判断",
+        "合作：一个人做不到，两个人又不确定",
+        "谎言：说真话和说假话的代价不对称"
+      ],
+      "concept_ideas": [
+        "一个合作解谜：两个玩家看到的线索不同，但系统不保证对方说的是真话。",
+        "一个社交推理：没有明确阵营，每个人都有自己的胜利条件。",
+        "一个资源管理：你必须把关键资源交给别人保管，但可以随时背叛。",
+        "一个 roguelike：你的同伴由 AI 控制，AI 会根据你的行为决定是否背叛你。",
+        "一个密室逃脱：门需要两个人同时操作，但其中一个人知道出去后另一个人会死。",
+        "一个叙事游戏：你在调查一个事件，每个证人都可能撒谎，而撒谎有代价。",
+        "一个塔防游戏：你可以把防御塔的控制权交给“盟友”，但它们可能倒戈。",
+        "一个双人非对称游戏：一个人看得见陷阱，一个人看得见奖励，但两人不能直接沟通。"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "game_off_2026_shift",
+      "theme": "SHIFT",
+      "organizer": "GitHub",
+      "event": "Game Off",
+      "edition": "2026",
+      "year": 2026,
+      "source_url": "https://github.blog/open-source/gaming/game-off-2026-the-theme-is-shift/",
+      "source_title": "Game Off 2026: The theme is SHIFT",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/game-off-2026",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:transformation",
+        "mechanic:perspective",
+        "input:single-button"
+      ],
+      "keywords": [
+        "更换档位：换挡、换方向、换物理法则",
+        "转换视角：切换视角、维度、现实",
+        "按键 Shift：只用 Shift 键作为唯一控制方式",
+        "夜班：在夜班中发生的恐怖或喜剧故事",
+        "位运算：利用比特移位来操纵游戏世界",
+        "推卸责任：在侦探或喜剧游戏中“甩锅”"
+      ],
+      "concept_ideas": [
+        "一个只能用 Shift 键（或两个 Shift 键）玩的单键/双键游戏。",
+        "一个换挡会改变重力、时间、刹车方式的赛车游戏。",
+        "一个视角解谜：旋转镜头把墙壁变成地面，把影子变成平台。",
+        "一个在两个重叠现实之间切换的解谜平台游戏。断桥在另一层存在，但怪物也在。",
+        "一个变形冒险：变成生物或物体，继承它们的能力和弱点。",
+        "一个便利店夜班恐怖游戏：顾客越来越奇怪，七号货架上的东西不在培训手册里。",
+        "一个喜剧侦探游戏：你犯了罪，必须把锅甩给越来越不可能的嫌疑人，同时不能和证据矛盾。",
+        "一个位运算解谜：左移让物体翻倍，右移减半，位数用完了会发生什么。",
+        "一个冒险游戏，说服别人替你值班，好让你去打最终 Boss。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gbjam_14_old_gold",
+      "theme": "Old Gold",
+      "organizer": "Polyducks / chasehunter",
+      "event": "GBJAM",
+      "edition": "14",
+      "year": 2026,
+      "source_url": "https://itch.io/jam/gbjam-14",
+      "source_title": "GBJAM 14",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gbjam-14",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:digging",
+        "genre:platformer",
+        "mood:nostalgic",
+        "input:gamepad"
+      ],
+      "keywords": [
+        "旧日黄金",
+        "复古寻宝",
+        "四色怀旧",
+        "时光胶囊",
+        "褪色记忆",
+        "考古"
+      ],
+      "concept_ideas": [
+        "四色挖矿：越深的矿层颜色越少，最后只剩黑白，玩家靠形状判断矿石价值。",
+        "旧货鉴定：在旧货店用放大镜寻找被低估的宝物，赝品会在特定角度露出破绽。",
+        "怀表倒流：主角是祖父留下的旧怀表，倒流时间时画面变成金色，但表针会磨损。",
+        "时光胶囊：在 160x144 的小镇里挖掘埋藏物，每挖出一个就改变小镇外观。",
+        "照片迷宫：墙壁由旧照片拼成，找到照片中的地点才能打开对应的门。",
+        "当铺故事：收购旧物并听卖家讲述来历，判断物品真实价值与情感价值。",
+        "四色射击：敌人掉落金色碎片，收集后短暂解锁第五种颜色与特殊武器。",
+        "陶片考古：在四色遗迹中拼合陶片，还原失落文明的黄金时代，拼错会误导结局。"
+      ],
+      "design_constraints": [
+        "画面分辨率固定为 160×144；可等比缩放，但必须保持方形像素。",
+        "同屏最多使用 4 种颜色。",
+        "操作数量与 Game Boy 一致：方向键、A、B、Select、Start。"
+      ]
+    },
+    {
+      "id": "ggj_2026_mask",
+      "theme": "MASK",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2026",
+      "year": 2026,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:identity",
+        "genre:narrative",
+        "mood:mysterious"
+      ],
+      "keywords": [
+        "面具：遮住脸，也遮住意图",
+        "身份：你扮演谁，谁又在扮演你",
+        "防护：口罩、面罩、盔甲，保护也是一种隔离",
+        "伪装：让一个东西看起来像另一个东西",
+        "图层：蒙版、遮罩、图层叠加，隐藏与显露",
+        "表演：社会角色是一种面具，摘下需要代价"
+      ],
+      "concept_ideas": [
+        "一个社交推理游戏：每个人都有一个面具，面具决定别人能看到你的哪种情绪。",
+        "一个潜行游戏：你戴上不同的面具来获得不同的权限，但面具会改变你的能力。",
+        "一个图像解谜：用蒙版遮住部分画面，让两个不相干的图像拼成一个新世界。",
+        "一个叙事游戏：你在不同场合戴不同面具，最终忘记了自己的脸。",
+        "一个面具制作游戏：每层面具提供一种能力，但叠得越多越难呼吸。",
+        "一个恐怖游戏：面具摘下后，下面还有一张面具。",
+        "一个多人游戏：你看到的所有玩家都是面具，真实身份只在死亡时揭示。",
+        "一个声音游戏：你只能通过改变“声音面具”来伪装成不同角色。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gmtk_2026_count_down",
+      "theme": "COUNT DOWN",
+      "organizer": "Game Maker's Toolkit",
+      "event": "GMTK Game Jam",
+      "edition": "2026",
+      "year": 2026,
+      "source_url": "https://itch.io/jam/gmtk-jam-2026",
+      "source_title": "GMTK Game Jam 2026",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gmtk-jam-2026",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:countdown",
+        "genre:action",
+        "mood:tense"
+      ],
+      "keywords": [
+        "倒计时：时间在减少，选择在变少",
+        "发射：火箭、导弹、烟花，按下按钮之后不可撤回",
+        "倒数：从大到小，数字本身制造紧张",
+        "最后期限：必须在某个时刻之前完成，否则后果不可逆",
+        "归零：一切回到起点，或者彻底结束",
+        "节奏：倒计时是一种被设计出来的节奏"
+      ],
+      "concept_ideas": [
+        "一个火箭发射模拟：倒计时期间你要修好所有系统，但每次修复都会引发新问题。",
+        "一个拆弹游戏：倒计时不是真实的，但你的每一次确认都会让它减少。",
+        "一个倒计时平台游戏：屏幕上的数字同时是时间、生命和关卡进度。",
+        "一个反向塔防：敌人从 10 数到 0，数到 0 时发动攻击，而你可以改变计数。",
+        "一个叙事游戏：每次对话都在倒计时，沉默也会减少时间。",
+        "一个音乐游戏：倒计时是节拍器，归零时整首歌反转。",
+        "一个“最后 10 秒”循环：你反复回到最后 10 秒，试图改变结局。",
+        "一个经营游戏：你不断借未来的时间，倒计时越来越长，利息越来越高。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "macgdc_2026_visibility",
+      "theme": "VISIBILITY",
+      "organizer": "MacGDC",
+      "event": "MacGDC Game Jam",
+      "edition": "2026",
+      "year": 2026,
+      "source_url": "https://itch.io/jam/macgdc-game-jam-2026",
+      "source_title": "MacGDC Game Jam 2026",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/macgdc-game-jam-2026",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:visibility",
+        "genre:stealth",
+        "mood:tense"
+      ],
+      "keywords": [
+        "可见性：被看见的状态，或者被允许被看见的状态",
+        "光照：光线的充足程度，决定什么东西能被眼睛接收到",
+        "盲区：永远看不到的那块区域，只能靠别的方式推断那里发生了什么",
+        "权限：决定谁有权看到某一层信息，而层级本身可以被重新划分",
+        "暴露：把原本藏在背景里的东西拉到前景，拉出来之后它就再也回不去了",
+        "隐形：让某个东西从记录中消失，就好像它从未存在过"
+      ],
+      "concept_ideas": [
+        "一个角色只有在被敌人“看见”时才存在，敌人转头它就消失。",
+        "一个解谜游戏，光源是你唯一的工具，但照亮一个东西的同时会让另一个东西隐入黑暗。",
+        "一个潜行游戏，你的可见度是一个可以被主动调节的滑块，但调低可见度会让你自己也看不清路。",
+        "一个社交场景，所有人都在争取“被看见”，而看见别人的代价是自己变得可见。",
+        "一个盲区里的世界：屏幕中央有一块永远看不见的区域，但声音会告诉你那里发生了什么。",
+        "一个记录员，他的工作是把不该被看见的东西从档案里涂黑，但涂黑本身会留下痕迹。",
+        "一个只能通过影子判断敌人位置的游戏：敌人本体不可见，但影子会暴露它。",
+        "一个摄影游戏：取景框内可见的世界与取景框外不同，玩家必须决定把什么纳入画面。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "brackeys_2025_1_nothing_can_go_wrong",
+      "theme": "Nothing Can Go Wrong...",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2025.1",
+      "year": 2025,
+      "source_url": "https://itch.io/jam/brackeys-13",
+      "source_title": "Brackeys Game Jam 2025.1",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-13",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:chain-reaction",
+        "mechanic:risk-management",
+        "genre:simulation",
+        "mood:ironic"
+      ],
+      "keywords": [
+        "反讽",
+        "事故链",
+        "过度自信",
+        "灾难前兆",
+        "安全检查",
+        "墨菲定律"
+      ],
+      "concept_ideas": [
+        "扮演工厂质检员，放过的每个隐患都会在结尾连锁爆发",
+        "直播挑战中，玩家越保证没事，隐藏风险条越高",
+        "太空站日常维护，所有警告都被要求忽略",
+        "婚礼策划模拟，小决定在结局引发蝴蝶效应",
+        "扮演保险员，逐条评估他人冒险计划中的漏洞",
+        "一台号称绝对安全的机器，玩家要找出唯一故障点",
+        "限时搬家，玩家不断打包却总有东西掉出来",
+        "扮演灾难片配角，设法阻止主角做蠢事"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "brackeys_2025_2_risk_it_for_the_biscuit",
+      "theme": "Risk It for the Biscuit",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2025.2",
+      "year": 2025,
+      "source_url": "https://itch.io/jam/brackeys-14",
+      "source_title": "Brackeys Game Jam 2025.2",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-14",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:risk-reward",
+        "mechanic:greed",
+        "genre:arcade",
+        "mood:greedy"
+      ],
+      "keywords": [
+        "风险回报",
+        "诱惑",
+        "贪婪",
+        "赌注",
+        "见好就收",
+        "高风险高收益"
+      ],
+      "concept_ideas": [
+        "饼干放在陷阱深处，每多拿一块移动就越慢",
+        "厨房潜行偷吃零食，携带越多越容易被发现",
+        "经营饼干店，接大单冲销量还是保口碑",
+        "一次只能带走一块饼干，但可以事先选择藏匿点",
+        "攀爬高塔取饼干，越往上风力越大",
+        "与NPC赌饼干，输光即结束本局",
+        "烤箱倒计时，玩家决定是否再烤一批",
+        "扮演狗，桌上饼干与主人视线构成风险博弈"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "game_off_2025_waves",
+      "theme": "WAVES",
+      "organizer": "GitHub",
+      "event": "Game Off",
+      "edition": "2025",
+      "year": 2025,
+      "source_url": "https://github.blog/open-source/gaming/github-game-off-2025-theme-announcement/",
+      "source_title": "GitHub Game Off 2025 theme announcement",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/game-off-2025",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:waves",
+        "genre:arcade",
+        "mood:calm"
+      ],
+      "keywords": [
+        "水波：水面起伏、潮汐、涟漪，力量从远处传来",
+        "声波：频率、振幅、共振，声音本身就是一种波",
+        "信号：无线电、摩斯码、噪声里的规律",
+        "情绪波：情绪的起落、感染与消退",
+        "波次：一波接一波的敌人、事件或机会",
+        "波动：稳定被打破后，系统在平衡点附近来回摆动"
+      ],
+      "concept_ideas": [
+        "一个冲浪游戏：你只能通过改变波形的频率和振幅来塑造海面。",
+        "一个声波解谜：用不同频率的波让物体共振、破碎或悬浮。",
+        "一个无线电监听游戏：在噪声中辨认信号，拼出一段被淹没的求救。",
+        "一个情绪传染的叙事游戏：你的情绪像波一样传给 NPC，改变他们的行为。",
+        "一个塔防游戏：敌人以波次到来，但你可以提前“抵消”下一波。",
+        "一个在波形上行走的平台游戏：波峰是地面，波谷是深渊，而波还在移动。",
+        "一个心电图冒险：每次心跳都是一次选择，波形决定你能做什么。",
+        "一个把“波”当作货币的世界：你收集和释放波动来改变物理规则。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ggj_2025_bubble",
+      "theme": "BUBBLE",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2025",
+      "year": 2025,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:bubbles",
+        "genre:puzzle",
+        "mood:cozy"
+      ],
+      "keywords": [
+        "气泡：脆弱、透明、会破，也可能包裹住一个世界",
+        "泡沫：经济泡沫、社交泡沫，看起来繁荣但内部是空的",
+        "隔离：把自己包在气泡里，安全但看不到外面",
+        "膨胀：越吹越大，越大越接近破裂",
+        "过滤：气泡作为筛选器，只让某些东西通过",
+        "群体：气泡聚在一起会合并、排斥或形成新的边界"
+      ],
+      "concept_ideas": [
+        "一个吹泡泡的平台游戏：泡泡是你的载具，也是你的生命值。",
+        "一个经济模拟：你在泡沫破裂前不断吹大市场，但不知道谁是最后一个接盘的人。",
+        "一个社交游戏：每个人都有一个“个人空间气泡”，靠近别人会压缩它。",
+        "一个解谜游戏：用泡泡包裹物体来改变它们的浮力、碰撞和声音。",
+        "一个末日叙事：城市被巨大的气泡罩住，里面的人以为世界还在。",
+        "一个泡泡合并游戏：合并小气泡来获得能力，但合并后你不再能分开。",
+        "一个“信息气泡”游戏：你只能看到算法给你看的东西，直到你主动戳破它。",
+        "一个音效游戏：每个泡泡破裂的声音组成一段旋律。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "godot_wild_jam_79_growing",
+      "theme": "Growing",
+      "organizer": "Godot Wild Jam",
+      "event": "Godot Wild Jam",
+      "edition": "79",
+      "year": 2025,
+      "source_url": "https://godotwildjam.com/past-jams/",
+      "source_title": "Godot Wild Jam Past Jams",
+      "source_kind": "archive",
+      "rules_url": "https://itch.io/jam/godot-wild-jam-79",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:growth",
+        "genre:platformer",
+        "mood:cozy",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "生长扩张",
+        "培育代价",
+        "空间挤压",
+        "共生关系",
+        "资源修剪",
+        "缓慢变化"
+      ],
+      "concept_ideas": [
+        "藤蔓平台：玩家浇水让藤蔓长成临时平台，水量有限，长出的路径也会枯萎。",
+        "城市扩张：每建一栋楼就挤占一块绿地，玩家在住房、绿地与预算间维持平衡。",
+        "细胞塔防：培育免疫细胞对抗感染，但细胞过度增殖会反过来伤害宿主。",
+        "根系解谜：引导树根穿过土壤寻找水源，避开岩石、管道与污染层。",
+        "成长代价：角色随经验变大，体型增大后无法进入早期的小门，需要规划路线。",
+        "菌丝网络：连接菌丝扩张领地并吸收养分，同时净化被污染的土地。",
+        "殖民舱维护：植物过度生长堵塞氧气管道，玩家定期修剪以维持循环。",
+        "墙面争夺：双人培育藤蔓覆盖墙面，先覆盖六成面积者获胜，可剪断对方藤蔓。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "js13k_2025_black_cat",
+      "theme": "Black Cat",
+      "organizer": "Enclave Games",
+      "event": "js13kGames",
+      "edition": "2025",
+      "year": 2025,
+      "source_url": "https://js13kgames.com/2025",
+      "source_title": "js13kGames 2025",
+      "source_kind": "official",
+      "rules_url": "https://js13kgames.com/2025/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:stealth",
+        "genre:platformer",
+        "mood:mischievous",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "黑猫迷信",
+        "夜间潜行",
+        "九条命",
+        "女巫伙伴",
+        "厄运反转",
+        "月光路线"
+      ],
+      "concept_ideas": [
+        "屋顶跳跃：黑猫在夜间屋顶间穿行，避开居民手电筒并收集散落的护身符。",
+        "女巫学徒：黑猫潜入村庄偷取配方材料，被发现会消耗一条命。",
+        "镜像解谜：黑猫穿过镜子进入倒影世界，移动物品来改变现实中的房间布局。",
+        "猫咖经营：黑猫用尾巴扫过柜台招待客人，但会打翻杯子，玩家要控制力道。",
+        "博物馆潜行：黑猫避开保安与激光，专偷被诅咒的展品。",
+        "九命平台：每死一次失去一种颜色，世界逐渐变灰，能力也随之减弱。",
+        "月光信使：黑猫在万圣夜送信，路线随月光方向变化，走错会遇到恶犬。",
+        "厄运反转：黑猫故意制造小灾祸吓走拆迁队，保护老屋不被拆除。"
+      ],
+      "design_constraints": [
+        "整包（代码与素材）压缩为 zip 后不得超过 13,312 字节。"
+      ]
+    },
+    {
+      "id": "kenney_jam_2025_power",
+      "theme": "POWER",
+      "organizer": "Kenney",
+      "event": "Kenney Jam",
+      "edition": "2025",
+      "year": 2025,
+      "source_url": "https://itch.io/jam/kenney-jam-2025",
+      "source_title": "Kenney Jam 2025",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/kenney-jam-2025",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:resource_management",
+        "genre:simulation",
+        "mood:tense",
+        "input:mouse"
+      ],
+      "keywords": [
+        "电力调度",
+        "能量过载",
+        "权力博弈",
+        "充能循环",
+        "基础设施",
+        "取舍"
+      ],
+      "concept_ideas": [
+        "电网调度：用电高峰时切换线路，避免医院与工厂同时断电。",
+        "电池角色：滚动充电并释放电能击退敌人，充电时无法移动。",
+        "电梯救援：把有限电力分配给不同电梯，在停电前救出被困住户。",
+        "权力桌游：用影响力卡牌夺取议会席位，集权过高会引发叛乱。",
+        "充电站经营：为不同车辆分配功率，快充收益高但会损伤电池寿命。",
+        "灯塔值守：雷暴中手动切换备用电源，为过往船只指引航道。",
+        "超能力者：每次使用能力都会抽走城市电网，玩家要在救人与停电之间权衡。",
+        "工厂传送带：接通电路启动机械臂，错误配电会打乱生产节拍并卡住工件。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_57_depths",
+      "theme": "DEPTHS",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "57",
+      "year": 2025,
+      "source_url": "https://ldjam.com/events/ludum-dare/57",
+      "source_title": "Ludum Dare 57",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:exploration",
+        "genre:adventure",
+        "mood:dark"
+      ],
+      "keywords": [
+        "深度：向下、向里、向更远处，越深越难返回",
+        "海洋：黑暗、压力、未知生物与沉没的东西",
+        "地下：矿层、洞穴、根系与埋藏的记忆",
+        "深渊：看不见底部，恐惧来自无法测量",
+        "深入：对一个问题、一段关系或一个秘密的挖掘",
+        "压力：越深压力越大，资源越少，退路越长"
+      ],
+      "concept_ideas": [
+        "一个潜水器资源管理游戏：下潜越深，氧气、灯光和外壳压力越紧张。",
+        "一个地下挖掘游戏：每一层都埋着上一层的遗迹，越深越古老。",
+        "一个心理叙事：你不断追问一个事件，每次回忆都更深一层，也更不可靠。",
+        "一个声呐解谜：你看不见地形，只能用回声在黑暗中画出路径。",
+        "一个深海生态游戏：发光生物组成唯一的导航系统。",
+        "一个“深度”作为难度的平台游戏：每下降一层，重力、敌人和规则都变化。",
+        "一个沉没城市探索：你在废墟中寻找证据，但每次上浮都会失去一些记忆。",
+        "一个垂直矿井经营：向下扩张，但越深越难把资源运回地面。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "pirate_software_jam_16_you_are_the_weapon",
+      "theme": "You Are The Weapon",
+      "organizer": "Pirate Software",
+      "event": "Pirate Software Game Jam",
+      "edition": "16",
+      "year": 2025,
+      "source_url": "https://itch.io/jam/pirate16",
+      "source_title": "Pirate Software - Game Jam 16",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/pirate16",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:possession",
+        "genre:action",
+        "mood:dark",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "人即武器",
+        "被使用",
+        "附身契约",
+        "牺牲代价",
+        "服从与反抗",
+        "传递"
+      ],
+      "concept_ideas": [
+        "传代之剑：玩家是一把被历代英雄传递的剑，每任持有者死亡后继承其部分记忆。",
+        "诅咒手套：附身敌人让其自相残杀，附身时间有限，脱离后会暴露位置。",
+        "导弹 AI：玩家是导弹制导系统，在命中前通过截获的通信决定是否改变目标。",
+        "双人合体：一人是枪、一人是射手，枪决定弹道，射手决定开火时机。",
+        "病毒潜入：玩家是病毒，潜入细胞并变异出不同能力，但会被免疫系统识别。",
+        "话痨法杖：法师用会说话的法杖施法，法杖会偷偷改变法术效果。",
+        "少年兵器：玩家是被当作武器培养的孩子，在任务中决定服从还是反抗。",
+        "肉身城墙：塔防中玩家把自己嵌进城墙，用身体阻挡敌人并为友军争取时间。"
+      ],
+      "design_constraints": [
+        "禁止色情、裸露、血腥与毒品内容。"
+      ]
+    },
+    {
+      "id": "acerola_jam_0_aberration",
+      "theme": "Aberration",
+      "organizer": "Acerola",
+      "event": "Acerola Jam",
+      "edition": "0",
+      "year": 2024,
+      "source_url": "https://itch.io/jam/acerola-jam-0",
+      "source_title": "Acerola Jam 0",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/acerola-jam-0",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:pattern_recognition",
+        "genre:puzzle",
+        "mood:eerie",
+        "input:mouse"
+      ],
+      "keywords": [
+        "异常感知",
+        "细微偏差",
+        "违和感",
+        "扭曲规则",
+        "异类视角",
+        "错误阈值"
+      ],
+      "concept_ideas": [
+        "质检流水线：找出外形偏差超过阈值的玩偶，阈值逐轮收紧，误判会扣分。",
+        "色差平台：同一场景在红蓝通道中位置不同，玩家切换通道对齐平台前进。",
+        "街区测绘：每次测量都多出一条不存在的小巷，玩家要判断哪条是真实入口。",
+        "倾斜世界：重力方向偶尔偏移十五度，玩家要适应倾斜的关卡并利用偏移。",
+        "错位生态：玩家是被放进错误生态系统的动物，选择改变环境或改变自身习性。",
+        "名画修复：每次修复都会让画中人物多出一个不合理细节，玩家要决定何时停手。",
+        "重复一分钟：同一分钟重复三次，玩家必须让三次行动产生不同结果才能脱离。",
+        "异常值社交：玩家是唯一能看见别人头上异常值的人，决定是否揭穿，每个选择改变关系。"
+      ],
+      "design_constraints": [
+        "提交作品必须使用英文。",
+        "作品必须包含可玩的核心循环，不能只是技术演示。"
+      ]
+    },
+    {
+      "id": "brackeys_2024_2_calm_before_the_storm",
+      "theme": "Calm Before the Storm",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2024.2",
+      "year": 2024,
+      "source_url": "https://itch.io/jam/brackeys-12",
+      "source_title": "Brackeys Game Jam 2024.2",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-12",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:preparation",
+        "mechanic:forecast",
+        "genre:management",
+        "mood:ominous"
+      ],
+      "keywords": [
+        "暴风雨前的宁静",
+        "准备阶段",
+        "张力积累",
+        "短暂和平",
+        "预警",
+        "必然来临"
+      ],
+      "concept_ideas": [
+        "小镇居民在风暴前决定带走哪几样东西",
+        "玩家布置防线，风暴强度由前期行为累积决定",
+        "平静的对话场景，背景细节不断暗示灾难",
+        "灯塔看守人必须在风平浪静时修好灯塔",
+        "扮演气象员，预报失误会改变结局",
+        "海上最后一天，玩家与船员逐一告别",
+        "收集宁静来延迟风暴，但每次使用都会加速它",
+        "风暴前的拍卖会，玩家用有限时间处理遗产"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "brackeys_2024_1_behind_the_door",
+      "theme": "What's Behind the Door",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2024.1",
+      "year": 2024,
+      "source_url": "https://itch.io/jam/brackeys-11",
+      "source_title": "Brackeys Game Jam 2024.1",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-11",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:portal",
+        "mechanic:exploration",
+        "genre:adventure",
+        "mood:eerie"
+      ],
+      "keywords": [
+        "门后未知",
+        "期待与恐惧",
+        "窥视",
+        "选择哪扇门",
+        "空间转换",
+        "边界"
+      ],
+      "concept_ideas": [
+        "每扇门后是规则不同的小房间，玩家判断是否进入",
+        "门是传送门，门后的世界会反过来改变门的形状",
+        "扮演门卫，决定谁可以通过以及门后出现什么",
+        "门只能从另一侧打开，玩家需绕路到背面",
+        "门后会复制进入者的记忆，玩家要辨认哪一个是真的",
+        "走廊不断生成新门，玩家留下标记防止迷路",
+        "门后是同一房间的过去版本，改动它会改变现在",
+        "玩家可以画一扇门，但画出的门后是随机空间"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "game_off_2024_secrets",
+      "theme": "Secrets",
+      "organizer": "GitHub",
+      "event": "Game Off",
+      "edition": "2024",
+      "year": 2024,
+      "source_url": "https://github.blog/open-source/game-off-2024-theme-announcement",
+      "source_title": "Game Off 2024 theme announcement - The GitHub Blog",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/game-off-2024",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:stealth",
+        "genre:mystery",
+        "mood:secretive",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "隐藏信息",
+        "秘密社会",
+        "揭示与代价",
+        "隐私边界",
+        "密室与暗门",
+        "不可告人的动机"
+      ],
+      "concept_ideas": [
+        "玩家在 NPC 家中翻找日记，每次翻找都会留下痕迹。",
+        "秘密社团入会仪式，玩家要保守一个会随进程变化的秘密。",
+        "双身份潜行，白天是店员，夜晚潜入同一栋楼。",
+        "密码破译游戏，玩家收集碎片却永远无法确认最后一条信息。",
+        "一间只有玩家知道的隐藏房间，NPC 会逐渐察觉它的存在。",
+        "家庭聚餐叙事，玩家选择揭穿谁的秘密，关系网随之改变。",
+        "考古解谜，越接近真相越触发陷阱，撤退也会毁掉证据。",
+        "多人社交推理，每个人都有一个不能说的目标，任务本身是掩护。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gmtk_2024_built_to_scale",
+      "theme": "BUILT TO SCALE",
+      "organizer": "Game Maker's Toolkit",
+      "event": "GMTK Game Jam",
+      "edition": "2024",
+      "year": 2024,
+      "source_url": "https://itch.io/jam/gmtk-2024",
+      "source_title": "GMTK Game Jam 2024",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gmtk-2024",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:scale",
+        "genre:puzzle",
+        "mechanic:perspective"
+      ],
+      "keywords": [
+        "缩放：把某个东西变大或变小，改变它和世界之间的比例关系",
+        "比例尺：地图上一小段距离代表真实的一大段距离，比例改了，世界就改了",
+        "天平：衡量重量或价值的装置，平衡是需要维持的状态，倾斜是可以被利用的状态",
+        "音阶：一组按频率排列的音，爬升和下降构成旋律，而方向可以被反转",
+        "攀登：沿着一个表面向上移动，表面本身的尺度决定了攀登的难度和方式",
+        "度量：把两个不可直接比较的东西放到同一个尺度上，而尺度本身是你选的"
+      ],
+      "concept_ideas": [
+        "一个物理平台游戏：史莱姆膨胀时能跳得更高、推开更重的东西，但会卡在窄缝里。",
+        "一个嵌套解谜：俄罗斯套娃式的空间，玩家在某一层里操作的是“上一层”的物体。",
+        "一个窗口本身的尺寸就是谜题：缩小浏览器窗口才能看到隐藏的路径。",
+        "一个蚂蚁殖民地的资源管理游戏，玩家在多个可缩放层级之间切换，同一片叶子在某个尺度上是食物，在另一个尺度上是地形。",
+        "一个强制透视摄影叙事游戏：改变物体与镜头的距离来制造“看起来像”的画面。",
+        "一个用有限材料搭建通往高处的结构，但结构越大越不稳定。",
+        "一个天平解谜：两边放着不可直接称重的东西，玩家只能通过交换和移动来猜测相对重量。",
+        "一个音阶游戏：玩家在音高上“爬升”，但爬到某个点之后音阶反转，上升变成下降。",
+        "一个角色越大越难被忽略、也越难穿过狭窄空间，而游戏的目标恰恰在狭窄空间里。",
+        "一个清扫者用吸尘器吸走比自己小的东西来变大，但变大会让它再也进不去某些区域。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "js13k_2024_triskaidekaphobia",
+      "theme": "TRISKAIDEKAPHOBIA",
+      "organizer": "Enclave Games",
+      "event": "js13kGames",
+      "edition": "2024",
+      "year": 2024,
+      "source_url": "https://js13kgames.com/2024",
+      "source_title": "js13kGames 2024",
+      "source_kind": "official",
+      "rules_url": "https://js13kgames.com/2024/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:numbers",
+        "genre:horror",
+        "mood:eerie"
+      ],
+      "keywords": [
+        "十三恐惧：对数字 13 的非理性避讳",
+        "迷信：明知没有因果，行为还是被规则束缚",
+        "不祥：预感、征兆、重复出现的坏兆头",
+        "禁忌：不能做、不能说、不能数的东西",
+        "仪式：为了避开厄运而重复的动作",
+        "巧合：当巧合足够多，人就会开始相信模式"
+      ],
+      "concept_ideas": [
+        "一个电梯恐怖游戏：楼层跳过 13，但你在 12 和 14 之间听到了不该存在的楼层。",
+        "一个数字解谜：所有操作都围绕 13 展开，凑出 13 会触发不同结果。",
+        "一个仪式模拟：每天重复小动作来避免厄运，但仪式本身开始改变世界。",
+        "一个 roguelike：第 13 层永远不同，而且它记得你上次来过。",
+        "一个社交推理：13 个人里有一个“不祥者”，但没人知道规则是谁定的。",
+        "一个反向塔罗游戏：你抽到的牌越不吉利，越能解锁隐藏路径。",
+        "一个节奏游戏：13 拍循环，第 13 拍总是空的。",
+        "一个元游戏：游戏本身在数你的失败次数，第 13 次失败后它开始作弊。"
+      ],
+      "design_constraints": [
+        "整包（代码与素材）压缩为 zip 后不得超过 13,312 字节。"
+      ]
+    },
+    {
+      "id": "ld_55_summoning",
+      "theme": "Summoning",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "55",
+      "year": 2024,
+      "source_url": "https://ldjam.com/events/ludum-dare/55",
+      "source_title": "Ludum Dare 55: Summoning",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:summoning",
+        "genre:roguelike",
+        "mood:occult",
+        "input:mouse"
+      ],
+      "keywords": [
+        "召唤仪式与法阵",
+        "契约的代价",
+        "召唤物失控",
+        "被召唤者的视角",
+        "献祭与交换",
+        "召唤资源管理"
+      ],
+      "concept_ideas": [
+        "在六边形法阵上放置符文，每回合召唤一种生物，用有限格子凑出能挡住入侵的阵容。",
+        "你被不同雇主反复召唤，每次只能在战场停留十秒，要在消失前完成当前委托。",
+        "召唤物继承献祭物品的属性，玩家必须决定烧掉哪件家当来应对下一波敌人。",
+        "双人非对称：一人绘制召唤阵，一人扮演被召唤的怪物，只能靠三个手势指令配合。",
+        "召唤失败会生成畸形生物，玩家把它关进笼子，用它的失控能力反打下一关。",
+        "用麦克风模仿咒语节奏来召唤，节拍越准召唤物越强，但噪音也会惊动守卫。",
+        "地牢召唤师只能召唤自己见过的敌人，探索越深，可选牌库越危险。",
+        "召唤阵是旋转的管道网络，能量流向决定产出灵体的种类与攻击方式。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_56_tiny_creatures",
+      "theme": "TINY CREATURES",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "56",
+      "year": 2024,
+      "source_url": "https://ldjam.com/events/ludum-dare/56",
+      "source_title": "Ludum Dare 56",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:ecosystem",
+        "genre:simulation",
+        "mood:cozy"
+      ],
+      "keywords": [
+        "微小：小到被忽略，但小有小的优势",
+        "生态：一个池塘、一块石头、一片叶子就是一个世界",
+        "宠物：照顾、喂养、观察，关系在细节里",
+        "虫群：数量本身就是一种力量",
+        "视角：俯身贴近地面，世界变得陌生",
+        "脆弱：小生物更容易被踩到、吹走、遗忘"
+      ],
+      "concept_ideas": [
+        "一个蚂蚁群落管理游戏：你只能通过信息素间接指挥。",
+        "一个微观平台游戏：雨滴是巨石，草叶是高塔，人类的脚步是地震。",
+        "一个宠物养成游戏：你养的不是猫狗，而是一只你无法完全理解的微小生物。",
+        "一个生态瓶解谜：调整水、光、温度和生物数量，让系统自己找到平衡。",
+        "一个虫群逃生游戏：你控制一群小虫，没有单只是重要的。",
+        "一个“被踩到”的 roguelike：每次死亡都是因为一个巨大的、毫无恶意的脚。",
+        "一个微观摄影叙事：用放大镜观察一个家庭留下的微小痕迹。",
+        "一个声音游戏：你只能通过振动和回声感知这个微观世界。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "brackeys_2023_1_end_is_new_beginning",
+      "theme": "An End Is a New Beginning",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2023.1",
+      "year": 2023,
+      "source_url": "https://itch.io/jam/brackeys-9",
+      "source_title": "Brackeys Game Jam 2023.1",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-9",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:legacy",
+        "mechanic:loop",
+        "genre:roguelite",
+        "mood:hopeful"
+      ],
+      "keywords": [
+        "结束与开始",
+        "循环",
+        "继承",
+        "废墟重建",
+        "死亡与新生",
+        "交接"
+      ],
+      "concept_ideas": [
+        "角色死亡后会变成下一名角色的地形",
+        "灾难后的城市重建，旧建筑残骸成为新材料",
+        "上一局的存档变成下一局的敌人",
+        "扮演临终者，把技能逐件传给继承人",
+        "每关结束保留一部分地图，其余重新生成",
+        "一本书读完后，空白页开始书写新的故事",
+        "被击败的Boss尸体会孕育出新的生态",
+        "四季循环，冬季结束时玩家建的东西被春天覆盖"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "ld_53_delivery",
+      "theme": "Delivery",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "53",
+      "year": 2023,
+      "source_url": "https://ldjam.com/events/ludum-dare/53",
+      "source_title": "Ludum Dare 53: Delivery",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:routing",
+        "genre:arcade",
+        "mood:chaotic",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "路线与时效",
+        "易碎货物",
+        "收件人身份",
+        "途中意外",
+        "运输工具",
+        "交付的代价"
+      ],
+      "concept_ideas": [
+        "骑着会散架的自行车送易碎蛋糕，路面颠簸会逐层震裂包装，必须减速或绕行。",
+        "在上涨的洪水里划船送信，用货物重量调平船身，丢掉哪一箱由玩家决定。",
+        "夜间快递员给怪物送包裹，必须根据门牌与气味猜对敲门暗号。",
+        "用弹弓把包裹射进高楼窗口，风力和弹道是唯一难题，撞墙会损坏内容物。",
+        "送一颗不断膨胀的包裹，途中要定时放气，否则会撑爆电梯或卡住走廊。",
+        "双人合作：一人开车一人看地图，但地图会随行驶距离逐渐模糊。",
+        "货物在多个角色间接力，每次换手损失一点完好度，玩家要安排交接顺序。",
+        "送货路线本身是谜题：单行道、断桥和临时集市每天重排，必须重新规划。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_52_harvest",
+      "theme": "Harvest",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "52",
+      "year": 2023,
+      "source_url": "https://ldjam.com/events/ludum-dare/52",
+      "source_title": "Ludum Dare 52: Harvest",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:resource_cycle",
+        "genre:farming",
+        "mood:eerie",
+        "input:mouse"
+      ],
+      "keywords": [
+        "季节与周期",
+        "土地的反噬",
+        "留种与消耗",
+        "劳作节奏",
+        "丰收的代价",
+        "资源囤积"
+      ],
+      "concept_ideas": [
+        "每季只能收割一块田，土地会记住种过的作物并在下一季变异。",
+        "你是会走路的稻草人，白天驱鸟，夜里收割成熟过度的庄稼。",
+        "收获的不是粮食而是记忆，卖得越多，村民忘掉的事情越多。",
+        "在漂浮岛上收割云朵，收成越重岛屿下沉越深，要及时抛货减重。",
+        "用镰刀割出路径，作物既是血包也是迷宫墙壁，割错会断掉退路。",
+        "设计传送带与收割机组成自动化农场，但机器会逐步抢占你的田地。",
+        "丰收节倒计时，玩家要决定哪些作物留种、哪些换成过冬物资。",
+        "地下根茎网络会在收割时尖叫，声音会引来饥饿的土壤生物。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "brackeys_2022_1_it_is_not_real",
+      "theme": "It Is Not Real",
+      "organizer": "Brackeys",
+      "event": "Brackeys Game Jam",
+      "edition": "2022.1",
+      "year": 2022,
+      "source_url": "https://itch.io/jam/brackeys-7",
+      "source_title": "Brackeys Game Jam 2022.1",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/brackeys-7",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:unreliable-reality",
+        "mechanic:deduction",
+        "genre:psychological",
+        "mood:uncanny"
+      ],
+      "keywords": [
+        "真假难辨",
+        "幻觉",
+        "不可靠叙事",
+        "认知偏差",
+        "现实边界",
+        "信任"
+      ],
+      "concept_ideas": [
+        "玩家标记真实物件，但标记行为本身会改变物件",
+        "同一房间反复出现，细节每次不同，玩家找出变化",
+        "怀疑值过高时会看见并不存在的敌人",
+        "NPC坚称世界是假的，玩家选择相信或揭穿",
+        "可以删除场景物件，但删除后其他物件会补位",
+        "镜中映出与实际不同的房间，玩家在两个版本间穿梭",
+        "服下的药片会切换真实层与幻觉层",
+        "地图边界外是未加载的空白，玩家必须假装没看见"
+      ],
+      "design_constraints": [
+        "禁止 NSFW 与冒犯性内容，须遵守 itch.io 服务条款。"
+      ]
+    },
+    {
+      "id": "ld_50_delay_the_inevitable",
+      "theme": "Delay the inevitable",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "50",
+      "year": 2022,
+      "source_url": "https://ldjam.com/events/ludum-dare/50",
+      "source_title": "Ludum Dare 50: Delay the inevitable",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:time_pressure",
+        "genre:strategy",
+        "mood:dread",
+        "input:mouse"
+      ],
+      "keywords": [
+        "必然结局",
+        "拖延的代价",
+        "倒计时压力",
+        "暂时安全",
+        "资源换时间",
+        "接受失败"
+      ],
+      "concept_ideas": [
+        "陨石注定砸中村庄，玩家用越来越荒谬的手段每天推迟一小时撞击。",
+        "末日邮差要把最后一封信送到，每耽搁一次，沿途世界就破败一分。",
+        "用沙袋堵住上涨的黑色潮水，堵得越久，下一次涨潮越高。",
+        "病床上的老人只剩最后一口气，玩家通过讲故事拖住死神。",
+        "维持一台将崩的服务器，每次重启都会丢失一部分玩家记忆。",
+        "与怪物下棋，输一局它就更靠近房门，赢棋只能让它多等一回合。",
+        "太空站轨道衰减，玩家用残骸拼临时推进器，推迟坠落时间。",
+        "每个选择都能让倒计时变慢，但代价是永久失去一项能力。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "game_off_2021_bug",
+      "theme": "Bug",
+      "organizer": "GitHub",
+      "event": "Game Off",
+      "edition": "2021",
+      "year": 2021,
+      "source_url": "https://github.blog/open-source/gaming/game-off-2021-theme-announcement/",
+      "source_title": "Game Off 2021 theme announcement - The GitHub Blog",
+      "source_kind": "official",
+      "rules_url": "https://github.blog/open-source/gaming/game-off-2021-theme-announcement/",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:glitch",
+        "genre:puzzle",
+        "mood:comedic",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "程序缺陷",
+        "昆虫",
+        "监听器",
+        "故障美学",
+        "将错就错",
+        "修复与利用"
+      ],
+      "concept_ideas": [
+        "玩家扮演 QA，在发售前利用 bug 通关，但修复太多会封死自己的路径。",
+        "昆虫王国建造，不同虫子把地形啃成通路。",
+        "一只会复制代码错误的甲虫，吃掉代码块后改写关卡规则。",
+        "窃听器解谜，玩家在房间里放置虫子形状的监听器获取情报。",
+        "游戏本身逐渐崩溃，玩家用剩余的 UI 元素拼出出口。",
+        "病毒传播策略，玩家要感染所有系统又不触发杀毒软件。",
+        "故障艺术音乐游戏，玩家把噪声节拍修回旋律。",
+        "办公室喜剧，玩家是唯一能看见 bug 的人，要在同事面前掩饰混乱。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gmtk_2021_joined_together",
+      "theme": "Joined Together",
+      "organizer": "Game Maker's Toolkit",
+      "event": "GMTK Game Jam",
+      "edition": "2021",
+      "year": 2021,
+      "source_url": "https://itch.io/jam/gmtk-2021",
+      "source_title": "GMTK Game Jam 2021",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gmtk-2021",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:connection",
+        "mechanic:physics",
+        "genre:puzzle-platformer",
+        "input:two-player"
+      ],
+      "keywords": [
+        "连接",
+        "共生",
+        "物理绑定",
+        "协作",
+        "分离代价",
+        "整体与部分"
+      ],
+      "concept_ideas": [
+        "两个角色用弹性绳索相连，靠摆荡与拉扯通过断崖",
+        "身体由可拆分的部件组成，玩家现场拼接自己穿过窄缝",
+        "两名玩家各控制一半按键，共享同一条生命",
+        "用链条连接漂浮岛屿，连得越长越稳但越难移动",
+        "玩家与敌人被粘在一起，必须带着敌人一起逃出",
+        "建筑模块必须彼此相接才供电，断开即失去功能",
+        "影子与本体绑定，影子的动作反向作用于本体",
+        "一群小生物只有保持接触才能行动，分散即失控"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "js13k_2021_space",
+      "theme": "Space",
+      "organizer": "Enclave Games",
+      "event": "js13kGames",
+      "edition": "2021",
+      "year": 2021,
+      "source_url": "https://js13kgames.com/2021",
+      "source_title": "js13kGames 2021",
+      "source_kind": "official",
+      "rules_url": "https://js13kgames.com/2021/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:physics",
+        "genre:arcade",
+        "mood:lonely",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "深空孤独",
+        "轨道运动",
+        "资源循环",
+        "未知信号",
+        "微型探索",
+        "归途"
+      ],
+      "concept_ideas": [
+        "单键推进：太空舱燃料有限，玩家利用行星引力弹弓调整轨道回家。",
+        "空间站维修：舱段持续旋转，离心力改变跳跃方向，玩家在旋转中修复故障。",
+        "未知信号：同一段信号不断重复，玩家选择回应或静默，走向不同结局。",
+        "小行星采矿：背包容量有限，玩家在氧气与矿石之间反复取舍。",
+        "太空农场：在失重舱内安排光照与水循环，维持船员长期生存。",
+        "轨道清障：用钩爪拖拽太空垃圾，避免碎片连锁碰撞空间站。",
+        "延迟通信：宇航员失联，玩家通过数秒延迟的指令远程操控漫游车。",
+        "陨石带塔防：炮台受轨道周期影响，玩家需预测陨石来袭方向并轮换火力。"
+      ],
+      "design_constraints": [
+        "整包（代码与素材）压缩为 zip 后不得超过 13,312 字节。"
+      ]
+    },
+    {
+      "id": "ld_49_unstable",
+      "theme": "Unstable",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "49",
+      "year": 2021,
+      "source_url": "https://ldjam.com/events/ludum-dare/49",
+      "source_title": "Ludum Dare 49: Unstable",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:physics",
+        "genre:puzzle",
+        "mood:tense",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "结构失衡",
+        "连锁崩塌",
+        "临时支撑",
+        "危险平衡",
+        "系统失控",
+        "应力可视化"
+      ],
+      "concept_ideas": [
+        "在摇晃的积木塔上继续加层，每块积木的摩擦与重量都不同。",
+        "走钢丝的搬运工，货物随风摆动，必须用身体反向配重。",
+        "搭建随时会散架的桥，车辆通过时的震动会改变结构应力。",
+        "控制情绪不稳定的机器人，情绪越高力量越大但越容易自爆。",
+        "在解体的空间站里铺电缆，每次连接都会改变重力方向。",
+        "用不稳定元素合成药剂，反应越剧烈效果越强，但瓶子会裂。",
+        "双人共骑一辆独轮车，一人控方向一人控平衡，谁都不能松手。",
+        "城市地基不断塌陷，玩家要在下沉街区之间架设临时通道。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "game_off_2020_moonshot",
+      "theme": "Moonshot",
+      "organizer": "GitHub",
+      "event": "Game Off",
+      "edition": "2020",
+      "year": 2020,
+      "source_url": "https://github.blog/open-source/gaming/github-game-off-2020-theme-announcement",
+      "source_title": "GitHub Game Off 2020 theme announcement - The GitHub Blog",
+      "source_kind": "official",
+      "rules_url": "https://github.blog/open-source/gaming/github-game-off-2020-theme-announcement",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:trajectory",
+        "genre:simulation",
+        "mood:ambitious",
+        "input:mouse"
+      ],
+      "keywords": [
+        "登月",
+        "极高目标",
+        "豪赌",
+        "一次性机会",
+        "荒诞科技",
+        "失败与再尝试"
+      ],
+      "concept_ideas": [
+        "玩家经营一家失败率极高的航天公司，每次发射失败都会改变股价与公众信任。",
+        "用十年时间在沙漠里建造一座只能发射一次的火箭，期间不断拆东墙补西墙。",
+        "月球殖民地缺水的危机，玩家必须把冰矿运输路线压缩到单次窗口。",
+        "一个关于“把整座城市送上太空”的荒诞工程解谜，零件来自日常家具。",
+        "玩家扮演负责喊停的工程师，在所有人狂热时判断哪一次发射该被取消。",
+        "时间胶囊式任务：发射后无法通信，玩家只能在地面推演探测器会遇到什么。",
+        "一群学生用业余无线电追踪自制卫星，目标是被 NASA 无意间收到信号。",
+        "月球婚礼策划游戏，在低重力与有限氧气中完成一场“完美仪式”。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gmtk_2020_out_of_control",
+      "theme": "Out of Control",
+      "organizer": "Game Maker's Toolkit",
+      "event": "GMTK Game Jam",
+      "edition": "2020",
+      "year": 2020,
+      "source_url": "https://itch.io/jam/gmtk-2020",
+      "source_title": "GMTK Game Jam 2020",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gmtk-2020",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:indirect-control",
+        "mechanic:automation",
+        "genre:simulation",
+        "mood:chaotic"
+      ],
+      "keywords": [
+        "失控",
+        "有限操控",
+        "间接控制",
+        "系统自主",
+        "混乱管理",
+        "放弃直接操作"
+      ],
+      "concept_ideas": [
+        "玩家只能改变重力方向，不能直接移动角色",
+        "飞船各系统会自行漂移，玩家只能不断修正参数",
+        "训练一个AI通关，AI会逐渐偏离指令",
+        "遥控器电量越低，角色越不听从输入",
+        "城市自动扩张，玩家只能设置分区规则",
+        "角色每秒自动更换目标，玩家只能调整优先级",
+        "借风力与洋流把船队间接推向港口",
+        "玩家编写自动战斗脚本，开战后无法干预"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_46_keep_it_alive",
+      "theme": "Keep it alive",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "46",
+      "year": 2020,
+      "source_url": "https://ldjam.com/events/ludum-dare/46",
+      "source_title": "Ludum Dare 46: Keep it alive",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:escort",
+        "genre:survival",
+        "mood:tender",
+        "input:mouse"
+      ],
+      "keywords": [
+        "守护脆弱目标",
+        "持续供养",
+        "护送任务",
+        "资源分配",
+        "濒危状态",
+        "取舍保护"
+      ],
+      "concept_ideas": [
+        "守护最后一株发光植物，怪物会被光吸引，必须不断移动花盆。",
+        "照顾会模仿你动作的幼兽，它学到的坏习惯会变成关卡障碍。",
+        "维持昏迷病人的生命体征，分配有限的电力与药物。",
+        "护送一队没有战斗力的蜗牛穿越盐滩，必须提前铺出安全路线。",
+        "你是灯塔看守，火焰会引来飞蛾也会烧尽燃料，要平衡亮度与存量。",
+        "在洪水里托举一只纸船，船会吸水变重，玩家要不断舀水。",
+        "养一颗会吞噬周围物体的宠物蛋，喂太少会饿死，喂太多会孵化灾难。",
+        "双人合作：一人供氧一人维修，但两人共享同一罐氧气。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_47_stuck_in_a_loop",
+      "theme": "STUCK IN A LOOP",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "47",
+      "year": 2020,
+      "source_url": "https://ldjam.com/events/ludum-dare/47",
+      "source_title": "Ludum Dare 47",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:time-loop",
+        "genre:puzzle",
+        "mood:surreal"
+      ],
+      "keywords": [
+        "时间循环：同一组事件反复发生，而记忆是唯一不重复的东西",
+        "程序循环：条件为真时重复执行，条件不变则永远不退出",
+        "音频循环：一段声音听起来是连续的，直到你注意到接缝",
+        "物理回环：你的子弹总会回到你身上，所以每次开枪都是在给未来制造障碍",
+        "习惯处境：当事人觉得出不去，但外部视角看不出边界在哪里",
+        "绕圈子：接近目标又远离，而“接近”本身可能只是循环的一部分"
+      ],
+      "concept_ideas": [
+        "一个时间循环：每次死亡或失败后回到起点，但上一轮的自己作为可交互的幽灵留在场景里。",
+        "一个物理回环：你的子弹总会回到你身上，所以每次开枪都是在给未来制造障碍。",
+        "一段被循环播放的录音，玩家在接缝处插入新的声音，而接缝会越来越难找到。",
+        "一个办公室场景：每天重复同样的流程，但玩家可以通过微小的偏差逐步改变流程本身。",
+        "一个环道上的赛跑，玩家可以放置食物来“撑开”环道，扩大活动区域，但撑开之后环道不再是闭合的。",
+        "一个程序循环的可视化：玩家必须修改循环条件才能退出，而修改条件需要先在循环内收集变量。",
+        "一个叙事循环：同一段对话反复发生，每次玩家可以选择说不同的台词，但对方总是给出相似的回应。",
+        "一个被困在循环里的角色开始注意到循环，而注意到本身是脱出的第一步——也可能只是循环的新阶段。",
+        "一个音乐循环：玩家必须在 loop 的接缝处完成动作，而接缝越来越短。",
+        "一个“卡住”的物理状态：玩家越用力挣脱，循环收得越紧，而放松反而让出口出现。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ggj_2019_home",
+      "theme": "What home means to you",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2019",
+      "year": 2019,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:building",
+        "genre:adventure",
+        "mood:warm",
+        "input:mouse"
+      ],
+      "keywords": [
+        "归属感",
+        "家的多重定义",
+        "迁徙与记忆",
+        "物件承载情感",
+        "离开与返回",
+        "临时栖居"
+      ],
+      "concept_ideas": [
+        "搬家模拟，每个箱子只能装有限物品，玩家选择带走哪些记忆。",
+        "在陌生城市找路，家的方向由熟悉气味与声音提示。",
+        "建造树屋给不同动物居住，每个动物对“家”的需求不同。",
+        "难民家庭安置游戏，玩家在有限预算里重建生活。",
+        "一间会随居住时间变化的房子，玩家留下痕迹也改变空间。",
+        "太空站故障，宇航员用地球带来的小物件维持心理稳定。",
+        "祖屋拆除前最后一夜，玩家整理物品并触发回忆小游戏。",
+        "多人合作，每个人只能看到自己房间，必须共同设计一栋共享住宅。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gmtk_2019_only_one",
+      "theme": "Only One",
+      "organizer": "Game Maker's Toolkit",
+      "event": "GMTK Game Jam",
+      "edition": "2019",
+      "year": 2019,
+      "source_url": "https://itch.io/jam/gmtk-2019",
+      "source_title": "GMTK Game Jam 2019",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gmtk-2019",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:scarcity",
+        "mechanic:single-use",
+        "genre:arcade",
+        "mood:tense"
+      ],
+      "keywords": [
+        "唯一资源",
+        "单次机会",
+        "排他选择",
+        "稀缺性",
+        "不可逆",
+        "聚焦"
+      ],
+      "concept_ideas": [
+        "全场只有一颗子弹，射出后必须回收",
+        "只有一座可移动的桥，每次通行都要把它拆走重建",
+        "只能保留一个存档，覆盖即永久失去旧进度",
+        "全队共享一条命，任何失误都直接结束",
+        "地图上同时只存在一个敌人，击败后才生成下一个",
+        "只能持有一件道具，拾取新的就会丢掉旧的",
+        "只有一盏灯，照亮一处就让另一处陷入黑暗",
+        "整局只有一次跳跃，落地即结算"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_45_start_with_nothing",
+      "theme": "Start with nothing",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "45",
+      "year": 2019,
+      "source_url": "https://ldjam.com/events/ludum-dare/45",
+      "source_title": "Ludum Dare 45: Start with nothing",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:crafting",
+        "genre:survival",
+        "mood:hopeful",
+        "input:mouse"
+      ],
+      "keywords": [
+        "从零开始",
+        "白手起家",
+        "空白世界",
+        "逐步建造",
+        "资源匮乏",
+        "最小起点"
+      ],
+      "concept_ideas": [
+        "开局只有一根木棍，所有工具都要靠组合地上捡到的垃圾解锁。",
+        "空白房间里每放置一件家具就会生成一个新谜题。",
+        "你是一无所有的流放者，用积雪搭出第一间能过夜的屋子。",
+        "从一颗细胞开始进化，每个器官都要用环境中找到的碎片拼装。",
+        "程序生成的荒岛，玩家只能带走上一局最后制作的一件工具。",
+        "用粉笔在墙上画出门和桥，画得越复杂消耗的粉笔越多。",
+        "零预算剧组：用纸箱、手电和床单拍完一部怪物电影。",
+        "城市停电后，玩家从一根蜡烛开始恢复整栋楼的供电网络。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "game_off_2018_hybrid",
+      "theme": "Hybrid",
+      "organizer": "GitHub",
+      "event": "Game Off",
+      "edition": "2018",
+      "year": 2018,
+      "source_url": "https://github.blog/news-insights/the-library/game-off-2018-theme-announcement/",
+      "source_title": "Game Off 2018 theme announcement - The GitHub Blog",
+      "source_kind": "official",
+      "rules_url": "https://github.blog/news-insights/the-library/game-off-2018-theme-announcement/",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:fusion",
+        "genre:mashup",
+        "mood:playful",
+        "input:gamepad"
+      ],
+      "keywords": [
+        "混合与杂交",
+        "类型拼接",
+        "风格冲突",
+        "共生关系",
+        "边界模糊",
+        "组合优势"
+      ],
+      "concept_ideas": [
+        "左半屏重力向下、右半屏重力向右，角色在接缝处切换规则。",
+        "植物与机械杂交的农场，作物会自行移动并需要铺设轨道。",
+        "手绘角色进入三维扫描的祖屋，玩家用二维贴纸修补三维破损。",
+        "农场模拟加格斗，作物成熟时会变成拳手，玩家安排种植顺序组建队伍。",
+        "白天手绘、夜晚 3D 的同一座小镇，地形相同但物理规则不同。",
+        "生物拼装工坊，把不同动物的器官组合成能生存的新物种。",
+        "卡牌加即时战略，手牌决定单位，战场却实时推进。",
+        "两种控制方式同时生效：键盘移动角色，鼠标移动整个世界。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ggj_2018_transmission",
+      "theme": "Transmission",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2018",
+      "year": 2018,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:signal_routing",
+        "genre:puzzle",
+        "mood:lonely",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "信号传递",
+        "噪声与失真",
+        "远程沟通",
+        "广播与监听",
+        "信息传染",
+        "接收者的责任"
+      ],
+      "concept_ideas": [
+        "修理无线电塔，玩家旋转天线在噪声中捕捉逐渐清晰的求救信号。",
+        "双人游戏，一人编码，一人解码，中间有随机噪声干扰。",
+        "病毒传播模拟，玩家决定信息或病原体的传播路径。",
+        "太空延迟通信，每条消息要等几分钟才到达，玩家靠预测对话。",
+        "传话游戏，句子经过多个 NPC 后失真，玩家要找出原始信息。",
+        "用摩尔斯电码在黑暗中导航，敌人会监听信号。",
+        "城市广播系统，玩家分配有限频道给不同社区并处理紧急事件。",
+        "接收站守夜人，几十年间接收到同一颗卫星的孤独信号。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "gmtk_2018_genre_without_mechanic",
+      "theme": "Genre, but you can't Mechanic",
+      "organizer": "Game Maker's Toolkit",
+      "event": "GMTK Game Jam",
+      "edition": "2018",
+      "year": 2018,
+      "source_url": "https://itch.io/jam/gmtk-2018",
+      "source_title": "Game Maker's Toolkit Jam 2018",
+      "source_kind": "official",
+      "rules_url": "https://itch.io/jam/gmtk-2018",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:constraint",
+        "mechanic:substitution",
+        "genre:experimental",
+        "mood:clever"
+      ],
+      "keywords": [
+        "类型解构",
+        "移除核心机制",
+        "替代方案",
+        "约束创意",
+        "反直觉操作",
+        "类型预期"
+      ],
+      "concept_ideas": [
+        "平台跳跃但不能跳：投掷身体部件搭出攀爬路径",
+        "射击游戏但不能瞄准：子弹自动索敌，玩家只负责走位",
+        "赛车游戏但不能转向：只靠加速与刹车调整姿态",
+        "塔防但不能建塔：改造地形把敌人引向陷阱",
+        "潜行游戏但不能躲藏：制造噪音把守卫引开",
+        "解谜游戏但不能移动方块：旋转整个房间改变重力",
+        "格斗游戏但不能攻击：靠站位与格挡耗尽对手体力",
+        "农场游戏但不能种植：只能交易与加工已有作物"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_41_incompatible_genres",
+      "theme": "Combine 2 Incompatible Genres",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "41",
+      "year": 2018,
+      "source_url": "https://ldjam.com/events/ludum-dare/41",
+      "source_title": "Ludum Dare 41: Combine 2 Incompatible Genres",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "genre:mashup",
+        "mechanic:hybrid",
+        "mood:playful",
+        "input:mixed"
+      ],
+      "keywords": [
+        "类型混搭",
+        "机制冲突",
+        "双重规则",
+        "玩法拼接",
+        "反差体验",
+        "融合创新"
+      ],
+      "concept_ideas": [
+        "回合制战棋 + 实时音游：每次命中节拍才能下达指令。",
+        "农场经营 + 恐怖追逐：白天种地，夜里作物会追杀你。",
+        "恋爱模拟 + 弹幕射击：约会选项会变成弹幕密度。",
+        "塔防 + 平台跳跃：玩家既是防御塔也是唯一能修塔的人。",
+        "解谜 + 格斗：攻击会打碎场景，碎片成为解谜道具。",
+        "赛车 + 俄罗斯方块：赛道由不断下落的方块实时拼成。",
+        "潜水探索 + 卡牌构筑：氧气就是手牌上限，越深牌越少。",
+        "文字冒险 + 物理沙盒：每个形容词都会改变物体的物理属性。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ld_43_sacrifices",
+      "theme": "Sacrifices must be made",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "43",
+      "year": 2018,
+      "source_url": "https://ldjam.com/events/ludum-dare/43",
+      "source_title": "Ludum Dare 43: Sacrifices must be made",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:sacrifice",
+        "genre:puzzle",
+        "mood:tragic",
+        "input:mouse"
+      ],
+      "keywords": [
+        "牺牲抉择",
+        "永久失去",
+        "仪式代价",
+        "两难困境",
+        "不可逆后果",
+        "团队取舍"
+      ],
+      "concept_ideas": [
+        "每关必须献祭一名队员才能打开出口，队员能力决定后续路线。",
+        "你是守桥人，桥只能承受一定重量，必须决定让谁掉下去。",
+        "用记忆换取预言，忘掉的技能会在后续关卡中永久消失。",
+        "村庄饥荒，玩家要决定宰杀哪只家畜，每只都提供不同增益。",
+        "双人合作解谜，有些门只能由一人留在机关上永久压住。",
+        "献祭武器强化角色，被献祭的武器类型从此不再掉落。",
+        "你是邪教祭司，信众的忠诚度决定献祭效果，也会引发叛乱。",
+        "时间循环中每次重来都要牺牲一件物品，物品越珍贵循环越稳定。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "js13k_2017_lost",
+      "theme": "Lost",
+      "organizer": "Enclave Games",
+      "event": "js13kGames",
+      "edition": "2017",
+      "year": 2017,
+      "source_url": "https://js13kgames.com/2017",
+      "source_title": "js13kGames 2017",
+      "source_kind": "official",
+      "rules_url": "https://js13kgames.com/2017/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:exploration",
+        "genre:adventure",
+        "mood:melancholic",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "迷失方向",
+        "寻找归途",
+        "记忆缺口",
+        "空白地图",
+        "失去与放手",
+        "微弱指引"
+      ],
+      "concept_ideas": [
+        "黑暗森林：蜡烛会随时间缩短，玩家烧掉记忆碎片换取照明，照得越久忘得越多。",
+        "路标谜题：每个路标指向不同方向，玩家通过风向、苔藓等环境线索判断正确路径。",
+        "平台游戏：每死一次随机遗忘一个操作键，玩家需在按键耗尽前通关。",
+        "迷宫：跟随一个若即若离的影子，太近会消失，太远会彻底迷路。",
+        "物品管理：背包物品逐渐失去名字，玩家只能凭形状与用途猜测并使用。",
+        "海边寻狗：潮水每涨一次抹去一组脚印，玩家要在下一次涨潮前锁定方向。",
+        "太空漂流：导航损坏，玩家用星图碎片拼出回家航线，错误拼接会进入死路。",
+        "失物招领：整理箱子里的物品，通过细节推断失主故事，并决定归还给谁。"
+      ],
+      "design_constraints": [
+        "整包（代码与素材）压缩为 zip 后不得超过 13,312 字节。"
+      ]
+    },
+    {
+      "id": "ld_40_more_is_worse",
+      "theme": "The more you have, the worse it is",
+      "organizer": "Ludum Dare",
+      "event": "Ludum Dare",
+      "edition": "40",
+      "year": 2017,
+      "source_url": "https://ldjam.com/events/ludum-dare/40",
+      "source_title": "Ludum Dare 40: The more you have, the worse it is",
+      "source_kind": "official",
+      "rules_url": "https://ldjam.com/events/ludum-dare/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:burden",
+        "genre:puzzle",
+        "mood:ironic",
+        "input:mouse"
+      ],
+      "keywords": [
+        "资源负担",
+        "堆积惩罚",
+        "贪婪代价",
+        "负重机制",
+        "减法设计",
+        "拥有即拖累"
+      ],
+      "concept_ideas": [
+        "每捡一枚金币移动速度就慢一点，但金币能打开终点大门。",
+        "收集的武器越多，切换栏越乱，误操作概率越高。",
+        "背包里的物品会互相反应，装得越满越容易爆炸。",
+        "继承一座堆满家具的宅子，家具越多，走廊越窄。",
+        "光照范围随收集的宝石增加而缩小，越富越看不见路。",
+        "粉丝越多，直播弹幕越密，遮挡视野的弹幕也越多。",
+        "军队规模越大，补给线越脆弱，玩家必须主动裁军。",
+        "记忆收藏品会占据思维槽位，收集越多，可用技能越少。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ggj_2016_ritual",
+      "theme": "Ritual",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2016",
+      "year": 2016,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:sequence",
+        "genre:simulation",
+        "mood:mystic",
+        "input:mouse"
+      ],
+      "keywords": [
+        "重复与秩序",
+        "规则与禁忌",
+        "日常习惯",
+        "集体同步",
+        "献祭与代价",
+        "仪式感的消解"
+      ],
+      "concept_ideas": [
+        "每天早晨的固定流程，任何一步错位都会让房子长出新的房间。",
+        "村庄祭祀模拟，玩家决定供品顺序，收成与灾难随之变化。",
+        "节奏性敲击仪式，玩家要复现逐渐复杂的鼓点。",
+        "办公室日常仪式：复印、泡茶、打卡，细微偏差揭示超自然。",
+        "多人同步仪式，玩家必须与陌生人同时按下相同符号。",
+        "修复一座被遗忘的神龛，每完成一轮仪式解锁一段家族史。",
+        "反仪式游戏，玩家被要求遵守互相矛盾的规则，必须选择打破哪一个。",
+        "机器人学习人类葬礼仪式，通过观察而非语言理解意义。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "js13k_2016_glitch",
+      "theme": "Glitch",
+      "organizer": "Enclave Games",
+      "event": "js13kGames",
+      "edition": "2016",
+      "year": 2016,
+      "source_url": "https://js13kgames.com/2016",
+      "source_title": "js13kGames 2016",
+      "source_kind": "official",
+      "rules_url": "https://js13kgames.com/2016/rules",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:glitch",
+        "genre:platformer",
+        "mood:unstable",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "故障美学",
+        "系统错误",
+        "规则破坏",
+        "画面撕裂",
+        "真假信息",
+        "重试循环"
+      ],
+      "concept_ideas": [
+        "横版平台：关卡几何每隔数秒错位一次，玩家要在短暂稳定窗口内跳到下一个落脚点。",
+        "俯视射击：敌人贴图与碰撞体故意错位，玩家需观察弹道而非外观来判断真实位置。",
+        "解谜：同一房间存在两个版本，找出被篡改的物件并修复，错误选择会加深故障。",
+        "音游：节拍故意卡顿与丢帧，玩家按实际听到的节奏而非谱面提示输入。",
+        "竞速：赛道在比赛中自我改写，抄近路会累积故障值，故障值过高则关卡重置。",
+        "文字冒险：对话框被另一条叙事覆盖，玩家选择相信其中一层并承担后果。",
+        "经营：修复一台篡改菜单与价格的故障终端，在顾客信任耗尽前恢复正常。",
+        "潜行：监控画面随机撕裂，玩家只能根据碎片画面推断守卫位置并规划路线。"
+      ],
+      "design_constraints": [
+        "整包（代码与素材）压缩为 zip 后不得超过 13,312 字节。"
+      ]
+    },
+    {
+      "id": "ggj_2013_heartbeat",
+      "theme": "The Sound of a Heartbeat",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2013",
+      "year": 2013,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:rhythm",
+        "genre:horror",
+        "mood:tense",
+        "input:audio"
+      ],
+      "keywords": [
+        "心跳节律",
+        "生命体征",
+        "紧张与安抚",
+        "同步与共振",
+        "身体内部",
+        "监听与陪伴"
+      ],
+      "concept_ideas": [
+        "玩家用听诊器寻找废墟中的幸存者，心跳方向代替地图指引。",
+        "节奏游戏：心跳是节拍器，玩家在两次搏动之间完成手术步骤。",
+        "黑暗森林里靠心跳声躲避怪物，屏息会降低音量但缩短视野。",
+        "双人合作，一人看到心电图，一人听到心跳声，必须口头配合。",
+        "机械心脏城市，玩家调整脉搏频率来驱动电梯与闸门。",
+        "心跳越来越快的电梯惊悚，玩家要在恐慌中按对楼层。",
+        "用麦克风采集玩家真实心跳作为关卡节拍，并提供无麦克风的替代模式。",
+        "心脏移植叙事，两颗心的节律冲突，玩家调和记忆与身体。"
+      ],
+      "design_constraints": []
+    },
+    {
+      "id": "ggj_2012_ouroboros",
+      "theme": "Ouroboros",
+      "organizer": "Global Game Jam",
+      "event": "Global Game Jam",
+      "edition": "2012",
+      "year": 2012,
+      "source_url": "https://en.wikipedia.org/wiki/Global_Game_Jam#Event_themes",
+      "source_title": "Global Game Jam - Wikipedia",
+      "source_kind": "archive",
+      "rules_url": "https://global-game-jam.gitbook.io/ggj-manual/next-steps/structure-of-the-event",
+      "verified_at": "2026-11-17",
+      "tags": [
+        "mechanic:loop",
+        "genre:puzzle",
+        "mood:mystic",
+        "input:keyboard"
+      ],
+      "keywords": [
+        "循环与回归",
+        "自我吞噬",
+        "始与终相接",
+        "闭环因果",
+        "永续结构",
+        "循环中的变异"
+      ],
+      "concept_ideas": [
+        "蛇形角色吞食自己的尾巴，每吃一节就缩短身体，用长度换取穿过窄门的能力。",
+        "一条生产线必须把废料送回起点，玩家调整回流比例让系统永续运转。",
+        "时间循环的钟表店，每次重置保留一个齿轮的位置，逐步修好整座钟。",
+        "双向卷轴关卡，角色从终点回到起点，过程中改变起点的状态。",
+        "蛇形迷宫里玩家既是追逐者也是猎物，尾部会复制头部的路径。",
+        "生态缸中的分解者把尸体变回养分，玩家平衡捕食与分解避免崩溃。",
+        "一座城市每天在同一天重建，玩家用上一轮的废墟材料搭建下一轮避难所。",
+        "音乐循环叠层，每圈加入一件乐器，玩家必须删掉一层才能继续循环。"
+      ],
+      "design_constraints": []
+    }
+  ]
+}

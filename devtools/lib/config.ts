@@ -1,6 +1,7 @@
 import fs from "node:fs";
-import type { Dirent } from "node:fs";
 import path from "node:path";
+
+import { discoverProjectsIn } from "./jam_projects";
 
 export const PROJECT_ROOT = path.resolve(import.meta.dir, "..", "..");
 export const BUILD_DIR = path.join(PROJECT_ROOT, "build");
@@ -41,17 +42,7 @@ function isGodotProject(dir: string): boolean {
 }
 
 export function discoverExampleProjects(): string[] {
-  let entries: Dirent[];
-  try {
-    entries = fs.readdirSync(EXAMPLES_DIR, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(EXAMPLES_DIR, entry.name))
-    .filter(isGodotProject)
-    .sort();
+  return discoverProjectsIn(EXAMPLES_DIR);
 }
 
 export function resolveProjects(paths: readonly string[]): string[] {

@@ -6,7 +6,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 ## 命令
 
-- 构建部署：`bun run gda-dev-tools build` + `bun run gda-dev-tools deploy`（子命令：`build` / `deploy` / `package` / `package-check` / `clean` / `test` / `tui`；`deploy`/`clean` 下 `--project <dir>`（可重复；省略时自动发现 `examples/*`），`package` 下 `--libs-dir <dir>` / `--preset debug|release`；`tui` 需交互式终端，非 TTY 退出 2）
+- 构建部署：`bun run gda-dev-tools build` + `bun run gda-dev-tools deploy`（子命令：`build` / `deploy` / `package` / `package-check` / `clean` / `test` / `jam` / `tui`；`deploy`/`clean` 下 `--project <dir>`（可重复；省略时递归发现 `examples/` 下的比赛最终项目并跳过 intake 与 e2e 沙盒），`package` 下 `--libs-dir <dir>` / `--preset debug|release`；`jam` 抽题并生成 `examples/<theme_id>/project/` intake，`jam create` 创建 `<slug>-<hash8>` 比赛最终项目，`jam e2e [--reset]` 创建/刷新/重置固定沙盒 `examples/e2e`，`jam list [--projects]` / `jam index` 查看与收藏；`tui` 需交互式终端，非 TTY 退出 2）
 - Devtools（Bun/TS）：全部开发命令统一走 `bun run gda-dev-tools <子命令>`；Python 入口已删除，`no_python_guard` 守卫拦截 `*.py` / `uv run` / `python main.py` / CMake Python 查找回退
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
 - 快速验证：`ctest --preset debug`（全量默认门：单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖；`--single <用例名>` 单跑）
@@ -44,6 +44,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 ## 协作
 
+- 文档与汇报一律不写 git 工作树/远端状态（未提交、未推送、未打 tag）；它们不构成知识。
 - `git status` 的大量 `M` 多为 CRLF 伪变更（仓库无 `.gitattributes`），核查一律以 `git diff HEAD` 为准。
 - 提交信息 `<type>(<scope>): <中文描述>`，scope 用中文功能域，按功能域拆分提交。
 - 多代理并行时子代理只写代码不编译，主代理统一 configure/build 再分批测（并行编译会锁）；单元/边界测试禁调已注册 handler。
