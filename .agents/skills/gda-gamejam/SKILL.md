@@ -1,6 +1,6 @@
 ---
 name: gda-gamejam
-description: "用 GDA 从 Game Jam 主题开发一款完整、可运行、可提交的比赛游戏；未给主题时先 jam 抽题，读题、命名、jam create、安装插件、创意开发、试玩、打磨、写作品说明、jam index；目标是交付游戏，不评估工具；触发词：做个游戏、开发游戏、Game Jam、抽题做游戏、游戏原型、实现这个主题、把 demo 做完、用 GDA 做游戏；不用于端到端测试、测试 GDA 工具表现、记录工具缺陷（走 gda-e2e-testing）。"
+description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的比赛游戏（交付游戏，不评估工具）。何时用：做个游戏、开发游戏、Game Jam、抽题做游戏、游戏原型、实现这个主题、把 demo 做完、用 GDA 做游戏、写 SUBMISSION.md。不用于：端到端测试、测试 GDA 工具表现、记录工具缺陷（走 gda-e2e-testing）、根因分析（走 gda-e2e-analysis）。"
 ---
 
 # GDA Game Jam

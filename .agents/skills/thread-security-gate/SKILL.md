@@ -1,6 +1,6 @@
 ---
 name: thread-security-gate
-description: 触碰 Godot API 或改监听、高风险确认、脱敏、导出、路径、截断时守主线程与默认安全姿态；触发词：主线程、CommandQueue、submit、submit_tracked、execute_sync、非环回、confirm、ExportGuard、desensitize、normalize_project_path、main_thread_timeout。
+description: 改动 Godot API 调用、监听、高风险确认、脱敏、导出、路径或截断时守主线程与默认安全姿态。何时用：主线程 / CommandQueue / submit / submit_tracked / execute_sync、非环回、confirm、ExportGuard、desensitize、normalize_project_path、报错 main_thread_timeout。
 ---
 
 # 主线程与安全门
@@ -27,7 +27,7 @@ description: 触碰 Godot API 或改监听、高风险确认、脱敏、导出�
 
 ## 验证
 
-- 高风险工具可经 `get_tool_detail.side_effect` 识别；授权拒绝返回含 `authorization_required` 与 `enable` 字段。
+- 高风险工具可经 `get_tool_detail.side_effect` 识别；缺 `confirm` 调用返回 `confirmation_required` 结构化错误。
 - 主线程停摆返回 `main_thread_timeout` 结构化错误，而非挂死。
 - 按 `docs/wiki/security_contract.md` 验收清单逐项自检。
 

@@ -1,6 +1,6 @@
 ---
 name: cpp-registration
-description: 新增、删除、移动 C++ 编译单元时做 CMake 双登记与双守卫验证；触发词：新增cpp、双登记、GDA_UNIT_BUSINESS_SOURCES、migration_guard、comment_guard、编译链接失败。
+description: 新增、删除或移动 C++ 编译单元时同步 CMake 双登记并通过双守卫。何时用：新增 .cpp、双登记漏项、GDA_UNIT_BUSINESS_SOURCES 不匹配、migration_guard / comment_guard 报错、编译链接失败。
 ---
 
 # 编译单元登记
@@ -11,7 +11,7 @@ description: 新增、删除、移动 C++ 编译单元时做 CMake 双登记与�
 
 1. 判定是否为 header-only：仅 `.hpp` 变更时跳过登记，转步骤 4。
 2. 新增 `.cpp` 时同批修改两处：
-   - 根 `CMakeLists.txt` 的 `add_library()` 源表。
+   - 根侧源表：根 `CMakeLists.txt` 的 `add_library()` 直列条目或 `cmake/sources/*.cmake` 清单（现有清单优先，避免与他人分支冲突）。
    - `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/domains/*/*_ops.cpp` 由 glob 自动纳入，不逐个登记）。
 3. 检查旧宏残留：头文件禁 `GDA_TOOL_CLASS`，禁新增 `schema_*_ops.cpp` 与 `tool_decl.hpp` 引用。
 4. 检查注释：`src/`、`tests/` 下 `*.cpp/*.hpp` 禁 `//`（仅 `// namespace` 结尾放行）与 `/*…*/`。
@@ -31,7 +31,7 @@ description: 新增、删除、移动 C++ 编译单元时做 CMake 双登记与�
 
 - 执行 `ctest --preset debug -R comment_guard`，预期 `comment-guard OK`。
 - 执行 `ctest --preset debug -R migration_guard`，预期 `OK` 且域数为当前清单值。
-- 执行 `ctest --preset debug -E "^gda_runner_"`，预期全绿；总数以 `docs/wiki/tests.md` 数值核算总表为准，不硬编码。
+- 执行 `ctest --preset debug`，预期全绿；总数以 `docs/wiki/tests.md` 数值核算总表为准，不硬编码。
 - 用 `git diff HEAD` 确认真实变更，忽略 CRLF 伪变更。
 
 ## 权威参考

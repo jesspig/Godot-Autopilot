@@ -1,6 +1,6 @@
 ---
 name: gda-e2e-testing
-description: "以任意 Godot 工程或固定沙盒 examples/e2e 为场地，用 GDA 完成一轮端到端测试，产出问题记录、优化建议与递归闭环证据；触发词：端到端测试、e2e、跑一轮验收、验收 demo、测试 GDA 工具表现、递归优化闭环、指定某个 demo 做端到端；不用于开发游戏、参加 Game Jam（走 gda-gamejam）。"
+description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一轮端到端验收，只记录问题与证据、不修复。何时用：端到端测试、e2e、跑一轮验收、测试 GDA 工具表现、指定某个 demo 做端到端、要 report.md / evidence.md / Q<n> 问题记录。不用于：开发游戏或参加 Game Jam（走 gda-gamejam）、根因分析与实施优化（走 gda-e2e-analysis）。"
 ---
 
 # Godot 工程端到端验收
@@ -105,7 +105,7 @@ description: "以任意 Godot 工程或固定沙盒 examples/e2e 为场地，用
    - `bun run gda-dev-tools deploy --project <project-dir>`
 3. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
 4. 记录基线：开始时间、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`、`git status --porcelain`；若本轮由 `jam e2e` 抽题，记录主题、来源、`draw_id` 与 `jam.json` 的抽样快照。
-5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。被授权门拒绝时，记录「轨迹不可得」及原因，继续执行，不推测。
+5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。调用被拒（如高风险确认缺失）时，记录「轨迹不可得」及原因，继续执行，不推测。
 6. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
 
 ## 4. 执行
@@ -167,19 +167,7 @@ description: "以任意 Godot 工程或固定沙盒 examples/e2e 为场地，用
 4. 实际表现（附证据）
 5. 问题分析（只基于本轮可观察证据；不读 GDA 源码补全根因，根因结论标记「待分析」）
 
-按以下格式写问题条目：
-
-```markdown
-### Q1 [失败] <一句话标题>
-- 触发场景：
-- 操作步骤：
-- 预期行为：
-- 实际表现：
-- 问题分析：
-- 可复用性：通用 | 本工程
-- trace：`<文件名>#seq=<n> | <tool> | ok=<bool> | error_code=<...> | duration_ms=<...> | request_id=<...>`
-- 截图：`img/<文件名>`
-```
+问题条目格式见 [references/report-templates.md](references/report-templates.md)「问题条目格式（第 7 节）」。
 
 ## 8. 报告
 
@@ -187,25 +175,7 @@ description: "以任意 Godot 工程或固定沙盒 examples/e2e 为场地，用
 - 在本轮目录写 `report.md`（目录已带时间，文件名固定）。
 - 在本轮目录写 `img/`（截图）与 `evidence.md`（关键事件摘录）；其他本轮产物同样放本轮目录，不写入共享目录。
 - 只写 `report.md`、`evidence.md`、`img/`；不创建、不改写 `analysis.md`；本轮结束后不再改写这些文件。
-- 工程文档若写 `report/<ts>-report.md` 或 `report/img/`，以本技能路径为准，并在报告中说明覆盖。
-- 按以下结构写报告：
-
-```markdown
-# 端到端测试报告
-- 开始时间 / 结束时间 / GDA 版本 / Godot 版本 / git HEAD / 任务类型 / 完成度
-- 项目名 / 工程路径 / 主题 / 来源 / 抽样摘要 / draw_id（若本轮由 `jam e2e` 抽题；外部工程写「无」）
-- 轨迹：`<集中根>/projects/...`（关键事件见 `evidence.md`）
-- 日志：`<集中根>/projects/...`
-
-## 1. 结论摘要
-## 2. 执行过程（每环一段，随做随写）
-## 3. GDA 工具表现评估（按选用的维度）
-## 4. 问题记录（Q1、Q2…；类型 + 可复用性 + 五要素 + trace 引用 + 截图）
-## 5. 优化建议（S1、S2…；按优先级，每条含实际收益、触发场景、验证方式）
-## 6. 递归闭环产出（经验条目、优化提案、验证方式、下轮建议）
-## 7. 通用事实 vs 本工程偶然现象
-## 8. 证据索引（截图、trace/log 路径、未覆盖项）
-```
+`report.md` 结构与路径覆盖规则见 [references/report-templates.md](references/report-templates.md)「report.md 结构（第 8 节）」。
 
 按以下规则写优化建议：
 
@@ -230,15 +200,9 @@ description: "以任意 Godot 工程或固定沙盒 examples/e2e 为场地，用
 
 ## 文件契约（自包含）
 
-只通过文件系统与后续流程配合；不依赖任何其他技能。
+只通过文件系统与后续流程配合；不依赖任何其他技能。输入输出路径、编号规则与只读边界见 §2、§7、§8、「本轮边界」与「执行期边界」，报告模板见 [references/report-templates.md](references/report-templates.md)。
 
-- 接收输入：`<project-dir>/`、`GAMEJAM.md`、`jam.json`、`docs/`、同一工程的历史轮目录。
-- 写出输出：`report/<YYYY-MM-DD_HH-MM>/report.md`、同目录 `evidence.md`、`img/`；每环的基线/改动后对照证据。
-- 若 `report/` 最近一轮存在 `analysis.md` 且对应本工程，只读取「待下一轮端到端验证项」。
-- 不写 `analysis.md`；不修改已有轮目录中的文件。
-- 按 `Q<n>` 编号问题、`S<n>` 编号建议；标注问题类型与可复用性（通用/本工程）。
-- 提供可回放的报告、证据与对照材料，供后续离线评估；不复制完整轨迹。
-- 测试期只读 `<project-dir>/`、本轮报告目录与 GDA 工具输出；把 GDA 源码、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/` 留给分析阶段。
+不写 `analysis.md`；不修改已有轮目录中的文件；不复制完整轨迹，只交付可回放的报告、证据与对照材料。
 
 ## 10. 禁止事项
 
