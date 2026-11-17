@@ -13,13 +13,11 @@
 
 **English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-Godot Autopilot (GDA) is an [MCP](https://modelcontextprotocol.io/) server that lives **inside the Godot editor** as a plugin. Once installed, your AI coding assistant (Claude Code, Cursor, Codex, OpenCode, …) operates your project the way you do: build scenes, tweak properties, run the game, press buttons, take screenshots, and read the logs — then iterate on what it sees. No bridge process, no copy-pasting errors into a chat window. In a graphical editor session the server starts when your project opens and stops when it closes.
+Godot Autopilot (GDA) is an [MCP](https://modelcontextprotocol.io/) server that lives **inside the Godot editor** as a plugin. Your AI coding assistant (Claude Code, Cursor, Codex, OpenCode, …) then operates the project the way you do: builds scenes, tweaks properties, runs the game, presses buttons, takes screenshots, and reads logs — then iterates on what it sees. No bridge process and no copy-pasting errors into chat. A graphical editor session starts the server when the project opens and stops it when the project closes.
 
 ![Demo 001](assets/demo-001.gif)
 
-**252 tools** cover the whole editor-to-game loop — 246 domain tools, 5 meta tools, and `system_status` (the exact count grows with each version; ask the agent to check via `search_tools`). 325 deprecated tool-name aliases are registered and stay callable through `call_tool` until 0.6.0 (names still exposed as real tools win).
-
-Skill books (**1 entry card + 9 references**) teach the calling protocol; the CLI is the fallback when MCP is down. Full references: [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md) and [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md).
+**252 tools** cover the editor-to-game loop: 246 domain tools, 5 meta tools, and `system_status` (the exact count grows with each version; ask the agent to check via `search_tools`). 325 deprecated tool-name aliases stay callable through `call_tool` until 0.6.0 (names still exposed as real tools win). Skill books (**1 entry card + 9 references**) teach the calling protocol; the CLI is the fallback when MCP is down. References: [tool surface](docs/wiki/tool_surface_baseline.md), [skills](docs/wiki/modules/skills.md), [CLI](docs/wiki/modules/cli.md).
 
 ## Quick start
 

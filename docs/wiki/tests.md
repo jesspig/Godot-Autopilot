@@ -17,7 +17,7 @@ resource: tests/
 
 ## 架构总览
 
-测试由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入（`CMakeLists.txt:100`）。该开关已固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（cacheVariables 默认 `ON`），并经 `inherits` 下发给全部 4 个可执行 configure 预设（`debug`/`debug-portable`/`release`/`release-portable`），**清理/重建 `build/` 后重新配置（`bun run gda-dev-tools build` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参**；直接以裸 `cmake`（不带 preset）配置时仍为默认 OFF。
+测试由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入（`CMakeLists.txt:100`）。该开关固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（cacheVariables 默认 `ON`），经 `inherits` 下发给全部 4 个可执行 configure 预设（`debug`/`debug-portable`/`release`/`release-portable`）：重建 `build/` 后重新配置（`bun run gda-dev-tools build` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参；裸 `cmake`（不带 preset）配置仍默认 OFF。
 
 **三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-17 实测 **885 = 589 + 190 + 88 + 16 + 2**）：
 
@@ -29,9 +29,9 @@ resource: tests/
 | 守卫与脚本项 | `tests/CMakeLists.txt` 的 `add_test`（含 `no_python_guard`、源码守卫、守卫自测、`cli_contract` / `cli_unit`） | 以 `ctest -N` 为准 | `guard` / `cli` | 脚本退出码 | 源码纪律、无 Python 回退与 CLI wire 形状 |
 | 合计 | `ctest -N` | 以实测为准 | — | — | — |
 
-**回归属性**不是独立 ctest 目标，而是分布在单元 / 集成 / 脚本项内的基线断言组，钉住注册面、错误面、wire 形状与技能面，防止工具集与协议漂移；基线清单与更新 SOP 见「回归属性清单」。
+**回归属性**不是独立 ctest 目标，而是分布在单元 / 集成 / 脚本项内的基线断言组，钉住注册面、错误面、wire 形状与技能面，防工具集与协议漂移；清单与更新 SOP 见「回归属性清单」。
 
-**Agent e2e**：依赖真实编辑器 / Godot 进程的行为验证（GDScript 编译执行、游戏进程通道、端到端 HTTP 往返、编辑器态错误文案）不再有仓库内引擎轨，移交 `gda-e2e-testing` 工作流执行、`gda-e2e-analysis` 分析闭环（根 `.agents/skills/`）；未给工程路径时由 `bun run gda-dev-tools jam` 先抽题并生成 `examples/<id>/`，再进入开发。程序化测试（单元/集成/守卫）不依赖 `jam` 抽题或 `examples/` 生成物；生成器自身单测在临时目录覆盖它。仓库测试基建（configure + build + ctest）不含任何 Godot 进程路径。
+**Agent e2e**：依赖真实编辑器 / Godot 进程的行为验证（GDScript 编译执行、游戏进程通道、端到端 HTTP 往返、编辑器态错误文案）已无仓库内引擎轨，移交 `gda-e2e-testing` 工作流执行、`gda-e2e-analysis` 分析闭环（根 `.agents/skills/`）；未给工程路径时由 `bun run gda-dev-tools jam` 抽题生成 `examples/<id>/` 再开发。程序化测试（单元/集成/守卫）不依赖 `jam` 抽题或 `examples/` 生成物，生成器单测在临时目录自覆盖；仓库测试基建（configure + build + ctest）无 Godot 进程路径。
 
 ## 构建与运行
 
@@ -56,9 +56,9 @@ bun run gda-dev-tools test                 # 全量默认门（ctest --preset <r
 bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 ```
 
-上列 `debug` / `release` 预设**固定 Ninja 生成器**，本机 PATH 无 ninja 时须换成 `debug-portable` / `release-portable`（无 ninja 回退路径见 [build.md](./build.md)「预设」）。走 `bun run gda-dev-tools test` 则由 `resolvePreset()`（`devtools/lib/config.ts`）自动选路，`--preset` 选项仍只有 `debug` / `release` 两个。四个 preset 共用同一 `binaryDir`，测试目标与可执行文件位置均为 `build/debug/` 或 `build/release/`，不受生成器选择影响。
+上列 `debug` / `release` 预设**固定 Ninja 生成器**，PATH 无 ninja 时改用 `debug-portable` / `release-portable`（回退路径见 [build.md](./build.md)「预设」）。`bun run gda-dev-tools test` 由 `resolvePreset()`（`devtools/lib/config.ts`）自动选路，`--preset` 仍只有 `debug` / `release`。四个 preset 共用同一 `binaryDir`，测试目标与可执行文件位置均为 `build/debug/` 或 `build/release/`，不受生成器选择影响。
 
-- **依赖**：googletest 为 `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出（`git clone --recurse-submodules` 或 `git submodule update --init --recursive`），由 `tests/CMakeLists.txt:9-15` 复用 `gda_require_submodule` + `add_subdirectory` 引入，缺失即 configure 报错、不做网络回退；godot-cpp 与 mcp-cpp-sdk 同为子模块，单元与集成目标均链接（集成目标另链接 `mcp-http`，`tests/CMakeLists.txt:107-108`）。**不需要 Godot 可执行文件、不需要 `.env` / `GODOT_PATH`、不需要部署插件**——仓库测试链路无任何引擎拉起路径。
+- **依赖**：googletest 为 `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出（`git clone --recurse-submodules` 或 `git submodule update --init --recursive`），由 `tests/CMakeLists.txt:9-15` 经 `gda_require_submodule` + `add_subdirectory` 引入，缺失即 configure 报错、不做网络回退；godot-cpp 与 mcp-cpp-sdk 同为子模块，单元与集成目标均链接（集成另链接 `mcp-http`，`tests/CMakeLists.txt:107-108`）。**不需要 Godot 可执行文件、`.env` / `GODOT_PATH` 或插件部署**——测试链路无引擎拉起路径。
 - **测试侧构建目标**：`gda_unit_tests` / `gda_boundary_tests` / `gda_integration_tests`（ctest 常驻，分别打 `unit` / `boundary` / `integration` 标签）与 `gda_mcp_transport_probe`（`tests/probe/mcp_transport_probe.cpp`，传输自检程序，**不注册为 ctest 用例**、不计入 885，由主代理验收阶段按需执行）。
 
 ### tests/ 目录布局
@@ -84,25 +84,25 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 边界测试 | `boundary` | `gda_boundary_tests` | 非法 / 极端输入与拒绝路径：参数校验、错误映射、预算与超时、门控与守卫、可容忍降级 |
 | 集成测试 | `integration` | `gda_integration_tests` | 跨模块调用链：注入 `CommandQueue` 与处理器表后经 `dispatch` 驱动元工具与域工具 |
 
-划分依据是**文件主旨**（文件名与断言主体共同表达的意图），不是单条用例的输入形态——一个单元测试文件里出现个别边界断言属正常，不因此改判。新增测试先按判据选目录，再用对应标签验证能被 `ctest -L` 筛到。
+划分依据是**文件主旨**（文件名与断言主体共同表达的意图），而非单条用例的输入形态——单元测试文件出现个别边界断言属正常，不因此改判。新增测试先按判据选目录，再用对应标签验证能被 `ctest -L` 筛到。
 
 ## 单元测试层
 
-**57 个测试文件，589 个用例**（2026-11-17 `ctest -L unit -N` 实测；源码 `TEST`/`TEST_F` 宏口径见数值总表；历史批次计数演变见本页 git 历史与 [changelog/](changelog/) 各日记录）：
+**57 个测试文件，589 个用例**（2026-11-17 `ctest -L unit -N` 实测；源码 `TEST`/`TEST_F` 宏口径见数值总表；历史计数演变见本页 git 历史与 [changelog/](changelog/) 各日记录）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
-| `alias_coverage_test.cpp` | 1 | 能力矩阵旧工具行全部可解析为 kept/mapped/alias/merged，且别名解析无冲突 |
-| `alias_projection_test.cpp` | 8 | 各域别名参数/结果投影：legacy 输入形状映射到统一 canonical 工具 |
-| `alias_resolution_test.cpp` | 8 | 别名解析：改名、参数改名、标量包数组、结果恢复旧形状、破坏类别名要求 confirm、冲突拒绝、catalog 只列真实工具、detail 带别名元数据 |
+| `alias_coverage_test.cpp` | 1 | 能力矩阵旧工具行均可解析为 kept/mapped/alias/merged、别名解析无冲突 |
+| `alias_projection_test.cpp` | 8 | 各域别名参数/结果投影：legacy 输入映射到统一 canonical 工具 |
+| `alias_resolution_test.cpp` | 8 | 别名解析：改名、参数改名、标量包数组、结果恢复旧形状、破坏类别名需 confirm、冲突拒绝、catalog 只列真实工具、detail 带别名元数据 |
 | `bm25_index_test.cpp` | 20 | BM25 检索：命中排序、分类/标签过滤、空查询、上限截断 |
-| `capability_matrix_test.cpp` | 2 | 历史工具映射矩阵：旧工具必须 kept 或 mapped、唯一旧工具数与行数一致 |
-| `register_all_test.cpp` | 31 | 注册管线：5 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、同 server 重注册拒绝（SDK 0.3.11 语义）、双服务器一致性；full 面分页与 `list_changed`、Tasks 能力广告、`tool.side_effect` 可读性、UI 布局工具描述契约、`json` 参数不写 `type`；`ToolResultIsError` 五项判定 |
-| `command_queue_test.cpp` | 16 | 跨线程 submit/drain、异常经 future 传播、主线程记录；`submit_tracked`/`cancel`（命中/已执行/未知 id）与 drain 心跳 `last_drain_age_ms`；带预算 submit 在预算内完成、超时取消待执行任务、取消计数递增，owner 线程内联执行、预算非正时仍等完成 |
+| `capability_matrix_test.cpp` | 2 | 历史工具映射矩阵：旧工具须 kept 或 mapped、唯一旧工具数与行数一致 |
+| `register_all_test.cpp` | 31 | 注册管线：5 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、同 server 重注册拒绝（SDK 0.3.11）、双服务器一致性；full 面分页与 `list_changed`、Tasks 能力广告、`tool.side_effect` 可读性、UI 布局描述契约、`json` 参数不写 `type`；`ToolResultIsError` 五项判定 |
+| `command_queue_test.cpp` | 16 | 跨线程 submit/drain、异常经 future 传播、主线程记录；`submit_tracked`/`cancel`（命中/已执行/未知 id）与 drain 心跳 `last_drain_age_ms`；带预算 submit 预算内完成、超时取消待执行任务、取消计数递增、owner 线程内联执行、预算非正仍等完成 |
 | `tool_catalog_test.cpp` | 6 | ToolCatalog：add/get、重复覆盖、并发安全 |
-| `log_system_test.cpp` | 9 | 单例、级别/分类/文本过滤、环形缓冲覆盖、值拷贝快照与 recent 上限；`trace_id`/`span_id` 关联字段与 `filter_text` 匹配 detail/`trace_id`/`span_id` |
-| `tool_registry_test.cpp` | 6 | `SpecTool`/ToolRegistry：add/find/categories、execute echo、`side_effect_of`、`kMeta` flags 归类、flags 路由与 `make_tool_info` 的 dynamic/mutating |
-| `tool_verdict_test.cpp` | 15 | 工具结果判定纯逻辑（`src/tools/base/tool_spec.hpp`）：顶层/结构化 `code` 优先级、`runtime_error` 与成功判定、`deferred` 标记识别、trace stash/take 往返 |
+| `log_system_test.cpp` | 9 | 单例、级别/分类/文本过滤、环形缓冲覆盖、值拷贝快照与 recent 上限；`trace_id`/`span_id` 关联字段、`filter_text` 匹配 detail/`trace_id`/`span_id` |
+| `tool_registry_test.cpp` | 6 | `SpecTool`/ToolRegistry：add/find/categories、execute echo、`side_effect_of`、`kMeta` flags 归类与路由、`make_tool_info` 的 dynamic/mutating |
+| `tool_verdict_test.cpp` | 15 | 工具结果判定（`src/tools/base/tool_spec.hpp`）：顶层/结构化 `code` 优先级、`runtime_error` 与成功判定、`deferred` 标记、trace stash/take 往返 |
 | `confirmation_test.cpp` | 3 | 高风险工具确认（`src/tools/base/confirmation.hpp`）：高风险副作用缺 `confirm` 拒绝、`confirm:true` 放行、拒绝携带结构化码与档位 |
 | `schema_builder_test.cpp` | 5 | schema 构造形状、required 位置、未知类型不崩溃 |
 | `runtime_ops_test.cpp` | 12 | 编辑器队列注入往返、`payload_is_pending` 识别（非对象/非整数拒绝）、`discard_pending` 未命中返回 false |
@@ -151,13 +151,13 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | `godot_transport_pending_test.cpp` | 3 | Godot 传输 pending 键纯逻辑（`src/core/godot_transport.{hpp,cpp}`）：复合键区分连接与请求 id、同输入键稳定（幂等）、int 与 string 请求 id 前后缀区分不串扰 |
 | **合计** | **589** | |
 
-**链接来源**（`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`，源清单经 `cmake/sources/` 下清单聚合：`gda_unit_sources.cmake` 30 个业务源（含 `tests/support/config_loader.cpp` 与 `tests/support/tool_catalog_baseline.cpp`）+ 4 个登记的测试文件本体 + 1 组 `GDA_TOOLS_OPS_SOURCES` glob；`api_unit_transport.cmake` 10 个业务源 + 5 个测试本体；`api_unit_contract.cmake` 2 个测试本体；`api_unit_storage.cmake` 2 个业务源 + 2 个测试本体；`api_unit_instance_guard.cmake` 1 个业务源 + 1 个测试本体；`api_unit_cli.cmake` / `api_unit_docs.cmake` 现无登记项。合计显式业务源 43 + 1 组 glob、测试本体 14 个）：`src/core/` 的 `log_system`、`log_persist`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`、`editor_coords`、`trace_recorder`、`monitor`、`gda_home`、`project_store`、`instance_registry`、`storage_paths`、`legacy_store`、`instance_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`scene_verify`、`variant_json`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`、`editor_ui_actions`、`tool_args`、`tool_pipeline`、`tool_invoke`；传输面的 `src/core/port_resolver`、`http_route_table`、`http_stream_registry`、`godot_transport`、`mcp_http_shim`、`api_token`、`ipc_endpoint`、`ipc_transport`、`ipc_framing`；`src/resources/resource_error_mapping`；`src/tools/domains/*/*_ops.cpp`（glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。`gdscript_wrap`/`ready_policy` 等 header-only 头由对应测试直接 include，无需源登记。
+**链接来源**（`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`，由 `cmake/sources/` 清单聚合：`gda_unit_sources.cmake` 30 业务源（含 `tests/support/config_loader.cpp` 与 `tests/support/tool_catalog_baseline.cpp`）+ 4 个测试本体 + 1 组 `GDA_TOOLS_OPS_SOURCES` glob；`api_unit_transport.cmake` 10 业务源 + 5 测试本体；`api_unit_contract.cmake` 2 测试本体；`api_unit_storage.cmake` 2 业务源 + 2 测试本体；`api_unit_instance_guard.cmake` 1 业务源 + 1 测试本体；`api_unit_cli.cmake` / `api_unit_docs.cmake` 无登记项。合计显式业务源 43 + 1 组 glob、测试本体 14）：`src/core/`：`log_system`、`log_persist`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`、`editor_coords`、`trace_recorder`、`monitor`、`gda_home`、`project_store`、`instance_registry`、`storage_paths`、`legacy_store`、`instance_guard`；`src/util/`：`bm25_index`、`error_util`、`readback_util`、`scene_verify`、`variant_json`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/`：`tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`、`editor_ui_actions`、`tool_args`、`tool_pipeline`、`tool_invoke`；传输面 `src/core/port_resolver`、`http_route_table`、`http_stream_registry`、`godot_transport`、`mcp_http_shim`、`api_token`、`ipc_endpoint`、`ipc_transport`、`ipc_framing`；`src/resources/resource_error_mapping`；`src/tools/domains/*/*_ops.cpp`（glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。`gdscript_wrap`/`ready_policy` 等 header-only 头由对应测试直接 include，无需源登记。
 
-**约束**：单元测试禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃；handler 契约由集成层在受控边界内覆盖，见「集成层」）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp`）为运行时统计：期望值由 `tests/support/tool_catalog_baseline.cpp` 读取 `tests/data/tool_catalog_baseline.json` 的 `catalog_total`、`schema_non_empty`、`schema_empty`，测试源码不再硬编码计数；工具集变化时用 `bun run gda-dev-tools audit-tools --baseline` 更新 JSON。`sanitize_policy.cpp` 未列入 单元与边界测试业务源——`enabled()`/`set_enabled()` 为 header 内联原子缓存（单元测试 经 `TraceRecorder::sanitize_args(text, bool)` 直接传参断言脱敏口径），`initialize()` 仅由入口调用、不参与 单元测试 链接。`monitor.cpp` 显式列入 单元与边界测试业务源（`monitor_test` 覆盖）；`monitor_env.cpp` 仅主线程调用、`perf_sampler.cpp` 依赖引擎 tick，二者不进 单元测试。
+**约束**：单元测试禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃；handler 契约由集成层在受控边界内覆盖）。`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp`）为运行时统计：`tests/support/tool_catalog_baseline.cpp` 读取 `tests/data/tool_catalog_baseline.json` 的 `catalog_total`、`schema_non_empty`、`schema_empty`，测试源码不硬编码计数；工具集变化时用 `bun run gda-dev-tools audit-tools --baseline` 更新 JSON。`sanitize_policy.cpp` 未列入单元与边界业务源——`enabled()`/`set_enabled()` 为 header 内联原子缓存（单元测试经 `TraceRecorder::sanitize_args(text, bool)` 直接传参断言脱敏口径），`initialize()` 仅入口调用、不参与单元测试链接。`monitor.cpp` 显式列入单元与边界业务源（`monitor_test` 覆盖）；`monitor_env.cpp` 仅主线程调用、`perf_sampler.cpp` 依赖引擎 tick，二者不进单元测试。
 
 ### skill_gen 技能生成器测试（`skill_gen_test.cpp`）
 
-生成器 `src/util/skill_gen.cpp`；1 张入口卡 + 9 篇 references 存于仓库根 `skills/` 标准目录（共 10 个 .md，name/description 存 frontmatter；聚合顺序为目录名字序），经 `tools/embed_skills.ts` 构建期嵌入为生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染目标 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，单元测试 可跑无需引擎。10 个用例：
+生成器 `src/util/skill_gen.cpp`：1 张入口卡 + 9 篇 references 存于仓库根 `skills/` 标准目录（共 10 个 .md，name/description 存 frontmatter，按目录名字序聚合），经 `tools/embed_skills.ts` 构建期嵌入生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染到 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，单元测试无需引擎。10 个用例：
 
 | 用例 | 内容 |
 |---|---|
@@ -171,7 +171,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | `SkillRegistryFixture.SkillBooksDescribeDiscovery` | CLI-first 发现契约：`godot-autopilot-tools` 正文须含 `gda search`、`gda describe`、`gda tools list`、`gda call`、`confirmation_required` 与 `new_errors_since_last_call`，防技能书退回旧调用阶梯 |
 | `EverySkillHasSkillMd` | 每册恰 1 个自包含 `SKILL.md`（files.size() == 1，files[0] 必为 `SKILL.md`） |
 
-**工具名回验机制**：`SkillRegistryFixture` 照抄 `register_all_test.cpp` 的服务端构造方式（`register_all_tools` 填充 catalog，仅注册不调用任何 handler），允许集 = 运行时 catalog 全部工具名 ∪ 各工具 `input_schema.properties` 参数名 ∪ 253 项手动白名单（`kManualWhitelist`，`skill_gen_test.cpp:40-109` 逐项统计，均为明确非工具名的词：Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值等）；随后提取各册正文反引号包裹的全小写含下划线词逐一比对（``` 围栏代码块整体跳过），未命中即 FAIL。保证技能文档中出现的工具名/参数名与运行时注册始终一致。
+**工具名回验机制**：`SkillRegistryFixture` 照抄 `register_all_test.cpp` 的服务端构造（`register_all_tools` 填充 catalog，仅注册、不调用 handler），允许集 = 运行时 catalog 全部工具名 ∪ 各工具 `input_schema.properties` 参数名 ∪ 253 项手动白名单（`kManualWhitelist`，`skill_gen_test.cpp:40-109` 逐项统计，均为明确非工具名的词：Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值等）；随后提取各册正文反引号包裹的全小写含下划线词逐一比对（``` 围栏代码块整体跳过），未命中即 FAIL。保证技能文档中的工具名/参数名与运行时注册一致。
 
 ## 边界测试层
 
@@ -201,7 +201,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 ## 集成层（进程内契约测试）
 
-**`gda_integration_tests`，10 个 `*_test.cpp`，88 个 TEST**（2026-11-14 实测）。由旧 L2 引擎轨的 48 份 config JSON 蒸馏而来：错误串逐字等价、结构键与值一致、env 注入等价复刻旧 runner `requires` 语义；不可进程内复现的引擎触达断言划回 Agent e2e（逐条台账见各对照表的 R-01 条目）。
+**`gda_integration_tests`，10 个 `*_test.cpp`，88 个 TEST**（2026-11-14 实测）。由旧 L2 引擎轨的 48 份 config JSON 蒸馏：错误串逐字等价、结构键与值一致、env 注入等价复刻旧 runner `requires` 语义；不可进程内复现的引擎触达断言划回 Agent e2e（逐条台账见各对照表的 R-01 条目）。
 
 ### 目标与边界
 
@@ -213,8 +213,8 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 ### 夹具结构（`tests/integration/harness.hpp`）
 
 - **`IntegrationHarness`**：`SetUp` 构造 `InMemoryTransport::CreatePair()` → `McpServer::Create(pair.server)` → `register_all_tools(server, queue, catalog, index, 9527)` → `queue.drain()`（登记 owner 线程，此后 handler 全部 inline 执行）→ `runtime_ops::set_editor_queue(&queue)`；`TearDown` 摘除 editor 队列 → `dispatch::clear_handlers()` → 关闭 server，用例间零残留。
-- **`IntegrationHarnessWithAllow(allow_value)`**：`SetUp` 注入 `GODOT_AUTOPILOT_ALLOW`（保存并在 `TearDown` 恢复原值），沿用旧 runner 的 `requires` 传参形状；0.3.2 起该环境变量在生产代码中已无消费者，注入仅为保持既有套件写法。
-- **业务源与 单元测试 同源**：集成目标 = `integration/*_test.cpp` glob + `GDA_UNIT_BUSINESS_SOURCES`（剔除 `tests/unit/` 测试文件），另链接 `mcp-http`（`tests/CMakeLists.txt:93-120`）。
+- **`IntegrationHarnessWithAllow(allow_value)`**：`SetUp` 注入 `GODOT_AUTOPILOT_ALLOW`（保存并在 `TearDown` 恢复原值），沿用旧 runner 的 `requires` 传参形状；0.3.2 起该变量在生产代码已无消费者，注入仅为保持既有套件写法。
+- **业务源与单元测试同源**：集成目标 = `integration/*_test.cpp` glob + `GDA_UNIT_BUSINESS_SOURCES`（剔除 `tests/unit/` 测试文件），另链接 `mcp-http`（`tests/CMakeLists.txt:93-120`）。
 - **注册**：`file(GLOB integration/*_test.cpp CONFIGURE_DEPENDS)` + `gtest_discover_tests`——新增 `*_test.cpp` 后重新 configure 即逐 TEST 注册为 ctest 用例，无需改 CMake。
 
 ### 套件覆盖清单（历史口径 109；2026-11-14 当前 88）
@@ -232,7 +232,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | `tool_detail_contract_test.cpp` | `ContractAssertSuite`（`code_execute`） | 1 | `get_tool_detail` 契约：`code_execute` 的 `tool.side_effect` 序列化值 `"code_execute"`；执行步不迁（真实脚本执行，见 R-01-05） |
 | `toolface_contract_test.cpp` | `IntegrationHarness`（默认拒绝） | 7 | 工具面动态枚举契约：详情契约 2 + 元工具类别可区分 1 + 排除划分自洽 1 + 空参实调 2 组（`Mutating` / `Dynamic`）+ 空查询枚举冒烟 1（见「回归属性清单」） |
 
-> 步骤级对照表（源 JSON expect ↔ gtest 断言 ↔ 等价结论）与 R-01 台账（引擎触达剔除记录）：`.handoff/evidence/T-02/mapping.md`（试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`。合并定稿「A 类迁移对照表」与引擎行为验收清单已落盘 wiki（[engine-behavior-checklist.md](engine-behavior-checklist.md) 的「A 类迁移对照表」小节，含已迁逐例对照与未迁用例划回 e2e 汇总），本页不复制对照表全文。
+> 步骤级对照表（源 JSON expect ↔ gtest 断言 ↔ 等价结论）与 R-01 台账（引擎触达剔除记录）：`.handoff/evidence/T-02/mapping.md`（试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`。合并定稿「A 类迁移对照表」与引擎行为验收清单见 [engine-behavior-checklist.md](engine-behavior-checklist.md) 的「A 类迁移对照表」小节（含已迁逐例对照与未迁用例划回 e2e 汇总），本页不复制全文。
 
 ### 运行与排查
 
@@ -242,11 +242,11 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 ### 进程内边界（硬边界）
 
-1. **栈上 godot 对象构造**：handler 在参数校验**前**构造含 `godot::Variant` / `godot::Ref<…>` 的栈对象 → 测试进程 SEH——本仓 godot-cpp 的 `Variant()`/`~Variant()` 无条件调用 gdextension 接口指针，测试进程 GDExtension 接口未初始化即空函数指针调用（实证：`handle_code_execute` 的 `ExecContext`，`.handoff/evidence/T-02/mapping.md` R-01-03）。2026-11-10 起，`VariantJsonStrictTest.*Accepts*` 的 12 个用例按此边界从程序化测试中移除（由 e2e 覆盖）。
-2. **引擎单例**：`godot::<Class>::get_singleton()` 同为硬边界（`ProjectSettings`/`EditorInterface`/`InputMap` 等，生成 getter 走同一接口指针；`.handoff/evidence/T-04/mapping-12-16-17-39.md` R-04-01、`T-05/mapping-23-24-35-37-40.md` R-01-02）。凡依赖上述两条路径的断言不可迁集成层，已划回 e2e（对照表各 R-01 条目）。
-3. **运行期通道错误文案**：通道错误依赖编辑器插件实例（`DebugCapturePlugin::s_instance` 仅编辑器入口置位），进程内恒为 `debugger capture plugin not initialized`——凡以 `game not running: …` 等编辑器态精确全串为 expect 的断言不可迁（进程内无法复现该文案）；JSON 仅声明 error 非空的步骤可迁（进程内通道错误满足声明）。
-4. **HTTP socket 层**：传输栈绑定 Godot 引擎 `TCPServer`/`StreamPeerTCP`，进程内无法监听（判定记录 `.handoff/evidence/T-03/verdict.md`：degrade；FR-03 降级决议草案待用户确认）——集成层无真实 HTTP 监听试点，HTTP 解析/shim 头校验/路由的纯逻辑面由 单元测试 与集成层分担，端到端 HTTP 往返随 `gda-e2e-testing` 自然发生。
-5. **`tests/runner/` 残留口径**：仅保留 `config_loader.{cpp,hpp}`（单元与边界测试业务源，`gda_unit_sources.cmake:41` 登记、`config_loader_strict_test` 8 项测之；偏离登记见 `.handoff/evidence/T-08/manifest.md`），其余 runner 文件已随引擎轨删除。
+1. **栈上 godot 对象构造**：handler 在参数校验**前**构造含 `godot::Variant` / `godot::Ref<…>` 的栈对象 → 测试进程 SEH——本仓 godot-cpp 的 `Variant()`/`~Variant()` 无条件调用 gdextension 接口指针，测试进程接口未初始化即成空函数指针调用（实证：`handle_code_execute` 的 `ExecContext`，`.handoff/evidence/T-02/mapping.md` R-01-03）。2026-11-10 起，`VariantJsonStrictTest.*Accepts*` 的 12 个用例按此边界从程序化测试移除（由 e2e 覆盖）。
+2. **引擎单例**：`godot::<Class>::get_singleton()` 同为硬边界（`ProjectSettings`/`EditorInterface`/`InputMap` 等，生成 getter 走同一接口指针；`.handoff/evidence/T-04/mapping-12-16-17-39.md` R-04-01、`T-05/mapping-23-24-35-37-40.md` R-01-02）。依赖上述两条路径的断言不可迁集成层，已划回 e2e（对照表各 R-01 条目）。
+3. **运行期通道错误文案**：通道错误依赖编辑器插件实例（`DebugCapturePlugin::s_instance` 仅编辑器入口置位），进程内恒为 `debugger capture plugin not initialized`——以 `game not running: …` 等编辑器态精确全串为 expect 的断言不可迁（进程内无法复现）；JSON 仅声明 error 非空的步骤可迁（通道错误满足声明）。
+4. **HTTP socket 层**：传输栈绑定引擎 `TCPServer`/`StreamPeerTCP`，进程内无法监听（判定记录 `.handoff/evidence/T-03/verdict.md`：degrade；FR-03 降级决议草案待用户确认）——集成层无真实 HTTP 监听试点，HTTP 解析/shim 头校验/路由的纯逻辑面由单元测试与集成层分担，端到端 HTTP 往返随 `gda-e2e-testing` 自然发生。
+5. **`tests/runner/` 残留口径**：仅保留 `config_loader.{cpp,hpp}`（单元与边界业务源，`gda_unit_sources.cmake:41` 登记、`config_loader_strict_test` 8 项测之；偏离登记见 `.handoff/evidence/T-08/manifest.md`），其余 runner 文件已随引擎轨删除。
 
 ## 回归属性清单
 
@@ -277,11 +277,11 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 - `migration_guard`（`migration_guard.cmake` + `migrated_domains.txt`，30 域 + `strict`）：零依赖源码断言，防旧宏/`schema_*_ops.cpp`/`tool_input_schema` 回退；实测输出 `-- [migration-guard] OK (domains: 30, strict: on)`；迁移规则见 [ToolSpec 数据层与执行管线](tool_base_design.md)。
 - `comment_guard`（`comment_guard.ts`）：递归扫描 `src/` 与 `tests/` 下 `*.cpp/*.hpp`（`SCAN_DIRS`，只认这两棵目录的 C++ 文件），除 `// namespace` 结尾标记外禁止任何 `//`/`/*…*/` 注释（正确处理字符串/字符字面量与 `R"TAG(…)TAG"` raw string）；无违规打印 `comment-guard OK` 并退出 0，违规退出 1，文件无法解码退出 2。
 - `no_python_guard`（`no_python_guard.ts`）：**无 Python 守卫**，扫描全仓 `*.py`、`uv run`、`python main.py`、`find_package(Python3`、`GDA_PYTHON_EXECUTABLE`、CI 的 `setup-python`/`PYTHONUTF8` 与 `pyproject.toml`/`uv.lock`/`.python-version`；历史 changelog、运维日志与设计文档按「文件 + 规则 + 行内特征」白名单豁免并附理由。退出码：0 无残留、1 有违规（逐条打印 `文件:行号: [规则]`）、2 读失败或参数错误。`--self-test` 以临时目录注入违规样本验证守卫本身能报错。
-- `main_thread_guard`（`main_thread_guard.ts`）：**主线程契约守卫**，静态扫描 `src/` 下 `*.cpp/*.hpp` 里的 **Godot API 直接调用**。判定依据是「线程上下文分类」——每个源文件被显式归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）三类（`THREAD_CONTEXT_RULES`），外线程文件里的 Godot API 调用默认违规，只有落在该文件显式登记的主线程作用域里才放行（`FOREIGN_MAIN_THREAD_SCOPES`，当前只登记 `src/core/observability/log_persist.cpp` 的 6 个主线程作用域）。词法顺序：先剥离字符串字面量、字符字面量与 raw string，再剥离注释，最后做标识符匹配（`GODOT_API_PATTERNS` 覆盖 `godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）。退出码：0 无违规（`main-thread-guard OK`）、1 有违规（逐行打印 `文件:行号: 片段`）、2 文件读或解码失败；可选参数为待扫描目录，缺省仓库 `src/`；只用标准库。
-- `version_sync_guard`（`guard/version_sync_guard.ts`）：版本号一致性——根 `README*.md` 与 `INSTALL*.md` 的版本钉必须与根 `VERSION` 同值，另含 `VERSION` 与 `CLI_VERSION` 两个值源；`skills/` 与 `skills-zh/` 是交付技能书，**禁止**出现版本钉或 Git ref（技能书不钉版本）。非版本引用（如 `#develop`）只登记、不参与比对。退出码：0 全部一致、1 存在版本漂移、2 关键文件缺钉 / 技能书出现版本钉 / 未知引用形态 / 文件读失败；覆盖范围以守卫脚本为准。
-- `source_manifest_guard`（`source_manifest_guard.ts`）：**源清单守卫**——断言 测试源清单引用的 `src/` 源 ⊆ 插件源并集，防「漏登根 `CMakeLists.txt` / 清单文件导致编译单元不进产物」的静默缺失（解析规则见该脚本模块 docstring）。
-- `install_docs_guard`（`install_docs_guard.ts`）：**安装文档守卫**——断言 `INSTALL.md` 含中文速览、Agent 流程、三条安装路径、MCP 连接、校验与排错入口，且引用两个安装脚本、`--project` / `--skills` / `--skills-project`、全局与项目技能目录、`project.godot`、`mcp_url`、`sha256sums.txt`；同时断言两个安装脚本具备最新版解析、工程识别与技能作用域参数，且不含 AtomGit 残留。
-- `zip_layout_guard`（`zip_layout_guard.ts`）：**ZIP 布局守卫**——用大于 64 KiB 的随机载荷调用 `writeZip`，断言 `validateZipLayout` 接受合法 EOCD/中央目录偏移且 `readZip` 能读回原文；随后篡改 EOCD 中央目录偏移，断言校验器拒绝。防 `writeZip` 把 EOCD 中央目录偏移写坏导致标准解压器（Windows `Expand-Archive` / bsdtar）拒绝发布包。
+- `main_thread_guard`（`main_thread_guard.ts`）：**主线程契约守卫**，静态扫描 `src/` 下 `*.cpp/*.hpp` 的 **Godot API 直接调用**。判定依据「线程上下文分类」：每个源文件显式归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）（`THREAD_CONTEXT_RULES`）；外线程文件的 Godot API 调用默认违规，仅落在该文件登记的主线程作用域内才放行（`FOREIGN_MAIN_THREAD_SCOPES`，当前只登记 `src/core/observability/log_persist.cpp` 的 6 个主线程作用域）。词法顺序：先剥离字符串、字符字面量与 raw string，再剥离注释，最后做标识符匹配（`GODOT_API_PATTERNS` 覆盖 `godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）。退出码：0 无违规（`main-thread-guard OK`）、1 有违规（逐行打印 `文件:行号: 片段`）、2 文件读或解码失败；可选参数为待扫描目录，缺省仓库 `src/`；只用标准库。
+- `version_sync_guard`（`guard/version_sync_guard.ts`）：版本号一致性——根 `README*.md` 与 `INSTALL*.md` 的版本钉必须与根 `VERSION` 同值，另含 `VERSION` 与 `CLI_VERSION` 两个值源；`skills/` 与 `skills-zh/` 为交付技能书，**禁止**出现版本钉或 Git ref（技能书不钉版本）。非版本引用（如 `#develop`）只登记、不参与比对。退出码：0 全部一致、1 存在版本漂移、2 关键文件缺钉 / 技能书出现版本钉 / 未知引用形态 / 文件读失败；覆盖范围以守卫脚本为准。
+- `source_manifest_guard`（`source_manifest_guard.ts`）：**源清单守卫**——断言测试源清单引用的 `src/` 源 ⊆ 插件源并集，防「漏登根 `CMakeLists.txt` / 清单文件导致编译单元不进产物」的静默缺失（解析规则见该脚本模块 docstring）。
+- `install_docs_guard`（`install_docs_guard.ts`）：**安装文档守卫**——断言 `INSTALL.md` 含中文速览、Agent 流程、三条安装路径、MCP 连接、校验与排错入口，引用两个安装脚本、`--project` / `--skills` / `--skills-project`、全局与项目技能目录、`project.godot`、`mcp_url`、`sha256sums.txt`；并断言两个安装脚本具备最新版解析、工程识别与技能作用域参数，不含 AtomGit 残留。
+- `zip_layout_guard`（`zip_layout_guard.ts`）：**ZIP 布局守卫**——用大于 64 KiB 的随机载荷调用 `writeZip`，断言 `validateZipLayout` 接受合法 EOCD/中央目录偏移且 `readZip` 读回原文；再篡改 EOCD 中央目录偏移，断言校验器拒绝。防 `writeZip` 写坏偏移导致标准解压器（Windows `Expand-Archive` / bsdtar）拒绝发布包。
 - `skills_guard`（`guard/skills_guard.ts`，Bun 可用时注册；不可用时由 `cli_unit` 的 `bun test cli/tests` 覆盖同一实现）：扫描 `skills/` 与 `skills-zh/` 全部文本，失败逐条输出 `文件:行号: [规则] 说明`。规则包括旧版本钉、`bunx`、`9527`、`gda serve`、`gda api`、`Allow write`、REST、配置面板与 allow-list；提取 `gda` 命令与参数并对照 `cli/src/commands/index.ts`、`cli/src/args.ts`；校验 `gda status --json` 示例字段来自 `cli/src/commands/status.ts`；校验 EN/ZH 相对路径、frontmatter 与 10 个文件数量一致。
 - `skills_guard_self_test`（同一脚本 `--self-test`）：注入未知册、旧关键词、未知命令、未知 status 字段、多文件与缺册反例，验证护栏本身能报错；Bun 可用时与 `skills_guard` 一起注册。
 - 守卫自测项：`migration_guard_self_test` / `comment_guard_self_test` / `no_python_guard_self_test` / `main_thread_guard_self_test` / `tool_domain_guard_self_test` / `skills_guard_self_test`——以注入违规样本的方式验证源码/技能守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
@@ -321,18 +321,18 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 主线程预算 | 默认 27000 ms / 健康探针 5000 ms / 长阻塞 29000 ms | `src/core/config.hpp:16-20`（常量即生效值）；预算选择逻辑 `src/tools/base/dispatch.cpp:288-298`；长阻塞预算经 `env_int_clamped` 钳制在 `[1000, 29000]`，未设 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 时生效 29000 ms | 一致 |
 | `code_execute` 超时上界 | 静态 27000 ms，实际生效 = `min(27000, 生效长阻塞派发预算)` | `src/core/config.hpp:45` `GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000`；唯一实现点 `code_exec_ops.cpp:464-470` 的 `max_timeout_ms()`；派发侧余量 2000 ms、传输侧余量 2000 ms，由 `config.hpp:48-62` 三条 `static_assert` 约束 | 一致 |
 
-> 对照说明：本表为逐文件/逐宏统计与实测证据的重基线值；`AGENTS.md` 与技能层只引用本页、不复制数值，`tests/README.md` 若出现旧值（其 L2 内容为 T-10 重基线对象）以本页为准。旧「L1/L2 双层」口径的行（L2 用例数、池化注册、池床、遍历枚举/排除/候选/步数/warnings）已随引擎轨删除移除，去向见「历史口径迁移」。
+> 对照说明：本表为逐文件/逐宏统计与实测证据的重基线值；`AGENTS.md` 与技能层只引用本页、不复制数值，`tests/README.md` 若出现旧值（其 L2 内容为 T-10 重基线对象）以本页为准。旧「L1/L2 双层」口径的行（L2 用例数、池化注册、池床、遍历枚举/排除/候选/步数/warnings）已随引擎轨移除，去向见「历史口径迁移」。
 
 ## 历史口径迁移（L2 引擎轨删除，2026-11-09）
 
-「L1/L2 双层」时代的下列章节随引擎轨删除（提交 `c023a5c`；脚本编排收敛 `bf31e8a` / `8997db9`）整体移除，历史结论去向如下（下述 L2 均为已删除资产的历史指称，不作现存事实）：
+「L1/L2 双层」时代的下列章节随引擎轨删除（提交 `c023a5c`；脚本编排收敛 `bf31e8a` / `8997db9`）；历史结论去向如下（L2 均为已删除资产的历史指称，非现存事实）：
 
 - **L2 载体行、构建与运行、执行闭环（GodotProcess / GDA_FORCE_HEADLESS / 就绪轮询）、报告格式、CLI 与退出码**：随 `gda_test_runner` 删除；测试床迁移与无头实测的历史记载见 [changelog/2026-09-26-log.md](changelog/2026-09-26-log.md)、[changelog/2026-09-29-log.md](changelog/2026-09-29-log.md)。
 - **L2 池化编排**（五池常驻、`pools.json` 分区、`gen_partition.py`/`gen_pool_map.py`、`pool_setup`/`pool_cleanup` fixtures 与 `RESOURCE_LOCK`、逐例会话复位、`isolated` 名单、池床布局与磁盘占用、游戏默认无头）：无 changelog 落点，设计与实测记录仅存于 git 历史（本页 2026-10-28 至 2026-10-30 版本与 `feature/l2-pool-test` 分支）。
-- **48 份 L2 用例表、JSON schema 冻结规则、断言语义、软失败语义**：用例语义已由集成层逐条蒸馏（对照表见 `.handoff/evidence/` 各 mapping，R-01 台账登记划回 e2e 的条目；合并定稿「A 类迁移对照表」与引擎行为验收清单见 [engine-behavior-checklist.md](engine-behavior-checklist.md)）；配置加载器以 `config_loader.{cpp,hpp}` 形式保留为 单元与边界测试业务源。
-- **全量遍历与排除工具清单**（`traversal.cpp`、预期错误豁免表、`side_effect` 逐档名单与历史事故、warnings 基线）：判定逻辑由集成层 toolface 契约承接（动态枚举 + 空参缺参拒绝断言 + 计数观察值口径，见「回归属性清单」）；历史基线演变（枚举 452 / 排除 182 / 候选 270 / 489 步 / warnings 0 等）见 [changelog/2026-10-19-log.md](changelog/2026-10-19-log.md) 至 [changelog/2026-10-22-log.md](changelog/2026-10-22-log.md)；Example 污染事故（`set_editor_main_scene` / `save_editor_scene`）的原始记载见 [changelog/2026-09-18-log.md](changelog/2026-09-18-log.md) 与 git 历史（排除清单注释考古，提交 `ca1461c`）。
-- **已知引擎副作用、L2 环境漂移（编辑器场景恢复）、审计不一致点清单**：对象均为已删除的测试床与引擎轨，历史记载见 [changelog/2026-09-26-log.md](changelog/2026-09-26-log.md)、[changelog/2026-09-29-log.md](changelog/2026-09-29-log.md)。
-- **已知遗留（待跟进）**：mcp-cpp-sdk 客户端响应等待缺陷随测试客户端（`tests/integration/mcp_test_client.cpp`）删除而不再适用于测试轨，生产服务端不受影响；「编辑器进程的引擎错误不可经 MCP 观测」属产品能力边界，历史记载见本页 git 历史（2026-10-30 版「已知遗留」）与 `skills/godot-autopilot-runtime/references/debug-paths.md`；游戏侧双进程 e2e 覆盖缺口与编辑器 UI 动作自动化缺口移交 Agent e2e 闭环（`gda-e2e-testing` 工作流 + `gda-e2e-analysis` 分析闭环）。
+- **48 份 L2 用例表、JSON schema 冻结规则、断言语义、软失败语义**：用例语义由集成层逐条蒸馏（对照表见 `.handoff/evidence/` 各 mapping，R-01 台账登记划回 e2e 的条目；合并定稿「A 类迁移对照表」与引擎行为验收清单见 [engine-behavior-checklist.md](engine-behavior-checklist.md)）；配置加载器以 `config_loader.{cpp,hpp}` 形式保留为单元与边界业务源。
+- **全量遍历与排除工具清单**（`traversal.cpp`、预期错误豁免表、`side_effect` 逐档名单与历史事故、warnings 基线）：判定逻辑由集成层 toolface 契约承接（动态枚举 + 空参缺参拒绝断言 + 计数观察值口径，见「回归属性清单」）；历史基线演变（枚举 452 / 排除 182 / 候选 270 / 489 步 / warnings 0 等）见 [changelog/2026-10-19-log.md](changelog/2026-10-19-log.md) 至 [changelog/2026-10-22-log.md](changelog/2026-10-22-log.md)；Example 污染事故（`set_editor_main_scene` / `save_editor_scene`）见 [changelog/2026-09-18-log.md](changelog/2026-09-18-log.md) 与 git 历史（排除清单注释考古，提交 `ca1461c`）。
+- **已知引擎副作用、L2 环境漂移（编辑器场景恢复）、审计不一致点清单**：对象均为已删除的测试床与引擎轨，记载见 [changelog/2026-09-26-log.md](changelog/2026-09-26-log.md)、[changelog/2026-09-29-log.md](changelog/2026-09-29-log.md)。
+- **已知遗留（待跟进）**：mcp-cpp-sdk 客户端响应等待缺陷随测试客户端（`tests/integration/mcp_test_client.cpp`）删除而不再适用于测试轨，生产服务端不受影响；「编辑器进程的引擎错误不可经 MCP 观测」属产品能力边界，记载见本页 git 历史（2026-10-30 版「已知遗留」）与 `skills/godot-autopilot-runtime/references/debug-paths.md`；游戏侧双进程 e2e 覆盖缺口与编辑器 UI 动作自动化缺口移交 Agent e2e 闭环（`gda-e2e-testing` 工作流 + `gda-e2e-analysis` 分析闭环）。
 - **页头批次级数值演变（2026-08 至 2026-10-30 的 L1/L2/ctest 计数史）**：见本页 git 历史（2026-10-30 版页头）与 [changelog/2026-10-23-log.md](changelog/2026-10-23-log.md)（现有最新一篇，其余各日按文件名检索）。
 
 ## 相关页面

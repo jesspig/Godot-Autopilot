@@ -24,7 +24,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 - **进程内 GDExtension**：插件随编辑器启动而启动、随编辑器关闭而停止，无独立桥接进程（`src/main.cpp` 的 `GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 中创建并启动 `ServerContext`）。
 - **产物名**：`godot-autopilot`（`.dll` / `.so` / `.dylib` + `.gdextension`），部署目录为目标 Godot 工程的 `addons/godot-autopilot/`。
-- **示例工程（可选）**：仓库不再内置示例；`bun run gda-dev-tools deploy --project <dir>` 可把插件部署到任意 Godot 工程，未传 `--project` 时递归发现 `examples/` 下的比赛最终项目并跳过 intake 与 e2e 沙盒。`bun run gda-dev-tools jam` 抽题并生成 `examples/<theme_id>/project/` intake，`jam create` 再创建 `<slug>-<hash8>` 比赛最终项目，供本地收藏使用；`jam e2e` 管理固定沙盒 `examples/e2e`，供端到端测试每轮重置。程序化测试不依赖它抽题，只有生成器自身单测在临时目录覆盖。详见 [gamejam.md](gamejam.md)。
+- **示例工程（可选）**：仓库不内置示例；`bun run gda-dev-tools deploy --project <dir>` 可部署到任意 Godot 工程，未传 `--project` 时递归发现 `examples/` 下的比赛最终项目并跳过 intake 与 e2e 沙盒。`jam` 抽题生成 `examples/<theme_id>/project/` intake，`jam create` 创建 `<slug>-<hash8>` 比赛项目，`jam e2e` 管理固定沙盒 `examples/e2e`（每轮重置）。程序化测试不依赖抽题，只有生成器单测在临时目录覆盖。详见 [gamejam.md](gamejam.md)。
 
 ## 核心能力
 
@@ -87,7 +87,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 编辑器 UI
 
-- 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同匹配 message 与 detail）、折叠重复、Detail 切换显示诊断 detail、Open Logs 打开工程级日志目录（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/logs`）、09-21 新增 Open Traces 打开工程级轨迹目录（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/traces`）与 Trace 视图（日志行带可点击 `[trace]` 标记，点击按 trace_id 渲染结构化事件列表，默认关闭）；日志面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经集中根下的全局级 `config.json`（`<集中根>/config.json`，默认 `~/.godot-autopilot/config.json`；新路径缺该键时回退读旧 `user://godot_autopilot/config.json`）的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
+- 自定义底部日志面板 `McpLogDock`（"GDA Log"）：按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同时匹配 message 与 detail）、折叠重复、Detail 显示诊断 detail、Open Logs 打开工程级日志目录（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/logs`）、Open Traces 打开同工程 `traces` 目录与 Trace 视图（日志行带可点击 `[trace]` 标记，按 trace_id 渲染结构化事件列表，默认关闭）。"Show timestamps" 开关控制每条日志的 `[HH:MM:SS]` 本地时间前缀，经 `<集中根>/config.json`（默认 `~/.godot-autopilot/config.json`）的 `show_time` 键持久化；新路径缺该键时回退旧 `user://godot_autopilot/config.json`。折叠重复日志时，除条数外始终显示最新一条的时间，不受总开关控制。
 - 右侧配置面板 `McpConfigDock`（"MCP Config"）已于 0.3.2 移除：端口由插件持有并持久化，MCP 配置从 `gda status --json` 的 `mcp_url` 生成，授权门改为高风险工具的 `confirm`，技能通过 `gda install skills` 安装。当前仅保留 `McpLogDock`。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; retry after export completes"}`）；导出期拒绝现覆盖**工具调用 / MCP 资源 / MCP 提示词**三类入口。导出标志为**实例级**——每个 `ExportGuard` 实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表，任一实例处于导出期即返回 true。
 
@@ -141,7 +141,7 @@ godot-self-driving/
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 27 个文件（7 cpp + 20 hpp）
 │   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
 ├── skills/                     # 插件技能卡源（1 张入口卡 + 9 篇 references；共 10 个 .md）
-├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 37 个 .test.ts（运行 348 项：325 pass + 23 skip）
+├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 37 个 .test.ts
 ├── tests/                      # 单元/边界/集成 gtest 目标 + support/ 夹具 + guard/ 源码守卫（含 no_python_guard）+ probe/ 传输探针（数值见 tests.md 数值核算总表）
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，scripts.gda-dev-tools → devtools/main.ts，零运行时依赖）

@@ -21,11 +21,6 @@ description: 新增、改名、改参或改副作用领域工具时按 ToolSpec 
 - 输入：工具名、参数表、副作用声明；输出：handler 加参数表加注册行。
 - `register_all.cpp` 经各域 `make_tools()` 自动汇总，不手改注册表。
 
-## 非目标
-
-- 不做文本级增量编辑、glob 匹配、C# 热重载。
-- 不放宽监听、高风险确认、脱敏默认值。
-
 ## 验证
 
 - 执行 `ctest --preset debug -R "migration_guard|comment_guard"`，预期全过。

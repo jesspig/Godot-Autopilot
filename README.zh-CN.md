@@ -13,13 +13,11 @@
 
 [English](README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-Godot Autopilot（GDA）是一个住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，你的 AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）就能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志——然后根据看到的结果继续迭代。不需要桥接进程，也不用把报错复制粘贴到聊天框。图形界面编辑器打开项目时服务端自动启动，关闭项目时自动停止。
+Godot Autopilot（GDA）是住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志，再根据结果继续迭代。不需要桥接进程，也不用把报错复制到聊天框。图形界面编辑器打开项目时服务端自动启动，关闭项目时自动停止。
 
 ![Demo 001](assets/demo-001.gif)
 
-**252 个工具**，覆盖从编辑器到游戏的完整闭环——246 个域工具 + 5 个元工具 + `system_status`（数量随版本增长，以代理通过 `search_tools` 查到的为准）；325 条旧工具名别名在 0.6.0 前经 `call_tool` 可调用（与实名工具重名的条目按实名工具优先）。完整工具面见 [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md)。
-
-技能书为 **1 张入口卡 + 9 篇 references**，教代理按调用协议执行；定位：MCP 是主产品通道，技能是体验层，调用指南在 MCP 失效时改用 GDA CLI。完整参考见 [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md) 与 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)。
+**252 个工具**覆盖从编辑器到游戏的完整闭环：246 个域工具 + 5 个元工具 + `system_status`（数量随版本增长，以代理通过 `search_tools` 查到的为准）。325 条旧工具名别名在 0.6.0 前经 `call_tool` 可调用（与实名工具重名的条目按实名工具优先）。技能书为 **1 张入口卡 + 9 篇 references**，教代理按调用协议执行；MCP 失效时改用 GDA CLI。参考：[工具面](docs/wiki/tool_surface_baseline.md)、[技能](docs/wiki/modules/skills.md)、[CLI](docs/wiki/modules/cli.md)。
 
 ## 快速开始
 

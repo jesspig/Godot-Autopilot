@@ -1,20 +1,20 @@
 ---
 name: gda-e2e-testing
-description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一轮端到端验收，只记录问题与证据、不修复。何时用：端到端测试、e2e、跑一轮验收、测试 GDA 工具表现、指定某个 demo 做端到端、要 report.md / evidence.md / Q<n> 问题记录。不用于：开发游戏或参加 Game Jam（走 gda-gamejam）、根因分析与实施优化（走 gda-e2e-analysis）。"
+description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一轮端到端验收，只记录问题与证据、不修复。何时用：端到端测试、e2e、跑一轮验收、测试 GDA 工具表现、指定某个 demo 做端到端、要 report.md / evidence.md / Q<n> 问题记录。"
 ---
 
 # Godot 工程端到端验收
 
-读取目标 Godot 工程，用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。本轮只记录，不修复；修复留给报告产出后的独立分析会话。
+读取目标 Godot 工程，用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。本轮只记录，不修复。
 
 ## 本轮边界：只记录，不修复
 
 - 报告侧唯一产物是 `report/<YYYY-MM-DD_HH-MM>/` 下的 `report.md`、`evidence.md`、`img/`。
 - 工程侧只允许修改 `examples/e2e`（或用户指定的工程）与 `build/`、部署产生的 `addons/` 等构建产物。
 - 不修改 `src/`、`devtools/`、`cli/`、`tests/`、`skills/`、`docs/wiki/`、`AGENTS.md`、`VERSION`、构建与测试配置。
-- 不运行修复、不应用补丁、不提交 git；不调用 `gda-e2e-analysis`，不写 `analysis.md`。
+- 不运行修复、不应用补丁、不提交 git。
 - 开工记录 `git status --porcelain` 基线；收尾比对，除被忽略目录外不得出现新的跟踪文件改动。
-- 问题只记录现象、影响、复现步骤与证据；根因与修复由后续分析会话负责。
+- 问题只记录现象、影响、复现步骤与证据；本轮不做根因分析与修复。
 
 ## 输入
 
@@ -59,7 +59,7 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 
 ## 执行期边界
 
-只做测试与记录，不做 GDA 源码分析；把源码分析留给报告产出后的独立阶段。
+只做测试与记录，不做 GDA 源码分析。
 
 只读取：
 
@@ -200,9 +200,9 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 
 ## 文件契约（自包含）
 
-只通过文件系统与后续流程配合；不依赖任何其他技能。输入输出路径、编号规则与只读边界见 §2、§7、§8、「本轮边界」与「执行期边界」，报告模板见 [references/report-templates.md](references/report-templates.md)。
+只通过文件系统配合。输入输出路径、编号规则与只读边界见 §2、§7、§8、「本轮边界」与「执行期边界」，报告模板见 [references/report-templates.md](references/report-templates.md)。
 
-不写 `analysis.md`；不修改已有轮目录中的文件；不复制完整轨迹，只交付可回放的报告、证据与对照材料。
+不修改已有轮目录中的文件；不复制完整轨迹，只交付可回放的报告、证据与对照材料。
 
 ## 10. 禁止事项
 

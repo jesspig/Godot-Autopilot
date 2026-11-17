@@ -15,13 +15,11 @@
 
 > 本翻訳は英語版 [README.md](README.md) を正とします。
 
-Godot Autopilot (GDA) は、プラグインとして**Godotエディターの内部**に常駐する [MCP](https://modelcontextprotocol.io/) サーバーです。インストールすると、AIコーディングアシスタント（Claude Code、Cursor、Codex、OpenCode など）が、ユーザーと同じようにプロジェクトを操作できるようになります。シーンの構築、プロパティの調整、ゲームの実行、ボタンの押下、スクリーンショットの撮影、ログの読み取りを行い、その結果を見ながら反復改善します。ブリッジプロセスも、エラーをチャット欄にコピー＆ペーストする手間も不要です。グラフィカルなエディターセッションでは、サーバーはプロジェクトを開くと起動し、閉じると停止します。
+Godot Autopilot (GDA) は、プラグインとして**Godot エディターの内部**に常駐する [MCP](https://modelcontextprotocol.io/) サーバーです。インストールすると、AI コーディングアシスタント（Claude Code、Cursor、Codex、OpenCode など）がユーザーと同じようにプロジェクトを操作できます。シーンの構築、プロパティの調整、ゲームの実行、ボタンの押下、スクリーンショットの撮影、ログの読み取りを行い、その結果を見ながら反復改善します。ブリッジプロセスも、エラーをチャット欄にコピー＆ペーストする手間も不要です。グラフィカルなエディターセッションでは、サーバーはプロジェクトを開くと起動し、閉じると停止します。
 
 ![デモ 001](assets/demo-001.gif)
 
-エディターからゲーム実行までのループ全体をカバーする **252個のツール** を備えています（正確な数はバージョンごとに増えていきます。`search_tools` でエージェントに確認してください）。完全なツール面は [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md) を参照してください。
-
-スキルブックは **1 枚の入口スキルカードと 9 篇の references**。位置づけとして、MCP は主要な製品チャネルであり、スキルは体験レイヤーです。呼び出しガイドは、MCP が停止している場合に GDA CLI へフォールバックします。詳細は [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md) と [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) を参照してください。
+**252 個のツール**がエディターからゲーム実行までのループ全体をカバーします：246 個のドメインツール、5 個のメタツール、`system_status`（正確な数はバージョンごとに増えます。`search_tools` でエージェントに確認してください）。325 個の旧ツール名エイリアスは 0.6.0 まで `call_tool` で呼び出せます（実名ツールと重複する場合は実名ツールが優先）。スキルブックは **入口カード 1 枚と references 9 篇**で、呼び出しプロトコルをエージェントに教えます。MCP が停止している場合は GDA CLI へフォールバックします。参考：[ツール面](docs/wiki/tool_surface_baseline.md)、[スキル](docs/wiki/modules/skills.md)、[CLI](docs/wiki/modules/cli.md)。
 
 ## クイックスタート
 

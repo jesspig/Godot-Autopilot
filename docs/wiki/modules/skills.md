@@ -43,23 +43,23 @@ skills-zh/godot-autopilot/…（与 EN 同构）
 
 ## 词数预算
 
-| 文件 | 预算 | 当前（EN） |
-|---|---|---|
-| `SKILL.md` | 1,800 | 1,344 |
-| `references/setup.md` | 800 | 717 |
-| `references/tools.md` | 1,100 | 1,099 |
-| `references/scene-system.md` | 1,300 | 1,300 |
-| `references/scripting.md` | 900 | 900 |
-| `references/resources.md` | 900 | 898 |
-| `references/runtime.md` | 1,300 | 1,300 |
-| `references/content.md` | 800 | 797 |
-| `references/csharp.md` | 800 | 799 |
-| `references/servers.md` | 900 | 892 |
-| 合计 | 10,600 | 10,046 |
+| 文件 | 预算 |
+|---|---:|
+| `SKILL.md` | 1,800 |
+| `references/setup.md` | 800 |
+| `references/tools.md` | 1,100 |
+| `references/scene-system.md` | 1,300 |
+| `references/scripting.md` | 900 |
+| `references/resources.md` | 900 |
+| `references/runtime.md` | 1,300 |
+| `references/content.md` | 800 |
+| `references/csharp.md` | 800 |
+| `references/servers.md` | 900 |
+| 合计 | 10,600 |
 
 - 硬上限 12,000 词；单文件硬上限 2,000 词。
-- 统计口径：按空白分词（`split(/\s+/)`），代码块与正文同权；EN 与 ZH 同预算。
-- 新增或扩写 reference 时先改本表，再写内容；超预算优先删示例与重复段落。
+- 统计口径：按空白分词（`split(/\s+/)`），代码块与正文同权；EN 与 ZH 同预算。实测值随内容变化，不在文档内固化。
+- 新增或扩写 reference 时先核对预算，再写内容；超预算优先删示例与重复段落。
 
 ## 构建管线
 

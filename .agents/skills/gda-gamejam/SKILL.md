@@ -1,19 +1,18 @@
 ---
 name: gda-gamejam
-description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的比赛游戏（交付游戏，不评估工具）。何时用：做个游戏、开发游戏、Game Jam、抽题做游戏、游戏原型、实现这个主题、把 demo 做完、用 GDA 做游戏、写 SUBMISSION.md。不用于：端到端测试、测试 GDA 工具表现、记录工具缺陷（走 gda-e2e-testing）、根因分析（走 gda-e2e-analysis）。"
+description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的比赛游戏。何时用：做个游戏、开发游戏、Game Jam、抽题做游戏、游戏原型、实现这个主题、把 demo 做完、用 GDA 做游戏、写 SUBMISSION.md。"
 ---
 
 # GDA Game Jam
 
-用 GDA 把 Game Jam 主题做成完整、可运行、可提交的游戏。游戏质量、创意与交付完整度是唯一目标；工具问题只作为阻塞处理，不做工具评估。
+用 GDA 把 Game Jam 主题做成完整、可运行、可提交的游戏。游戏质量、创意与交付完整度是唯一目标；工具问题只作为阻塞处理。
 
-## 目标与非目标
+## 目标与边界
 
 - 目标：交付一款有明确钩子、核心循环可玩、视听完整、能现场运行的游戏。
 - 目标：按 `GAMEJAM.md` 的提交要求准备作品说明，作品能直接用于比赛提交。
-- 非目标：评估 GDA 工具、记录工具缺陷、写 `Q/S` 问题报告、做根因分析。
-- 非目标：修改 GDA 源码、`devtools/`、`cli/`、`tests/`、`docs/wiki/`、`AGENTS.md`、`VERSION`。
-- 非目标：修改用户固定维护的 `devtools/templates/gamejam/brief.md`。
+- 边界：不修改 GDA 源码、`devtools/`、`cli/`、`tests/`、`docs/wiki/`、`AGENTS.md`、`VERSION`。
+- 边界：不修改用户固定维护的 `devtools/templates/gamejam/brief.md`。
 
 ## 输入
 
@@ -138,9 +137,9 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 
 ## 11. 工具问题处理
 
-- 小问题：换参数、换等价工具、换实现路径，直接绕过；不记录、不分析、不写 `Q/S`。
+- 小问题：换参数、换等价工具、换实现路径，直接绕过。
 - 影响推进但可绕过：记一句在 `DEVLOG.md` 或最终交付说明里，继续做游戏。
-- 无法绕过且阻塞交付：停止，说明阻塞点、复现步骤与已尝试的替代路径；把根因分析留给用户决定是否另开会话。
+- 无法绕过且阻塞交付：停止，说明阻塞点、复现步骤与已尝试的替代路径，等待用户决定。
 - 不读 GDA 源码定位根因；不修改工具、文档、技能或测试。
 - 不把工具问题写进作品说明或评审自检；它们不是游戏内容。
 
@@ -149,7 +148,7 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 - 禁止在 intake（`examples/<主题>/project/`）中开发、部署或打开 Godot。
 - 禁止手工创建最终项目目录或手工拼 `<slug>-<hash8>`；必须使用 `jam create`。
 - 禁止在开发过程中再次调用 `jam` 或 `jam create`，禁止切换主题；一轮只抽一次题、只创建一个项目。
-- 禁止使用 `jam e2e`；`examples/e2e` 是端到端测试沙盒，不属于比赛项目。
+- 禁止使用 `jam e2e`；比赛项目只走 `jam create`。
 - 禁止绕过 GDA 手动编辑 Godot 工程文件（`*.tscn`、`*.tres`、`*.gd`、`project.godot` 等）；`jam create` 生成的骨架除外。
 - 禁止修改 `devtools/templates/gamejam/brief.md`、GDA 源码、`devtools/`、`cli/`、`tests/`、`docs/wiki/`、`AGENTS.md`、`VERSION`。
 - 禁止主动重启 Godot；引擎崩溃时停止并如实记录。

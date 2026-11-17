@@ -35,7 +35,7 @@ resource: src/
 
 - 领域工具失败返回 `{"error": "消息"}` JSON（构造经 `util::error_json`，成功结果经 `util::ok_result` 包 `result`，见 `src/util/error_util.hpp`；个别执行类响应另带 `error_details`/`structured_error` 诊断字段），`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
 - 命名契约：`get/fetch/load` 目标必存在否则抛异常；`find/search/query` 允许为空；`validate/check` 失败即抛；`apply/compute` 为纯函数
-- **C++ 抛动态消息（`std::string` 拼接结果或 `std::string` 局部量）一律用 `godot_autopilot::RuntimeError` / `InvalidArgument**（`src/util/owned_exception.hpp`：以成员 `std::string` 自持消息并覆写 `what()`，仍派生自 `std::runtime_error`／`std::invalid_argument`，既有 `catch (const std::runtime_error&)` 捕获点与 `EXPECT_THROW(..., std::runtime_error)` 断言无需改动）。原因：MSVC STL 的 `runtime_error(const std::string&)` 只把 `c_str()` 转交 `exception(const char*, int)`，后者原样保存指针、不做拷贝（`<stdexcept>`/`<exception>` 头文件实证），消息临时量在 throw 完整表达式结束即销毁、`std::string` 局部量在栈展开离开函数帧时销毁，`what()` 随之野悬，释放块被复用即读到乱码；libstdc++/libc++ 会拷贝消息，故仅 Windows 复现。10-19 CI `VariantJsonStrictTest.Rect2MissingSizeMessage` 实测复现（本地亦确定性复现），根因为我方代码长期潜伏的 UB，SDK 0.3.7 升级只改变堆布局使其显性化；纯字面量消息为静态存储期、无此风险，可继续用 `std::` 原类型（`src/core/command_queue.hpp` 即如此）
+- **C++ 抛动态消息（`std::string` 拼接结果或局部量）一律用 `godot_autopilot::RuntimeError` / `InvalidArgument`**（`src/util/owned_exception.hpp`：以成员 `std::string` 自持消息并覆写 `what()`，仍派生自 `std::runtime_error`／`std::invalid_argument`，既有 catch 与 `EXPECT_THROW(..., std::runtime_error)` 断言无需改动）。原因：MSVC STL 的 `runtime_error(const std::string&)` 只保存 `c_str()` 指针、不拷贝，消息临时量或局部量销毁后 `what()` 悬空；libstdc++/libc++ 会拷贝，故仅 Windows 复现。10-19 CI `VariantJsonStrictTest.Rect2MissingSizeMessage` 实测复现，根因为长期潜伏的 UB，SDK 0.3.7 升级只改变堆布局使其显性化。纯字面量消息为静态存储期，可继续用 `std::` 原类型（如 `src/core/command_queue.hpp`）。
 
 ## 线程纪律
 
@@ -49,7 +49,7 @@ resource: src/
 `ToolRegistry` 单一来源 + 全量 `ToolSpec` 数据记录（无 `tool_defs.def`、无宏/真类；设计见 [tool_base_design.md](tool_base_design.md)）：
 
 1. `src/tools/domains/<域>/<域>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
-2. `src/tools/domains/<域>/<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状必须知道：`Args(raw, kXxxParams)` 取参器（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()`）**已实现且有 单元测试 覆盖，但 `src/` 下没有任何领域 handler 接入**（除 `tool_args.cpp` 自身，全仓 0 处 include）；在架 handler 一律 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`（`util::error_json` 在 `src/tools/*.cpp` 实测 759 行、`util::ok_result` 46 行）。35 个域的 handler 全部走 `args.Find(...)`。新增工具跟随所在域邻居的写法，不要在已用 `args.Find` 的文件里混入 `Args`，否则同一文件两种取参风格并存
+2. `src/tools/domains/<域>/<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状：`Args(raw, kXxxParams)` 取参器（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()`）已实现且有单元测试，但 `src/` 下无领域 handler 接入（除 `tool_args.cpp` 自身，全仓 0 处 include）；在架 handler 一律用 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`，35 个域均如此。新增工具跟随所在域邻居的写法，不要在已用 `args.Find` 的文件里混入 `Args`，避免同一文件两种取参风格并存
 3. 该域 `src/tools/domains/<域>/<域>_tools.hpp`：定义 `const std::vector<ParamSpec> kXxxParams = {...}` 参数表，并在 `make_tools()` 中以 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))` 一行注册——`register_all.cpp` 经各域 `make_tools()` 自动注册，无需手改；schema 从参数表自动派生（仅嵌套结构才用 `raw_schema` 手写 JSON）
 4. `side_effect`（`SideEffect` 枚举选值）与 `flags`（如 `kMutating`）按工具实际影响声明；合成输入类可加 `kObserve` 复用执行管线的截图后处理
 5. 仅新增 `.cpp` 才需动根侧登记（header-only 无需；**所有**新增 `.cpp` 都要登记——根 `CMakeLists.txt` 直列条目或 `cmake/sources/*.cmake` 清单二选一，Unity 构建只编译列出的文件）；迁移守卫 `tests/guard/` 拒绝旧宏（`GDA_TOOL_CLASS` 等）与 `schema_*_ops.cpp` 残留

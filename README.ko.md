@@ -15,13 +15,11 @@
 
 > 이 번역은 영문 [README.md](README.md)를 기준으로 합니다.
 
-Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주하는 [MCP](https://modelcontextprotocol.io/) 서버입니다. 설치하고 나면 AI 코딩 어시스턴트(Claude Code, Cursor, Codex, OpenCode 등)가 사용자와 똑같은 방식으로 프로젝트를 다룰 수 있습니다. 씬을 만들고, 속성을 조정하고, 게임을 실행하고, 버튼을 누르고, 스크린샷을 찍고, 로그를 읽은 다음, 확인한 내용을 바탕으로 계속 반복 개선합니다. 브리지 프로세스도 없고, 오류를 채팅창에 복사해 붙여넣을 필요도 없습니다. 그래픽 에디터 세션에서는 프로젝트를 열면 서버가 시작되고, 프로젝트를 닫으면 서버가 중지됩니다.
+Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주하는 [MCP](https://modelcontextprotocol.io/) 서버입니다. 설치하면 AI 코딩 어시스턴트(Claude Code, Cursor, Codex, OpenCode 등)가 사용자와 똑같은 방식으로 프로젝트를 다룹니다. 씬을 만들고, 속성을 조정하고, 게임을 실행하고, 버튼을 누르고, 스크린샷을 찍고, 로그를 읽은 다음, 확인한 내용을 바탕으로 계속 반복 개선합니다. 브리지 프로세스도 없고, 오류를 채팅창에 복사해 붙여넣을 필요도 없습니다. 그래픽 에디터 세션에서는 프로젝트를 열면 서버가 시작되고, 프로젝트를 닫으면 서버가 중지됩니다.
 
 ![Demo 001](assets/demo-001.gif)
 
-**252개의 도구**가 에디터에서 게임까지 이어지는 전체 루프를 아우릅니다(정확한 개수는 버전마다 늘어나므로, `search_tools`로 에이전트에게 확인하도록 요청하세요). 전체 도구 면은 [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md)를 참조하세요.
-
-스킬북은 **진입 스킬 카드 1장과 references 9편**. 포지셔닝: MCP가 주 제품 채널이고, 스킬은 경험 계층이며, 호출 가이드는 MCP가 중단되었을 때 GDA CLI로 대체됩니다. 자세한 내용은 [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md)와 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)를 참조하세요.
+**252개의 도구**가 에디터에서 게임까지 이어지는 전체 루프를 아우릅니다: 도메인 도구 246개, 메타 도구 5개, `system_status`(정확한 개수는 버전마다 늘어나므로 `search_tools`로 에이전트에게 확인하도록 요청하세요). 325개의 이전 도구 이름 별칭은 0.6.0까지 `call_tool`로 호출할 수 있습니다(실제 도구와 이름이 겹치면 실제 도구가 우선). 스킬북은 **진입 카드 1장과 references 9편**으로 호출 프로토콜을 가르칩니다. MCP가 중단되면 GDA CLI로 대체합니다. 참고: [도구 면](docs/wiki/tool_surface_baseline.md), [스킬](docs/wiki/modules/skills.md), [CLI](docs/wiki/modules/cli.md).
 
 ## 빠른 시작
 

@@ -15,13 +15,11 @@
 
 > 本翻譯以英文版 [README.md](README.md) 為準。
 
-Godot Autopilot（GDA）是一個以插件形式**常駐於 Godot 編輯器內部**的 [MCP](https://modelcontextprotocol.io/) 伺服器。安裝完成後，你的 AI 程式設計助理（Claude Code、Cursor、Codex、OpenCode 等）就能像你一樣操作專案：建置場景、調整屬性、執行遊戲、按下按鈕、截圖，並讀取日誌——再依據所見結果反覆迭代。不需要橋接程序，也不必把錯誤訊息複製貼到聊天視窗。在圖形化編輯器工作階段中，伺服器會隨專案開啟而啟動、隨專案關閉而停止。
+Godot Autopilot（GDA）是以插件形式**常駐於 Godot 編輯器內部**的 [MCP](https://modelcontextprotocol.io/) 伺服器。安裝後，AI 程式設計助理（Claude Code、Cursor、Codex、OpenCode 等）能像你一樣操作專案：建置場景、調整屬性、執行遊戲、按下按鈕、截圖、讀取日誌，再依據所見結果反覆迭代。不需要橋接程序，也不必把錯誤訊息複製到聊天視窗。圖形化編輯器工作階段中，伺服器隨專案開啟而啟動、隨專案關閉而停止。
 
 ![Demo 001](assets/demo-001.gif)
 
-**252 個工具**，涵蓋從編輯器到遊戲的完整閉環（實際數量隨版本成長——請代理透過 `search_tools` 查詢）；完整工具面見 [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md)。
-
-外掛內建 **1 張入口技能卡與 9 篇 references**。定位：MCP 是主要產品通道，技能書是體驗層；當 MCP 無法使用時，呼叫指南會改走 GDA CLI。完整參考見 [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md) 與 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)。
+**252 個工具**涵蓋從編輯器到遊戲的完整閉環：246 個領域工具 + 5 個元工具 + `system_status`（實際數量隨版本成長，請代理透過 `search_tools` 查詢）。325 條舊工具名別名在 0.6.0 前可經 `call_tool` 呼叫（與實名工具重名者以實名工具優先）。外掛內建 **1 張入口技能卡與 9 篇 references**，教代理依呼叫協定執行；MCP 無法使用時改走 GDA CLI。參考：[工具面](docs/wiki/tool_surface_baseline.md)、[技能](docs/wiki/modules/skills.md)、[CLI](docs/wiki/modules/cli.md)。
 
 ## 快速開始
 

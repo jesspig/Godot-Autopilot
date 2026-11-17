@@ -6,7 +6,7 @@ Godot Autopilot（GDA）项目指令。项目事实、数值口径与文档维�
 
 - 构建：`bun run gda-dev-tools build`；部署：`bun run gda-dev-tools deploy`。子命令 `package` / `package-check` / `clean` / `test` / `jam` / `tui` 及参数见 `docs/wiki/build.md`。
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`；无 ninja 时改用 `debug-portable` / `release-portable`。
-- 快速验证：`ctest --preset debug`（单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖）；CLI 单测 `bun test cli/tests`。
+- 快速验证：`ctest --preset debug`（单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖；无 ninja 用 `ctest --preset debug-portable`）；CLI 单测 `bun test cli/tests`。
 - 升版同步根 `VERSION`、`cli/src/version.ts`、`cli/assets/skills.json`，随后重新 configure。
 
 ## 硬约束

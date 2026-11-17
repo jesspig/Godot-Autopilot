@@ -1,6 +1,6 @@
 ---
 name: gda-e2e-analysis
-description: "报告产出后分析失败项并实施增强优化的离线阶段。何时用：分析最新端到端报告、根因分析、失败项分析、评估报告建议 S<n>、GDExtension 测试失败、实施增强优化、MCP 同类工具调研、写 analysis.md。不用于：执行端到端测试或产出报告（走 gda-e2e-testing）、无报告时凭印象分析。"
+description: "报告产出后分析失败项并实施增强优化的离线阶段。何时用：分析最新端到端报告、根因分析、失败项分析、评估报告建议 S<n>、GDExtension 测试失败、实施增强优化、MCP 同类工具调研、写 analysis.md。"
 ---
 
 # 端到端报告根因分析与优化
@@ -150,7 +150,7 @@ description: "报告产出后分析失败项并实施增强优化的离线阶段
    - `bun run gda-dev-tools build`
    - `ctest --preset debug -L "guard|unit|boundary"`（守卫 + 单元 + 边界，秒级）
    - 涉及 CLI 时 `bun test cli/tests`
-   - 涉及引擎内行为时，把最小复现写入报告「待下一轮端到端验证项」，交由 `gda-e2e-testing` 执行；仓库内已无引擎测试轨
+   - 涉及引擎内行为时，把最小复现写入报告「待下一轮端到端验证项」，交由后续端到端测试执行；仓库内已无引擎测试轨
 8. 不重跑整轮端到端测试；需要复现失败时只做最小复现，并在报告中标注。把改变工具行为的项列入「待下一轮端到端验证」。
 9. 记录验证证据：构建输出、测试通过数、关键日志、`git diff HEAD`。
 10. 保留变更文件清单与 diff；回滚前取得用户确认。
@@ -166,7 +166,7 @@ description: "报告产出后分析失败项并实施增强优化的离线阶段
 
 ## 文件契约（自包含）
 
-只通过文件系统与端到端产物配合；不依赖任何其他技能。输入输出、编号与候选集规则见 §1、§8、§9 及 [references/analysis-report-template.md](references/analysis-report-template.md)。
+只通过文件系统与端到端产物配合。输入输出、编号与候选集规则见 §1、§8、§9 及 [references/analysis-report-template.md](references/analysis-report-template.md)。
 
 本阶段阅读 GDA 源码、MCP SDK 与 GDExtension API 的 C++ 绑定源码、`docs/wiki/` 与外部资料；测试阶段只提供报告与证据。`report.md`、`evidence.md`、`img/` 只读，不删除或覆盖已有轮目录。
 

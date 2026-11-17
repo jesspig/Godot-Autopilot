@@ -19,7 +19,7 @@ resource: src/tools/
 
 ## 注册管线流程
 
-工具注册发生在 `register_all_tools()`（`src/tools/base/register_all.cpp`），唯一来源是 `ToolRegistry`：**246 个域工具 + `system_status` + 5 个元工具 = catalog 252 条**，全部为 `ToolSpec` 数据记录（`make_spec_tool` → `SpecTool`，见 [ToolSpec 数据层与执行管线](../tool_base_design.md)）。域工具定义在 `src/tools/domains/<域>/<域>_tools.hpp`（35 个域文件，共 246 条 `ToolSpec`），每域提供 `make_tools()` 返回 `vector<unique_ptr<ToolBase>>`；每个工具 = 参数表 `const std::vector<ParamSpec>` + 一行 `make_spec_tool(ToolSpec{...})`。
+工具注册发生在 `register_all_tools()`（`src/tools/base/register_all.cpp`），唯一来源是 `ToolRegistry`：**246 个域工具 + `system_status` + 5 个元工具 = catalog 252 条**，全部为 `ToolSpec` 数据记录（`make_spec_tool` → `SpecTool`，见 [ToolSpec 数据层与执行管线](../tool_base_design.md)）。域工具定义在 `src/tools/domains/<域>/<域>_tools.hpp`（35 个域文件，共 246 条 `ToolSpec`），每域 `make_tools()` 返回 `vector<unique_ptr<ToolBase>>`；每个工具 = `const std::vector<ParamSpec>` 参数表 + 一行 `make_spec_tool(ToolSpec{...})`。
 
 `build_registry()` 的注册顺序固定：先 add `system_status`（`kHealthProbe`），再逐域注册 35 个 `make_tools()`，再 add 5 个元工具（`flags = kMeta` 自动归入 meta 表），最后追加 `dynamic_specs::store()` 中的用户脚本工具（`kDynamic`）。`refresh_derived()` 从 registry 派生 catalog、BM25 索引与 dispatch handlers。
 
