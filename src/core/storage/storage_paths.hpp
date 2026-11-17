@@ -8,6 +8,7 @@ namespace godot_autopilot {
 class StoragePaths {
 public:
   static std::string global_config_path();
+  static std::string task_dir();
   static std::string project_dir(const std::string &project_path);
   static std::string project_config_path(const std::string &project_path);
   static std::string log_dir(const std::string &project_path);
