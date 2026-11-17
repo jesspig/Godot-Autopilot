@@ -29,7 +29,7 @@ description: 新增、删除、移动 C++ 编译单元时做 CMake 双登记与�
 
 ## 验证
 
-- 执行 `py -3 tests/guard/comment_guard.py`，预期 `comment-guard OK`。
+- 执行 `ctest --preset debug -R comment_guard`，预期 `comment-guard OK`。
 - 执行 `ctest --preset debug -R migration_guard`，预期 `OK` 且域数为当前清单值。
 - 执行 `ctest --preset debug -E "^gda_runner_"`，预期全绿；总数以 `docs/wiki/tests.md` 数值核算总表为准，不硬编码。
 - 用 `git diff HEAD` 确认真实变更，忽略 CRLF 伪变更。

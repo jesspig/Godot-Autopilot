@@ -1,6 +1,6 @@
 ---
 name: gda-e2e-analysis
-description: "读取 report/ 最新一轮端到端测试报告，对失败项做 MCP SDK→插件→GDExtension API 的 C++ 绑定的全链路根因分析，逐条评估建议，调研 MCP 同类工具，并在授权后实施增强优化；触发词：分析最新端到端报告、根因分析、失败项分析、评估报告建议、GDExtension 测试失败、实施优化、MCP 同类工具调研、优化报告。"
+description: "读取 report/ 最新一轮端到端测试报告，对失败项做 MCP SDK→插件→GDExtension API 的 C++ 绑定的全链路根因分析，逐条评估建议，调研 MCP 同类工具，并在授权后实施增强优化；触发词：分析最新端到端报告、根因分析、失败项分析、评估报告建议、GDExtension 测试失败、实施优化、MCP 同类工具调研、优化报告；仅用于报告产出后的分析阶段，不用于执行端到端测试（走 gda-e2e-testing）。"
 ---
 
 # 端到端报告根因分析与优化
@@ -150,7 +150,7 @@ description: "读取 report/ 最新一轮端到端测试报告，对失败项做
    - `bun run gda-dev-tools build`
    - `ctest --preset debug -L "guard|unit|boundary"`（守卫 + 单元 + 边界，秒级）
    - 涉及 CLI 时 `bun test cli/tests`
-   - 涉及引擎内行为时 `ctest --preset debug -R "^gda_runner_"`（需要 `GODOT_PATH`）
+   - 涉及引擎内行为时，把最小复现写入报告「待下一轮端到端验证项」，交由 `gda-e2e-testing` 执行；仓库内已无引擎测试轨
 8. 不重跑整轮端到端测试；需要复现失败时只做最小复现，并在报告中标注。把改变工具行为的项列入「待下一轮端到端验证」。
 9. 记录验证证据：构建输出、测试通过数、关键日志、`git diff HEAD`。
 10. 保留变更文件清单与 diff；回滚前取得用户确认。
