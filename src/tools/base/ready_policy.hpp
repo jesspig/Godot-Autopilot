@@ -22,6 +22,18 @@ inline ReadyDecision decide_game_request(int ready_session_count,
                     : ReadyDecision::FailNotReady;
 }
 
+inline bool should_queue_for_ready(ReadyDecision decision, bool wait_ready,
+                                   bool editor_playing_scene) {
+  if (decision == ReadyDecision::QueueForReady)
+    return true;
+  return decision == ReadyDecision::FailNotRunning && wait_ready &&
+         editor_playing_scene;
+}
+
+inline bool is_broadcast_eligible(bool session_ready, bool scene_ready) {
+  return session_ready && scene_ready;
+}
+
 } // namespace godot_autopilot
 
 #endif
