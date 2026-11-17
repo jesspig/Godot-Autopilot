@@ -2,6 +2,7 @@
 #include "tools/base/tool_invoke.hpp"
 #include "util/scene_path.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/domains/property/property_ops.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
@@ -712,6 +713,7 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
     if (!parent) {
       mcp::JsonValue e = spec_error("parent node not found: " + parent_path +
                                     " — " + hint);
+      e = startup_gated_error(editor_in_startup_window(), e);
       e["rolled_back"] = mcp::JsonValue(false);
       return e;
     }

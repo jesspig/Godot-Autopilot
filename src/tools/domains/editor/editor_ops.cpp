@@ -1038,7 +1038,7 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
     e["error"] = mcp::JsonValue(
         "failed to start scene playback: no game process started — ensure the "
         "current scene is saved and runnable");
-    return e;
+    return startup_gated_error(editor_in_startup_window(), e);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");

@@ -4,6 +4,7 @@
 #include "util/scene_verify.hpp"
 #include "util/project_path.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "tools/domains/property/property_ops.hpp"
@@ -794,7 +795,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
       e["error"] = mcp::JsonValue("parent node not found: " + parent_path +
                                   " — " + hint);
-      return e;
+      return startup_gated_error(editor_in_startup_window(), e);
     }
     parent->add_child(obj);
     auto *scene_root = editor->get_edited_scene_root();

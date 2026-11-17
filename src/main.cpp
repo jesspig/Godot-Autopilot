@@ -21,6 +21,7 @@
 
 #include "core/command_queue.hpp"
 #include "core/transport/ipc_transport.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/export_guard.hpp"
 #include "core/storage/gda_home.hpp"
 #include "core/transport/http_transport_ext.hpp"
@@ -189,6 +190,7 @@ void GodotAutopilotPlugin::_enter_tree() {
   using godot_autopilot::LogLevel;
 
   godot_autopilot::monitor::lifecycle("plugin_enter_tree");
+  godot_autopilot::note_editor_startup();
   set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
   s_queue.open();
   godot_autopilot::perf_sampler::set_queue(&GodotAutopilotPlugin::queue());
