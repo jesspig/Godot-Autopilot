@@ -65,12 +65,13 @@ export type JamProjectRecord = {
 };
 
 export type JamOptions = {
-  action: "draw" | "create" | "list" | "projects" | "index";
+  action: "draw" | "create" | "list" | "projects" | "index" | "e2e";
   theme: string | null;
   name: string | null;
   slug: string | null;
   out: string | null;
   json: boolean;
+  reset?: boolean;
   random?: () => number;
   now?: () => Date;
   examplesDir?: string;
@@ -106,6 +107,8 @@ const MAX_SLUG_LENGTH = 40;
 const MAX_PROJECT_NAME_LENGTH = 80;
 const INTAKE_DIRECTORY = "project";
 const INTAKE_PROJECT_NAME = "project";
+const E2E_DIRECTORY = "e2e";
+const E2E_PROJECT_NAME = "e2e";
 const PROJECT_FILE = "project.godot";
 const BRIEF_FILE = "GAMEJAM.md";
 const BRIEF_REQUIRED_PLACEHOLDERS = ["theme", "source", "keywords", "concept_ideas"] as const;
@@ -773,6 +776,99 @@ function writeProjectIndex(examplesDir: string, projects: readonly JamProjectRec
   return indexPath;
 }
 
+function runE2e(
+  themes: readonly GameJamTheme[],
+  options: JamOptions,
+  examplesDir: string,
+  random: () => number,
+  now: () => Date,
+): number {
+  const e2eDir = path.join(examplesDir, E2E_DIRECTORY);
+  const existed = fs.existsSync(e2eDir);
+  const previous = existed ? readJamMetadata(e2eDir) : null;
+  if (existed && previous?.kind !== "e2e") {
+    throw new JamUsageError(
+      `refusing to ${options.reset === true ? "reset" : "overwrite"} non-e2e directory: ${e2eDir}`,
+    );
+  }
+  const isReset = existed && options.reset === true;
+  const isNew = !existed || isReset;
+  const previousCreatedAt =
+    previous !== null && typeof previous.created_at === "string" ? previous.created_at : null;
+  const createdAt = isNew ? now().toISOString() : previousCreatedAt ?? now().toISOString();
+  const theme =
+    options.theme === null
+      ? pickTheme(themes, new Set(), random)
+      : findTheme(themes, options.theme);
+  const sample = sampleTheme(theme, random, now);
+  const briefTemplate = loadTextFile(BRIEF_TEMPLATE_PATH, "Game Jam template");
+  if (isReset) fs.rmSync(e2eDir, { recursive: true, force: true });
+  fs.mkdirSync(e2eDir, { recursive: true });
+  try {
+    const projectFile = path.join(e2eDir, PROJECT_FILE);
+    if (!fs.existsSync(projectFile)) {
+      fs.writeFileSync(projectFile, renderProjectGodot(E2E_PROJECT_NAME), "utf8");
+    }
+    fs.writeFileSync(
+      path.join(e2eDir, BRIEF_FILE),
+      renderBrief(briefTemplate, theme, sample),
+      "utf8",
+    );
+    writeJsonFile(path.join(e2eDir, JAM_METADATA_FILE), {
+      schema_version: THEME_SCHEMA_VERSION,
+      kind: "e2e",
+      name: E2E_PROJECT_NAME,
+      slug: E2E_PROJECT_NAME,
+      theme_id: theme.id,
+      theme: theme.theme,
+      organizer: theme.organizer,
+      event: theme.event,
+      edition: theme.edition,
+      year: theme.year,
+      source: theme.source,
+      source_url: theme.source_url,
+      ...(theme.source_title === undefined ? {} : { source_title: theme.source_title }),
+      ...(theme.rules_url === undefined ? {} : { rules_url: theme.rules_url }),
+      tags: theme.tags,
+      design_constraints: theme.design_constraints,
+      sampled: {
+        keywords: sample.keywords,
+        concept_ideas: sample.concept_ideas,
+      },
+      draw_id: sample.draw_id,
+      drawn_at: sample.drawn_at,
+      created_at: createdAt,
+      updated_at: now().toISOString(),
+    });
+  } catch (error) {
+    if (isNew) fs.rmSync(e2eDir, { recursive: true, force: true });
+    throw error;
+  }
+  const relativePath = toProjectRelativePath(e2eDir);
+  if (options.json) {
+    writeJson({
+      ok: true,
+      kind: "e2e",
+      theme_id: theme.id,
+      theme: theme.theme,
+      source: theme.source,
+      path: e2eDir,
+      relative_path: relativePath,
+      draw_id: sample.draw_id,
+      reset: isReset,
+      sampled_keyword_count: sample.keywords.length,
+      sampled_concept_idea_count: sample.concept_ideas.length,
+    });
+  } else {
+    writeLine(`[JAM] e2e project: ${relativePath}`);
+    writeLine(`[JAM] theme: ${theme.theme} (${theme.source})`);
+    writeLine(
+      `[JAM] next: bun run gda-dev-tools build && bun run gda-dev-tools deploy --project ${relativePath}`,
+    );
+  }
+  return 0;
+}
+
 function runDraw(
   themes: readonly GameJamTheme[],
   options: JamOptions,
@@ -876,6 +972,9 @@ export function runJam(options: JamOptions): number {
         writeLine(`[JAM] index: ${relativePath} (${projects.length} projects)`);
       }
       return 0;
+    }
+    if (options.action === "e2e") {
+      return runE2e(themes, options, examplesDir, random, now);
     }
     if (options.action === "create") {
       return runCreate(themes, options, examplesDir, now);

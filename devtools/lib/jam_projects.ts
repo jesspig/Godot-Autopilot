@@ -24,6 +24,10 @@ export function isJamIntake(dir: string): boolean {
   return readJamMetadata(dir)?.kind === "intake";
 }
 
+export function isE2eProject(dir: string): boolean {
+  return readJamMetadata(dir)?.kind === "e2e";
+}
+
 function isGodotProject(dir: string): boolean {
   return fs.existsSync(path.join(dir, "project.godot"));
 }
@@ -33,7 +37,7 @@ export function discoverProjectsIn(root: string): string[] {
   const walk = (dir: string, depth: number): void => {
     if (depth > 4) return;
     if (isGodotProject(dir)) {
-      if (!isJamIntake(dir)) projects.push(dir);
+      if (!isJamIntake(dir) && !isE2eProject(dir)) projects.push(dir);
       return;
     }
     let entries: fs.Dirent[];

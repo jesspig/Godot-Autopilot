@@ -527,6 +527,288 @@ describe("intake and project creation", () => {
   });
 });
 
+describe("e2e project", () => {
+  test("creates a fixed e2e project and refreshes it without losing the project", () => {
+    const themes = loadThemes();
+    const firstTheme = themes[0];
+    const secondTheme = themes[1];
+    const firstNow = () => new Date("2026-11-17T00:00:00Z");
+
+    const firstCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "e2e",
+          theme: firstTheme.id,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          reset: false,
+          examplesDir: tmp,
+          random: () => 0.1,
+          now: firstNow,
+        }),
+      ).toBe(0);
+    } finally {
+      firstCapture.restore();
+    }
+    const first = JSON.parse(firstCapture.read()) as {
+      path: string;
+      kind: string;
+      theme_id: string;
+      reset: boolean;
+    };
+    const e2eDir = path.join(tmp, "e2e");
+    expect(first.kind).toBe("e2e");
+    expect(first.reset).toBe(false);
+    expect(first.theme_id).toBe(firstTheme.id);
+    expect(first.path).toBe(e2eDir);
+    expect(fs.readFileSync(path.join(e2eDir, "project.godot"), "utf8")).toContain(
+      'config/name="e2e"',
+    );
+    const metadataBefore = JSON.parse(
+      fs.readFileSync(path.join(e2eDir, "jam.json"), "utf8"),
+    ) as {
+      kind: string;
+      name: string;
+      slug: string;
+      created_at: string;
+      draw_id: string;
+      sampled: { keywords: string[] };
+    };
+    expect(metadataBefore.kind).toBe("e2e");
+    expect(metadataBefore.name).toBe("e2e");
+    expect(metadataBefore.slug).toBe("e2e");
+    expect(metadataBefore.sampled.keywords.length).toBeGreaterThanOrEqual(3);
+    const briefBefore = fs.readFileSync(path.join(e2eDir, "GAMEJAM.md"), "utf8");
+    const sentinel = path.join(e2eDir, "sentinel.txt");
+    fs.writeFileSync(sentinel, "keep", "utf8");
+
+    const secondCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "e2e",
+          theme: secondTheme.id,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          reset: false,
+          examplesDir: tmp,
+          random: () => 0.9,
+          now: () => new Date("2026-11-17T00:00:01Z"),
+        }),
+      ).toBe(0);
+    } finally {
+      secondCapture.restore();
+    }
+    const briefAfter = fs.readFileSync(path.join(e2eDir, "GAMEJAM.md"), "utf8");
+    const metadataAfter = JSON.parse(
+      fs.readFileSync(path.join(e2eDir, "jam.json"), "utf8"),
+    ) as { created_at: string; draw_id: string; theme_id: string };
+    expect(briefAfter).not.toBe(briefBefore);
+    expect(metadataAfter.draw_id).not.toBe(metadataBefore.draw_id);
+    expect(metadataAfter.theme_id).toBe(secondTheme.id);
+    expect(metadataAfter.created_at).toBe(metadataBefore.created_at);
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("keep");
+  });
+
+  test("resets the e2e project and refuses non-e2e directories", () => {
+    const themes = loadThemes();
+    expect(
+      runJam({
+        action: "e2e",
+        theme: themes[0].id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        reset: false,
+        examplesDir: tmp,
+        random: () => 0.1,
+        now: () => new Date("2026-11-17T00:00:00Z"),
+      }),
+    ).toBe(0);
+    const e2eDir = path.join(tmp, "e2e");
+    const sentinel = path.join(e2eDir, "sentinel.txt");
+    fs.writeFileSync(sentinel, "keep", "utf8");
+
+    expect(
+      runJam({
+        action: "e2e",
+        theme: themes[1].id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        reset: true,
+        examplesDir: tmp,
+        random: () => 0.9,
+        now: () => new Date("2026-11-17T01:00:00Z"),
+      }),
+    ).toBe(0);
+    expect(fs.existsSync(sentinel)).toBe(false);
+    const metadata = JSON.parse(
+      fs.readFileSync(path.join(e2eDir, "jam.json"), "utf8"),
+    ) as { created_at: string; kind: string };
+    expect(metadata.kind).toBe("e2e");
+    expect(metadata.created_at).toBe("2026-11-17T01:00:00.000Z");
+
+    fs.rmSync(e2eDir, { recursive: true, force: true });
+    fs.mkdirSync(e2eDir, { recursive: true });
+    fs.writeFileSync(path.join(e2eDir, "project.godot"), 'config/name="real"\n', "utf8");
+    fs.writeFileSync(
+      path.join(e2eDir, "jam.json"),
+      `${JSON.stringify({ schema_version: 2, kind: "project" }, null, 2)}\n`,
+      "utf8",
+    );
+    const protectedSentinel = path.join(e2eDir, "sentinel.txt");
+    fs.writeFileSync(protectedSentinel, "keep", "utf8");
+
+    expect(
+      runJam({
+        action: "e2e",
+        theme: themes[0].id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        reset: false,
+        examplesDir: tmp,
+        random: () => 0.1,
+        now: () => new Date("2026-11-17T02:00:00Z"),
+      }),
+    ).toBe(2);
+    expect(
+      runJam({
+        action: "e2e",
+        theme: themes[0].id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        reset: true,
+        examplesDir: tmp,
+        random: () => 0.1,
+        now: () => new Date("2026-11-17T02:00:00Z"),
+      }),
+    ).toBe(2);
+    expect(fs.readFileSync(protectedSentinel, "utf8")).toBe("keep");
+  });
+
+  test("keeps e2e projects out of the competition index and used themes", () => {
+    const themes = loadThemes();
+    const competitionTheme = themes[0];
+    const e2eTheme = themes[1];
+    const now = () => new Date("2026-11-17T00:00:00Z");
+
+    expect(
+      runJam({
+        action: "draw",
+        theme: competitionTheme.id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        random: () => 0.1,
+        now,
+      }),
+    ).toBe(0);
+    expect(
+      runJam({
+        action: "create",
+        theme: competitionTheme.id,
+        name: "Neon Shift",
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+        now,
+      }),
+    ).toBe(0);
+    expect(
+      runJam({
+        action: "e2e",
+        theme: e2eTheme.id,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        reset: false,
+        examplesDir: tmp,
+        random: () => 0.9,
+        now,
+      }),
+    ).toBe(0);
+
+    const projects = scanJamProjects(tmp);
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.theme_id).toBe(competitionTheme.id);
+
+    const projectsCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "projects",
+          theme: null,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+        }),
+      ).toBe(0);
+    } finally {
+      projectsCapture.restore();
+    }
+    const listedProjects = JSON.parse(projectsCapture.read()) as {
+      projects: Array<{ theme_id: string }>;
+    };
+    expect(listedProjects.projects).toHaveLength(1);
+    expect(listedProjects.projects[0]?.theme_id).toBe(competitionTheme.id);
+
+    const themesCapture = captureStdout();
+    try {
+      expect(
+        runJam({
+          action: "list",
+          theme: null,
+          name: null,
+          slug: null,
+          out: null,
+          json: true,
+          examplesDir: tmp,
+        }),
+      ).toBe(0);
+    } finally {
+      themesCapture.restore();
+    }
+    const listedThemes = JSON.parse(themesCapture.read()) as {
+      themes: Array<{ id: string; used: boolean }>;
+    };
+    expect(listedThemes.themes.find((item) => item.id === competitionTheme.id)?.used).toBe(true);
+    expect(listedThemes.themes.find((item) => item.id === e2eTheme.id)?.used).toBe(false);
+
+    expect(
+      runJam({
+        action: "index",
+        theme: null,
+        name: null,
+        slug: null,
+        out: null,
+        json: false,
+        examplesDir: tmp,
+      }),
+    ).toBe(0);
+    const index = fs.readFileSync(path.join(tmp, "INDEX.md"), "utf8");
+    expect(index).toContain("Neon Shift");
+    expect(index).not.toContain("(e2e)");
+  });
+});
+
 describe("collection", () => {
   test("scans projects, marks used themes, lists projects and writes an index", () => {
     const theme = loadThemes()[0];

@@ -22,6 +22,7 @@ const USAGE = [
   "  audit-tools              [--json|--baseline|--target] [--report [--json] [--out <file>]]",
   "  jam                      [--theme <id|theme>] [--json]",
   "  jam create               --theme <id|theme> --name <name> [--slug <slug>] [--out <dir>] [--json]",
+  "  jam e2e                  [--reset] [--theme <id|theme>] [--json]",
   "  jam list                 [--projects] [--json]",
   "  jam index                [--json]",
   "  tui",
@@ -172,10 +173,16 @@ function parseJam(args: string[]): JamOptions {
     slug: null,
     out: null,
     json: false,
+    reset: false,
   };
   let cursor = 0;
   const subcommand = args[0];
-  if (subcommand === "create" || subcommand === "list" || subcommand === "index") {
+  if (
+    subcommand === "create" ||
+    subcommand === "e2e" ||
+    subcommand === "list" ||
+    subcommand === "index"
+  ) {
     options.action = subcommand;
     cursor = 1;
   }
@@ -183,7 +190,12 @@ function parseJam(args: string[]): JamOptions {
   for (let index = cursor; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--json") options.json = true;
-    else if (arg === "--list") {
+    else if (arg === "--reset") {
+      if (options.action !== "e2e") {
+        throw new UsageError("jam: --reset is only valid for jam e2e");
+      }
+      options.reset = true;
+    } else if (arg === "--list") {
       if (options.action !== "draw") throw new UsageError("jam: --list is only valid for jam");
       options.action = "list";
     } else if (arg === "--projects") {
@@ -216,6 +228,10 @@ function parseJam(args: string[]): JamOptions {
   } else if (options.action === "create") {
     if (options.theme === null || options.name === null) {
       throw new UsageError("jam create: --theme and --name are required");
+    }
+  } else if (options.action === "e2e") {
+    if (options.name !== null || options.slug !== null || options.out !== null) {
+      throw new UsageError("jam e2e: --name, --slug and --out are not valid");
     }
   } else if (options.theme !== null || options.name !== null || options.slug !== null || options.out !== null) {
     throw new UsageError(`jam ${options.action}: --theme, --name, --slug and --out are not valid`);

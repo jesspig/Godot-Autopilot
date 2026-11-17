@@ -4,6 +4,7 @@ import path from "node:path";
 
 import {
   discoverProjectsIn,
+  isE2eProject,
   isJamIntake,
   readJamMetadata,
 } from "../../devtools/lib/jam_projects";
@@ -20,7 +21,7 @@ afterEach(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-function writeProject(dir: string, kind: "intake" | "project" | null): void {
+function writeProject(dir: string, kind: "intake" | "project" | "e2e" | null): void {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "project.godot"), 'config/name="probe"\n', "utf8");
   if (kind !== null) {
@@ -38,6 +39,7 @@ describe("jam project discovery", () => {
     writeProject(path.join(tmp, "theme_a", "neon-shift-abcd1234"), "project");
     writeProject(path.join(tmp, "theme_b", "nested", "deep-game-12345678"), "project");
     writeProject(path.join(tmp, "legacy"), null);
+    writeProject(path.join(tmp, "e2e"), "e2e");
     writeProject(path.join(tmp, ".godot", "ignored"), "project");
     writeProject(path.join(tmp, "addons", "ignored"), "project");
 
@@ -60,6 +62,13 @@ describe("jam project discovery", () => {
     const project = path.join(tmp, "theme_a", "neon-shift-abcd1234");
     writeProject(project, "project");
     expect(isJamIntake(project)).toBe(false);
+    expect(isE2eProject(project)).toBe(false);
+
+    const e2e = path.join(tmp, "e2e");
+    writeProject(e2e, "e2e");
+    expect(readJamMetadata(e2e)?.kind).toBe("e2e");
+    expect(isE2eProject(e2e)).toBe(true);
+    expect(isJamIntake(e2e)).toBe(false);
 
     const invalid = path.join(tmp, "theme_a", "invalid");
     fs.mkdirSync(invalid, { recursive: true });
