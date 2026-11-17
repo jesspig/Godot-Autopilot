@@ -114,7 +114,12 @@ constexpr size_t GDA_LATE_RESULT_SUMMARY_CHARS = 200;
 constexpr size_t GDA_ERROR_BUFFER_MAX = 200;
 constexpr size_t GDA_OUTPUT_BUFFER_MAX = 500;
 constexpr size_t GDA_EVAL_TRUNCATE_BYTES = 8192;
+constexpr int64_t GDA_CAPTURE_MIN_DIMENSION = 8;
 constexpr int64_t GDA_CAPTURE_MAX_DIMENSION = 4096;
+static_assert(GDA_CAPTURE_MIN_DIMENSION > 0 &&
+                  GDA_CAPTURE_MIN_DIMENSION < GDA_CAPTURE_MAX_DIMENSION,
+              "the capture minimum dimension must be positive and stay below "
+              "the capture maximum dimension");
 constexpr size_t GDA_CAPTURE_MAX_PNG_BYTES = 8 * 1024 * 1024;
 constexpr size_t GDA_VARIANT_MAX_STRING_BYTES = 64 * 1024;
 constexpr size_t GDA_VARIANT_MAX_ARRAY_ELEMENTS = 10000;
