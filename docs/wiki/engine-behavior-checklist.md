@@ -1,23 +1,23 @@
 ---
 type: 验收清单
 title: 引擎行为验收清单
-description: 已删除 L2 引擎轨 48 份用例蒸馏出的引擎行为验收点（按工具域分组）、历史事故回归点与 A 类迁移对照表；验收执行走 gda-e2e-testing 技能
+description: 已删除 L2 引擎轨 48 份用例蒸馏出的引擎行为验收点（按工具域分组）、历史事故回归点与 A 类迁移对照表
 tags:
   - 测试
   - 验收
   - e2e
   - L2蒸馏
-timestamp: "2026-11-09T02:46:53+08:00"
+timestamp: "2026-11-17T16:54:14+08:00"
 resource: src/tools/
 ---
 
 # 引擎行为验收清单
 
-> **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供 Agent e2e 验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。**验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)**（衔接说明见页尾，技能流程零改动）。
+> **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供端到端验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。
 
 ## 用途与边界
 
-- **为什么有本页**：48 份 L2 用例删除后，其覆盖的「必须真实编辑器/游戏进程才能验收」的行为语义不能丢——进程内可复现的契约面已由集成层 109 项钉住（[tests.md](tests.md)「集成层」），本页承载**划回 e2e 的引擎触达面**，逐域列出行为点并回溯来源。
+- **为什么有本页**：48 份 L2 用例删除后，其覆盖的「必须真实编辑器/游戏进程才能验收」的行为语义不能丢——进程内可复现的契约面已由集成层 88 项钉住（[tests.md](tests.md)「集成层」），本页承载**划回 e2e 的引擎触达面**，逐域列出行为点并回溯来源。
 - **来源纪律**：每条行为点标注来源（用例编号或历史事故的 changelog/git 记录），无来源的条目不收；蒸馏自 git 历史（`git show c023a5c~1:tests/config/NN_*.json`）、旧版 tests.md 用例表（`0dad560~2`）与 `.handoff/evidence/` 四份迁移对照表。
 - **域覆盖口径**：本页只列 48 份用例覆盖到的工具域；未覆盖的域（physics/nav/audio/render/display/os/text/animation/gridmap/tween/analyze/test/debug 等）不因缺页而失去行为——它们的行为面由工具自述与 [modules/tools_ops_a.md](modules/tools_ops_a.md)、[modules/tools_ops_b.md](modules/tools_ops_b.md) 承载。
 - **前置标注**：依赖 .NET 编辑器、游戏进程、GUI 渲染等前置的条目在所属域内标注；集成层已覆盖的参数校验错误串不重复收录。
@@ -27,7 +27,7 @@ resource: src/tools/
 | 域 | 对应实现 | 48 用例来源 |
 |---|---|---|
 | 1. 元工具与工具面契约 | 元工具（register_all）、工具注册/排除面 | 00、03、40、42 |
-| 2. 授权门 | authorization（默认拒绝/注入语义） | 47（35/16/23/37 为授权前置态） |
+| 2. 确认门（原授权门，0.3.2 移除） | confirmation（高风险 `confirm=true`） | 47（35/16/23/37 为授权前置态） |
 | 3. 场景节点与属性 | scene_ops、property_ops、scene_spec_ops、spriteframes_ops | 01、02、08、13、20、28、32、34、42（写入链路）、15（写回显） |
 | 4. 编辑器会话与场景文件 | editor_ops（打开/保存/脏标记/核验） | 07、25、33、43、15 |
 | 5. 编辑器 UI 与输入 | editor_ui_ops、editor_ui_actions、input_ops、input_map_ops | 09、10、11、24（编辑器侧） |
@@ -59,12 +59,11 @@ resource: src/tools/
 - json 参数类型接受任意 JSON：property_set 直写标量/布尔/对象/数组不再被类型校验拒绝（`42_tool_contract.json`）。
 - e2e 抽查建议：跑一轮工程时顺带用 search_tools/describe 核对新增工具的 `side_effect` 与 schema 是否如实声明；发现"空参不报错"或"未声明副作用"即登记。
 
-## 域 2：授权门
+## 域 2：确认门（原授权门，0.3.2 已移除）
 
-- 默认拒绝态（不声明 requires 时执行器注入 `GODOT_AUTOPILOT_ALLOW=none` 哨兵；e2e 对应「未授权能力不注入」）：write 档工具在授权门（`deny_if_unauthorized`，先于 handler 参数校验）即被拒，响应为结构化拒绝形状——`error` 为 authorization required 精确全串、`code=authorization_required`、`authorization_required=write`（`47_authorization_gate.json`，集成层 `authorization_gate_test.cpp` 已逐字钉住进程内可达部分）。
-- 授权态与通道态可区分：同一工具在「未授权」与「已授权但无游戏」两种态下错误文案不同，验收时须分辨（`35_scene_tree_gate.json` 两态口径）。
-- 历史缺口注记：授权拒绝路径此前从未被自动断言（42 号仅手工验证 REST 403），47 号补上自动断言缺口（`47_authorization_gate.json` description 自述）。
-- e2e 抽查建议：e2e 环境按需注入能力组合（面板/env/配置三来源）；遇到 authorization required 时先核对本轮授权姿态再判缺陷。
+- 历史语义（`47_authorization_gate.json` 蒸馏）：授权门 `deny_if_unauthorized` 先于 handler 参数校验，默认拒绝写档工具，拒绝形状为 `error` 全串 + `code=authorization_required` + `authorization_required=<capability>`。0.3.2 起授权门、`GODOT_AUTOPILOT_ALLOW` 与三档能力整体移除，对应集成层断言 `authorization_gate_test.cpp` 一并删除；现行等价门面为高风险 `side_effect`（`destructive`/`process`/`code_execute`/`game_runtime`）缺 `confirm=true` 时返回 `confirmation_required`。
+- 授权态与通道态可区分的验收语义仍适用：同一工具在「缺 `confirm` 被拒」与「`confirm` 通过但无游戏」两种态下错误文案不同，验收时须分辨（`35_scene_tree_gate.json` 两态口径）。
+- e2e 抽查建议：遇到 `confirmation_required` 时先核对本轮调用是否显式带 `confirm=true` 再判缺陷；高风险工具的 confirm 门不得被别名或批量编排绕过。
 
 ## 域 3：场景节点与属性
 
@@ -174,7 +173,7 @@ resource: src/tools/
 
 - 注册→调用→注销闭环：code_execute 内 `AutopilotTools.register_tool` 注册用户工具 → MCP call_tool 调用回显 → search_tools 命中且 get_tool_detail 标记 `dynamic=true` → code_execute 内 `api.call_tool` 直连（code-mode 桥）→ `get_tool` 取 handle 后 `unregister_tool` → 再调报 `domain tool ... not found`（`26_user_tools_code_mode.json`）。
 - 目录扫描 rescan：code_execute 写 probe 工具文件（`register_autopilot_tools(api)` 实例方法约定）→ `api.rescan` 注册非空 → call_tool 回显 → 二次 rescan 幂等（registered 空、failed 存在）（`27_user_tools_rescan.json`）。
-- **前置：code_execute + user_tools 能力**；user_tools 开关写配置自包含（env 优先于配置，env 不含 user_tools 时 set_enabled 无效）。
+- **前置：code_execute 带 `confirm=true`**；`user_tools` 能力门已随 0.3.2 移除，动态工具注册与调用（含 rescan）不再门控。
 - e2e 抽查建议：工程需要临时专用工具时走一次注册/调用/注销闭环，核对 dynamic 标记与注销后不可再调。
 
 ## 域 13：可观测性与主线程韧性
@@ -216,11 +215,6 @@ resource: src/tools/
 | Godot 4.7.2 启动期 root certificate store ERROR（环境敏感） | 10 | 错误计数用增量游标而非绝对计数 | 旧 tests.md isolated 名单节（git 历史） |
 
 > 附注：mcp-cpp-sdk 客户端响应等待缺陷属已删除测试客户端（`tests/runner`）的缺陷，生产服务端不受影响，不构成引擎行为验收点，此处仅存目（旧 tests.md「已知遗留」）。
-
-## 与 gda-e2e-testing 的衔接
-
-- 验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)：以任意 Godot 工程为场地、按其任务书与验收清单推进，本页的域条目与回归点作为**验收时的行为对照面**（发现偏离即记入该技能产出的问题记录）。
-- 本页不改变该技能流程；分析闭环由 [gda-e2e-analysis 技能](../../.agents/skills/gda-e2e-analysis/SKILL.md) 承接。测试计数口径见 [tests.md](tests.md)「数值核算总表」。
 
 ## A 类迁移对照表
 
@@ -268,6 +262,5 @@ resource: src/tools/
 ## 相关页面
 
 - [测试体系（tests.md）](tests.md)——集成层 109 项的套件覆盖清单、回归属性清单与数值核算总表
-- [工具注册表（modules/tools_registry.md）](modules/tools_registry.md)——授权三档、排除划分与遍历判定
+- [工具注册表（modules/tools_registry.md）](modules/tools_registry.md)——注册管线、工具面与排除划分判定
 - [领域工具 A 组（modules/tools_ops_a.md）](modules/tools_ops_a.md) / [B 组（modules/tools_ops_b.md）](modules/tools_ops_b.md)——各域工具实现细节
-- [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)——验收执行载体

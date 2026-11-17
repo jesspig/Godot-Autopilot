@@ -1,8 +1,12 @@
 # 维护日志摘要
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-17；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+>
+> changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
 
 ## 2026-11-17
+
+- **文档批量优化（信噪比收口，零代码改动）**：范围 `docs/wiki/`（非 changelog）、根 `AGENTS.md`、五语 `README*.md`、`.agents/skills/`。[tests.md](tests.md) 数值核算总表重基线到当前实测（单元 589 / ctest 885 / 域工具 246（35 域）/ 类别 28 / 破坏类 7 声明者 + 3 豁免 / add_library 117），CLI 单测统一为 37 文件 348 项（325 pass + 23 skip，本轮实测复跑）；清理 0.3.2 授权移除后的文档残留（tool_base_design 执行链改 confirm 门、conventions 守卫表更新为 12 个 `.ts` 载体、core.md 删除已不存在的 `allow`/`auth_mode` 函数、engine-behavior-checklist 域 2 改确认门口径、roadmap 控制面二期标注 0.3.2 移除、入口注册类 5→4、mermaid 端口 9527→20000–29999）；同步 4 个技能（cpp-registration/thread-security-gate/gda-e2e-testing/domain-tool-authoring）；四语 README 删除与安全说明重复的 confirm 提示行；AGENTS.md 双登记条目按现行 cmake/sources 机制精确化。所有数值均先静态复算或实测核验再写入。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 
 - **GDA Game Jam 技能与 e2e 沙盒分流**：新增 `gda-gamejam` 创作向技能，默认走比赛流程 `jam` → `jam create` → `examples/<theme_id>/<slug>-<hash8>`，创建后立即 `build` + `deploy`，收尾 `jam index`。`gda-e2e-testing` 恢复 Game Jam 之前的 RSI 基线（保留 `Q`/`S`、递归闭环与证据体系），只补固定沙盒 `examples/e2e`、每轮 `jam e2e --reset`、创建/重置后装插件、报告目录 `report/<YYYY-MM-DD_HH-MM>/` 与“只记录不修复”边界。新增 `jam e2e [--reset]`；`jam.json.kind=e2e` 的沙盒不进入自动发现、`used` 与 `index`；比赛流程不变。同步更新 `gda-e2e-analysis` 的报告路径扫描。验证：`bun run typecheck` 通过，`bun test cli/tests` 37 文件 / 348 项（325 pass + 23 skip + 0 fail）。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 

@@ -1,6 +1,6 @@
 ---
 name: domain-tool-authoring
-description: 新增、改名、改参或改副作用领域工具时走 ToolSpec 数据化管线；触发词：新增工具、make_spec_tool、ParamSpec、side_effect、kMutating、args.Find、missing required parameter。
+description: 新增、改名、改参或改副作用领域工具时按 ToolSpec 数据化管线注册、取参并声明副作用。何时用：新增工具、编写 make_spec_tool / ParamSpec、声明 side_effect / kMutating、取参用 args.Find、报错 missing required parameter。
 ---
 
 # 领域工具编写
@@ -20,11 +20,6 @@ description: 新增、改名、改参或改副作用领域工具时走 ToolSpec 
 
 - 输入：工具名、参数表、副作用声明；输出：handler 加参数表加注册行。
 - `register_all.cpp` 经各域 `make_tools()` 自动汇总，不手改注册表。
-
-## 非目标
-
-- 不做文本级增量编辑、glob 匹配、C# 热重载。
-- 不放宽监听、授权、脱敏默认值。
 
 ## 验证
 

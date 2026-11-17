@@ -7,26 +7,26 @@
 | 页面 | 内容 | 对应代码 |
 |---|---|---|
 | [overview.md](overview.md) | 项目定位、整体架构、技术栈、目录结构、命名体系 | 全仓库 |
-| [build.md](build.md) | 构建/部署/打包流程、CMake 模块、产物清单、环境变量 | `CMakeLists.txt`、`cmake/`、`devtools/` |
-| [gamejam.md](gamejam.md) | 比赛开发与 e2e 用 Game Jam 题库 v2、随机抽样、创意约束、intake 与项目创建、固定 e2e 沙盒、本地收藏 | `devtools/commands/jam.ts`、`devtools/data/gamejam/`、`devtools/templates/gamejam/` |
-| [tests.md](tests.md) | 测试体系（程序化四层 + Agent e2e）、数值统计 | `tests/` |
+| [build.md](build.md) | 构建/部署/打包流程、CMake 模块、产物清单、环境变量、CI/Release | `CMakeLists.txt`、`cmake/`、`devtools/`、`.github/workflows/` |
+| [gamejam.md](gamejam.md) | Game Jam 题库 v2、随机抽样、创意约束、intake 与项目创建、固定 e2e 沙盒、本地收藏 | `devtools/commands/jam.ts`、`devtools/data/gamejam/`、`devtools/templates/gamejam/` |
+| [tests.md](tests.md) | 测试体系（程序化四层 + Agent e2e）、守卫清单、数值核算总表 | `tests/` |
 | [engine-behavior-checklist.md](engine-behavior-checklist.md) | 引擎行为验收清单：D-01 蒸馏落点、A 类迁移对照表、e2e 抽查建议 | — |
-| [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
-| [security_contract.md](security_contract.md) | T0 安全边界与并发契约：MCP 可信客户端与 REST 令牌认证、监听、授权三档、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
-| [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：246 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、35 个域 `*_tools.hpp`、`register_all.cpp` |
-| [tool_surface_baseline.md](tool_surface_baseline.md) | 工具面最终基线：catalog 252（246 域 + 5 元 + `system_status`）、35 个域文件、生产别名 325、schema 235/17、能力矩阵 561 行缺失 0，含历史 459 对比 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
-| [tool_surface_conventions.md](tool_surface_conventions.md) | 工具面别名约定：隐藏别名、参数适配、结果投影、弃用字段、冲突与目录/搜索排除 | `tool_spec.hpp`、`tool_registry.hpp`、`dispatch.cpp`、`tool_catalog.cpp` |
-| [tool_surface_report.md](tool_surface_report.md) | T-24 最终审计：catalog 459→252、生产别名 325、schema 235/17、能力矩阵 561 行缺失 0、按域与副作用分布、未验证的引擎 e2e | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
-| [modules/core.md](modules/core.md) | 核心层：线程模型、端口、统一埋点门面（monitor/monitor_env/perf_sampler）、日志与本地持久化（日志/trace 双目录、脱敏）、配置常量、集中根与工程级存储布局、遗留数据兼容 | `src/core/` |
-| [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
-| [modules/ports.md](modules/ports.md) | 端口与实例登记：一个端口承载 MCP 与 REST 两个端点、端口解析优先级与候选序列、显式与自动分配的失败差异、实例登记结构与全局索引、CLI 发现链与两级存活校验、控制面端口与实例端口的分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |
-| [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、统一执行入口（导出拦截→工具存在→参数校验→授权→派发→信封）、授权三档、ToolSpec 派生、元工具与动态工具、schema 统计、契约缺口与遍历排除 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline/tool_execute/argument_validator/authorization） |
-| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/编辑器 15 域，133 个 canonical 工具；action 表 + 旧名别名列） | `src/tools/domains/*/*_ops.cpp` |
-| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/图像/网格/瓦片等 20 域，113 个 canonical 工具；A 133 + B 113 = 246） | `src/tools/domains/*/*_ops.cpp` |
+| [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、线程纪律、添加工具流程、守卫约定 | 全仓库 |
+| [security_contract.md](security_contract.md) | T0 安全边界与并发契约：MCP 可信客户端、监听范围、高风险工具与 `confirm`、主线程、队列生命周期、路径/响应大小边界 | `src/core/`、`src/tools/`、`src/main.cpp` |
+| [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：SpecTool、dispatch 预算、Args 取参、动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、各域 `*_tools.hpp`、`register_all.cpp` |
+| [tool_surface_baseline.md](tool_surface_baseline.md) | 工具面最终基线：catalog、域文件、别名、schema、能力矩阵 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
+| [tool_surface_conventions.md](tool_surface_conventions.md) | 工具面别名与 action 约定：隐藏别名、参数适配、结果投影、弃用字段、冲突与搜索排除 | `tool_spec.hpp`、`tool_registry.hpp`、`dispatch.cpp`、`tool_catalog.cpp` |
+| [tool_surface_report.md](tool_surface_report.md) | T-24 工具面压缩审计：前后对比、按域与副作用分布、未验证项 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
+| [modules/core.md](modules/core.md) | 核心层：线程模型、端口、埋点门面、日志与本地持久化、配置常量、存储布局、遗留兼容 | `src/core/` |
+| [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口、运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
+| [modules/ports.md](modules/ports.md) | 端口与实例登记：端点复用、解析优先级、实例登记与发现、控制面与实例端口分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |
+| [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、meta/full 工具面、别名解析、元工具与动态工具、Tasks/Progress/MRTR/Skills、schema 统计、dispatch 预算 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline/confirmation） |
+| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组：场景/属性/输入/物理/导航/资源/脚本/配置/编辑器等域，action 表与旧名别名 | `src/tools/domains/*/*_ops.cpp` |
+| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组：调试/显示/OS/运行时/音频/渲染/图像/网格/瓦片等域，action 表与旧名别名 | `src/tools/domains/*/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
-| [modules/skills.md](modules/skills.md) | 技能卡与 references：目录结构、词数预算、构建管线、guard 规则、MCP 资源 12、安装与 `--prune` | `skills/`、`skills-zh/`、`cli/scripts/build-skills-asset.ts`、`tools/embed_skills.ts`、`tests/guard/skills_guard.ts` |
-| [modules/cli.md](modules/cli.md) | CLI 载体（gda）：Bun + TS 源码直跑、命令参考、五级寻址链、两套注册表与集中根位置、IPC 通道、生命周期与重启、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
-| [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
+| [modules/skills.md](modules/skills.md) | 技能卡与 references：目录结构、词数预算、构建管线、guard 规则、MCP 资源、安装与 `--prune` | `skills/`、`skills-zh/`、`cli/scripts/build-skills-asset.ts`、`tools/embed_skills.ts`、`tests/guard/skills_guard.ts` |
+| [modules/cli.md](modules/cli.md) | CLI 载体（gda）：命令参考、寻址链、注册表、IPC 通道、生命周期、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
+| [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位与 P0–P3 批次交付状态 | 全仓库 |
 | [.agents/skills/](../../.agents/skills/) | 项目级可执行技能：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
 
 ## 关键数值速查
@@ -35,7 +35,7 @@
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / security_contract / modules/tools_registry / modules/tools_ops_a / modules/support / modules/skills / modules/core / modules/cli；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值（数值口径统一取 [tests.md](tests.md) 的"数值核算总表"，不另立口径）→ 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头审计日期（仅带日期行的页面：overview / build / tests / security_contract / modules/tools_registry / modules/tools_ops_a / modules/support / modules/skills / modules/core / modules/cli；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值（唯一口径为 [tests.md](tests.md) 的「数值核算总表」）→ 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录；[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否同步技能（见下「三层文档分工」）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
 
 ## 三层文档分工
 
@@ -47,8 +47,8 @@
 | 事实 | `docs/wiki/`（本页为入口） | **陈述性事实**：架构、模块行为、数值口径（`tests.md` 数值核算总表为唯一权威）、已知坑与历史结论 | 可执行的分步流程、检查清单 |
 | 做法 | 根 `.agents/skills/*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
 
-- 维护时机与本项目一致：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
-- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`（EN）与 `skills-zh/`（ZH，同结构 parity）、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`，教的是"怎么用这套工具"；前者存于 `.agents/skills/`、教的是"怎么改这个仓库"，两者按目录隔离，互不删除。
+- 维护时机：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
+- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`（EN）与 `skills-zh/`（ZH，同结构 parity）、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`，教的是「怎么用这套工具」；前者存于 `.agents/skills/`、教的是「怎么改这个仓库」，两者按目录隔离，互不删除。
 - 归属不确定时按此判据：不写下来 agent 会做错动作 → 技能；写下来只是让人知道现状 → wiki；两者都不需要、但每次会话都要遵守 → `AGENTS.md`。
 
 ## 编写规则
@@ -56,8 +56,8 @@
 - 语言简体中文；事实来源限本仓库代码、文档化行为与用户明确讨论结果，**禁止推测**。
 - 更新前以 `git diff HEAD` 核查实际变更范围（`git status` 的 CRLF 伪变更不作依据）；无法核实的论断标 `> [!todo] 待补充`，不要写成结论。
 - frontmatter 必含 `type`/`title`/`description`/`tags`/`timestamp`/`resource`，例外页仅 `index.md`、`log.md`、`changelog/*-log.md`。
-- 每页至少 1 条相对链接指向仓库内真实文件；`changelog/*` 是历史记录页，只保证"新增条目至少 1 条相对链接"，不回溯补链。
-- 只改受影响页；被取代的描述直接删除，不留"已废弃"" formerly"之类标记。
+- 每页至少 1 条相对链接指向仓库内真实文件；`changelog/*` 是历史记录页，只保证「新增条目至少 1 条相对链接」，不回溯补链。
+- 只改受影响页；被取代的描述直接删除，不留「已废弃」「formerly」之类标记。
 - 不记录 git 工作树与远端状态（未提交 / 未推送 / 未打 tag）；它们随操作必然变化，不构成可复用知识，任何位置都不写。
-- 数值一律以运行时统计为准，口径以 [tests.md](tests.md) 的"数值核算总表"为准。
-- 各页的"与 AGENTS.md 对照"表属审计记录，其中引用的 AGENTS.md 条目是 **2026-09-25 精简前**的版本（当时该文件承载架构与计数）；现行 `AGENTS.md` 只保留最小入口内容，不再逐条对应，遇到此类表格按"历史结论"读、以当前源码与本页正文为准。
+- 数值一律以运行时统计为准，口径以 [tests.md](tests.md) 的「数值核算总表」为准。
+- 各页的「与 AGENTS.md 对照」表属审计记录，其中引用的 AGENTS.md 条目是 **2026-09-25 精简前**的版本；现行 `AGENTS.md` 只保留最小入口内容，遇到此类表格按「历史结论」读、以当前源码与本页正文为准。
