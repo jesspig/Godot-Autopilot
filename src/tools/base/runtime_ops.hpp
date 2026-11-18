@@ -29,6 +29,22 @@ std::string late_result_summary(const mcp::JsonValue &response);
 void push_late_result(std::deque<LateResult> &buffer, LateResult entry,
                        size_t cap);
 
+struct GameTimeoutReceiptInput {
+  std::string op;
+  int64_t request_id = 0;
+  int64_t timeout_ms = 0;
+  int32_t session_count = 0;
+  bool awaiting_ready = false;
+  int64_t responses_received = 0;
+  int64_t pending_count = 0;
+  int64_t last_channel_response_age_ms = -1;
+  bool late_response_for_request = false;
+  bool game_error_during_wait = false;
+  mcp::JsonValue late_results;
+};
+
+mcp::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input);
+
 struct GameJob {
   int64_t job_id = 0;
   int64_t request_id = 0;

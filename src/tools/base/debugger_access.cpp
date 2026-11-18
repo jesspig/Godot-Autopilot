@@ -1,5 +1,6 @@
 #include "tools/base/debugger_access.hpp"
 #include "tools/domains/debugger/debugger_ops.hpp"
+#include "tools/base/ready_policy.hpp"
 #include "runtime/gda_protocol.hpp"
 #include <cstdint>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
@@ -30,7 +31,8 @@ bool debugger_broadcast_request(const std::string &payload,
         plugin->forget_ready_session(id);
       continue;
     }
-    if (!plugin->is_session_ready(id))
+    if (!is_broadcast_eligible(plugin->is_session_ready(id),
+                               plugin->is_session_scene_ready(id)))
       continue;
     sessions.push_back(session);
     if (first_id < 0)
@@ -113,6 +115,16 @@ bool debugger_broadcast_engine_command(const godot::String &command,
   return sent;
 }
 
+mcp::JsonValue build_cancel_request_body(int64_t request_id) {
+  mcp::JsonValue cancel_body(mcp::JsonValue::object_tag);
+  cancel_body[GDA_FIELD_REQUEST_ID] = mcp::JsonValue(request_id);
+  cancel_body[GDA_FIELD_OP] = mcp::JsonValue(std::string(GDA_OP_CANCEL));
+  mcp::JsonValue params(mcp::JsonValue::object_tag);
+  params[GDA_FIELD_REQUEST_ID] = mcp::JsonValue(request_id);
+  cancel_body[GDA_FIELD_PARAMS] = std::move(params);
+  return cancel_body;
+}
+
 void debugger_send_cancel(int32_t session_id, int64_t request_id) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)
@@ -120,10 +132,7 @@ void debugger_send_cancel(int32_t session_id, int64_t request_id) {
   auto session = plugin->get_session(session_id);
   if (!(session.is_valid() && session->is_active()))
     return;
-  mcp::JsonValue cancel_body(mcp::JsonValue::object_tag);
-  cancel_body[GDA_FIELD_REQUEST_ID] = mcp::JsonValue(request_id);
-  cancel_body[GDA_FIELD_OP] = mcp::JsonValue(std::string(GDA_OP_CANCEL));
-  cancel_body[GDA_FIELD_PARAMS] = mcp::JsonValue(mcp::JsonValue::object_tag);
+  const mcp::JsonValue cancel_body = build_cancel_request_body(request_id);
   godot::Array arr;
   arr.push_back(godot::String(cancel_body.Dump().c_str()));
   session->send_message(
