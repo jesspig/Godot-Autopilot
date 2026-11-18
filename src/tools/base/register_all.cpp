@@ -4,6 +4,7 @@
 #include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
+#include "core/transport/godot_transport.hpp"
 #include <version.hpp>
 #include "tools/base/code_exec_ops.hpp"
 #include "tools/base/dispatch.hpp"
@@ -786,7 +787,8 @@ static void register_surface_tool(
             const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
             -> mcp::CallToolResult {
             const std::string gda_request_id =
-                monitor::request_id_text(ctx.GetRequest().id);
+                godot_transport_instance()->client_request_id_text(
+                    mcp_wire::request_id_key(ctx.GetRequest().id));
             monitor::RequestScope gda_request_scope(gda_request_id);
             monitor::RequestRecord gda_request_record;
             std::string gda_request_trace;

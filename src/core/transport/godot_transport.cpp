@@ -1,5 +1,6 @@
 #include "core/transport/godot_transport.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -106,6 +107,9 @@ bool is_supported_protocol_version(const std::string &version) {
 namespace {
 
 constexpr std::chrono::milliseconds kPendingExpiredGraceMs{60000};
+constexpr const char *kCancelledNotificationMethod = "notifications/cancelled";
+constexpr const char *kRequestIdParam = "requestId";
+constexpr std::size_t kRequestIdKeyPrefixSize{2};
 
 std::mutex &transport_instance_mutex() {
   static std::mutex mutex;
@@ -141,7 +145,7 @@ void GodotTransport::expire_stale_pending() {
       ++it;
       continue;
     }
-    id_index_.erase(mcp_wire::request_id_key(it->second.request_id));
+    id_index_.erase(mcp_wire::request_id_key(it->second.internal_id));
     it = pending_.erase(it);
   }
 }
@@ -194,12 +198,13 @@ void GodotTransport::SendMessageAsync(mcp::JsonRpcMessage message) {
   bool drop_expired = false;
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
-    auto index = id_index_.find(key);
+    const auto index = id_index_.find(key);
     if (index == id_index_.end()) {
       return;
     }
-    auto it = pending_.find(index->second);
+    const auto it = pending_.find(index->second);
     if (it == pending_.end()) {
+      id_index_.erase(index);
       return;
     }
     if (it->second.expired) {
@@ -208,6 +213,13 @@ void GodotTransport::SendMessageAsync(mcp::JsonRpcMessage message) {
       drop_expired = true;
     } else {
       waiter = it->second.promise;
+      if (auto *response = std::get_if<mcp::JsonRpcResponse>(&message)) {
+        response->id = it->second.request_id;
+      } else if (auto *failure =
+                     std::get_if<mcp::JsonRpcErrorResponse>(&message)) {
+        failure->id = it->second.request_id;
+      }
+      id_index_.erase(index);
     }
   }
   if (drop_expired) {
@@ -239,6 +251,28 @@ bool GodotTransport::pending_request_meta(const std::string &request_key,
   return true;
 }
 
+std::string GodotTransport::client_request_id_text(
+    const std::string &internal_key) {
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex_);
+    const auto index = id_index_.find(internal_key);
+    if (index != id_index_.end()) {
+      const auto entry = pending_.find(index->second);
+      if (entry != pending_.end()) {
+        const mcp::RequestId &client_id = entry->second.request_id;
+        if (std::holds_alternative<int64_t>(client_id)) {
+          return std::to_string(std::get<int64_t>(client_id));
+        }
+        return std::get<std::string>(client_id);
+      }
+    }
+  }
+  if (internal_key.size() > kRequestIdKeyPrefixSize) {
+    return internal_key.substr(kRequestIdKeyPrefixSize);
+  }
+  return internal_key;
+}
+
 bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
                             const std::string &connection_id,
                             std::string &error) {
@@ -247,6 +281,8 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
     return false;
   }
   expire_stale_pending();
+  mcp::JsonRpcMessage message = parsed.message;
+  std::string internal_key;
   if (parsed.is_request) {
     auto promise = std::make_shared<std::promise<mcp::JsonRpcMessage>>();
     std::shared_future<mcp::JsonRpcMessage> future = promise->get_future().share();
@@ -254,35 +290,54 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
         mcp_wire::make_pending_key(connection_id, parsed.request_id);
     {
       std::lock_guard<std::mutex> lock(pending_mutex_);
-      auto index = id_index_.find(parsed.request_id);
-      if (index != id_index_.end()) {
-        std::string owner = connection_id;
-        const auto entry = pending_.find(index->second);
-        if (entry != pending_.end()) {
-          owner = entry->second.connection_id;
-        }
-        error = "request id already in flight (connection " + owner + ")";
+      const auto existing = pending_.find(key);
+      if (existing != pending_.end()) {
+        error = "request id already in flight (connection " +
+                existing->second.connection_id + ")";
         return false;
       }
+      const mcp::RequestId internal_id{
+          next_internal_id_.fetch_add(1, std::memory_order_relaxed)};
+      internal_key = mcp_wire::request_id_key(internal_id);
       PendingExchange exchange;
       exchange.promise = std::move(promise);
       exchange.future = std::move(future);
       exchange.method = parsed.method;
-      if (const auto *request = mcp::AsRequest(parsed.message)) {
-        exchange.request_id = request->id;
-      }
       exchange.connection_id = connection_id;
+      exchange.internal_id = internal_id;
+      if (auto *request = std::get_if<mcp::JsonRpcRequest>(&message)) {
+        exchange.request_id = request->id;
+        request->id = internal_id;
+      }
       pending_.emplace(key, std::move(exchange));
-      id_index_.emplace(parsed.request_id, key);
+      id_index_.emplace(internal_key, key);
+    }
+  } else if (parsed.is_notification &&
+             parsed.method == kCancelledNotificationMethod) {
+    auto *notification = std::get_if<mcp::JsonRpcNotification>(&message);
+    if (notification && notification->params) {
+      mcp::JsonValue *target = notification->params->Find(kRequestIdParam);
+      if (target != nullptr && (target->IsInt() || target->IsString())) {
+        const mcp::RequestId client_id =
+            target->IsInt() ? mcp::RequestId{target->GetInt()}
+                            : mcp::RequestId{target->GetString()};
+        const std::string client_key = mcp_wire::make_pending_key(
+            connection_id, mcp_wire::request_id_key(client_id));
+        std::lock_guard<std::mutex> lock(pending_mutex_);
+        const auto entry = pending_.find(client_key);
+        if (entry != pending_.end()) {
+          *target = mcp::RequestIdToJson(entry->second.internal_id);
+        }
+      }
     }
   }
-  if (!GetMessageChannel().TrySend(parsed.message)) {
+  if (!GetMessageChannel().TrySend(message)) {
     if (parsed.is_request) {
       const std::string key =
           mcp_wire::make_pending_key(connection_id, parsed.request_id);
       std::lock_guard<std::mutex> lock(pending_mutex_);
       pending_.erase(key);
-      id_index_.erase(parsed.request_id);
+      id_index_.erase(internal_key);
     }
     error = "message channel is closed";
     return false;
@@ -320,7 +375,7 @@ bool GodotTransport::await_response(const std::string &connection_id,
     std::lock_guard<std::mutex> lock(pending_mutex_);
     auto it = pending_.find(key);
     if (it != pending_.end()) {
-      id_index_.erase(mcp_wire::request_id_key(it->second.request_id));
+      id_index_.erase(mcp_wire::request_id_key(it->second.internal_id));
       pending_.erase(it);
     }
   }
