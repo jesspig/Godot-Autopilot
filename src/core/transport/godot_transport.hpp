@@ -1,7 +1,9 @@
 #ifndef GODOT_AUTOPILOT_GODOT_TRANSPORT_HPP
 #define GODOT_AUTOPILOT_GODOT_TRANSPORT_HPP
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -61,20 +63,26 @@ public:
                             std::string &method,
                             std::string &connection_id);
 
+  std::string client_request_id_text(const std::string &internal_key);
+
 private:
   struct PendingExchange {
     std::shared_ptr<std::promise<mcp::JsonRpcMessage>> promise;
     std::shared_future<mcp::JsonRpcMessage> future;
     mcp::RequestId request_id;
+    mcp::RequestId internal_id;
     std::string connection_id;
     std::string method;
     bool expired{false};
     std::chrono::steady_clock::time_point expired_at{};
   };
 
+  static constexpr int64_t kInitialInternalId{1};
+
   std::mutex pending_mutex_;
   std::unordered_map<std::string, PendingExchange> pending_;
   std::unordered_map<std::string, std::string> id_index_;
+  std::atomic<int64_t> next_internal_id_{kInitialInternalId};
 
   void expire_stale_pending();
   void fail_pending_exchanges();

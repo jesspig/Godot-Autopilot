@@ -429,8 +429,10 @@ bool ServerContext::start() {
           }
         }
       }
-      monitor::begin_request(monitor::request_id_text(req.id), std::string(method), digest,
-                             traceparent);
+      monitor::begin_request(
+          godot_transport_instance()->client_request_id_text(
+              mcp_wire::request_id_key(req.id)),
+          std::string(method), digest, traceparent);
     };
     opts.outgoing_filters = std::make_shared<mcp::FilterPipeline>();
     opts.outgoing_filters->AddFilter(
@@ -439,13 +441,17 @@ bool ServerContext::start() {
               if (const auto *response =
                       std::get_if<mcp::JsonRpcResponse>(&message)) {
                 monitor::end_request(
-                    monitor::request_id_text(response->id), true, "",
+                    godot_transport_instance()->client_request_id_text(
+                        mcp_wire::request_id_key(response->id)),
+                    true, "",
                     static_cast<int64_t>(response->result.Dump().size()));
               } else if (const auto *error =
                              std::get_if<mcp::JsonRpcErrorResponse>(&message)) {
                 const std::string error_request_id =
-                    error->id ? monitor::request_id_text(*error->id)
-                              : std::string();
+                    error->id
+                        ? godot_transport_instance()->client_request_id_text(
+                              mcp_wire::request_id_key(*error->id))
+                        : std::string();
                 ErrorPathEvent path_event;
                 path_event.request_id = error_request_id;
                 path_event.error_code = static_cast<int>(error->error.code);
