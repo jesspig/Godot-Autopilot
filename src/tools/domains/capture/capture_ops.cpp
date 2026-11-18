@@ -51,6 +51,13 @@ static int g_last_w = 0;
 static int g_last_h = 0;
 static bool g_has_baseline = false;
 
+bool viewport_capture_is_degenerate(int image_width, int image_height,
+                                    int viewport_width, int viewport_height) {
+  return image_width <= GDA_CAPTURE_MIN_DIMENSION ||
+         image_height <= GDA_CAPTURE_MIN_DIMENSION || viewport_width <= 0 ||
+         viewport_height <= 0;
+}
+
 namespace {
 
 constexpr size_t kBaselineMaxBytes = 32u * 1024u * 1024u;
@@ -64,6 +71,39 @@ mcp::JsonValue capture_limit_error(const std::string &code,
   mcp::JsonValue error = util::error_json(message);
   mcp::JsonValue details(mcp::JsonValue::object_tag);
   details["code"] = mcp::JsonValue(code);
+  error["structured_error"] = std::move(details);
+  return error;
+}
+
+mcp::JsonValue capture_viewport_unavailable_error(const std::string &code,
+                                                  godot::SubViewport *viewport) {
+  int width = 0;
+  int height = 0;
+  if (viewport) {
+    if (godot::Ref<godot::ViewportTexture> texture = viewport->get_texture();
+        !texture.is_null()) {
+      if (godot::Ref<godot::Image> image = texture->get_image();
+          !image.is_null()) {
+        width = image->get_width();
+        height = image->get_height();
+      }
+    }
+  }
+  const std::string message =
+      code == "no_scene_open"
+          ? "no scene open: open or create a scene before capturing the editor "
+            "viewport"
+          : "editor viewport is degenerate: rendered size is too small to "
+            "capture";
+  mcp::JsonValue error = util::error_json(message);
+  error["code"] = mcp::JsonValue(code);
+  mcp::JsonValue details(mcp::JsonValue::object_tag);
+  details["code"] = mcp::JsonValue(code);
+  details["captured_viewport"] = mcp::JsonValue("2d");
+  mcp::JsonValue size(mcp::JsonValue::object_tag);
+  size["width"] = mcp::JsonValue(width);
+  size["height"] = mcp::JsonValue(height);
+  details["size"] = std::move(size);
   error["structured_error"] = std::move(details);
   return error;
 }
@@ -126,7 +166,18 @@ usable_viewport_texture(godot::Viewport *viewport) {
   if (!viewport)
     return texture;
   texture = viewport->get_texture();
-  if (texture.is_null() || texture->get_image().is_null()) {
+  if (texture.is_null())
+    return texture;
+  const godot::Ref<godot::Image> image = texture->get_image();
+  if (image.is_null()) {
+    texture.unref();
+    return texture;
+  }
+  const godot::Vector2 visible = viewport->get_visible_rect().size;
+  if (viewport_capture_is_degenerate(
+          image->get_width(), image->get_height(),
+          static_cast<int>(std::lround(visible.x)),
+          static_cast<int>(std::lround(visible.y)))) {
     texture.unref();
   }
   return texture;
@@ -777,7 +828,8 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
           "make sure the editor window is visible and not minimized");
     }
   } else {
-    texture = usable_viewport_texture(editor->get_editor_viewport_2d());
+    godot::SubViewport *viewport_2d = editor->get_editor_viewport_2d();
+    texture = usable_viewport_texture(viewport_2d);
     if (!texture.is_null()) {
       captured_viewport = "2d";
     } else {
@@ -786,10 +838,9 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
         captured_viewport = "3d";
     }
     if (texture.is_null()) {
-      return util::error_detail("editor viewport texture unavailable",
-                                "capture_ops.cpp handle_capture_viewport",
-                                "2D/3D editor viewport rendered",
-                                "open a scene with a visible viewport first");
+      const bool no_scene_open = editor->get_edited_scene_root() == nullptr;
+      return capture_viewport_unavailable_error(
+          no_scene_open ? "no_scene_open" : "viewport_degenerate", viewport_2d);
     }
   }
 
