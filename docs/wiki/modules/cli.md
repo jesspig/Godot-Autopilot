@@ -9,7 +9,7 @@ tags:
   - TypeScript
   - MCP
   - IPC
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource:
   - cli/
   - package.json
@@ -18,7 +18,7 @@ resource:
 
 # CLI 载体（`cli/`，命令 `gda`）
 
-> 审计日期：2026-11-17（Game Jam v2 单测；CLI 顶层命令 22、源码 54 个 `.ts`、测试 37 文件 / 348 项）
+> 审计日期：2026-11-18（stop/restart 失败识别任务存储中毒并提示降级；命令与测试数值以命令参考表与 [tests.md](../tests.md) 为准）
 
 ## 定位与分发
 
@@ -272,12 +272,13 @@ resource:
 - **停止方法按窗口状态选择**（`stopMethod(force, headless)`）：显式 `--force` **或目标实例 `headless: true`** 时强制停止，否则优雅停止。无窗口实例收不到不带 `/F` 的 `taskkill` 关闭请求，故必须直接强制；此时输出的 `method: "force"` 是**预期值**，不是优雅停止超时后的降级。
 - **有窗口实例默认优雅**（Windows `taskkill /PID`，其他 `SIGTERM`，默认等 10s，`--wait` 覆盖）；**失败只报告**：超时未退出输出 `ok: false` + hint（`the process is still running; retry with --force`），退出码 2 并**保留登记**，不会静默升级为强制停止。
 - **`--force` 强杀**：Windows `taskkill /F /T /PID`，其他 `SIGKILL`；仍存活报 `the process survived a force stop`。停止成功后从 registry 移除条目。
+- **失败诊断识别任务存储中毒（11-18 新增）**：优雅停止失败时经 `collectTaskStorePoisoning`（[`src/commands/stop-diagnosis.ts`](../../../cli/src/commands/stop-diagnosis.ts)）读该工程最新 `gda-*.log` 尾部 64 KiB，命中签名 `task store: failed to persist` 即在 hint 输出中毒诊断（SDK FileTaskStore compaction bug on Windows，非瞬时磁盘错误）+ `retry with --force (this discards unsaved scene edits)` 风险提示；未命中保持原 hint。退出码不变，仅增诊断文本。
 
 ### restart（[`src/commands/restart.ts`](../../../cli/src/commands/restart.ts)）
 
 - **定位规则与 `stop` 一致**：位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一（同时给出报用法错误）。只作用于 **CLI 本地注册表**的实例（`source="cli"`）；插件索引中不由 CLI 拉起的编辑器（`source="plugin"`）只用于展示与寻址，不能 `stop`/`restart`。
 - **流程**：定位条目 → 进程存活时按 `stop` 规则停止（**无窗口或显式 `--force` 强制**；有窗口优雅：Windows `taskkill /PID`、其他 `SIGTERM`）→ **固定等待 10 秒**（**不受 `--wait` 影响**）→ 从注册表移除旧条目 → 以**原端口、原 headless、原 godot 路径**调用 `start`（`--wait` 在此阶段生效，默认 60 秒就绪超时；`--no-import` / `--play` / `--probe` 随本次调用传入）→ 输出 `{ok: true, restarted: true, previous: {id, pid, port}, ...新实例视图}`。
-- **失败语义**：有窗口实例优雅停止后 10 秒仍未退出 → **不启动替代实例**，退出码 2，建议改用 `--force` 或手工停止，并保留登记（同一工程同时开两个编辑器可能静默崩溃，见 [端口与实例登记](ports.md)「同一工程的多实例：默认拒绝」）。启动阶段失败时，错误消息追加「原实例已被停止」。
+- **失败语义**：有窗口实例优雅停止后 10 秒仍未退出 → **不启动替代实例**，退出码 2，建议改用 `--force` 或手工停止，并保留登记（同一工程同时开两个编辑器可能静默崩溃，见 [端口与实例登记](ports.md)「同一工程的多实例：默认拒绝」）。suggestion 同样经 `gracefulRestartSuggestion(poisoned)` 识别任务存储中毒签名并附 `--force` 风险提示（11-18 新增，诊断源与 stop 相同）。启动阶段失败时，错误消息追加「原实例已被停止」。
 - 目标实例本就已退出时，跳过停止与等待，直接按登记的端口 / headless / godot 路径重新拉起。
 
 ### logs / list

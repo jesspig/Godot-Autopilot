@@ -178,7 +178,10 @@ including errors the call itself produced. It is one-shot: reading resets it.
 | Code | Raised when | Retry? |
 |---|---|---|
 | `exec_timeout` | A `code_execute` script outran `timeout_ms` | Split the work or raise the timeout within the cap |
-| `eval_timeout` | A game-side eval outlived the host wait | Not immediately; the game may still be running it |
+| `eval_timeout` | A game-side eval outlived the host wait; `timeout_cause` names `script_error` or `channel_lost` | Not immediately; the game may still be running it |
+| `game_ready_timeout` | A queued game call never saw `gda:ready` with scene-ready | Yes, once ready; check the extension loads |
+| `startup_in_progress` | The editor is still restoring its scene after launch | Yes, after `retry_after_ms` |
+| `no_scene_open` / `viewport_degenerate` | Editor capture: no scene open, or 2D and 3D viewports both degenerate | Open a scene or restore the viewport, then retry |
 | `main_thread_timeout` | The editor main thread missed its budget | Read state first; the side effect may still land |
 | `queue_unavailable` | The main-thread queue was full or closing | Yes, later |
 | `confirmation_required` | A high-risk tool ran without confirmation | Review the target, then retry with `--confirm` |

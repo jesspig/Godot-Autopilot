@@ -27,7 +27,7 @@
 
 - `execute_script` 自动返回单个表达式；多行代码要显式 return。裸语句会包进 `extends Node` + `func _run()`；完整脚本必须定义 `func _run()`。编译错误会映射回行号。`print()` 进 `output`，错误进 `errors`，`SceneRoot` 是被编辑场景根。
 - `call_script_node` 在现有节点实例内运行，状态是真实的。参数为 `node_path`、`function` 与可选 `args`；非 `@tool` 脚本报错。
-- `game_script` 的 action=execute 在运行中的游戏里执行，`script_action: "script"`。`source_code` 接受定义 `func _run()` 的完整脚本或同样包装的裸语句。值需要显式 return；包装调用返回 `wrapped: true`。它创建的临时节点可能在调用后保留。
+- `game_script` 的 action=execute 在运行中的游戏里执行，`script_action: "script"`。`source_code` 接受定义 `func _run()` 的完整脚本或包进 `@tool extends Node` + `func _run()` 的裸语句。值需要显式 return；包装调用返回 `wrapped: true`。临时节点在 `/root` 下执行，不在当前场景内（用绝对路径或 `../`）；调用后即释放，除非 `persist: true` 保留在 `/root/__gda_runtime` 下。
 
 ## code_execute
 

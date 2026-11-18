@@ -15,7 +15,7 @@
 - action=open 同样拒绝未保存场景；错误会列出未保存路径，并建议保存或用 action=reload 丢弃。
 - action=save 对从未保存的场景写入 `res://<根节点名>.tscn`；需要显式路径时用 action=save_as。action=save_all 保存所有打开标签，但没有文件路径的场景无法写入。
 - action=close 拒绝未保存改动。action=reload 从磁盘恢复且不确认即丢弃编辑，同时清除该场景 undo 历史；改动重要时先保存。
-- `get_scene_tree` 传 `verify: true` 会对比内存树与磁盘 `.tscn`，报告缺失路径；要求每个节点都落盘时在保存后运行。
+- `get_scene_tree` 传 `verify: true` 会对比内存树与磁盘 `.tscn`，报告缺失路径；要求每个节点都落盘时在保存后运行。`include_hash` 附加排序节点路径集合的 FNV-1a 结构哈希：只覆盖结构——挂脚本或改属性不变；内容验收要读回文件。
 
 ## 节点
 

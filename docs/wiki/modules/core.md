@@ -7,7 +7,7 @@ tags:
   - 核心层
   - 线程模型
   - 存储布局
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource: src/core/
 ---
 
@@ -15,7 +15,7 @@ resource: src/core/
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-11-17（0.3.2 移除 REST 与授权门后的核心层事实；目录与文件数以当前源码为准）
+> 审计日期：2026-11-18（会话可靠性增强后的核心层事实：SDK 日志桥、传输按连接去重 + 内部 id 改写；目录与文件数以当前源码为准）
 > 目录布局：`src/core/` 分根目录（基座与线程模型）、`transport/`（HTTP 与端口）、`observability/`（日志/轨迹/监控/脱敏）、`storage/`（集中根/工程目录/实例登记）；共 31 个业务 `.cpp`（不含 header-only 与版本模板）。
 ## 模块简介
 
@@ -95,6 +95,7 @@ resource: src/core/
 - `static LogSystem& instance()` — 局部静态单例
 - **缓冲本体仅内存**（无回调、无 Godot 控制台直接输出；`McpLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）；磁盘落盘由 `LogPersist` 增量拉取（游标 `last_log_serial_`，见下节）
 - MCP 侧消费方：`get_plugin_log`（debugger_ops）经 `query`/`query_from` 读取同一缓冲（级别/分类/子串/增量过滤，值拷贝快照），与 `McpLogDock` 并行消费互不影响；过滤口径有差异——非增量分支走 `LogSystem::query`（`filter_text` 匹配 `message`∪`detail`），`since_index` 分支经 `plugin_log_entry_matches`（`debugger_ops.cpp:660`）只匹配 `message`，且响应条目仅含 `serial`/`timestamp`/`level`/`category`/`message` 五个字段（不含 `detail`）
+- **SDK 日志桥（11-18 新增）**：`route_sdk_logs()`（`log_system.cpp:110-122`）在 `ServerContext::start()` 装配时调用——SDK 日志级别低于 Error 时抬到 Error（`mcp::SetLogLevel`），并经 `mcp::SetLogHandler` 把 SDK 日志路由进同一环形缓冲：消息以 `task store:` 开头归 `LogCategory::Tools`，其余归 `LogCategory::Transport`；级别经 `sdk_log_level` 映射，文本统一加 `MCP SDK: ` 前缀并附 `req=`/`method=` 上下文（`sdk_log_text`）。task persist 失败等 SDK 侧故障从此可经 `get_plugin_log` 与 `gda-*.log` 观测，不再静默。
 - **错误路径日志**：`ErrorPathEvent{request_id, method, error_code, connection_id, exception_type}`（`log_system.hpp:27-33`）+ `format_error_path_detail()` / `classify_error_path_exception()` / `log_error_path()`（`log_system.cpp:54-78`）。`log_error_path` 以 `LogLevel::Error` + `LogCategory::Transport`、summary `MCP error path` 落库，detail 形如 `request_id="..." method="..." error_code=N connection_id="..." exception_type="..."`（字符串值双引号包裹并转义 `"`/`\\`，控制字符替换为空格），随后由 `LogPersist` 写入 `gda-<stamp>.log`。`exception_type`：`non_std_exception`（message 前缀 `internal error: non-std exception`）、`std_exception`（前缀 `internal error: ` 或 `handler error: `），其余为空串（普通 JSON-RPC 校验错误，非异常）。调用点两处：HTTP 错误响应（`mcp_http_shim.cpp:262-274` 的 `log_http_error_path`，覆盖 parse error / method not found / 无 session 等）与 SDK 出站错误响应过滤器（`server_context.cpp:297-319`，先从待响应表补 method/connection_id 再落盘）
 
 ### LogPersist（单例，09-20 新增）
@@ -186,15 +187,15 @@ resource: src/core/
 
 MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）；09-30 起为错误路径日志提供待响应元数据：
 
-- `submit(parsed, connection_id, &error)` — 请求（非通知）登记 `PendingExchange{promise, future, request_id, connection_id, method}`：key = `connection_id + '\x1f' + request_id`（`make_pending_key`），`id_index_` 以 `request_id_key`（`i:<n>` / `s:<str>`）反查 key；同一 request id 已在途时拒绝第二次提交（`request id already in flight (connection <id>)`），发送失败时回滚登记
-- `pending_request_meta(request_key, &method, &connection_id)` — 按 request id 反查待响应记录并回填 method/connection_id，命中返回 true；错误响应晚于 `await_response` 移除记录到达时可能未命中（日志尽力补齐，不阻塞响应）
+- `submit(parsed, connection_id, &error)` — 请求（非通知）登记 `PendingExchange{promise, future, request_id, connection_id, method, internal_id}`：去重 key = `connection_id + '\x1f' + request_id`（`make_pending_key`，**按连接作用域**——跨连接同 id 不再互拒，同连接同 id 在途时拒绝第二次提交，报 `request id already in flight (connection <id>)`）；提交时经 `next_internal_id_` 分配内部 id 并**把出站请求 id 改写为内部 id**（`request->id = internal_id`），`id_index_` 以 `request_id_key(internal_id)`（`i:<n>` / `s:<str>`）反查去重 key；响应按内部 id 匹配后**回填客户端原 id**（`response->id = request_id`），保障并发路由；`notifications/cancelled` 的 `params.request_id` 同样按 (connection, 原 id) 改写为对应内部 id；发送失败时回滚登记
+- `pending_request_meta(request_key, &method, &connection_id)` — 按内部 id 的 request key 反查待响应记录并回填 method/connection_id，命中返回 true；错误响应晚于 `await_response` 移除记录到达时可能未命中（日志尽力补齐，不阻塞响应）
 - `await_response(...)` — 成功返回后移除记录；超时把记录标记 expired（记录 `expired_at`，留 `kPendingExpiredGraceMs = 60000` 宽限后由 `expire_stale_pending()` 清理）；迟到的响应在 `SendMessageAsync` 里记 Warning（`dropped late mcp response for expired request ...`）后丢弃
 - 关闭：`Close()` 经 `fail_pending_exchanges()` 清空 `pending_`/`id_index_`，并以 `McpErrorCode::ConnectionClosed`（`the MCP transport closed before the request completed`）完成全部等待者
 
 ### ServerContext
 
 - 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()`/`resolve_host()` 解析端口与主机并写 Transport 日志；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
-- `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
+- `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；装配时经 `route_sdk_logs()` 把 SDK 日志级别抬到 ≥Error 并路由进 LogSystem（见 LogSystem 节；`MCP_LOG_LEVEL` 未设置时 SDK 默认 Off）
 - `void stop()` — 幂等关闭 `server_`/`transport_`，清空 dispatch handler 与 active registry；析构函数对非空资源兜底调用
 - `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；0.3.2 配置面板（`McpConfigDock`）移除后 `src/` 内已无调用点，保留为编程入口
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`

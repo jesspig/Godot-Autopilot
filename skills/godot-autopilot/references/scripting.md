@@ -50,9 +50,11 @@ All four execute arbitrary GDScript and are highest-risk side effects.
   are `node_path`, `function`, and optional `args`; non-`@tool` scripts error.
 - `game_script` action=execute runs inside the running game with
   `script_action: "script"`. `source_code` accepts a complete GDScript defining
-  `func _run()` or bare statements wrapped the same way. A value needs an
-  explicit return; wrapped calls report `wrapped: true`. Temporary nodes it
-  creates can persist after the call.
+  `func _run()` or bare statements wrapped into `@tool extends Node` +
+  `func _run()`. A value needs an explicit return; wrapped calls report
+  `wrapped: true`. The temporary node runs under `/root`, outside the current
+  scene (use absolute paths or `../`), and is freed after the call unless
+  `persist: true` keeps it under `/root/__gda_runtime`.
 
 ## code_execute
 

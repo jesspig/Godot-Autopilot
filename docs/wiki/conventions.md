@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource: src/
 ---
 
@@ -34,6 +34,7 @@ resource: src/
 ## 错误模式
 
 - 领域工具失败返回 `{"error": "消息"}` JSON（构造经 `util::error_json`，成功结果经 `util::ok_result` 包 `result`，见 `src/util/error_util.hpp`；个别执行类响应另带 `error_details`/`structured_error` 诊断字段），`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
+- 11-18 可靠性增强新增/收紧的结构化错误码：`startup_in_progress`（编辑器启动窗——无编辑场景根且插件启动 5000ms 内——替代 create/play 失败的误归因文本，`retryable=true`、`retry_after_ms=1000`，`src/core/editor_readiness.*`）；`no_scene_open` / `viewport_degenerate`（编辑器截图 2D 与 3D 视口均退化——渲染图像任一边 ≤8px 或可见矩形为零——且前者对应无场景打开，附 `captured_viewport`/`size` 诊断；**有意收紧**：旧行为静默 ok + 占位图，迁移说明见 `capture_tools.hpp` 描述）；`game_ready_timeout`（排队的游戏调用始终未就绪，`retryable=true`）；`eval_timeout` 编辑器侧回执增 `timeout_cause`（`script_error`/`channel_lost`/`unknown`）。游戏侧 `eval_timeout`/`eval_cancelled` 语义不变。
 - 命名契约：`get/fetch/load` 目标必存在否则抛异常；`find/search/query` 允许为空；`validate/check` 失败即抛；`apply/compute` 为纯函数
 - **C++ 抛动态消息（`std::string` 拼接结果或局部量）一律用 `godot_autopilot::RuntimeError` / `InvalidArgument`**（`src/util/owned_exception.hpp`：以成员 `std::string` 自持消息并覆写 `what()`，仍派生自 `std::runtime_error`／`std::invalid_argument`，既有 catch 与 `EXPECT_THROW(..., std::runtime_error)` 断言无需改动）。原因：MSVC STL 的 `runtime_error(const std::string&)` 只保存 `c_str()` 指针、不拷贝，消息临时量或局部量销毁后 `what()` 悬空；libstdc++/libc++ 会拷贝，故仅 Windows 复现。10-19 CI `VariantJsonStrictTest.Rect2MissingSizeMessage` 实测复现，根因为长期潜伏的 UB，SDK 0.3.7 升级只改变堆布局使其显性化。纯字面量消息为静态存储期，可继续用 `std::` 原类型（如 `src/core/command_queue.hpp`）。
 

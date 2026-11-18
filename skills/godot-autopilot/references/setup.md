@@ -118,13 +118,13 @@ loopback only; never forward, proxy, or publish the port.
 ```bash
 gda search scene
 gda describe create_scene_node
-gda call ping
 gda call system_status
 gda call get_editor_state --args '{"action": "info"}'
 ```
 
 `gda search` needs a live editor. `gda describe` shows the schema and
-`side_effect` marker before the first write. Read
+`side_effect` marker before the first write. Call canonical tools: `ping` is
+only a deprecated alias of `system_status`. Read
 `new_errors_since_last_call` in every response; zero means no new engine errors
 were recorded.
 

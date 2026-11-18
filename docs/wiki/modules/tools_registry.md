@@ -7,13 +7,13 @@ tags:
   - 工具注册
   - ToolSpec
   - 别名
-timestamp: "2026-11-17T12:00:00+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-11-17（工具面 252 = 246 域 + 5 元 + `system_status`；35 个域文件、28 个 category、325 个生产别名；schema 235 非空 / 17 空）
+> 审计日期：2026-11-18（工具面 252 = 246 域 + 5 元 + `system_status`；35 个域文件、28 个 category、325 个生产别名；schema 235 非空 / 17 空；Tasks 存储路径修正见正文）
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`tool_spec.hpp`、`tool_args.cpp/hpp`、`tool_pipeline.cpp/hpp`、`tool_base.hpp`、`tool_registry.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.cpp/hpp`、`side_effect_policy.hpp`、`confirmation.hpp`、35 个域 `*_tools.hpp`，对照 `tests/unit/register_all_test.cpp`、`tests/unit/tool_registry_test.cpp`、`tests/unit/confirmation_test.cpp`、`tests/unit/tool_verdict_test.cpp`、`tests/guard/` 与仓库根 `AGENTS.md`。
 > 相关页面：[ToolSpec 数据层与执行管线](../tool_base_design.md) · [别名约定](../tool_surface_conventions.md) · [测试体系](../tests.md) · [端口与实例登记](ports.md) · [工具实现 A 组](tools_ops_a.md) · [工具实现 B 组](tools_ops_b.md) · [入口与运行时](entry_runtime.md) · [架构总览](../overview.md)
 
@@ -93,7 +93,7 @@ flowchart TD
 
 ## Tasks、Progress、MRTR 与 Skills
 
-- **Tasks**：`ServerContext` 固定启用 `enable_tasks_extension`，任务存储为 `<gda_home>/tasks/tasks-<stamp>.jsonl` 的 `FileTaskStore`；`call_tool` 以 `Task/Optional` 注册，支持 `tasks/get|update|cancel`，不支持任务的客户端同步退化。
+- **Tasks**：`ServerContext` 固定启用 `enable_tasks_extension`，任务存储为 `<gda_home>/.godot-autopilot/tasks/tasks-<stamp>.jsonl` 的 `FileTaskStore`（11-18 修正：此前漏 `.godot-autopilot` 段落到 profile 根 `tasks/`；路径变更仅影响新会话，旧文件保留），装配时发 `tasks_enabled` lifecycle 事件、`path` 属性与存储路径同值；`call_tool` 以 `Task/Optional` 注册，支持 `tasks/get|update|cancel`，不支持任务的客户端同步退化。
 - **Progress**：`batch_execute` 在请求带 progress token 时发送开始/结束两条 `notifications/progress`（当前不逐 operation 上报）。
 - **MRTR**：full 面直接工具在客户端声明 elicitation 且未带 `confirm` 时返回 `input_required`；`accept` 注入 `confirm=true`，`decline/cancel` 不执行。`call_tool` 仍走目标工具的 `confirmation_required`。
 - **Skills**：`enable_skills_extension=true`，1 张入口卡 + 9 篇 references 以 `godot://skills/<name>/SKILL.md` 注册为 `mcp::Skill`（resources=dynamic）；旧 `godot://skills/...` 资源保留。Skills 是 2026 协议能力：客户端必须先发 `server/discover`（不要用 `initialize`）再把 `MCP-Protocol-Version: 2026-07-28` 与 `params._meta` 带到 `skills/list|get`；`initialize` 仍按 2025-11-25 协商，供旧客户端使用。

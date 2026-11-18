@@ -1,8 +1,14 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-17；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-18；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
 >
 > changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
+
+## 2026-11-18
+
+- **会话可靠性增强（ST-01 行为修复归并概述）**：任务存储路径回归集中根 `<gda_home>/.godot-autopilot/tasks/`（tasks_enabled lifecycle path 同值）；SDK 日志桥装配时抬到 ≥Error 并路由 LogSystem（task store 前缀归 Tools）；CLI stop/restart 优雅失败识别 `task store: failed to persist` 中毒签名并附 `--force` 风险提示（退出码不变）；cancel 消息 params.request_id 对齐游戏桥契约；编辑器侧 eval 超时回执增 `timeout_cause`（script_error/channel_lost/unknown）与 `game_ready_timeout`；ready 门槛 SendNow 要求 ready>0 且 scene_ready>0，gda:ready 增 scene_ready 字段并在场景入树后补发；编辑器启动窗（无场景根且启动 5000ms 内）create/play 失败改报 `startup_in_progress`（retryable）；capture 退化（≤8px/零尺寸视口）拒绝静默成功——2D 退化触发 3D 回退、均不可用报 `no_scene_open`/`viewport_degenerate`（有意收紧，旧行为 ok+占位图）；传输请求号按 (connection_id, request_id) 去重并以内部 id 改写保障并发路由（跨连接同 id 由拒转受理，60s 宽限不变）。详见 [changelog/2026-11-18-log.md](changelog/2026-11-18-log.md)。
+
+- **T-09 描述诚实化与文档走查（零代码行为改动）**：game_script 描述增补执行上下文（@tool wrap、/root 临时节点、相对路径基准、call 后销毁、persist 容器、启动窗建议）；game_input 增补 hold 到期自动释放/窗口内读回/event duration_ms=0 不释放/_unhandled_input 说明；include_hash 改「排序节点路径集合 FNV-1a 结构哈希（非内容证明）」并删除 byte-level 字样；capture 补退化错误迁移说明并修正 timeout 上限文案 30000→25000。setup 参考离线走查零 not-found（`gda call ping` 改 canonical `gda call system_status`，ping 为注册弃用别名；live 复核待 e2e）；EN/ZH 五篇 references 同批同步，守卫同款正则 parity 自检 10/10 一致；wiki 八页同步（entry_runtime/core/tools_registry/overview/security_contract/conventions/cli/engine-behavior-checklist）。本轮未编译未测试，守卫由主代理统一执行。详见 [changelog/2026-11-18-log.md](changelog/2026-11-18-log.md)。
 
 ## 2026-11-17
 

@@ -129,7 +129,10 @@ gda docs sync
 | Code | 触发条件 | 重试？ |
 |---|---|---|
 | `exec_timeout` | `code_execute` 脚本超过 `timeout_ms` | 拆分工作或在 schema 上限内提高超时 |
-| `eval_timeout` | 游戏侧 eval 超过宿主等待 | 不要立即重试；游戏可能仍在执行 |
+| `eval_timeout` | 游戏侧 eval 超过宿主等待；`timeout_cause` 区分 `script_error` 与 `channel_lost` | 不要立即重试；游戏可能仍在执行 |
+| `game_ready_timeout` | 排队的游戏调用一直没等到带场景就绪的 `gda:ready` | 就绪后可重试；检查扩展是否加载 |
+| `startup_in_progress` | 编辑器启动后仍在恢复场景 | `retry_after_ms` 后重试 |
+| `no_scene_open` / `viewport_degenerate` | 编辑器截图：没有打开场景，或 2D 与 3D 视口都退化 | 打开场景或恢复视口后重试 |
 | `main_thread_timeout` | 编辑器主线程超出预算 | 先读状态；副作用可能已落地 |
 | `queue_unavailable` | 主线程队列满或正在关闭 | 稍后重试 |
 | `confirmation_required` | 高风险工具未确认 | 审查目标后用 `--confirm` 重试 |

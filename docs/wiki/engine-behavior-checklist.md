@@ -7,7 +7,7 @@ tags:
   - 验收
   - e2e
   - L2蒸馏
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource: src/tools/
 ---
 
@@ -106,6 +106,7 @@ resource: src/tools/
 ## 域 6：截图与视觉辅助
 
 - capture 参数校验（集成层 `capture_params_validation_test.cpp` 已钉住错误串）：`after_frames` 负数/非整数、`when` 仅限 target=game、`scale` 越界、`save`/`save_dir` 类型错误、`res://../` 逃逸与 `user://` 拒绝（`12_capture_params.json`）。
+- **退化视口错误迁移（11-18 收紧）**：编辑器目标 2D 视口渲染图像任一边 ≤8px 或可见矩形为零判退化，触发 3D 回退；两者均不可用返回结构化错误 `no_scene_open`（无场景打开）/ `viewport_degenerate`（附 `captured_viewport`/`size` 诊断）——旧行为静默 ok + 占位图（e2e Q1 的 2×2 图）；e2e 抽查：空工程捕获应报 error 或产出正常尺寸图像。
 - 工程外绝对路径拒绝（`path rejected: absolute path is outside the project root` 语义）：进程内不可复现（ProjectSettings 单例边界），错误串等价性由源码背书，验收在真实编辑器中发生（`12_capture_params.json` 的 editor_save_dir_outside_project 步，T-04 R-04-01）。
 - 视觉辅助参数（集成层 `vision_assist_validation_test.cpp` 已钉住）：`annotate_nodes`/`annotate_nodes_max`/`diff_image`/`review_scene_visually` 全参数负例（`17_vision_assist.json`）。
 - `diff_image requires diff_against_last` 前置校验：进程内不可复现（EditorInterface 单例边界），真实编辑器中验收（`17_vision_assist.json` 的 diff_image_requires_diff 步，T-04 R-04-02）。
@@ -147,7 +148,8 @@ resource: src/tools/
 - click_game_ui_element 坐标换算端到端：`window_position` 由游戏进程内 `run_ui_click` 计算（viewport→screen transform 复合 canvas transform），必须在真实游戏里点固定 rect 控件观测（历史补测骨架：320x180 视口 → 1280x720 窗口 4x 下 `window_position={640,360}`）；换算正确性由 单元测试 game_ui_coords_test 与 coords_inverse_test 覆盖纯函数层（`23_click_ui_coords.json` 覆盖力声明）。
 - 键名入参在游戏进程内的判决：queue_game_input 的键名解析发生在游戏进程内，error+hint 两键可区分「被接受」与「被拒」（`24_keycode_alias.json` 游戏侧声明）。
 - **回归点（B1 第三层）**：8 个 SceneTree 工具（set_scene_tree_pause / is_scene_tree_paused / reload_scene_tree_current_scene / set_scene_tree_debug_collisions_hint / call_scene_tree_group / notify_scene_tree_group / get_scene_tree_nodes_in_group / create_scene_tree_timer）统一经运行时通道转发到游戏进程，**编辑器自身场景树永不被触碰**——真实游戏中验证暂停态/计时器/组调用/重载落点确在游戏进程（历史代码缺陷曾操作编辑器树致插件停摆）（`35_scene_tree_gate.json` 回归守卫声明）。
-- **回归点（B7，就绪门不可达）**：无游戏进程时默认 `wait_ready=true` 的游戏工具立即返回 `game not running: ...` 精确文案（修复前无 peer 的常驻会话也被计数致该路径几乎不可达）；`wait_ready=false` 走同一立即失败路径；就绪窗口（peer 已连接但 `gda:ready` 未到）的排队与重放需真实游戏进程复现（`37_game_ready_gate.json`；决策表由 单元测试 ready_policy_test 覆盖）。
+- **回归点（B7，就绪门不可达）**：无游戏进程时默认 `wait_ready=true` 的游戏工具立即返回 `game not running: ...` 精确文案（修复前无 peer 的常驻会话也被计数致该路径几乎不可达）；`wait_ready=false` 走同一立即失败路径；就绪窗口（peer 已连接但 `gda:ready` 未到，或已到但 `scene_ready=false`/场景未入树）的排队与重放需真实游戏进程复现；SendNow 判定要求 ready>0 且 scene_ready>0 同时成立（`37_game_ready_gate.json`；决策表由 单元测试 ready_policy_test 覆盖）。
+- **回归点（11-18 可靠性增强）**：① force restart 后启动窗（无编辑场景根且插件启动 5000ms 内）首调 create/play 返回 `startup_in_progress`（`retryable=true`），不再误归因「parent node not found」/「no game process started」；② game_script 执行节点在 `/root` 下（不在当前场景内），persist=false 调用后即删——相对路径以临时节点为基准，场景节点需绝对路径或 `../`；③ game_input hold 瞬态态读回须落 hold 窗口内（到期自动释放），event duration_ms=0 只 press 不释放，注入事件不到达 `_unhandled_input`（改 `_process` 轮询）；④ 编辑器侧 eval 超时回执带 `timeout_cause`（`script_error`/`channel_lost`/`unknown`），排队未就绪返回 `game_ready_timeout`。
 - **回归点（class-body parse error 残留）**：execute_game_script 对裸语句（含 for/if/return）先包裹再编译（顶层 `wrapped=true`），成功调用不留 class-body parse error——同一游戏进程内 get_debugger_errors 断言 `total_errors=0` 起步（`45_runtime_observability.json`；包裹与信封抬升纯逻辑由 单元测试 gdscript_wrap_test / game_response_envelope_test 覆盖）。
 - get_debugger_errors 错误增量游标：受控 push_error 后 `total_errors`/`total_groups`/`next_seq` 与 `since_seq` 排他过滤逐项断言（`45_runtime_observability.json`；游标纯逻辑由 单元测试 error_cursor_test 覆盖）。**环境敏感注记**：Godot 4.7.2 编辑器启动期会报一条引擎 ERROR（root certificate store，Windows 平台）计入编辑器错误缓冲，使 `total_errors` 的绝对计数断言差 1——绝对计数断言在 e2e 中改用增量（since_seq）口径。
 - get_game_status 节点观测排除保留子树：经 execute_game_script 创建 `__gda_runtime` 命名的运行时子树后，`node_count`/`instrumentation_node_count` 不计该子树——插件自建节点不污染游戏侧观测计数（`45_runtime_observability.json` 的 instrumentation_node_count 阶段）。

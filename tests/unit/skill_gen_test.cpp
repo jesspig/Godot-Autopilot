@@ -122,7 +122,9 @@ const char *const kManualWhitelist[] = {
     "registered_resource", "reloaded_scenes", "saved_scenes", "script_class",
     "set_physics_", "stale_references", "uid_preserved",
     "unsupported_binary_references", "update_file", "updated_files",
-    "when_timeout", "would_delete", "wrapped_source"};
+    "when_timeout", "would_delete", "wrapped_source",
+    "channel_lost", "game_ready_timeout", "no_scene_open", "scene_ready",
+    "script_error", "startup_in_progress", "timeout_cause", "viewport_degenerate"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
