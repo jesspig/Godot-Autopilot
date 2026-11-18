@@ -74,7 +74,7 @@ const std::vector<ParamSpec> kGetSceneTreeParams = {
     {"paths", "array", "Optional non-empty array (max 50) of node paths; attaches a nodes section with per-node screen positions and per-item errors never fail the call", false},
     {"viewport", "string", "Coordinate space for paths: 'auto' (default, picks 2D or 3D by node type), '2d' or '3d'", false},
     {"scene_path", "string", "Scene file path compared by verify, e.g. 'res://game.tscn'; defaults to the edited scene file path", false},
-    {"include_hash", "boolean", "With verify: attach FNV-1a content hashes memory_hash/disk_hash (default: false)", false},
+    {"include_hash", "boolean", "With verify: attach FNV-1a structural hashes memory_hash/disk_hash computed over the sorted node-path sets (default: false); node paths only — properties, script references and file bytes do not participate, so this is a structure check, not a content proof", false},
 };
 
 const std::vector<ParamSpec> kSceneCameraParams = {

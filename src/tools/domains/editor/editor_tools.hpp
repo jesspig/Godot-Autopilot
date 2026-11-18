@@ -69,7 +69,7 @@ const std::vector<std::string> kSaveEditorSceneActions = {"save", "save_as",
 
 const std::vector<ParamSpec> kSaveEditorSceneParams = {
     {"path", "string", "save_as: target file path for the save, e.g. 'res://levels/level1.tscn'; missing parent directories are created automatically", false},
-    {"include_hash", "boolean", "save/save_as: attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default, enable for byte-level save proof", false},
+    {"include_hash", "boolean", "save/save_as: attach FNV-1a structural hashes of the memory tree and the on-disk file (memory_hash/disk_hash), computed over the sorted node-path sets; off by default. Node paths only — properties, script references and file bytes do not participate, so attaching a script or changing properties leaves the hash unchanged while adding/removing nodes changes it; this is a structure check, not a content proof (read the file back to verify content; script writes carry their own content_hash over the read-back bytes)", false},
     {"include_paths", "boolean", "save/save_as: always attach the missing_paths list even when node counts match (default: attached only on mismatch)", false},
 };
 
