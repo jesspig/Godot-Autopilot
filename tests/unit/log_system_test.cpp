@@ -6,6 +6,8 @@
 #include <mcp/McpError.hpp>
 #include <mcp/storage/FileTaskStore.hpp>
 
+#include "support/test_temp.hpp"
+
 #include <filesystem>
 #include <string>
 
@@ -134,7 +136,7 @@ TEST(LogSystemTest, SdkLogBridgeRoutesStoreFailureReason) {
     godot_autopilot::route_sdk_logs();
 
     const std::filesystem::path blocked_path =
-        std::filesystem::temp_directory_path() / "gda_sdk_log_bridge_blocked";
+        gda_test::test_temp_root() / "gda_sdk_log_bridge_blocked";
     std::error_code ec;
     std::filesystem::remove(blocked_path, ec);
     std::filesystem::create_directories(blocked_path, ec);

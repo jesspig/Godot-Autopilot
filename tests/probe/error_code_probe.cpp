@@ -53,7 +53,7 @@ std::shared_ptr<mcp::FilterPipeline> capturing_filters() {
 
 std::filesystem::path blocked_store_path() {
   const std::filesystem::path path =
-      std::filesystem::temp_directory_path() / "gda_error_code_probe_blocked";
+      std::filesystem::current_path() / "gda_error_code_probe_blocked";
   std::error_code ec;
   std::filesystem::remove(path, ec);
   std::filesystem::create_directories(path, ec);
