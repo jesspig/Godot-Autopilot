@@ -36,6 +36,7 @@
 #include "core/transport/ipc_endpoint.hpp"
 #include "core/transport/ipc_transport.hpp"
 #include "core/storage/project_store.hpp"
+#include "core/storage/storage_paths.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include "core/storage/instance_guard.hpp"
@@ -352,8 +353,8 @@ bool ServerContext::start() {
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
     opts.enable_progressive_discovery = true;
-    const std::filesystem::path task_dir =
-        to_fs_path(HomeResolver::gda_home()) / "tasks";
+    route_sdk_logs();
+    const std::filesystem::path task_dir = to_fs_path(StoragePaths::task_dir());
     std::error_code task_dir_error;
     std::filesystem::create_directories(task_dir, task_dir_error);
     if (task_dir_error) {

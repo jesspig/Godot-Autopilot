@@ -12,6 +12,7 @@ namespace {
 constexpr const char *kLogsDirName = "logs";
 constexpr const char *kTracesDirName = "traces";
 constexpr const char *kCapturesDirName = "captures";
+constexpr const char *kTasksDirName = "tasks";
 
 std::string normalized_project_path(const std::string &project_path) {
   return trim_path_trailing_separators(project_path);
@@ -30,6 +31,14 @@ std::string project_sub_dir(const std::string &project_path,
 
 std::string StoragePaths::global_config_path() {
   return ProjectStore::global_config_path();
+}
+
+std::string StoragePaths::task_dir() {
+  const std::string root = ProjectStore::root_dir();
+  if (root.empty()) {
+    return std::string();
+  }
+  return join_path(root, kTasksDirName);
 }
 
 std::string StoragePaths::project_dir(const std::string &project_path) {

@@ -5,6 +5,7 @@ import { isAlive, stopForce, stopGraceful } from "../process";
 import { findLiveByProject, loadRegistry, saveRegistry, type InstanceEntry } from "../registry";
 import { assertSingleSelector, parseTargetPort } from "../target";
 import { readRawEntries, readRawEntry } from "./registry-raw";
+import { collectTaskStorePoisoning, stopFailureHint } from "./stop-diagnosis";
 import { writeJson } from "./json-output";
 
 export const DEFAULT_STOP_WAIT_SEC = 10;
@@ -42,9 +43,8 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
     }
     const gone = await waitUntilDead(entry.pid, waitSec);
     if (!gone) {
-      const hint = method === "force"
-        ? "the process survived a force stop"
-        : "the process is still running; retry with --force";
+      const poisoned = method === "graceful" && collectTaskStorePoisoning(entry);
+      const hint = stopFailureHint(method, poisoned);
       writeJson({ ok: false, method, id: entry.id, pid: entry.pid, project: entry.project, hint }, opts);
       err(`instance ${entry.id} (pid ${entry.pid}) still alive after ${waitSec}s; ${hint}`);
       return ExitCode.Transport;

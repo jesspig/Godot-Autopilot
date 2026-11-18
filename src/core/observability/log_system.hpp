@@ -35,6 +35,7 @@ struct ErrorPathEvent {
 std::string format_error_path_detail(const ErrorPathEvent &event);
 std::string classify_error_path_exception(const std::string &message);
 void log_error_path(const ErrorPathEvent &event);
+void route_sdk_logs();
 
 class LogSystem {
 public:
