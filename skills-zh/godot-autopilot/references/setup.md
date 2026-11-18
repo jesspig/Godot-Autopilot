@@ -94,12 +94,11 @@ gda install skills --prune
 ```bash
 gda search scene
 gda describe create_scene_node
-gda call ping
 gda call system_status
 gda call get_editor_state --args '{"action": "info"}'
 ```
 
-`gda search` 需要 live 编辑器。`gda describe` 在首次写入前显示 schema 与 `side_effect` 标记。每次响应都读 `new_errors_since_last_call`；为零表示没有记录新引擎错误。
+`gda search` 需要 live 编辑器。`gda describe` 在首次写入前显示 schema 与 `side_effect` 标记。调用 canonical 工具：`ping` 只是 `system_status` 的弃用别名。每次响应都读 `new_errors_since_last_call`；为零表示没有记录新引擎错误。
 
 ## 失败签名
 

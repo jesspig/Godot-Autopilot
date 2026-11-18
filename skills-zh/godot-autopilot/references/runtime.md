@@ -11,7 +11,7 @@
 
 所有 game 域工具经编辑器调试会话到达运行中的游戏。游戏必须从编辑器启动，且游戏项目加载 GDA 扩展。没有附加游戏时返回 `game not running`。会改变状态的 game 工具属于 GameRuntime，需要 `confirm: true`；确认错误是停下审查的信号，不是通道故障。
 
-已附加但未就绪时，默认 `wait_ready: true` 会排队并在游戏报告 `gda:ready` 后重放；`wait_ready: false` 立即失败。若 `gda:ready` 一直不到，排队调用会超时。已附加游戏且 `wait_ready: false` 持续失败，说明游戏项目未加载扩展。
+已附加但未就绪时，默认 `wait_ready: true` 会排队，并在游戏报告带 `scene_ready`（当前场景已入树）的 `gda:ready` 后重放；`wait_ready: false` 立即失败。就绪一直不到时排队调用超时（`game_ready_timeout`）。force restart 后先等场景就绪再首调。已附加游戏且 `wait_ready: false` 持续失败，说明游戏项目未加载扩展。
 
 游戏调用等待 `timeout_ms` 加 2000 ms，上限 25000；长任务拆成较短调用并轮询 `get_game_state` 的 action=status。
 
@@ -30,7 +30,7 @@
 
 ## 输入注入
 
-- `game_input` 的 action=queue 发送一次输入。`type` 为 `key`、`mouse_button`、`wheel`、`mouse_motion` 或 `action`；`mode` 为 `event`（解析事件）、`api`（直接动作状态）或 `hold`（按住 `duration_ms`）。未知参数报错；`api` 不创建 `InputEvent`，输入回调看不到，UI 必须用 `event`。`click` 在两个物理帧后自动释放，`double_click` 再加一对按下/释放。
+- `game_input` 的 action=queue 发送一次输入。`type` 为 `key`、`mouse_button`、`wheel`、`mouse_motion` 或 `action`；`mode` 为 `event`（解析事件）、`api`（直接动作状态）或 `hold`（每物理帧重按，`duration_ms` 到期自动释放）。未知参数报错；`api` 不创建 `InputEvent`，输入回调看不到，UI 必须用 `event`。`event` 配 `duration_ms=0` 只按下不释放。`click` 在两个物理帧后自动释放，`double_click` 再加一对按下/释放。
 - action=wait 等待物理帧中的 `just_pressed`（默认）、`just_released` 或 `pressed`，上限 `timeout_ms`（默认 5000，最大 25000）。可选 `inject` 先发送输入；瞬态状态必须带它。
 - action=sequence 按精确物理帧偏移触发时间线（最多 256 项，每项自带 `at_frame` 偏移），用于 playtest 自动化。
 
@@ -38,12 +38,15 @@
 
 - `just_pressed` 有 process 与 physics 两套计数。瞬态状态在 `_physics_process` 轮询，不在 `_process`；物理上下文最早下一 tick 才一致。
 - 解析事件在显示服务器事件阶段末尾刷新，因此在下一帧开头派发。不要假设注入后立即读取会落在同一帧。
+- 瞬态键态的读回必须落在 hold 窗口内（注入到读回的间隔短于 `duration_ms`）；自动释放后 `pressed` 恢复 false，而持久效果（如累积位移）仍在。读回要配对玩法自有计数。
+- 注入经 `Input.parse_input_event`，不会到达 `_unhandled_input`；改在 `_process` 轮询 `Input.is_action_pressed`。
 
 帧精确配方：用一条带显式物理帧偏移的 `game_input` action=sequence 时间线，再做条件截图。
 
 ## 截图
 
-- `capture_editor_viewport` 默认截编辑器视口；传 `target: "game"` 截运行中的游戏。game 目标在游戏进程内写 PNG 并返回路径；该目标的 `timeout_ms` 默认 5000（最大 30000）。
+- `capture_editor_viewport` 默认截编辑器视口；传 `target: "game"` 截运行中的游戏。game 目标在游戏进程内写 PNG 并返回路径；该目标的 `timeout_ms` 默认 5000（最大 25000）。
+- 编辑器 2D 视口退化（渲染图像任一边 ≤8 px 或可见矩形为零）时回退 3D；两者都不可用则报 `no_scene_open`（没有打开场景）或 `viewport_degenerate` 并带尺寸诊断——不再静默返回占位图。
 - 编辑器目标拒绝 `after_frames` 与 `when`。
 - `save=true` 或 `save_dir` 写入 GDA 截图目录或项目内 `res://` 目录，其它路径被拒绝；最多保留最近 20 张。
 - `scale`（1-8）用最近邻放大读取小字 HUD；顺序是区域裁剪、放大、`max_dimension`。
@@ -63,7 +66,7 @@
 
 - `game_scene_tree` 的 action=set_pause 暂停或恢复；action=is_paused 确认。process mode 仍决定哪些节点运行，暂停还会停用物理服务器；瞬态输入状态在暂停期间丢失。
 - action=reload_current_scene 从磁盘重载运行场景，脚本状态、连接与运行时修改都重置；没有运行场景时返回 `ERR_UNCONFIGURED`。
-- `game_script` 的 action=execute 在游戏内运行。`script_action` 取 `script`（配 `source_code`）、`get_property`、`set_property` 或 `call_method`；脚本要有显式 return 才能产生值。`persist` 把临时节点保留在 `/root/__gda_runtime` 下。
+- `game_script` 的 action=execute 在游戏内运行。`script_action` 取 `script`（配 `source_code`）、`get_property`、`set_property` 或 `call_method`；脚本要有显式 return 才能产生值。裸语句包进 `@tool extends Node` + `func _run()`，在 `/root` 下的临时节点执行，不在当前场景内——访问场景节点用绝对路径（`/root/...`）或 `../`；调用后节点即释放，除非 `persist` 把它保留在 `/root/__gda_runtime` 下。
 
 ## 日志与错误路径
 
@@ -106,5 +109,5 @@
 | 症状 | 原因 | 首步动作 |
 |---|---|---|
 | `game not running` | 游戏不是从编辑器启动 | `editor_scene_control` 的 action=play |
-| 启动后游戏调用超时 | `gda:ready` 一直不到 | 检查游戏项目是否加载扩展 |
+| 启动后游戏调用超时 | `gda:ready`/scene-ready 一直不到 | 检查游戏项目是否加载扩展；等场景就绪 |
 | 没有调试器错误 | 无会话或传输丢弃 | 读 `get_game_log_entries` |

@@ -20,8 +20,10 @@ load the GDA extension. Without an attached game they fail with
 channel failure.
 
 When attached but not ready, the default `wait_ready: true` queues the request
-and replays it after `gda:ready`; `wait_ready: false` fails immediately. A queued
-call times out if `gda:ready` never arrives. If `wait_ready: false` keeps failing
+and replays it once the game reports `gda:ready` with `scene_ready` (current
+scene in the tree); `wait_ready: false` fails immediately. A queued call times
+out (`game_ready_timeout`) if readiness never arrives. After a force restart,
+wait for scene-ready before the first call. If `wait_ready: false` keeps failing
 while a game is attached, the game project does not load the extension.
 
 Game calls wait `timeout_ms` plus 2000 ms, capped at 25000; budget long work as
@@ -51,10 +53,12 @@ action=sequence, or `game_script` action=execute.
 
 - `game_input` action=queue sends one input. `type` is `key`, `mouse_button`,
   `wheel`, `mouse_motion`, or `action`; `mode` is `event` (parsed event), `api`
-  (direct action state), or `hold` (event held for `duration_ms`). Unknown
-  parameters fail; `api` creates no `InputEvent`, so input callbacks never see
-  it, and `event` is required for UI. `click` pairs a press with a release two
-  physics frames later; `double_click` adds a second pair.
+  (direct action state), or `hold` (re-pressed every physics frame,
+  auto-released when `duration_ms` expires). Unknown parameters fail; `api`
+  creates no `InputEvent`, so input callbacks never see it, and `event` is
+  required for UI. `event` with `duration_ms=0` presses without a release.
+  `click` pairs a press with a release two physics frames later; `double_click`
+  adds a second pair.
 - action=wait waits for `just_pressed` (default), `just_released`, or `pressed`
   in a physics frame, up to `timeout_ms` (default 5000, max 25000). Optional
   `inject` sends the input first; transient states require it.
@@ -69,6 +73,12 @@ Timing facts:
 - Parsed events are buffered and flushed at the end of the display server pass,
   so they dispatch at the start of the next frame. Never assume
   inject-then-read lands on the same frame.
+- Read transient key state back inside the hold window (inject-to-read gap
+  shorter than `duration_ms`); after auto-release `pressed` is false again,
+  while persistent effects such as accumulated movement remain. Pair the
+  readback with a gameplay-owned counter.
+- Injection goes through `Input.parse_input_event`, which never reaches
+  `_unhandled_input`; poll `Input.is_action_pressed` in `_process` instead.
 
 Frame-accuracy recipe: one `game_input` action=sequence timeline with explicit
 physics-frame offsets, then a conditioned capture.
@@ -78,7 +88,11 @@ physics-frame offsets, then a conditioned capture.
 - `capture_editor_viewport` captures the editor viewport by default; pass
   `target: "game"` to capture the running game. The game target writes a PNG in
   the game process and returns its path; `timeout_ms` defaults to 5000 (max
-  30000) for that target.
+  25000) for that target.
+- The editor 2D viewport falls back to 3D when degenerate (rendered image ≤8 px
+  on a side, or zero visible rect); both unusable fails with `no_scene_open`
+  (no scene open) or `viewport_degenerate` plus size diagnostics — no silent
+  placeholder image.
 - The editor target rejects `after_frames` and `when`.
 - `save=true` or `save_dir` writes a PNG into the GDA capture folder or a
   `res://` directory inside the project; other paths are rejected. Only the 20
@@ -115,8 +129,11 @@ occluded controls. Validate first, click with `click_game_ui_element`, and check
   returns `ERR_UNCONFIGURED`.
 - `game_script` action=execute runs in the game. `script_action` is `script`
   (with `source_code`), `get_property`, `set_property`, or `call_method`.
-  A script needs an explicit return to produce a value. `persist` keeps the
-  temporary node under `/root/__gda_runtime`.
+  A script needs an explicit return to produce a value. Bare statements wrap
+  into `@tool extends Node` + `func _run()` on a temporary node under `/root`,
+  outside the current scene — reach scene nodes with absolute paths
+  (`/root/...`) or `../`; the node is freed after the call unless `persist`
+  keeps it under `/root/__gda_runtime`.
 
 ## Log and error paths
 
@@ -185,5 +202,5 @@ executed `files`.
 | Symptom | Cause | First move |
 |---|---|---|
 | `game not running` | Game not launched from the editor | `editor_scene_control` action=play |
-| Game call times out after play | `gda:ready` never arrived | Check the game project loads the extension |
+| Game call times out after play | `gda:ready`/scene-ready never arrived | Check the game project loads the extension; wait for scene-ready |
 | No debugger errors | No session or transport drop | Read `get_game_log_entries` |

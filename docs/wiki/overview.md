@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource:
   - README.md
   - README.zh-CN.md
@@ -16,7 +16,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-11-17（Game Jam v2 与工具面 252 收口；数值口径见 [tests.md](./tests.md)）
+> 审计日期：2026-11-18（就绪门控消费 scene-ready；数值口径见 [tests.md](./tests.md)）
 
 ## 项目定位
 
@@ -83,7 +83,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 运行时桥接（game_* 工具）
 
-编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` / `game_bridge_verify.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询与 SceneTree 操作（09-29 新增 `scene_tree` op）等 op；游戏工具默认 `wait_ready=true`——游戏已启动但未就绪时请求排队、收到 `gda:ready` 后自动重放，无游戏进程时立即返回 `game not running: ...`。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
+编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` / `game_bridge_verify.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询与 SceneTree 操作（09-29 新增 `scene_tree` op）等 op；游戏工具默认 `wait_ready=true`——游戏已启动但未就绪时请求排队、收到带场景就绪（`scene_ready`，当前场景已入树）的 `gda:ready` 后自动重放，无游戏进程时立即返回 `game not running: ...`。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
 
 ### 编辑器 UI
 

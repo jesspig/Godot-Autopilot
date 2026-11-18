@@ -7,7 +7,7 @@ tags:
   - 并发
   - 契约
   - 认证
-timestamp: "2026-11-14T01:08:47+08:00"
+timestamp: "2026-11-18T12:25:50+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -26,7 +26,7 @@ resource:
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约，也是实现、评审与测试的验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-11-17（0.3.2 移除 REST 与授权门后的当前安全边界；高风险工具由 `confirm=true` 控制）
+> 审计日期：2026-11-18（超时回执成因区分与按连接请求号去重后的当前安全边界；高风险工具由 `confirm=true` 控制）
 
 ## 0. 当前安全姿态
 
@@ -150,7 +150,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - 只有不访问 Godot API 的纯 C++ 逻辑可留在 HTTP 线程；只读缓冲区若由代码明确保证线程安全，才可使用该例外。新增例外必须在代码和文档中同时说明。
 - 主线程判定以队列首次 `drain()` 记录的线程为准；队列必须在插件正常生命周期内先完成主线程初始化，再处理依赖 Godot API 的任务。
 - **等待全预算化（10-20 起）**：编辑器内不再有无限等待点。`CommandQueue` 新增 `submit_tracked_bounded(fn, budget_ms)`（`src/core/command_queue.hpp:260-290`），预算耗尽时 `cancel(id)` 并置 `timed_out`/`cancelled`；上层统一包装 `dispatch::run_bounded_on_main_thread()`（`src/tools/base/dispatch.hpp:45-68`）已覆盖资源读取（`resource_handlers.cpp` 8 处、`debugger_resources.cpp` 7 处）、MCP 提示词（`prompt_handlers.cpp` 7 个）、用户脚本动态工具（`autopilot_tools.cpp` 3 处）、`code_execute`/`batch_execute` 主线程快照（`code_exec_ops.cpp` 2 处）与游戏通道（`runtime_ops.cpp` 2 处），超时返回结构化 `main_thread_timeout`（资源/提示词路径分别映射为 `main_thread_timeout` / `resource_read_failed`）。`CommandQueue::execute_sync()`（`src/core/command_queue.hpp:292-298`）仍是 `submit(...).get()` 无界等待，但**在 `src/` 内已无调用点**（`grep -rn execute_sync src/` 只命中定义）——它是遗留入口，**新增代码不得调用**，否则重新引入无界等待。
-- **协作式执行期超时（10-20 起）**：主线程等待预算只约束「排队等主线程」，管不到「主线程上正在跑的长脚本」。`code_execute` 因此在包装脚本注入截止时间常量 `__gda_deadline_ms` 与超时哨兵，并在循环体与入口函数注入检查点（`src/util/gdscript_wrap.hpp` 的 `deadline_declaration` / `deadline_check_line` / `deadline_break_line` / `deadline_loop_condition` / `inject_deadline_checks`），脚本在检查点自行退出；执行后按哨兵与实测耗时判定超时，返回结构化错误 `code="exec_timeout"`（`retryable=false`，含 `timeout_ms` / `execution_time_ms`，`src/tools/base/dispatch.cpp:333-343`）。游戏侧 eval 同理：宿主在 `eval_timeout_budget_ms()`（上限 `GDA_MAX_GAME_OP_TIMEOUT_MS` = 25000ms）内装配截止时间并注入检查点，超时返回 `structured_error.code="eval_timeout"`（附 `game_may_be_busy=true`——脚本无法被强行中断，游戏主线程须等脚本返回），被宿主取消时返回 `structured_error.code="eval_cancelled"`。协作式边界：**它依赖脚本执行到检查点**，含 `await` 或不返回的脚本无法被强制中止。
+- **协作式执行期超时（10-20 起）**：主线程等待预算只约束「排队等主线程」，管不到「主线程上正在跑的长脚本」。`code_execute` 因此在包装脚本注入截止时间常量 `__gda_deadline_ms` 与超时哨兵，并在循环体与入口函数注入检查点（`src/util/gdscript_wrap.hpp` 的 `deadline_declaration` / `deadline_check_line` / `deadline_break_line` / `deadline_loop_condition` / `inject_deadline_checks`），脚本在检查点自行退出；执行后按哨兵与实测耗时判定超时，返回结构化错误 `code="exec_timeout"`（`retryable=false`，含 `timeout_ms` / `execution_time_ms`，`src/tools/base/dispatch.cpp:333-343`）。游戏侧 eval 同理：宿主在 `eval_timeout_budget_ms()`（上限 `GDA_MAX_GAME_OP_TIMEOUT_MS` = 25000ms）内装配截止时间并注入检查点，超时返回 `structured_error.code="eval_timeout"`（附 `game_may_be_busy=true`——脚本无法被强行中断，游戏主线程须等脚本返回），被宿主取消时返回 `structured_error.code="eval_cancelled"`。编辑器侧等待超时回执（`runtime_ops::build_game_timeout_receipt`，11-18 增区分）对 eval 族 op 附 `timeout_cause`（`script_error`=收到本请求迟到响应或等待期游戏错误 / `channel_lost`=通道无响应 / `unknown`），排队后始终未就绪的请求返回 `game_ready_timeout`（`retryable=true`）；`late_results` 按请求关联。协作式边界：**它依赖脚本执行到检查点**，含 `await` 或不返回的脚本无法被强制中止。
 - **主线程契约静态守卫（10-20 新增，现为 `tests/guard/main_thread_guard.ts`）**：扫描 `src/` 下全部 `*.cpp`/`*.hpp`，按「文件级线程归类 + 作用域级放行」判定：每个源文件归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）；外线程文件中的 Godot API 调用（`godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）默认违规，仅在该文件显式登记的主线程作用域内放行（当前仅 `src/core/observability/log_persist.cpp` 登记 `init_session` / `flush_on_main_thread` / `flush_trace_images` / `rotate_on_init` / `append_persist_file` / `prune_persist_dir`）。词法层先剥离字符串/字符/raw 字面量与注释，再匹配标识符，避免误判字面量中的 API 名。守卫在 ctest 阶段以 `main_thread_guard` 用例拦截，与 `comment_guard` 同级；退出码 0 = 无违规、1 = 存在违规、2 = 扫描输入不可读。
 - **守卫的固有局限（如实记录）**：判定是**文件级线程归类 + 作用域级放行**，**不做跨函数数据流分析**：① 登记为「主线程作用域」的函数，其内 Godot API 调用一律放行，不校验调用者——同一文件内「transport 线程函数」调用「主线程函数」会被放行；② 外线程文件调用主线程分类文件中的辅助函数不会被拦（跨文件调用链不参与判定）；③ 只认 `godot::` 限定名，经别名、`using` 改写或第三方封装绕过的调用不在覆盖范围。它是防回归的**最小静态网**，不是线程安全证明；最终保证仍是「所有 Godot API 经 `CommandQueue` 在主线程执行」的人工契约与测试体系（历史 L2 行为测试已由集成层 gtest 与 Agent e2e 承接）。
 - **导出期拒绝（10-20 加固）**：`ExportGuard` 的导出标志改为**实例级**（成员 `ExportState state_`，`is_exporting()` 遍历已注册实例查各自标志），不再是全局单例；`_export_begin` 用 RAII `ExportState::Scope` 包裹，析构复位，**导出回调抛异常也不会残留 true**（`_export_end` 仍显式复位）。拒绝覆盖三类入口：**工具调用**（`src/tools/base/tool_invoke.cpp:182` 的 `invoke_tool` 与 `src/tools/base/register_all.cpp:656` 的元工具注册回调）、**MCP 资源**（`src/resources/resource_handlers.cpp` 9 处 + `src/resources/debugger_resources.cpp` 7 处）、**MCP 提示词**（`src/prompts/prompt_handlers.cpp:40`）。拒绝响应统一为 `editor is exporting; retry after export completes`（`dispatch::export_blocked_error_text()`），**10-21 起带机器可读 `code="export_in_progress"`**。引擎内证据边界：真实导出由引擎在编辑器主线程触发，MCP 通道无法可靠构造；历史 L2 用例 `41_thread_guard.json`（已随引擎轨删除）同样**不覆盖导出期拒绝**，该缺口仍在。
@@ -160,7 +160,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - 停止顺序是：阻止服务器继续接受新请求，调用 `McpServer::Close()`，再调用 transport `Close()`，清理 handler 与 registry，最后释放 `ServerContext`。插件退出时先停服务器，再 `CommandQueue::close()` 并清空 `runtime_ops` 指针，最后释放其他插件组件（`main.cpp:_exit_tree`）。
 - 重载/改端口是原子意图而非并行启动：先执行 `stop()`，再更新端口并 `start()`；`start()` 任意阶段失败会清理已创建的 transport/server 并重置 handler/registry，不会假报运行中。
 - `CommandQueue` 已具备 `open/close/is_closed`、容量限制（默认 1024）、关闭时拒绝未执行任务并通过 `future` 抛异常、首次 `drain()` 固定主线程且错误线程 `drain()` 返回 false 的语义；09-29 起另有 `submit_tracked()`（返回任务 id + future）、`cancel(id)`（仅取消尚未 drain 的任务并在 future 抛 `cancelled before execution`）、`last_drain_age_ms()`（最近一次 drain 距今毫秒数，未 drain 为 -1）、`oldest_pending_age_ms()`（最旧排队任务年龄，空队为 -1）与 `Stats::cancelled` 计数；析构自动 `close()`。实现保证停止期间未完成 future 有明确结果，且不会在 `ServerContext` 已销毁后触碰 Godot 对象。
-- 停止/重载与队列排空并发时，禁止产生悬垂引用、重复响应或把旧实例任务交给新实例。异步运行时请求必须以 request id 关联，`runtime_ops` 保证先登记 pending 再广播、超时后标记 `Cancelled`、迟到响应丢弃并告警。
+- 停止/重载与队列排空并发时，禁止产生悬垂引用、重复响应或把旧实例任务交给新实例。异步运行时请求必须以 request id 关联，`runtime_ops` 保证先登记 pending 再广播、超时后标记 `Cancelled`、迟到响应丢弃并告警。传输层请求号去重按 **(connection_id, request_id)** 作用域（11-18 起）：跨连接同 id 合法受理，出站 id 改写为内部 id、响应回填客户端原 id（见 [modules/core.md](modules/core.md) GodotTransport 节）；同连接重复 id 仍拒绝。
 
 ## 6. 路径与响应大小
 

@@ -29,7 +29,9 @@ before the first call; the calling protocol lives in `references/tools.md`.
   Save first when the changes matter.
 - `get_scene_tree` with `verify: true` compares the in-memory tree with the
   on-disk `.tscn` and reports missing paths. Run it after a save when every node
-  must persist.
+  must persist. `include_hash` adds FNV-1a hashes of the sorted node-path sets:
+  structure only — attaching a script or changing properties leaves them
+  unchanged; verify content by reading the file back.
 
 ## Nodes
 
