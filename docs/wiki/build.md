@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-19T05:31:53+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -17,7 +17,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-11-17（Game Jam v2；构建、部署、打包命令与产物以本页「命令速查表」为准）
+> 审计日期：2026-11-19（Game Jam v2；构建、部署、打包命令与产物以本页「命令速查表」为准）
 
 ## 命令速查表
 
@@ -197,7 +197,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `BuildOptimization.cmake` | 硬件感知并行度（核心规则） | `GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`（CACHE 优先、其次 ENV）、`GDA_UNITY_BUILD`（ON 且核数 >1 时启用）、`GDA_UNITY_BATCH_SIZE`（0=auto）、`GDA_MAX_COMPILE_MEM_MB`（默认 1500）、`GDA_MAX_LINK_MEM_MB`（默认 4000）、`GDA_UNITY_MEM_MB`（默认 500）；`CMAKE_BUILD_PARALLEL_LEVEL` 对**所有**生成器生效；`gda_compile_pool`/`gda_link_pool` 仅在 `if(CMAKE_GENERATOR MATCHES "Ninja")` 时注册（`:84-91`），非 Ninja 只打印 `[gda] Ninja jobs: N (non-Ninja generator)`，其余并行度与 Unity 计算照常 |
 | `CompilerOptions.cmake` | 按编译器分发 flags | Clang/clang-cl 与 MSVC：`/utf-8 /bigobj /W4 /EHsc` + `_CRT_SECURE_NO_WARNINGS`、`_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS`、`_WIN32_WINNT=0x0A00`；**MSVC 分支（`elseif(MSVC)`，即真正的 cl.exe）额外 `/Zc:lambda`**，clang-cl 走的是第一个 `if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")` 分支、不加该开关（见下「MSVC lambda 捕获差异」小节）；**调试信息格式按配置**：MSVC 分支 `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT` = Debug `ProgramDatabase`（`/Zi`+外部 PDB）/其余 `Embedded`（`/Z7`）；clang-cl（Windows）分支 Debug 设 `Embedded` CodeView，由链接器 `/debug /pdb:<TARGET_PDB>` 汇总为外部 `godot-autopilot.pdb`；两种情况下 Release 都不新增外部符号；GCC/Clang 非 Windows 非 CI 追加 `-march=native`；`find_package(Threads REQUIRED)`；`CMAKE_POSITION_INDEPENDENT_CODE ON` |
 | `Cache.cmake` | 编译缓存自动探测 | 优先 sccache（支持 MSVC），回退 ccache（仅 GCC/Clang）；命中则设 `CMAKE_C/CXX_COMPILER_LAUNCHER` |
-| `Dependencies.cmake` | `third_party/` 子模块依赖（纯 `add_subdirectory`，无 FetchContent） | `GDA_THIRD_PARTY_DIR`（`${CMAKE_SOURCE_DIR}/third_party`）、`GDA_SUBMODULE_BIN_DIR`（`${CMAKE_BINARY_DIR}/_sub`）、`gda_require_submodule(<name>)`（子模块缺失即 `FATAL_ERROR` 并提示 `git submodule update --init --recursive`，故意不做网络回退）、`MCP_WITH_OPENSSL "OFF"`（CACHE STRING ... FORCE，仅 `add_subdirectory(mcp-cpp-sdk)` 前设置；SDK 0.3.8 起三态开关 AUTO/ON/OFF，GDA 仅监听 127.0.0.1 明文 HTTP 无 TLS 需求，故显式 OFF）、`GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE）；`godot-cpp` @ `10.0.0-stable`（commit `507ed9d`）、`mcp-cpp-sdk` @ `0.3.11`（commit `93e18ef`） |
+| `Dependencies.cmake` | `third_party/` 子模块依赖（纯 `add_subdirectory`，无 FetchContent） | `GDA_THIRD_PARTY_DIR`（`${CMAKE_SOURCE_DIR}/third_party`）、`GDA_SUBMODULE_BIN_DIR`（`${CMAKE_BINARY_DIR}/_sub`）、`gda_require_submodule(<name>)`（子模块缺失即 `FATAL_ERROR` 并提示 `git submodule update --init --recursive`，故意不做网络回退）、`MCP_WITH_OPENSSL "OFF"`（CACHE STRING ... FORCE，仅 `add_subdirectory(mcp-cpp-sdk)` 前设置；SDK 0.3.8 起三态开关 AUTO/ON/OFF，GDA 仅监听 127.0.0.1 明文 HTTP 无 TLS 需求，故显式 OFF）、`GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE）；`godot-cpp` @ `10.0.0-stable`（commit `507ed9d`）、`mcp-cpp-sdk` @ `0.3.12`（commit `7a62e63`） |
 | `Lto.cmake` | 仅 Release 的链接优化 | 优先级 Clang ThinLTO（`-flto=thin`）> MSVC LTCG（`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`）> GCC IPO（`CheckIPOSupported`）；非 Release 直接跳过 |
 | `skill_gen.cmake` | skill 标准目录构建期嵌入（09-08 新增） | `GDA_BUN_EXECUTABLE`（`find_program(NAMES bun)`；未命中或 `bun --version` 失败即 `FATAL_ERROR` 并提示安装 Bun 1.4+）+ configure 期 `--version` 可用性自检；`add_custom_command` 执行 `"${GDA_BUN_EXECUTABLE}" tools/embed_skills.ts` 生成 `<build>/generated/skill_content_embedded.h` + `add_custom_target(gda_skill_embed_header)`；依赖 `skills/*/[SKILL.md|references/*.md|scripts/*.mjs]`（CONFIGURE_DEPENDS） |
 
@@ -210,7 +210,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | 子模块 | 上游仓库 | tag | commit |
 |---|---|---|---|
 | `third_party/godot-cpp` | `godotengine/godot-cpp` | `10.0.0-stable` | `507ed9d840c01a3c5b2a39af8bb4000bfac30bf5` |
-| `third_party/mcp-cpp-sdk` | `jesspig/modelcontextprotocol-cpp-sdk` | `0.3.11` | `93e18ef8bf9766754a5320b167389e094c28cca7` |
+| `third_party/mcp-cpp-sdk` | `jesspig/modelcontextprotocol-cpp-sdk` | `0.3.12` | `7a62e636bceeab63c07d820b85a60414a430ea06` |
 | `third_party/googletest` | `google/googletest` | `v1.15.2` | `b514bdc898e2951020cbdca1304b75f5950d1f59` |
 
 - **检出方式**：`git clone --recurse-submodules <repo>`，或事后 `git submodule update --init --recursive`；子模块源码在 `build/` 之外，不受清理 `build/` 影响。

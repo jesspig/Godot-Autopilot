@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-11-18T12:25:50+08:00"
+timestamp: "2026-11-19T05:31:53+08:00"
 resource:
   - README.md
   - README.zh-CN.md
@@ -16,7 +16,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-11-18（就绪门控消费 scene-ready；数值口径见 [tests.md](./tests.md)）
+> 审计日期：2026-11-19（就绪门控消费 scene-ready；数值口径见 [tests.md](./tests.md)）
 
 ## 项目定位
 
@@ -104,7 +104,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 |---|---|---|
 | 引擎 | Godot 4.x GDExtension（目标 4.7，见 `.gdextension` 的 `compatibility_minimum`） | `devtools/lib/gdextension.ts` |
 | 绑定层 | godot-cpp，tag `10.0.0-stable`，submodule commit `507ed9d` | `third_party/godot-cpp`、`cmake/Dependencies.cmake` |
-| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），tag `0.3.11`，submodule commit `93e18ef`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
+| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），tag `0.3.12`，submodule commit `7a62e63`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
 | HTTP / 异步 | mcp-cpp-sdk 自研网络栈（内部 HTTP 线程） | mcp-cpp-sdk 内置（0.3.x 起移除 libhv） |
 | JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
 | 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、生成器双路径预设（有 ninja 用 `debug`/`release`，无则 `debug-portable`/`release-portable`） | 根 `CMakeLists.txt`、`CMakePresets.json`、`devtools/lib/config.ts` |

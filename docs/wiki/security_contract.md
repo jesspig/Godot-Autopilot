@@ -7,7 +7,7 @@ tags:
   - 并发
   - 契约
   - 认证
-timestamp: "2026-11-18T12:25:50+08:00"
+timestamp: "2026-11-19T05:31:53+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -26,7 +26,7 @@ resource:
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约，也是实现、评审与测试的验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-11-18（超时回执成因区分与按连接请求号去重后的当前安全边界；高风险工具由 `confirm=true` 控制）
+> 审计日期：2026-11-19（超时回执成因区分与按连接请求号去重后的当前安全边界；高风险工具由 `confirm=true` 控制）
 
 ## 0. 当前安全姿态
 
@@ -51,7 +51,7 @@ resource:
 - 端口解析顺序：**环境变量 `GODOT_AUTOPILOT_PORT` ＞ 工程级配置偏好（集中根下工程目录的 `config.json` 的 `port` 键）＞ 自动分配**。自动分配从 `20000–29999` 随机候选序列取首个可用端口。**显式指定端口（环境变量 / 配置偏好）绑定失败时不自动更换**，直接启动失败并报 `the requested port N is unavailable: <原因>`；只有自动分配才顺延。监听地址与端点独立配置，端点固定为 `/mcp`，端口是唯一可配项。端口模型与候选序列见 [端口与实例登记](modules/ports.md)。
 - 环回约束是**两层**，缺一不可，改任一层都要重新验证：
   - **绑定层**（本项目）：`ServerContext::start()` 用 `is_loopback_host()` 判定 `127.0.0.1`/`::1`/`[::1]`，其余值拒绝启动（`src/core/server_context.cpp:28-29`、`:75-76`）。
-  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.11`，commit `93e18ef8bf9766754a5320b167389e094c28cca7`，由 `.gitmodules` 与 gitlink 确定）。
+  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.12`，commit `7a62e636bceeab63c07d820b85a60414a430ea06`，由 `.gitmodules` 与 gitlink 确定）。
   - 因此“把绑定地址放宽”并不能让非环回 Host 的请求可用；反向的 DNS 重绑定（用本机主机名或局域网 IP 访问）由请求层拦下。
 
 ## 3. 高风险工具分类

@@ -1,8 +1,12 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-18；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-19；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
 >
 > changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
+
+## 2026-11-19
+
+- **mcp-cpp-sdk 0.3.12 依赖升级**：gitlink `93e18ef` → `7a62e63`（tag `0.3.12` dereferenced commit `7a62e636bceeab63c07d820b85a60414a430ea06`），修复 Windows 上 FileTaskStore 压缩句柄冲突导致的 task store 中毒；六处版本 pin 同步为 `0.3.12` / `7a62e63`，页头审计日期与 frontmatter `timestamp` 同步，历史条目未改写；CLI 中毒诊断兜底保留。GDA 业务源码零改动，不升版。详见 [changelog/2026-11-19-log.md](changelog/2026-11-19-log.md)。
 
 ## 2026-11-18
 
