@@ -5,7 +5,7 @@ import { IpcSession, type IpcEndpoint } from "../ipc/client";
 export interface JsonRpcResponse {
   id: number;
   result?: unknown;
-  error?: { code: number; message?: string };
+  error?: { code: number; message?: string; data?: unknown };
 }
 
 export interface RequestProgress {
@@ -27,6 +27,7 @@ export interface CallToolOptions {
   progressSink?: (progress: RequestProgress) => void;
   inputResponses?: Record<string, unknown>;
   keepTask?: boolean;
+  ipcSession?: IpcSession;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -133,6 +134,20 @@ function makeInitializeEnvelope(): string {
       clientInfo: { name: CLIENT_NAME, version: CLI_VERSION },
     },
   });
+}
+
+function makeIpcInitializeRequest(endpoint: IpcEndpoint): Record<string, unknown> {
+  const init = JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>;
+  const initParams = (init.params ?? {}) as Record<string, unknown>;
+  const meta: Record<string, string> = {};
+  if (endpoint.token !== undefined && endpoint.token !== "") {
+    meta.gda_token = endpoint.token;
+  }
+  if (Object.keys(meta).length > 0) {
+    initParams._meta = meta;
+    init.params = initParams;
+  }
+  return init;
 }
 
 function isModernProtocolVersion(version: string): boolean {
@@ -369,14 +384,34 @@ async function waitForTask(
     if (result === null || typeof result !== "object" || Array.isArray(result)) {
       return { id: initial.id, error: { code: -32000, message: "invalid tasks/get result" } };
     }
-    const task = result as { status?: unknown; result?: unknown; error?: unknown; statusMessage?: unknown };
+    const task = result as {
+      status?: unknown;
+      result?: unknown;
+      error?: unknown;
+      statusMessage?: unknown;
+    };
     const status = typeof task.status === "string" ? task.status : "";
     if (status === "completed") {
       return { id: initial.id, result: task.result ?? { content: [] } };
     }
     if (status === "failed" || status === "cancelled") {
-      const message = typeof task.statusMessage === "string" ? task.statusMessage : `task ${status}`;
-      return { id: initial.id, error: { code: -32000, message } };
+      const errorRecord =
+        task.error !== null && typeof task.error === "object" && !Array.isArray(task.error)
+          ? (task.error as { code?: unknown; message?: unknown; data?: unknown })
+          : null;
+      const code =
+        errorRecord !== null && typeof errorRecord.code === "number" ? errorRecord.code : -32000;
+      const message =
+        errorRecord !== null && typeof errorRecord.message === "string"
+          ? errorRecord.message
+          : typeof task.statusMessage === "string"
+            ? task.statusMessage
+            : `task ${status}`;
+      const data = errorRecord !== null ? errorRecord.data : undefined;
+      return {
+        id: initial.id,
+        error: data !== undefined ? { code, message, data } : { code, message },
+      };
     }
     if (Date.now() >= deadline) {
       return { id: initial.id, error: { code: -32000, message: `task ${taskId} timed out` } };
@@ -407,7 +442,7 @@ export async function request(
   }
   if (transportMode !== "http" && ipcEndpoint !== undefined) {
     try {
-      const response = await requestOverIpc(method, requestParams, ipcEndpoint, timeoutMs);
+      const response = await requestOverIpc(method, requestParams, ipcEndpoint, timeoutMs, opts.ipcSession);
       const tokenFailure = response.error?.code === -32001 || response.error?.code === -32002;
       if (!tokenFailure) {
         opts.transportSink?.("ipc");
@@ -484,21 +519,16 @@ async function requestOverIpc(
   params: Record<string, unknown>,
   endpoint: IpcEndpoint,
   timeoutMs: number,
+  sharedSession?: IpcSession,
 ): Promise<JsonRpcResponse> {
+  if (sharedSession !== undefined) {
+    const id = nextRequestId++;
+    return await sharedSession.request({ jsonrpc: "2.0", id, method, params });
+  }
   const session = new IpcSession(endpoint, timeoutMs);
   try {
     await session.open();
-    const init = JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>;
-    const initParams = (init.params ?? {}) as Record<string, unknown>;
-    const meta: Record<string, string> = {};
-    if (endpoint.token !== undefined && endpoint.token !== "") {
-      meta.gda_token = endpoint.token;
-    }
-    if (Object.keys(meta).length > 0) {
-      initParams._meta = meta;
-      init.params = initParams;
-    }
-    const initResponse = await session.request(init);
+    const initResponse = await session.request(makeIpcInitializeRequest(endpoint));
     if (initResponse.error !== undefined) {
       return initResponse;
     }
@@ -508,4 +538,34 @@ async function requestOverIpc(
   } finally {
     session.close();
   }
+}
+
+export async function createBatchIpcSession(
+  endpoint: IpcEndpoint,
+  timeoutMs: number,
+): Promise<IpcSession> {
+  const session = new IpcSession(endpoint, timeoutMs);
+  try {
+    await session.open();
+    const initResponse = await session.request(makeIpcInitializeRequest(endpoint));
+    if (initResponse.error !== undefined) {
+      const detail =
+        initResponse.error.message !== undefined && initResponse.error.message !== ""
+          ? `: ${initResponse.error.message}`
+          : "";
+      throw new CliError(
+        ExitCode.Transport,
+        `IPC initialize failed (code ${initResponse.error.code})${detail}.`,
+      );
+    }
+    session.notify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD });
+    return session;
+  } catch (error) {
+    session.close();
+    throw error;
+  }
+}
+
+export function closeBatchIpcSession(session: IpcSession): void {
+  session.close();
 }
