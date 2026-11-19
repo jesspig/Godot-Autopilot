@@ -103,19 +103,20 @@ let dir: string;
 let socketPath: string;
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-batch-"));
-  socketPath = path.join(dir, "ipc.sock");
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "gb-"));
+  socketPath = path.join(process.cwd(), "gbatch.sock");
 });
 
 afterEach(async () => {
   while (servers.length > 0) {
     await closeServer(servers.pop()!);
   }
+  fs.rmSync(socketPath, { force: true });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 function writeBatchFile(value: unknown, raw?: string): string {
-  const file = path.join(dir, "batch.json");
+  const file = path.join(dir, "b.json");
   fs.writeFileSync(file, raw ?? JSON.stringify(value));
   return file;
 }
