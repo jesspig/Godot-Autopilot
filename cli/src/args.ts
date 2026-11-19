@@ -194,6 +194,7 @@ Commands:
   search <query>      Search tools
   describe <tool>     Show one tool's schema and side effects
   call <tool>         Call a tool
+  batch --args-file <path>  Run multiple tool calls in one process over a shared IPC session
   list                List running Godot instances
   docs sync           Export engine docs into the local cache (always)
   docs status         Show the resolved engine, project pin, and cache state

@@ -1,0 +1,190 @@
+import fs from "node:fs";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import { run as batch } from "../src/commands/batch";
+import { CliError, ExitCode } from "../src/errors";
+
+function encodeFrame(value: unknown): Buffer {
+  const payload = Buffer.from(JSON.stringify(value), "utf8");
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(payload.length, 0);
+  return Buffer.concat([header, payload]);
+}
+
+function frameServer(handler: (message: any, socket: net.Socket) => void): (socket: net.Socket) => void {
+  return (socket) => {
+    let buffer = Buffer.alloc(0);
+    socket.on("data", (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= 4) {
+        const size = buffer.readUInt32BE(0);
+        if (buffer.length < 4 + size) return;
+        const text = buffer.subarray(4, 4 + size).toString("utf8");
+        buffer = buffer.subarray(4 + size);
+        try {
+          handler(JSON.parse(text), socket);
+        } catch {
+        }
+      }
+    });
+  };
+}
+
+const activeSockets: net.Socket[] = [];
+const servers: net.Server[] = [];
+
+function listenLoopback(socketPath: string, handler: (socket: net.Socket) => void): Promise<net.Server> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer(handler);
+    server.on("connection", (socket) => activeSockets.push(socket));
+    server.once("error", reject);
+    server.listen(socketPath, () => resolve(server));
+  });
+}
+
+function closeServer(server: net.Server): Promise<void> {
+  for (const socket of activeSockets.splice(0)) {
+    socket.destroy();
+  }
+  return new Promise((resolve) => server.close(() => resolve()));
+}
+
+function captureOutput(): { stdout(): string; restore(): void } {
+  const origOut = process.stdout.write;
+  let outBuf = "";
+  process.stdout.write = ((chunk: unknown) => {
+    outBuf += String(chunk);
+    return true;
+  }) as typeof process.stdout.write;
+  return {
+    stdout: () => outBuf,
+    restore: () => {
+      process.stdout.write = origOut;
+    },
+  };
+}
+
+interface ServerState {
+  initializeCount: number;
+  calls: string[];
+  seenConfirm?: boolean;
+}
+
+function batchServer(state: ServerState, failTool: string | null): (socket: net.Socket) => void {
+  return frameServer((message, socket) => {
+    if (message.id === undefined) return;
+    let result: unknown;
+    if (message.method === "initialize") {
+      state.initializeCount += 1;
+      result = { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } };
+    } else if (message.method === "tools/call") {
+      const params = message.params ?? {};
+      const inner = params.name === "call_tool" ? params.arguments : params;
+      const name = typeof inner?.name === "string" ? inner.name : "";
+      state.calls.push(name);
+      if (name === "fail_tool" || name === failTool) {
+        state.seenConfirm = inner?.arguments?.confirm;
+        result = { isError: true, content: [{ type: "text", text: '{"error":"boom"}' }] };
+      } else {
+        result = { content: [{ type: "text", text: JSON.stringify({ ok: true, tool: name }) }] };
+      }
+    } else {
+      result = {};
+    }
+    socket.write(encodeFrame({ jsonrpc: "2.0", id: message.id, result }));
+  });
+}
+
+let dir: string;
+let socketPath: string;
+
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-batch-"));
+  socketPath = path.join(dir, "ipc.sock");
+});
+
+afterEach(async () => {
+  while (servers.length > 0) {
+    await closeServer(servers.pop()!);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function writeBatchFile(value: unknown, raw?: string): string {
+  const file = path.join(dir, "batch.json");
+  fs.writeFileSync(file, raw ?? JSON.stringify(value));
+  return file;
+}
+
+describe("gda batch", () => {
+  test("两个操作全成功：exit 0、results 两项 ok、握手只做一次", async () => {
+    const state: ServerState = { initializeCount: 0, calls: [] };
+    const server = await listenLoopback(socketPath, batchServer(state, null));
+    servers.push(server);
+    const file = writeBatchFile([{ tool: "alpha", args: { a: 1 } }, { tool: "beta" }]);
+    const cap = captureOutput();
+    let code: number;
+    try {
+      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "5" });
+    } finally {
+      cap.restore();
+    }
+    expect(code).toBe(ExitCode.Success);
+    const output = JSON.parse(cap.stdout()) as { results: unknown[] };
+    expect(output.results).toHaveLength(2);
+    expect(output.results[0]).toMatchObject({ index: 0, tool: "alpha", ok: true });
+    expect(output.results[1]).toMatchObject({ index: 1, tool: "beta", ok: true });
+    expect(state.initializeCount).toBe(1);
+    expect(state.calls).toEqual(["alpha", "beta"]);
+  });
+
+  test("一个 toolFailed：exit 1 且对应项 ok=false，confirm 写入参数", async () => {
+    const state: ServerState = { initializeCount: 0, calls: [] };
+    const server = await listenLoopback(socketPath, batchServer(state, "fail_tool"));
+    servers.push(server);
+    const file = writeBatchFile({
+      operations: [{ tool: "alpha" }, { tool: "fail_tool", args: {}, confirm: true }],
+    });
+    const cap = captureOutput();
+    let code: number;
+    try {
+      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "5" });
+    } finally {
+      cap.restore();
+    }
+    expect(code).toBe(ExitCode.ToolFailure);
+    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean }[] };
+    expect(output.results[0].ok).toBe(true);
+    expect(output.results[1].ok).toBe(false);
+    expect(state.seenConfirm).toBe(true);
+    expect(state.initializeCount).toBe(1);
+  });
+
+  test("非法 batch 文件：exit 3 (Usage)", async () => {
+    const file = writeBatchFile(null, '{"operations":');
+    let caught: unknown;
+    try {
+      await batch([], { argsFile: file, socketText: socketPath });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).code).toBe(ExitCode.Usage);
+  });
+
+  test("无可用 IPC endpoint：exit 2 (Transport)", async () => {
+    const file = writeBatchFile([{ tool: "alpha" }]);
+    let caught: unknown;
+    try {
+      await batch([], { argsFile: file, portText: "1" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).code).toBe(ExitCode.Transport);
+  });
+});

@@ -1204,6 +1204,151 @@ private:
   }
 };
 
+JV build_ui_click_result(const std::string &target_path,
+                         const std::string &target_mouse_filter,
+                         double center_x, double center_y,
+                         double window_center_x, double window_center_y,
+                         int64_t rounds, bool strict_hit) {
+  std::string hit_path;
+  bool hit_mismatch = false;
+  {
+    godot::Viewport *click_viewport = nullptr;
+    godot::Control *target_ctrl = nullptr;
+    if (godot::SceneTree *tree = get_scene_tree()) {
+      if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+              resolve_game_node_suffixed(tree->get_root(), target_path))) {
+        target_ctrl = ctrl;
+        click_viewport = ctrl->get_viewport();
+      }
+      if (!click_viewport)
+        click_viewport =
+            godot::Object::cast_to<godot::Viewport>(tree->get_root());
+    }
+    godot::Control *hovered =
+        click_viewport ? click_viewport->gui_get_hovered_control() : nullptr;
+    if (hovered)
+      hit_path = util::to_std(godot::String(hovered->get_path()));
+    hit_mismatch =
+        target_ctrl && !ui_hit_matches_target(target_ctrl, hovered);
+  }
+  if (strict_hit && hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    JV body = error_result("click target not hit: expected " + target_path +
+                           " but the hovered control is " + actual);
+    JV details(JV::object_tag);
+    details["code"] = JV("click_occluded");
+    details["target_path"] = JV(target_path);
+    details["hit_path"] = JV(hit_path);
+    details["target_mouse_filter"] = JV(target_mouse_filter);
+    details["strict_hit"] = JV(true);
+    body["structured_error"] = std::move(details);
+    body["hit_path"] = JV(hit_path);
+    body["hit_mismatch"] = JV(true);
+    body["hint"] = JV(
+        "another visible Control is covering the target: run "
+        "validate_game_ui_layout to list possibly_occluded controls, inspect "
+        "get_game_ui_elements mouse_filter/z_index, or click the reported "
+        "hit_path instead; omit strict_hit to keep the click as a warning");
+    return body;
+  }
+  JV clicked(JV::object_tag);
+  clicked["ok"] = JV(true);
+  clicked["path"] = JV(target_path);
+  JV position(JV::object_tag);
+  position["x"] = JV(center_x);
+  position["y"] = JV(center_y);
+  clicked["position"] = std::move(position);
+  JV viewport_position(JV::object_tag);
+  viewport_position["x"] = JV(center_x);
+  viewport_position["y"] = JV(center_y);
+  clicked["viewport_position"] = std::move(viewport_position);
+  JV window_position(JV::object_tag);
+  window_position["x"] = JV(window_center_x);
+  window_position["y"] = JV(window_center_y);
+  clicked["window_position"] = std::move(window_position);
+  clicked["clicks"] = JV(rounds);
+  clicked["hit_path"] = JV(hit_path);
+  clicked["hit_mismatch"] = JV(hit_mismatch);
+  if (hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    clicked["warning"] = JV(
+        "click may be occluded: the viewport hovered control is " + actual +
+        " instead of " + target_path +
+        " — pass strict_hit=true to fail on this mismatch");
+  }
+  JV inner(JV::object_tag);
+  inner["result"] = std::move(clicked);
+  return ok_result(std::move(inner));
+}
+
+class GameBridgeUiClickAwaiter : public godot::Node {
+  GDCLASS(GameBridgeUiClickAwaiter, godot::Node)
+
+  int64_t request_id_ = 0;
+  std::string target_path_;
+  std::string target_mouse_filter_;
+  double center_x_ = 0.0;
+  double center_y_ = 0.0;
+  double window_center_x_ = 0.0;
+  double window_center_y_ = 0.0;
+  int64_t rounds_ = 1;
+  bool strict_hit_ = false;
+  uint64_t start_process_frames_ = 0;
+  bool finished_ = false;
+
+ protected:
+  static void _bind_methods() {}
+
+ public:
+  void setup(int64_t request_id, const std::string &target_path,
+             const std::string &target_mouse_filter, double center_x,
+             double center_y, double window_center_x, double window_center_y,
+             int64_t rounds, bool strict_hit) {
+    request_id_ = request_id;
+    target_path_ = target_path;
+    target_mouse_filter_ = target_mouse_filter;
+    center_x_ = center_x;
+    center_y_ = center_y;
+    window_center_x_ = window_center_x;
+    window_center_y_ = window_center_y;
+    rounds_ = rounds;
+    strict_hit_ = strict_hit;
+    set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
+    set_process(true);
+    auto *engine = godot::Engine::get_singleton();
+    start_process_frames_ = engine ? engine->get_process_frames() : 0;
+  }
+
+  void cancel() {
+    if (finished_)
+      return;
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    queue_free();
+  }
+
+  void _process(double delta) override {
+    (void)delta;
+    if (finished_)
+      return;
+    auto *engine = godot::Engine::get_singleton();
+    const uint64_t current_frame =
+        engine ? engine->get_process_frames() : start_process_frames_;
+    if (current_frame - start_process_frames_ < 1)
+      return;
+    JV body = build_ui_click_result(target_path_, target_mouse_filter_,
+                                    center_x_, center_y_, window_center_x_,
+                                    window_center_y_, rounds_, strict_hit_);
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    body[GDA_FIELD_OK] = JV(!body.Contains("error"));
+    send_response(request_id_, std::move(body));
+    queue_free();
+  }
+};
+
 JV op_get_output(const JV &params) {
   int64_t limit = 200;
   if (auto *l = params.Find("limit")) {
@@ -1273,7 +1418,7 @@ JV op_get_tree() {
 }
 
 JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
-                bool truncated) {
+                bool truncated, int64_t request_id) {
   if (!click.IsObject())
     return error_result("ui_elements click must be an object");
   auto *path_p = click.Find("path");
@@ -1427,81 +1572,23 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
         return injected;
     }
   }
-  std::string hit_path;
-  bool hit_mismatch = false;
-  {
-    godot::Viewport *click_viewport = nullptr;
-    godot::Control *target_ctrl = nullptr;
-    if (godot::SceneTree *tree = get_scene_tree()) {
-      if (auto *ctrl = godot::Object::cast_to<godot::Control>(
-              resolve_game_node_suffixed(tree->get_root(), match->path))) {
-        target_ctrl = ctrl;
-        click_viewport = ctrl->get_viewport();
-      }
-      if (!click_viewport)
-        click_viewport =
-            godot::Object::cast_to<godot::Viewport>(tree->get_root());
-    }
-    godot::Control *hovered =
-        click_viewport ? click_viewport->gui_get_hovered_control() : nullptr;
-    if (hovered)
-      hit_path = util::to_std(godot::String(hovered->get_path()));
-    hit_mismatch =
-        target_ctrl && !ui_hit_matches_target(target_ctrl, hovered);
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree || !tree->get_root()) {
+    return build_ui_click_result(match->path, match->mouse_filter, center_x,
+                                 center_y, static_cast<double>(window_center.x),
+                                 static_cast<double>(window_center.y), rounds,
+                                 strict_hit);
   }
-  if (strict_hit && hit_mismatch) {
-    const std::string actual =
-        hit_path.empty() ? std::string("no hovered control") : hit_path;
-    JV body = error_result("click target not hit: expected " + match->path +
-                           " but the hovered control is " + actual);
-    JV details(JV::object_tag);
-    details["code"] = JV("click_occluded");
-    details["target_path"] = JV(match->path);
-    details["hit_path"] = JV(hit_path);
-    details["target_mouse_filter"] = JV(match->mouse_filter);
-    details["strict_hit"] = JV(true);
-    body["structured_error"] = std::move(details);
-    body["hit_path"] = JV(hit_path);
-    body["hit_mismatch"] = JV(true);
-    body["hint"] = JV(
-        "another visible Control is covering the target: run "
-        "validate_game_ui_layout to list possibly_occluded controls, inspect "
-        "get_game_ui_elements mouse_filter/z_index, or click the reported "
-        "hit_path instead; omit strict_hit to keep the click as a warning");
-    return body;
-  }
-  JV clicked(JV::object_tag);
-  clicked["ok"] = JV(true);
-  clicked["path"] = JV(match->path);
-  JV position(JV::object_tag);
-  position["x"] = JV(center_x);
-  position["y"] = JV(center_y);
-  clicked["position"] = std::move(position);
-  JV viewport_position(JV::object_tag);
-  viewport_position["x"] = JV(center_x);
-  viewport_position["y"] = JV(center_y);
-  clicked["viewport_position"] = std::move(viewport_position);
-  JV window_position(JV::object_tag);
-  window_position["x"] = JV(static_cast<double>(window_center.x));
-  window_position["y"] = JV(static_cast<double>(window_center.y));
-  clicked["window_position"] = std::move(window_position);
-  clicked["clicks"] = JV(static_cast<int64_t>(rounds));
-  clicked["hit_path"] = JV(hit_path);
-  clicked["hit_mismatch"] = JV(hit_mismatch);
-  if (hit_mismatch) {
-    const std::string actual =
-        hit_path.empty() ? std::string("no hovered control") : hit_path;
-    clicked["warning"] = JV(
-        "click may be occluded: the viewport hovered control is " + actual +
-        " instead of " + match->path +
-        " — pass strict_hit=true to fail on this mismatch");
-  }
-  JV inner(JV::object_tag);
-  inner["result"] = std::move(clicked);
-  return ok_result(std::move(inner));
+  GameBridgeUiClickAwaiter *awaiter = memnew(GameBridgeUiClickAwaiter);
+  awaiter->setup(request_id, match->path, match->mouse_filter, center_x,
+                 center_y, static_cast<double>(window_center.x),
+                 static_cast<double>(window_center.y), rounds, strict_hit);
+  tree->get_root()->add_child(awaiter);
+  register_cancel_handler(request_id, [awaiter] { awaiter->cancel(); });
+  return JV();
 }
 
-JV op_ui_elements(const JV &params) {
+JV op_ui_elements_impl(const JV &params, int64_t request_id) {
   int64_t max_elements = GDA_UI_ELEMENTS_DEFAULT;
   if (auto *m = params.Find("max_elements")) {
     if (m->IsInt() && m->GetInt() > 0)
@@ -1534,7 +1621,7 @@ JV op_ui_elements(const JV &params) {
   const std::vector<UiElement> elements =
       collect_ui_elements(root, max_elements, filter, truncated);
   if (auto *click_p = params.Find("click"))
-    return run_ui_click(*click_p, elements, truncated);
+    return run_ui_click(*click_p, elements, truncated, request_id);
   JV arr(JV::array_tag);
   for (const UiElement &element : elements) {
     JV item(JV::object_tag);
@@ -1638,6 +1725,10 @@ JV op_ui_elements(const JV &params) {
   return ok_result(std::move(r));
 }
 
+JV op_ui_elements(const JV &params) {
+  return op_ui_elements_impl(params, 0);
+}
+
 godot::SceneTree *g_ready_tree = nullptr;
 
 void send_ready_message(bool scene_ready) {
@@ -1738,7 +1829,7 @@ public:
     } else if (op == GDA_OP_INPUT_STATUS) {
       body = op_input_status(params);
     } else if (op == GDA_OP_UI_ELEMENTS) {
-      body = op_ui_elements(params);
+      body = op_ui_elements_impl(params, request_id);
     } else if (op == GDA_OP_CAPTURE) {
       body = op_capture(params, request_id);
     } else if (op == GDA_OP_EVAL_ASSERT) {

@@ -93,7 +93,7 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
    | 顺序 | 命令 | 通过判据 |
    |---|---|---|
    | 1 | `gda status --project <project-dir> --json` | 退出码 0，`ok=true`，`project` 与 `<project-dir>` 一致（Windows 大小写不敏感） |
-   | 2 | `gda call --project <project-dir> get_engine_version` | 退出码 0，返回引擎版本 |
+   | 2 | `gda call --project <project-dir> get_engine_state --args '{"action":"version"}'` | 退出码 0，返回引擎版本 |
    | 3 | `gda call --project <project-dir> system_status`（连续两次） | 两次均退出码 0 |
 
    任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda status --project <project-dir> --json` / `gda list` 的输出（实例、端口、`mcp_url` 与 `live`），再按下列判据分流，不自行启动或重启 Godot：
@@ -104,7 +104,7 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
    - `bun run gda-dev-tools build`
    - `bun run gda-dev-tools deploy --project <project-dir>`
 3. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
-4. 记录基线：开始时间、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`、`git status --porcelain`；若本轮由 `jam e2e` 抽题，记录主题、来源、`draw_id` 与 `jam.json` 的抽样快照。
+4. 记录基线：开始时间、`system_status.version`、`get_engine_state`（`action=version` 的返回值）、`git rev-parse --short HEAD`、`git status --porcelain`；若本轮由 `jam e2e` 抽题，记录主题、来源、`draw_id` 与 `jam.json` 的抽样快照。
 5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。调用被拒（如高风险确认缺失）时，记录「轨迹不可得」及原因，继续执行，不推测。
 6. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
 

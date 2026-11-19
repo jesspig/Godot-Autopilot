@@ -5,6 +5,7 @@ import { run as categories } from "./categories";
 import { run as search } from "./search";
 import { run as describe } from "./describe";
 import { run as call } from "./call";
+import { run as batch } from "./batch";
 import { run as list } from "./list";
 import { run as start } from "./start";
 import { run as stop } from "./stop";
@@ -34,6 +35,7 @@ export const COMMANDS: Record<string, Command> = {
   search: { run: search },
   describe: { run: describe },
   call: { run: call },
+  batch: { run: batch },
   list: { run: list },
   start: { run: start },
   stop: { run: stop },

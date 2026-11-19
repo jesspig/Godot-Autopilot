@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { callTool } from "../src/mcp/client";
 import { CLI_VERSION } from "../src/version";
 import { CliError, ExitCode } from "../src/errors";
+import { extractPayload } from "../src/payload";
 
 const servers: ReturnType<typeof Bun.serve>[] = [];
 
@@ -66,6 +67,44 @@ describe("callTool", () => {
     const res = await callTool("nope", {}, { port });
     expect(res.error?.code).toBe(-32000);
     expect(res.error?.message).toBe("bad tool");
+  });
+
+  test("failed task 透传 task.error 结构化数据并经 extractPayload 展示", async () => {
+    const port = serve(async (req) => {
+      const body = (await req.json()) as { method?: string; id?: number };
+      if (body.method === "initialize") {
+        return sseResponse({
+          jsonrpc: "2.0",
+          id: body.id,
+          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } },
+        });
+      }
+      if (body.method === "notifications/initialized") return new Response("", { status: 202 });
+      if (body.method === "tools/call") {
+        return sseResponse({ jsonrpc: "2.0", id: body.id, result: { resultType: "task", taskId: "t-fail" } });
+      }
+      if (body.method === "tasks/get") {
+        return sseResponse({
+          jsonrpc: "2.0",
+          id: body.id,
+          result: {
+            taskId: "t-fail",
+            status: "failed",
+            statusMessage: "boom",
+            error: { code: -32603, message: "boom", data: { structured_error: { code: "backend_down" } } },
+          },
+        });
+      }
+      return jsonResponse({ error: { code: -32600, message: "unexpected method" } }, 400);
+    });
+    const res = await callTool("x", {}, { port });
+    expect(res.error?.code).toBe(-32603);
+    expect(res.error?.message).toBe("boom");
+    const data = res.error?.data as { structured_error?: { code?: string } };
+    expect(data.structured_error?.code).toBe("backend_down");
+    const extracted = extractPayload(res);
+    expect(extracted.toolFailed).toBe(true);
+    expect(extracted.failureMessage).toContain("backend_down");
   });
 
   test("call_tool 包装结构", async () => {

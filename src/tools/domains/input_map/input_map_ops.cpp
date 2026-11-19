@@ -902,8 +902,47 @@ JV handle_get_input_map(const JV &args) {
     r["name"] = JV(name);
     return r;
   }
+  if (action == "query") {
+    if (name_p == nullptr) {
+      return input_map_action_error(
+          "missing required parameter for action 'query': name");
+    }
+    const std::string name = name_p->GetString();
+    auto *ps = godot::ProjectSettings::get_singleton();
+    if (!ps) {
+      return input_map_action_error("ProjectSettings not available");
+    }
+    const godot::String setting_path =
+        godot::String(("input/" + name).c_str());
+    if (!ps->has_setting(setting_path)) {
+      return input_map_action_error("input action '" + name +
+                                    "' not found in project settings");
+    }
+    godot::Variant stored = ps->get_setting(setting_path);
+    if (stored.get_type() != godot::Variant::DICTIONARY) {
+      return input_map_action_error(
+          "malformed input setting for action '" + name +
+          "': expected a dictionary at input/" + name);
+    }
+    JV config = VariantJson::serialize(stored);
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["action"] = JV(name);
+    r["source"] = JV("project_settings");
+    const JV *deadzone = config.Find("deadzone");
+    if (deadzone != nullptr) {
+      r["deadzone"] = *deadzone;
+    }
+    const JV *events = config.Find("events");
+    if (events != nullptr) {
+      r["events"] = *events;
+    }
+    r["config"] = std::move(config);
+    return r;
+  }
   return input_map_action_error(
-      "unknown action '" + action + "' for get_input_map (expected list, has)");
+      "unknown action '" + action +
+      "' for get_input_map (expected list, has, query)");
 }
 
 JV handle_set_input_map_action(const JV &args) {
