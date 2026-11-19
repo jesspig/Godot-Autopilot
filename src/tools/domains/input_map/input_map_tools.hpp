@@ -22,7 +22,7 @@ const std::vector<ParamSpec> kSaveInputMapParams = {
 };
 
 const std::vector<ParamSpec> kGetInputMapParams = {
-    {"name", "string", "Optional action name for action='list' or 'has'; with list it filters to [name] when the action exists and [] otherwise, with has it is the action to test", false},
+    {"name", "string", "Action name: for action='list' it filters to [name] when the action exists and [] otherwise; for action='has' it is the action to test; for action='query' it is the required name of the persisted action whose configuration is read from ProjectSettings input/<name>", false},
 };
 
 const std::vector<ParamSpec> kSetInputMapActionParams = {
@@ -258,7 +258,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       input_map_action_spec(
           ToolSpec{
               "get_input_map",
-              "Read input action names from the editor project InputMap, actions: list (all action names including built-in 'ui_*'; with name it returns [name] when the action exists and [] otherwise) and has (boolean existence check for name, reported as result and found). A running game process has its own InputMap loaded at startup, so this reflects only the editor project state. Deprecated aliases: get_input_map_actions, has_input_map_action.",
+              "Read input action names from the editor project InputMap, actions: list (all action names including built-in 'ui_*'; with name it returns [name] when the action exists and [] otherwise), has (boolean existence check for name, reported as result and found) and query (requires name; reads the persisted configuration of input/<name> from ProjectSettings and returns deadzone, events and the full config, so custom actions not loaded into the editor InputMap can be verified). A running game process has its own InputMap loaded at startup, so list and has reflect only the editor project state. Deprecated aliases: get_input_map_actions, has_input_map_action.",
               "Input",
               {"input", "map", "actions", "get_input_map_actions",
                "has_input_map_action"},
@@ -266,9 +266,10 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               tool_flags::kNone,
               kGetInputMapParams,
               input_map_ops::handle_get_input_map},
-          {"list", "has"},
+          {"list", "has", "query"},
           {"{\"action\":\"list\"}",
-           "{\"action\":\"has\",\"name\":\"mario_jump\"}"}),
+           "{\"action\":\"has\",\"name\":\"mario_jump\"}",
+           "{\"action\":\"query\",\"name\":\"mario_jump\"}"}),
       {
           [](ToolAlias alias) {
             alias.adapt_args = [](const mcp::JsonValue &args) {
