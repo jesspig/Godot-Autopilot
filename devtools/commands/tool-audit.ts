@@ -1111,6 +1111,10 @@ function buildAudit() {
   };
 }
 
+export function getCanonicalCatalog(): string[] {
+  return [...buildAudit().tool_names];
+}
+
 function buildTarget(audit: ReturnType<typeof buildAudit>) {
   const domains = Object.keys(audit.by_domain).map((name) => {
     const definition = DOMAIN_TARGETS[name];

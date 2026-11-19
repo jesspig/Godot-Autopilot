@@ -5,12 +5,13 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 
 # GDA Game Jam
 
-用 GDA 把 Game Jam 主题做成完整、可运行、可提交的游戏。游戏质量、创意与交付完整度是唯一目标；工具问题只作为阻塞处理。
+用 GDA 把 Game Jam 主题做成完整、可运行、可提交的游戏。游戏质量、创意与交付完整度是唯一目标；工具问题只作为阻塞处理。支持数小时长程任务：开工先写 `GOAL.md`，按关连续推进、逐关留证与存检查点，不中途打扰用户（见 §14）。
 
 ## 目标与边界
 
 - 目标：交付一款有明确钩子、核心循环可玩、视听完整、能现场运行的游戏。
 - 目标：按 `GAMEJAM.md` 的提交要求准备作品说明，作品能直接用于比赛提交。
+- 目标：长程任务推进到 `GOAL.md` 的 `complete` 或 `unmet`，全程留下可被离线回放消费的结构化自检证据（§14、§15）。
 - 边界：不修改 GDA 源码、`devtools/`、`cli/`、`tests/`、`docs/wiki/`、`AGENTS.md`、`VERSION`。
 - 边界：不修改用户固定维护的 `devtools/templates/gamejam/brief.md`。
 
@@ -38,8 +39,8 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 3. 定核心循环：输入 → 反馈 → 奖励/惩罚 → 下一轮；写清操作方式与一轮可玩内容。
 4. 定主题诠释：机制、叙事或表现至少有一层与主题直接对应，避免只在标题上贴主题。
 5. 定记忆点：玩家离开后最容易记住的一个机制、画面或声音。
-6. 定范围上限：一个核心机制、一个可玩循环、5–10 分钟内容；先保证完整，再考虑扩展。
-7. 长轮次或需要跨会话恢复时，可在项目根维护 `DEVLOG.md`，只记决策、阻塞与下一步；默认不建。
+6. 定范围：至少 3 个可游玩关卡，完整通关流程不低于 5 分钟；先跑通核心闭环，再按关卡计划扩展全部内容，不交付占位或半成品。
+7. 长轮次或需要跨会话恢复时，先按 §14 在项目根写入 `GOAL.md`，再按需维护 `DEVLOG.md`（只记决策、阻塞与下一步）；`DEVLOG.md` 默认不建，`GOAL.md` 为长程必建。
 
 ## 3. 命名与创建
 
@@ -54,17 +55,19 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 4. 不手工创建最终项目目录，不手工拼 `<slug>-<hash8>`。
 5. 创建失败时停止并报告；不得在 intake 中继续开发。
 
-## 4. 安装插件与打开工程
+## 4. 引擎准备与基线
 
-1. 创建成功后立即执行：
+1. 创建成功后立即执行一条命令完成装插件与启动引擎：
 
    ```bash
-   bun run gda-dev-tools build
-   bun run gda-dev-tools deploy --project <project-dir>
+   bun run gda-dev-tools harness setup --project <project-dir>
    ```
 
-2. 请用户在 Godot 编辑器中打开 `<project-dir>` 并启用插件；不自行启动或重启 Godot。
-3. 在仓库根执行只读探针：
+   该命令按序完成构建、部署、启动引擎、列出工程、核对状态与连通性；默认启动完整 Godot 编辑器，无显示环境才用 headless 回退。全程自行完成，不把启动或启用插件交回用户。
+
+2. 引擎由本流程自主启动；若崩溃，先按 §14.4 记录上下文（最后一个调用、日志尾部、未保存增量）再自主重启恢复，不中途要求用户介入。
+
+3. 在仓库根执行只读探针复核工程与运行状态：
 
    ```bash
    gda status --project <project-dir> --json
@@ -72,9 +75,9 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
    gda call --project <project-dir> system_status
    ```
 
-4. `gda status` 的 `project` 必须与 `<project-dir>` 一致；编辑器仍打开其他工程时，请用户切换或重新打开。
-5. `system_status` 必须返回 `running=true`；不可达时停止，说明需要打开工程并启用插件。
-6. 记录基线：开始时间、GDA 版本、Godot 版本、`git rev-parse --short HEAD`、主题与 `draw_id`。
+4. `gda status` 的 `project` 必须与 `<project-dir>` 一致；不一致时按 §14.4 记录后自主重启引擎并重连，不请用户切换工程。
+5. `system_status` 必须返回 `running=true`；不可达时按 §14.4 归因与重启恢复，仍不可达则停止并报告阻塞点。
+6. 记录基线：开始时间、GDA 版本、Godot 版本、`git rev-parse --short HEAD`、主题与 `draw_id`；把引擎启动与恢复情况登记到 `GOAL.md` 的 `blocker` / `checkpoints`（按 §14）。
 
 ## 5. 垂直切片
 
@@ -131,6 +134,8 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
    | Innovation | 钩子或机制有新意吗？ | 机制说明、实现证据 |
    | Theme Interpretation | 主题落到机制或叙事了吗？ | 机制与主题对应说明 |
 
+   > 本表六维自检的结论与证据引用同时按 §15 写入结构化自检证据，随每关/每轮交付保存，供离线回放按证据查阅。
+
 2. 收尾执行 `bun run gda-dev-tools jam index`，把项目登记进 `examples/INDEX.md`。
 3. 最终交付说明写清：项目名、主题、赛事与来源、工程路径、运行方式、操作、已覆盖内容、已知缺口。
 4. 自动试玩不能替代人工试玩；最终把需要用户亲自体验的部分明确列出。
@@ -151,7 +156,7 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 - 禁止使用 `jam e2e`；比赛项目只走 `jam create`。
 - 禁止绕过 GDA 手动编辑 Godot 工程文件（`*.tscn`、`*.tres`、`*.gd`、`project.godot` 等）；`jam create` 生成的骨架除外。
 - 禁止修改 `devtools/templates/gamejam/brief.md`、GDA 源码、`devtools/`、`cli/`、`tests/`、`docs/wiki/`、`AGENTS.md`、`VERSION`。
-- 禁止主动重启 Godot；引擎崩溃时停止并如实记录。
+- 禁止未记录上下文就重启 Godot；崩溃时先记录最后一个调用、日志尾部与未保存增量，再按 §14.4 自主重启恢复，不把未经记录的重启带进交付。
 - 禁止编造、夸大或凭印象补写试玩结果与证据。
 - 禁止提交 git、推送、打 tag 或升版。
 
@@ -164,4 +169,55 @@ description: "用 GDA 把 Game Jam 主题做成完整、可运行、可提交的
 - `SUBMISSION.md` 按 `GAMEJAM.md` 要求完成，内容与实现一致。
 - `examples/INDEX.md` 已包含本项目。
 - 已知缺口、未验证项与需要人工试玩的部分已明确说明。
+- 长程任务的 `GOAL.md` 已推进到 `complete` 或 `unmet`，每关/每轮结构化自检证据已保存（§14、§15）。
 - 本轮未修改 GDA 源码、文档、技能或固定模板。
+
+## 14. 长程任务与 GOAL.md
+
+面向数小时、至少 3 关、完整通关流程不低于 5 分钟的长程任务。开工先写 `GOAL.md`，全程按它连续推进。
+
+### 14.1 GOAL.md 字段与原子写
+
+- 位置：项目根 `GOAL.md`，为运行时产物；开工时先写入初版，规则本身不预建其他结构。
+- 字段：
+  - `objective`：一句话总目标（做出什么游戏、达到什么交付状态）。
+  - `acceptance`：可判定的验收条件，至少含关卡 ≥ 3、完整通关流程 ≥ 5 分钟、六维自检证据齐全、冷启动无阻断性错误。
+  - `limits`：预算 / 时间 / 范围上限，作为自动推进的停止边界。
+  - `state`：取值仅限 `active`、`paused`、`budgetLimited`、`usageLimited`、`complete`、`unmet`。
+  - `completionEvidence`：指向完成证据的路径或引用（关卡状态、六维自检结论、冷启动 / 重开 / 暂停状态、DEVLOG 决策点）。
+  - `blocker`：当前阻塞点，无阻塞写「无」。
+  - `checkpoints`：按关 / 按轮的检查点列表，每项含关卡或轮次标识、状态、证据引用、时间戳。
+- 原子写：任何字段更新都先写临时文件再重命名覆盖 `GOAL.md`，不原地多次写入；写入失败保留上一版，不产生半截状态。
+
+### 14.2 continuation rule（连续推进）
+
+1. 每关或每轮完成后按顺序执行：保存工程 → 由 verifier 判定（§14.3）→ 写 checkpoint（含证据引用）→ 更新 `GOAL.md` 字段。
+2. 判定未通过且未触达 `limits` 时，自动进入下一关或下一轮，禁止提前收尾。
+3. 仅在以下情况通知用户：`state` 为 `complete` 或 `unmet`、出现 `blocker`、`active` 之外且触达 `limits`（`budgetLimited` / `usageLimited`）；其余过程不中断用户。
+4. 触达 `limits` 后停止自动推进，写清未达成项，并把 `state` 置为对应的受限值。
+
+### 14.3 混合 verifier
+
+- 硬指标（关卡数、完整通关时长、冷启动与重开 / 暂停运行状态、六维证据是否齐全）按已保存证据判定，不靠开发者口述。
+- 软指标（创意、手感、主题诠释）由独立子代理判定；开发者不对自己的作品做软指标自评。
+- verifier 结论写入 checkpoint 与 `GOAL.md` 的 `completionEvidence`，只记录判定结果与证据引用，不在此改编判定逻辑。
+
+### 14.4 无进展检测与恢复
+
+- 连续 2 次关卡或轮次没有玩法或内容进展（无新可玩内容、无机制 / 视听增量）→ 把 `state` 置为 `paused`，写明阻塞与已尝试路径，并按 §14.2 报告。
+- 恢复时读取 `GOAL.md` 末态 + 已保存证据 + 当前工程状态，从最后一个 checkpoint 续跑；`complete` 与 `unmet` 不续跑。
+- 引擎崩溃按 §4.2 先记录上下文再自主重启；恢复后先用 §4.3 探针核对工程与运行状态，再继续下一段，每次恢复记入 checkpoints。
+
+## 15. 结构化自检证据
+
+每关完成或每轮交付时，产出一份可被离线回放消费的结构化自检证据；只定义格式与产出时机，供下游按证据回放，不在此做判定。
+
+- 时机：垂直切片完成、每关结束、每轮创意迭代结束、收尾冷启动复验后各产出一份；随 checkpoint 一起保存，并登记到 `GOAL.md` 的 `completionEvidence`。
+- 载体：项目根 `SELFCHECK.md`，或每关一个 `SELFCHECK-<关卡标识>.md`；用固定小标题 + 键值行或表格，便于机器读取。
+- 字段：
+  - 关卡 / 轮次标识与时间戳；
+  - 关卡状态：可玩 / 未完成 / 阻塞，以及本关新增内容摘要；
+  - 六维自检结论与证据引用：Overall、Gameplay、Graphics、Audio、Innovation、Theme Interpretation 各给结论（通过 / 待改进 / 缺失）与对应证据路径或引用（截图、读回值、音频播放证据、机制与主题对应说明）；
+  - 冷启动 / 重开 / 暂停状态：三态各记一次实际运行结论与证据引用；
+  - DEVLOG 决策点：本关 / 本轮的关键决策、取舍与下一步，引用 `DEVLOG.md` 对应条目（未建 `DEVLOG.md` 时直接写在此）。
+- 只记可观察事实与证据引用，不凭印象补写，不写未发生的状态。

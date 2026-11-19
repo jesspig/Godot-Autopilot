@@ -1,13 +1,13 @@
 ---
 name: gda-e2e-testing
-description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一轮端到端验收，只记录问题与证据、不修复。何时用：端到端测试、e2e、跑一轮验收、测试 GDA 工具表现、指定某个 demo 做端到端、要 report.md / evidence.md / Q<n> 问题记录。"
+description: "用 GDA 按主题开发一款流程完整、具备完整游戏机制与核心玩法的 Godot 游戏，在真实完整开发流程中检测工具表现；只记录问题与证据、不修复。何时用：端到端测试、e2e、跑一轮验收、测试 GDA 工具表现、指定某个 demo 做端到端、要 report.md / evidence.md / Q<n> 问题记录。"
 ---
 
-# Godot 工程端到端验收
+# 按主题开发完整游戏的端到端测试
 
-读取目标 Godot 工程，用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。本轮只记录，不修复。
+读取目标 Godot 工程，按主题开发一款流程完整、具备完整游戏机制与核心玩法的游戏。游戏是检测工具的载体，工具是被测对象；检测发生在真实完整开发流程中，不单列覆盖任务。本技能以真实完整开发驱动的工具覆盖为目标，覆盖口径固定为 252 canonical 工具名单；覆盖率是真实开发的自然结果而非优化目标，禁止为测试而测试、禁止为凑数调用工具。记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。本轮只记录，不修复。
 
-## 本轮边界：只记录，不修复
+## 本轮边界：真实开发检测工具，只记录不修复
 
 - 报告侧唯一产物是 `report/<YYYY-MM-DD_HH-MM>/` 下的 `report.md`、`evidence.md`、`img/`。
 - 工程侧只允许修改 `examples/e2e`（或用户指定的工程）与 `build/`、部署产生的 `addons/` 等构建产物。
@@ -15,24 +15,27 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 - 不运行修复、不应用补丁、不提交 git。
 - 开工记录 `git status --porcelain` 基线；收尾比对，除被忽略目录外不得出现新的跟踪文件改动。
 - 问题只记录现象、影响、复现步骤与证据；本轮不做根因分析与修复。
+- 目的差异：本技能以「真实完整开发驱动的工具覆盖」为目标，覆盖口径固定为 252 canonical 名单（`catalog_total=252`）；覆盖率是真实开发的自然结果，不是优化目标或完成判据。
+- 禁止为测试而测试、禁止为凑数调用工具；每次工具调用都必须服务于一个真实玩法功能增量，并能回答「这一步在真实开发里为什么需要」。
+- 工具覆盖是真实开发的结果，不设覆盖率 KPI；禁止为凑覆盖率做无开发意图的调用。
 
 ## 输入
 
 - 识别工程标识：接受绝对路径、相对路径，或 `examples/e2e` 写法。
-- 接收可选的本轮聚焦目标，例如「只验证场景与脚本工具」；未给出时按工程的任务书完整推进。
+- 环境准备全程自主：构建、部署、装插件、启动引擎都自行完成，默认启动**完整编辑器**（非 headless）；仅无显示环境才回退到 headless，不向命令传业务参数，也不需要用户打开工程、启用插件或关闭编辑器。任何重启前都执行「先记录上下文再自重启」（见 §3 注），崩溃恢复另按 §4.6。
 - 未收到工程路径时，使用固定沙盒 `examples/e2e`：
-  1. 若 Godot 正打开 `examples/e2e`，先请用户关闭编辑器；不自行关闭或重启 Godot。
-  2. 每个新轮次先重置：`bun run gda-dev-tools jam e2e --reset --json`；只有用户明确要求继续上一轮时才跳过重置。
-  3. 读取返回的 `path` 作为 `<project-dir>`，并读取 `<project-dir>/GAMEJAM.md` 与 `jam.json`。
-  4. 创建/重置成功后立即执行 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>`，确保插件已安装且为当前构建。
-  5. 请用户打开 `<project-dir>` 并启用插件，再进入前置检查。
-- 收到工程路径时：直接使用该工程，不重新抽题；若路径就是 `examples/e2e`，仍按新轮次先重置（用户明确要求续跑时除外）。
+  1. 每个新轮次先重置：`bun run gda-dev-tools jam e2e --reset --json`；只有用户明确要求继续上一轮时才跳过重置。
+  2. 读取返回的 `path` 作为 `<project-dir>`，并读取 `<project-dir>/GAMEJAM.md` 与 `jam.json`。
+  3. 创建/重置成功后执行一次自主环境准备：`bun run gda-dev-tools harness setup --project <project-dir>`。它按序完成 build、deploy、`gda start`、list、status、ping、tools list，即构建当前版本、安装插件、启动完整编辑器并确认可达。
+  4. setup 成功即进入 §3 前置检查；不再要求用户打开工程或启用插件。
+- 收到工程路径时：直接使用该工程，不重新抽题；若路径就是 `examples/e2e`，仍按新轮次先重置（用户明确要求续跑时除外）；随后同样执行 `bun run gda-dev-tools harness setup --project <project-dir>`。
+- 可接收本轮聚焦目标（如「重点验证脚本工具」），但它只调整验证侧重，不替代「按主题开发完整游戏」的完成判据。
 
 ## 1. 校验输入
 
 1. 规范化到绝对路径 `<project-dir>`。
 2. 校验 `project.godot`；缺失时报错并停止。
-3. 校验 `docs/`；存在时按第 2 节读取；缺失且无 `GAMEJAM.md` 时只做运行与观测验收，并在报告中注明无项目文档。存在 `GAMEJAM.md` 时按开发型推进，不因 `docs/` 缺失降级。
+3. 校验 `docs/` 与 `GAMEJAM.md`；两者缺失时请用户给出主题或先抽题，不降级为只读验收。存在 `GAMEJAM.md` 时按其主题推进，不因 `docs/` 缺失降级。
 
 ## 2. 读任务书
 
@@ -46,16 +49,13 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 6. 按 test-plan 的阅读路径补读 `docs/gdd/`、`docs/tech/`、`docs/art/` 中与本轮相关的页面。
 7. 若 `report/` 最近一轮存在 `analysis.md`，且该轮报告对应本工程，只读取其中的「待下一轮端到端验证项」，作为本轮附加观察点；文件缺失或无法确认对应关系时继续执行，不阻塞，不改变 test-plan。
 
-`GAMEJAM.md` 用于确定本轮开发范围；报告只评估 GDA 工具表现，不把游戏设计质量写成 `Q`。
+`GAMEJAM.md` 用于确定本轮开发范围与主题；报告只评估 GDA 工具表现，不把游戏设计质量写成 `Q`。
 
-判定任务形态：
-
-- 开发型：工程为空或文档要求从零实现。仅经 GDA 创建和修改工程文件。
-- 验收型：工程已建成且 test-plan 要求只读运行与核对。保持工程文件只读。
+任务形态：所有轮次均为开发型——按主题开发或补全为流程完整、具备完整机制与核心玩法的游戏。工程已有内容时，仍按主题要求补全缺失的机制与流程，不降级为只读验收。
 
 优先遵循工程文档的项目约定；与本技能默认流程冲突时，以工程文档为准，并在报告中记录冲突。
 
-按工程文档定位素材与资源，不假设固定目录。开发型只读查阅 `*.tscn`、`*.tres`、`project.godot` 用于核对与截图验证；不手动修改。
+按工程文档定位素材与资源，不假设固定目录。只读查阅 `*.tscn`、`*.tres`、`project.godot` 用于核对与截图验证；不手动修改。
 
 ## 执行期边界
 
@@ -76,7 +76,7 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 
 把文件搜索与通配扫描限定在 `<project-dir>/` 与本轮报告目录内；不使用仓库根递归搜索。
 
-只执行 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>` 完成构建与部署；读取命令输出，不读 `devtools/` 或源码实现。
+只执行 `bun run gda-dev-tools harness setup --project <project-dir>`（内含 build、deploy 与引擎启动）完成环境准备；需要单独重建时才用 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>`。读取命令输出，不读 `devtools/` 或源码实现。
 
 遇到工具失败、行为异常或疑似缺陷时：
 
@@ -96,29 +96,137 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
    | 2 | `gda call --project <project-dir> get_engine_state --args '{"action":"version"}'` | 退出码 0，返回引擎版本 |
    | 3 | `gda call --project <project-dir> system_status`（连续两次） | 两次均退出码 0 |
 
-   任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda status --project <project-dir> --json` / `gda list` 的输出（实例、端口、`mcp_url` 与 `live`），再按下列判据分流，不自行启动或重启 Godot：
-   - `status.project` 与 `<project-dir>` 不一致 → 工程目标不匹配，停止并请用户打开正确工程；不对另一个编辑器继续操作；
+   任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda status --project <project-dir> --json` / `gda list` 的输出（实例、端口、`mcp_url` 与 `live`）；属环境或实例问题时先按「先记录上下文再自重启」重试 `bun run gda-dev-tools harness setup --project <project-dir>` 一次再复测，再按下列判据分流：
+   - `status.project` 与 `<project-dir>` 不一致 → 工程目标不匹配：记录 `status.project` 与期望路径，停止对当前实例操作，自重启到目标工程后重跑探针；仍不匹配则转报告并记为阻断；
    - CLI 成功而后续 MCP 工具调用失败 → 客户端路径问题（客户端连接、协议或授权），GDA 本体可用；
-   - CLI 与客户端都失败且 `gda status --project <project-dir> --json` / `gda list` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
-2. 固定沙盒 `examples/e2e` 在创建/重置后已执行 `build` + `deploy`；外部工程若缺少 `<project-dir>/addons/godot-autopilot/`，在仓库根执行：
-   - `bun run gda-dev-tools build`
-   - `bun run gda-dev-tools deploy --project <project-dir>`
-3. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
+   - CLI 与客户端都失败且 `gda status --project <project-dir> --json` / `gda list` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，如实记录后自重启一次（记上下文 → 重跑 setup → 复测）；仍失败转报告。
+2. 固定沙盒 `examples/e2e` 在创建/重置后、外部工程在首次进入前，统一执行 `bun run gda-dev-tools harness setup --project <project-dir>`（已成功执行则跳过重复 build/deploy）。它完成 build、deploy、插件安装与引擎启动；不要求用户介入。
+3. 调用 `system_status`，要求 `running=true`。不可达时按「先记录上下文再自重启」重试 setup 一次并复测；仍不可达则转报告并记为阻断，不再要求用户打开工程或启用插件。
+
+   > 先记录上下文再自重启：任何重启编辑器/引擎的场景（前置检查失败、中毒兜底、崩溃恢复）都先记录当前工具调用、工程未保存增量清单、CLI 与插件 trace/log 尾部、`GOAL.md` 末态，再执行重启；崩溃恢复沿用 §4.6 且保留其归因与可复现性判定。禁止无记录重启，也不再请用户关闭或打开编辑器。
 4. 记录基线：开始时间、`system_status.version`、`get_engine_state`（`action=version` 的返回值）、`git rev-parse --short HEAD`、`git status --porcelain`；若本轮由 `jam e2e` 抽题，记录主题、来源、`draw_id` 与 `jam.json` 的抽样快照。
 5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。调用被拒（如高风险确认缺失）时，记录「轨迹不可得」及原因，继续执行，不推测。
 6. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
 
 ## 4. 执行
 
-1. 按工程的 test-plan 推进；无 test-plan 时按「搭 → 写 → 看 → 定」四拍推进：先搭场景与调整，再写脚本与挂载，再运行调试，据结果进入下一轮。
-2. 单环只做一个功能增量，不合并多个功能。
-3. 每环开始前记录基线：同条件截图、读回值或日志。
-4. 每环的「看」必须产生证据：结构类用编辑器截图，运行类用游戏截图，逻辑类用读回值或日志。
-5. 改动后用与基线相同的条件复测，记录行为差异；不只写「通过」，必须提供基线 vs 改动后的可比证据。
+### 4.1 完整游戏定义（硬门槛）
+
+在 §4.2 之前先确认本轮要交付的作品满足以下全部条件，缺任一项不得声称完成：
+
+- 主题契合：`GAMEJAM.md` 的创意约束在作品中有可指认的体现。
+- 核心玩法：至少一条「目标 → 挑战/失败 → 反馈 → 结果」完整链，不是孤立的机械动作。
+- 完整流程：开始 / 进行 / 胜利 / 失败 / 重玩复位，状态文本可见。
+- 实时反馈：HUD 呈现关键状态，至少一种视听反馈（音效或动画）。
+- 真实输入验证：经 `game_input` 注入完成一次完整循环，读回值与截图成对。
+- 稳定性：运行期无引擎错误日志。
+
+### 4.2 六阶段开发流程
+
+按「主题解读 → 玩法设计 → 场景搭建 → 脚本挂载 → 运行调试 → 闭环验证」推进，每阶段绑定必须使用的工具类别与产出证据：
+
+| 阶段 | 真实开发动作 | 必须使用的工具类别 | 产出证据 |
+| --- | --- | --- | --- |
+| 主题解读 | 读 `GAMEJAM.md` / `jam.json`，定主题与创意约束 | 文件读取（非工具调用） | 主题与约束摘记 |
+| 玩法设计 | 定目标、挑战、胜负、重玩、HUD、反馈 | 文件读取（非工具调用） | 玩法闭环验证表初稿 |
+| 场景搭建 | 建场景骨架、资源与视觉配置 | `editor_scene_control`、`create_scene_node`、`execute_script`、`property_set` | 场景树读回 + 编辑器截图 |
+| 脚本挂载 | 写玩法脚本、挂载、输入映射 | `create_script`、`patch_script`、`attach_script_to_node`、`set_input_map_action` | 脚本 content_hash + readback |
+| 运行调试 | 运行、输入、读回 | `game_input`、`get_game_evidence`、`game_script` | 基线 vs 改动后读回值 |
+| 闭环验证 | 胜负流程、重玩、截图、稳定性 | `click_game_ui_element`、`capture_editor_viewport`、`get_game_log_entries` | 完整循环截图 + 无错误日志 |
+
+纪律：
+
+1. 单环只做一个功能增量，不合并多个功能。
+2. 每环开始前记录基线：同条件截图、读回值或日志。
+3. 每环的「看」必须产生证据：结构类用编辑器截图，运行类用游戏截图，逻辑类用读回值或日志。
+4. 改动后用与基线相同的条件复测，记录行为差异；不只写「通过」，必须提供基线 vs 改动后的可比证据。
+5. 每环结束回答三问：本环影响了哪个玩法指标？基线值与改动后值分别是什么？若未影响任何玩法指标，说明为什么值得做。答案落入玩法闭环验证表对应行。
 6. 失败时区分「改动无效」与「引入回归」；回退引入回归的改动，只回滚本环。
 7. 本环验收项全过才进入下一环。
 8. 当场微调手感与数值问题并复验；不带病进入下一环。
 9. 存在本轮聚焦目标时优先覆盖该目标，同时交付一个可运行、可复验的增量。
+
+### 4.3 工具覆盖规则与证据一致性校验（反作弊）
+
+目的：e2e 以「真实完整开发驱动的工具覆盖」为目标，覆盖口径固定为 252 canonical 工具名单（`catalog_total=252`，由 `harness coverage` 导出）；覆盖率是真实开发的自然结果，不是优化目标。禁止为测试而测试、禁止为凑数调用工具；每次调用都必须服务于一个真实玩法功能增量。
+
+- 覆盖以 CLI 轨迹 `~/.godot-autopilot/cli-traces/trace-YYYYMMDD.jsonl` 为准，与 252 canonical 名单 join 后统计；插件轨迹有 20 文件 / 50MB 上限，会漏早期数据，不作为覆盖统计源。
+- 建立「工具真实操作流程表」：每个计入覆盖的工具必须同时具备三要素——①服务于哪个玩法功能；②真实操作步骤；③读回值或截图证据。缺任一要素判为**无效触碰**，从覆盖中剔除；`missing required parameter` 等无效调用同样单列为无效触碰，不计有效覆盖。
+- 证据一致性校验**不设数字门槛**：按证据与所指认玩法功能的对应关系判断，而不是靠覆盖率阈值。若某轮证据与所声称服务的玩法功能数不匹配（证据无法指认到具体玩法功能、同一证据被重复用于多个无关功能、玩法功能清单与证据无法一一对应），标 `suspected_gaming=true`。
+- 标 `suspected_gaming=true` 的轮次，其覆盖数据**不进经验库**（不写入 HARNESS_LIBRARY），等待下一轮真实开发复核；报告中写明依据，不自评「通过」。
+- 未覆盖工具须在报告中列出原因（如模态工具需人工值守、仅特定场景适用），禁止为凑数盲调用补齐。
+- 报告固定写一行口径：`覆盖 N/252，有效 M，无效触碰 K，suspected_gaming=是/否及依据`。N 为与 canonical join 后的触达数，M 为通过三要素校验的有效数，K 为无效触碰数。
+
+### 4.4 保存优先与中毒兜底
+
+- 每完成一个可保存增量（场景结构调整、脚本挂载、属性配置）立即 `save_editor_scene`，不要等一批做完再保存。
+- 仅当日志命中 `task store: failed to persist` 签名时才启用恢复流程：先读文件确认是否已落盘；已落盘则直接恢复，未落盘则重做后立即保存；记录恢复次数与丢失的增量。
+- C1 根因已由 SDK 0.3.12 根治；此流程为兜底而非常规步骤。整轮未命中签名时，在报告中写「未触发」。
+- 不得因预期可能中毒而预防性重启；确需重启时按 §3「先记录上下文再自重启」执行（崩溃恢复例外见 §4.6），不再要求用户关闭编辑器。
+
+### 4.5 模态工具受限
+
+- `show_display_dialog`、`open_os_path`、`show_os_alert` 列为受限工具：放在每轮最后、仅人工值守时调用、调用前先保存全部工作。
+- `show_os_alert` 已具备无人值守保护（返回 notice 不弹窗），作为正面范例。
+- 无人值守会话不调用前两者；调用自身超时后须记录后续工具是否连锁超时。
+
+### 4.6 崩溃恢复与定位
+
+引擎崩溃不再直接终止本轮；工具链已较早期稳定，允许在记录上下文与初步定位后重启恢复开发。
+
+1. **先记录上下文，再重启**：崩溃前最后一个工具调用（工具名、参数摘要、`request_id`、`trace`）、CLI 与插件日志尾部、工程未保存增量清单。进程已消失时从 `~/.godot-autopilot/projects/.../logs/gda-*.log` 与 `cli-traces/trace-YYYYMMDD.jsonl` 取最后记录。未记录上下文不得重启。
+2. **初步归因**（三选一，禁止臆断）：
+   - 工具导致：崩溃前最后一个工具调用与崩溃时间紧邻（秒级），或该调用属高风险/主线程通道类；写明可疑工具。
+   - 偶发：崩溃前无明确调用、时间不邻近，或同一调用此前多次成功；标注待观察。
+   - 未定：证据不足时写「未定」，不写成确定结论。
+3. **可复现性**：仅在安全前提下（不破坏工程、不反复触发同类崩溃）重试可疑调用；重试再次崩溃记「可复现」，否则记「不可复现」，未尝试则记原因。不得为复现反复崩溃。
+4. **恢复**：允许重启 Godot；重启后按 §4.4 补存未保存增量、核对工程状态，再继续开发；记录恢复次数与丢失的增量。
+5. **登记**：写成 Q 条目（类型=失败），五要素 + 归因（工具导致/偶发/未定）+ 可复现性 + 恢复次数，证据用轨迹与日志路径。
+6. **停止条件**：同一崩溃重复 3 次且无法定位，或恢复后仍崩溃、工程状态无法还原 → 停止本轮并转入报告，留待分析阶段。
+
+### 4.7 长程机制：GOAL 状态、续跑与判定
+
+支撑数小时、至少 3 关、完整通关流程不低于 5 分钟的连续开发；全程串行推进，不引入 worktree 并行。
+
+#### 4.7.1 GOAL.md（开工即写，原子写）
+
+开工（§3 前置检查通过后、§4.2 第一环开始前）在 `<project-dir>/GOAL.md` 写入目标状态文件；它是运行时产物，不预建、不提交。字段固定为八项：
+
+| 字段 | 内容 |
+| --- | --- |
+| `objective` | 本轮目标：按主题交付流程完整、机制完整、至少 3 关且完整通关流程不低于 5 分钟的游戏，并在此过程中完成真实开发驱动的工具覆盖 |
+| `acceptance` | 验收判据（全部满足才算 complete）：≥3 关；总通关时长 ≥5 分钟；覆盖表有效（三要素齐全、无无效触碰）；Q 条目证据齐全；冷启动无错（重启后 `gda status` 与 `system_status` 正常、无引擎错误日志） |
+| `limits` | 边界：只改授权工程与报告目录；不改 GDA 源码与版本；不提交 git；cap（最大环数与时长上限）记在此处 |
+| `state` | 取值限于 `active` / `paused` / `budgetLimited` / `usageLimited` / `complete` / `unmet` |
+| `completionEvidence` | 指向满足各 acceptance 项的具体证据（截图、读回值、轨迹、digest 路径），逐项对应 |
+| `blocker` | 当前阻断项描述；无则写「无」 |
+| `checkpoints` | 每环一条：环号、玩法增量、基线/改动后证据、覆盖数、verifier 判定、GOAL 状态快照 |
+
+写入采用**临时文件 + 重命名**的原子写：先写 `GOAL.md.tmp`，校验内容完整后重命名为 `GOAL.md`；禁止就地追加导致半截状态。每环结束都更新 `checkpoints` 与 `state`。
+
+#### 4.7.2 续跑规则（continuation rule）
+
+每一环的标准闭环：开发增量 → 保存（`save_editor_scene`）→ verifier 判定 → 写 checkpoint 与 GOAL.md。
+
+- 判为未完成且未触达 `limits` 中的 cap，立即自动进入下一环，**不询问用户、不结束会话、禁止提前收尾**。
+- 只在 `state` 变为 `complete` / `unmet`、出现 `blocker`、或触达 cap 时通知用户；其余环内进展只写入报告与 GOAL.md。
+- 触达 cap 仍未完成：按触达的是预算还是用量记 `budgetLimited` 或 `usageLimited` 并通知用户，不擅自突破 cap。
+- 严禁把「已跑若干环」「报告已写初稿」当作收尾理由；收尾只能由 acceptance 全过、blocker 阻断或 cap 三种情形触发。
+
+#### 4.7.3 混合 verifier（不自评）
+
+每环由两类独立判定组成，开发者不对自己的产出做终判：
+
+- **硬指标**（关卡数、完整通关时长、覆盖三要素有效性与 `suspected_gaming`、崩溃恢复次数、证据文件存在性、无引擎错误日志）：由 `bun run gda-dev-tools harness digest --round <轮目录>` 读取其 `digest.json` 判定，以 digest 输出为准，不手工改写判定结果。
+- **软指标**（玩法手感、主题诠释、画面表现、关卡可玩性）：由**独立子代理**判定；开发者只提供证据与复现步骤，不代替子代理下结论。
+- 两类都通过本环才算 verifier 通过；任一不通过按 §4.2 纪律 6 回退或补齐后复验。
+
+#### 4.7.4 无进展检测与恢复
+
+- 连续 2 环出现「玩法指标无变化且覆盖数无增长」→ 将 `state` 置 `paused`，在报告中写明停滞的具体指标与已尝试动作并通知用户，不空转续跑。
+- 恢复流程：读取 `GOAL.md` 末态 → 运行 `bun run gda-dev-tools harness digest --round <轮目录>` 取摘要 → `gda status` 核对实例与工程；再据末态决定续跑或继续暂停。
+- `complete` / `unmet` 为终态，不续跑；`paused` / `budgetLimited` / `usageLimited` 仅在用户明确授权或 cap 重设后恢复。
+- `digest.json` 是只读派生品：只读它做判定与续跑，不回写、不改写 `report.md` / `evidence.md`。
 
 ## 5. 过程记录
 
@@ -126,26 +234,27 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 2. 每环结束立即在「执行过程」追加一段：环号、目标、基线证据、关键动作、改动后证据、行为差异、截图相对路径、发现的问题。
 3. 随做随写报告；不凭印象补写。
 4. 不抄录全量调用序列；只摘录支撑结论的关键事件（工具名、参数摘要、ok、error_code、duration_ms、request_id）。
+5. 每环结束按原子写同步更新 `GOAL.md` 的 `checkpoints` 与 `state`（见 §4.7.1）。
 
 ## 6. 证据
 
 | 证据 | 来源 | 用途 |
 |---|---|---|
-| GDA 轨迹 `trace-*.jsonl` | `GODOT_AUTOPILOT_TRACE_DIR` | 调用序列、耗时、错误码、参数摘要 |
-| GDA 日志 `gda-*.log` | `GODOT_AUTOPILOT_LOG_DIR` | 人类可读的失败上下文 |
+| CLI 轨迹 `trace-YYYYMMDD.jsonl` | `~/.godot-autopilot/cli-traces/` | 工具覆盖统计、调用序列、耗时、错误码、参数摘要 |
+| GDA 日志 `gda-*.log` | `GODOT_AUTOPILOT_LOG_DIR` | 人类可读的失败上下文、中毒签名检索 |
 | 截图 | 本轮目录 `img/` | 结构、画面、菜单与行为 |
 | 读回值 | 工具返回 | 逻辑断言 |
 | 对照证据 | 基线 vs 改动后的成对截图/读回值/日志 | 证明行为差异，区分修复与回归 |
 
 - 在报告中注明轨迹默认脱敏：参数截断到 4000 字符、敏感键替换；截图默认不写入轨迹。
-- 轨迹保留最近 20 文件 / 50MB。结束前把本轮关键事件摘录到本轮目录 `evidence.md`：工具名、参数摘要、ok、error_code、duration_ms、request_id、对应截图。不复制完整 `trace-*.jsonl` 与 `gda-*.log`。
+- 插件轨迹保留最近 20 文件 / 50MB。结束前把本轮关键事件摘录到本轮目录 `evidence.md`：工具名、参数摘要、ok、error_code、duration_ms、request_id、对应截图。不复制完整 `trace-*.jsonl` 与 `gda-*.log`。
 - 在报告与 `evidence.md` 中记录原始轨迹与日志路径，用 `<集中根>/projects/...` 占位；不写真实用户名或本机绝对路径。
 - 用相对路径引用报告与 `evidence.md` 中的截图；原始轨迹/日志只作可追溯来源，不要求轮目录内存在副本。
 - 涉及画面效果时看截图验收；不用逻辑断言替代截图。
 
 ## 7. 评估
 
-从资深使用者与开发者视角评估 GDA；记录不足与良好表现；不找茬、不夸大。把影响推进的负面表现登记为第 4 节的带编号问题条目；第 3 节只做归纳，不留无法追溯的结论。
+从资深使用者与开发者视角评估 GDA；记录不足与良好表现；不找茬、不夸大。把影响推进的负面表现登记为第 6 节的带编号问题条目；第 5 节只做归纳，不留无法追溯的结论。
 
 登记前先过门槛：只登记影响真实推进、可复现的问题；有简单绕过且不影响结果的不登记；问题数量不是 KPI。
 
@@ -167,7 +276,9 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 4. 实际表现（附证据）
 5. 问题分析（只基于本轮可观察证据；不读 GDA 源码补全根因，根因结论标记「待分析」）
 
-问题条目格式见 [references/report-templates.md](references/report-templates.md)「问题条目格式（第 7 节）」。
+引擎崩溃按 §4.6 登记为 Q 条目（类型=失败），除五要素外必须标注崩溃归因（工具导致 / 偶发 / 未定）、可复现性、恢复次数与丢失增量；归因不确定时写「待分析」，不写成确定结论。
+
+问题条目与优化建议条目格式见 [references/report-templates.md](references/report-templates.md)「问题条目格式」与「优化建议条目格式」。
 
 ## 8. 报告
 
@@ -175,6 +286,11 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 - 在本轮目录写 `report.md`（目录已带时间，文件名固定）。
 - 在本轮目录写 `img/`（截图）与 `evidence.md`（关键事件摘录）；其他本轮产物同样放本轮目录，不写入共享目录。
 - 只写 `report.md`、`evidence.md`、`img/`；不创建、不改写 `analysis.md`；本轮结束后不再改写这些文件。
+- 报告必须包含「玩法闭环验证表」与「工具真实操作流程表」两节（字段见模板），缺任一项不得声称完成。
+- 报告头部与第 4 节必须写出固定口径行：`覆盖 N/252，有效 M，无效触碰 K，suspected_gaming=是/否及依据`；N 以 `harness coverage` 的 `catalog_total=252` 口径统计。
+- 报告必须记录关卡数、总通关时长、GOAL.md 终态、Q/S 条目、因果三元组与 `suspected_gaming` 结论（字段见模板）；这些字段供 `bun run gda-dev-tools harness digest --round <轮目录>` 解析。
+- `digest.json` 是只读派生品：只读它做判定与续跑，不回写、不改写 `report.md` / `evidence.md`。
+
 `report.md` 结构与路径覆盖规则见 [references/report-templates.md](references/report-templates.md)「report.md 结构（第 8 节）」。
 
 按以下规则写优化建议：
@@ -194,7 +310,7 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 - 用真实开发动作、轨迹与报告完成在线探索与证据沉淀。
 - 把 `report/` 下的所有轮目录作为证据池，跨轮累积；每轮目录自包含报告、截图、关键事件摘录、对照证据与后续 `analysis.md`（若存在）；不新建索引文件。
 - 每轮结束向证据池新增一条可回放记录：本轮 `report.md`、`evidence.md`、关键对照（Q 编号与基线/改动后差异）、`analysis.md`（若存在）。历史证据不足时，由后续分析阶段用最小复现代替回放，并在报告中注明。
-- 在报告第 7 节区分：
+- 在报告第 9 节区分：
   - GDA 通用事实：换工程仍成立，写明复现条件。
   - 本工程偶然现象：仅在当前工程、本次会话或当前环境出现，写明未跨工程验证。
 
@@ -207,11 +323,13 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 ## 10. 禁止事项
 
 - 禁止绕过 GDA 手动编辑任何 Godot 工程文件（`*.tscn`、`*.tres`、`*.gd`、`project.godot` 等）。
-- 禁止主动重启 Godot；重置 `examples/e2e` 前先请用户关闭编辑器；引擎崩溃时停止并如实记录。
+- 禁止无记录地重启 Godot：任何重启（含重置 `examples/e2e`、中毒兜底、崩溃恢复）都先记录上下文（当前工具调用、未保存增量、trace/log 尾部、`GOAL.md` 末态）再自重启；不再要求用户关闭或打开编辑器。崩溃恢复另按 §4.6 做归因与可复现性判定。
 - 禁止更新 `docs/wiki/`、`AGENTS.md` 或技能文件；禁止修改 GDA 源码、构建配置或测试配置。
 - 禁止在本轮修复工具问题、应用补丁或运行修改命令；修复留给分析会话。
 - 禁止编造、夸大或凭印象补写工具表现与调用记录。
 - 禁止为凑评估维度硬评，禁止把理论上的「最好有」写成优化建议。
+- 禁止为凑覆盖率做无开发意图的工具调用，禁止把覆盖率写成完成判据。
+- 禁止在无人值守会话调用 `show_display_dialog`、`open_os_path`，以及未确认保护的模态弹窗工具。
 - 禁止提交 git。
 
 ## 11. 终止与收尾
@@ -219,18 +337,23 @@ description: "用 GDA 在任意 Godot 工程或固定沙盒 examples/e2e 跑一�
 出现以下情况时立即停止并转入报告：
 
 - GDA 功能缺失或致命缺陷导致无法继续开发；
-- Godot 崩溃；
+- Godot 崩溃且按 §4.6 无法恢复（同一崩溃重复 3 次仍未定位，或恢复后工程状态无法还原）；
 - 前置检查失败且无法在不违反约束的前提下恢复。
 
 收尾前逐项核对：
 
 - 轮目录名为 `YYYY-MM-DD_HH-MM`（零填充），可按目录名排序取最新；
 - 本轮目录包含 `report.md`、`img/`、`evidence.md`，报告内截图引用均为相对路径；
-- 报告 8 节齐全，问题均有证据；
+- 报告 9 节齐全，含「玩法闭环验证表」与「工具真实操作流程表」，问题均有证据；
+- 作品满足 §4.1 完整游戏定义全部条件，或明确列出未达标项；
 - 问题编号唯一、类型与可复用性标注齐全，写入边界未被越界；
 - 每环有基线 vs 改动后的成对对照证据，引入回归的改动已回退；
+- 每起引擎崩溃已按 §4.6 登记，含归因（工具导致/偶发/未定）、可复现性、恢复次数与丢失增量；
+- 工具覆盖按 CLI 轨迹与 252 canonical 名单 join 统计，每个计入覆盖的工具三要素齐全，无效触碰已剔除，未覆盖工具已列原因；固定口径行与 `suspected_gaming` 依据已写入报告，`suspected_gaming=true` 轮次覆盖未进经验库；
+- 已写 `GOAL.md` 并逐环原子更新；收尾仅发生在 acceptance 全过、blocker 阻断或触达 cap，且已按 §4.7.2 通知用户；软指标由独立子代理判定、硬指标由 `digest.json` 判定，未自评；
+- `harness digest` 产出的 `digest.json` 只读，未回写 `report.md` / `evidence.md`；
 - 证据池已登记本轮可回放材料；
-- 新轮次已重置 `examples/e2e`（用户明确要求续跑时除外），并在创建/重置后执行 `build` + `deploy`；
+- 新轮次已重置 `examples/e2e`（用户明确要求续跑时除外），并在创建/重置后执行 `harness setup --project <project-dir>`（含 build、deploy 与引擎启动）；
 - 本轮未修改任何工具源码、文档或技能；`git status --porcelain` 与开工基线相比，除被忽略目录外无新增跟踪文件改动；
 - 本轮未读取 GDA 源码、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/`；疑似缺陷均标记「待分析」；
 - 截图文件存在且报告中标注对应环号与验收项；

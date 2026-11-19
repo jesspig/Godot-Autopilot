@@ -2,6 +2,14 @@
 import { runBuild, type BuildOptions } from "./commands/build";
 import { runClean } from "./commands/clean";
 import { runDeploy, type DeployOptions } from "./commands/deploy";
+import {
+  runHarnessCoverage,
+  runHarnessDigest,
+  runHarnessSetup,
+  type HarnessCoverageOptions,
+  type HarnessDigestOptions,
+  type HarnessSetupOptions,
+} from "./commands/harness";
 import { runJam, type JamOptions } from "./commands/jam";
 import { runPackage } from "./commands/package";
 import { runPackageCheck } from "./commands/package-check";
@@ -25,6 +33,9 @@ const USAGE = [
   "  jam e2e                  [--reset] [--theme <id|theme>] [--json]",
   "  jam list                 [--projects] [--json]",
   "  jam index                [--json]",
+  "  harness setup            --project <dir> [--headless]",
+  "  harness coverage         --round <dir> [--trace <path>] [--json]",
+  "  harness digest           --round <dir> [--json]",
   "  tui",
 ].join("\n");
 
@@ -239,6 +250,67 @@ function parseJam(args: string[]): JamOptions {
   return options;
 }
 
+function readOptionValue(args: string[], index: number, flag: string, label: string): string {
+  const value = args[index + 1];
+  if (value === undefined || value === "" || value.startsWith("-")) {
+    throw new UsageError(`${label}: argument ${flag}: expected one argument`);
+  }
+  return value;
+}
+
+export function parseHarnessSetup(args: string[]): HarnessSetupOptions {
+  let project: string | null = null;
+  let headless = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--headless") headless = true;
+    else if (arg === "--project") {
+      if (project !== null) throw new UsageError("harness setup: --project may be given only once");
+      project = readOptionValue(args, index, arg, "harness setup");
+      index += 1;
+    } else throw new UsageError(`harness setup: unrecognized argument: ${arg}`);
+  }
+  if (project === null) throw new UsageError("harness setup: --project <dir> is required");
+  return { project, headless };
+}
+
+export function parseHarnessCoverage(args: string[]): HarnessCoverageOptions {
+  let round: string | null = null;
+  let trace: string | null = null;
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--json") json = true;
+    else if (arg === "--round") {
+      if (round !== null) throw new UsageError("harness coverage: --round may be given only once");
+      round = readOptionValue(args, index, arg, "harness coverage");
+      index += 1;
+    } else if (arg === "--trace") {
+      if (trace !== null) throw new UsageError("harness coverage: --trace may be given only once");
+      trace = readOptionValue(args, index, arg, "harness coverage");
+      index += 1;
+    } else throw new UsageError(`harness coverage: unrecognized argument: ${arg}`);
+  }
+  if (round === null) throw new UsageError("harness coverage: --round <dir> is required");
+  return { round, trace, json };
+}
+
+export function parseHarnessDigest(args: string[]): HarnessDigestOptions {
+  let round: string | null = null;
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--json") json = true;
+    else if (arg === "--round") {
+      if (round !== null) throw new UsageError("harness digest: --round may be given only once");
+      round = readOptionValue(args, index, arg, "harness digest");
+      index += 1;
+    } else throw new UsageError(`harness digest: unrecognized argument: ${arg}`);
+  }
+  if (round === null) throw new UsageError("harness digest: --round <dir> is required");
+  return { round, json };
+}
+
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   if (command === undefined) {
@@ -276,6 +348,14 @@ export async function main(argv: string[]): Promise<number> {
         return runToolAudit(parseToolAudit(rest));
       case "jam":
         return runJam(parseJam(rest));
+      case "harness": {
+        const action = rest[0];
+        const actionArgs = rest.slice(1);
+        if (action === "setup") return await runHarnessSetup(parseHarnessSetup(actionArgs));
+        if (action === "coverage") return runHarnessCoverage(parseHarnessCoverage(actionArgs));
+        if (action === "digest") return runHarnessDigest(parseHarnessDigest(actionArgs));
+        throw new UsageError(`harness: unknown subcommand: ${action ?? "(none)"}`);
+      }
       case "tui":
         expectNoArgs("tui", rest);
         return runTui();
@@ -292,9 +372,11 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-try {
-  process.exitCode = await main(process.argv.slice(2));
-} catch (error) {
-  console.error(`[ERROR] ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
+if (import.meta.main) {
+  try {
+    process.exitCode = await main(process.argv.slice(2));
+  } catch (error) {
+    console.error(`[ERROR] ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  }
 }
