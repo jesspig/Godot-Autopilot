@@ -14,7 +14,7 @@ description: "报告产出后分析失败项根因、评估优化建议，并在
 - 接收报告：`report/` 下最新一轮的 `report.md` 与同目录 `evidence.md`、`img/`；用户指定轮目录或 demo 名时优先使用指定范围。
 - 接收历史轮（模拟器池）：`report/*/` 下全部轮目录及其产物；用于离线回放与候选探索。
 - 接收 digest：`bun run gda-dev-tools harness digest --round <轮目录>` 生成的 `<轮目录>/digest.json`（只读派生品）。
-- 接收共享改进库：`report/HARNESS_LIBRARY.md`（按 id 增量合并，不重写整库）。
+- 接收共享改进库：本技能目录下的 `HARNESS_LIBRARY.md`（按 id 增量合并，不重写整库）。
 - 接收 GOAL 末态、本项目源码、MCP SDK（`third_party/mcp-cpp-sdk`）、绑定层（优先 `GODOT_CPP_DIR`，否则 `third_party/godot-cpp`）与联网检索的外部参考。
 - 信息不足、实施授权或采纳边界不明确时提问。
 

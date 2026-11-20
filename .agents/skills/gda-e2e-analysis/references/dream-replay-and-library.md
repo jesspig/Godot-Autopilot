@@ -16,7 +16,7 @@
 
 ## 共享改进库增量合并（Harness² harnessing 级）
 
-持续改进落在单一共享文件 `report/HARNESS_LIBRARY.md`，按 IF-05 schema 写条目：
+持续改进落在单一共享改进库文件，按 IF-05 schema 写条目：
 
 1. 每条经验按库字段填写：id、状态、可编辑面、适用条件、教训（动作→条件→后果）、证据、置信度、可复用范围、来源轮次、更新历史。教训必须与 `digest.causal_triples` 的 `action/condition/consequence` 对齐；证据字段引用 `digest.q_items` / `digest.s_items` 与对照来源（轮目录、轨迹、测试）；来源轮次填 `digest.round`。
 2. 只有 deep 深挖且对照为直接证据的结论可写「采纳」；broad 阶段仅有间接证据的写「候选」，待下一轮真实开发复核后写「待验证」；证据不足写观察，不写库条目。

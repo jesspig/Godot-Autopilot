@@ -30,7 +30,7 @@
 - 运行 `bun run gda-dev-tools harness digest --round <轮目录>` 取得同目录 `digest.json`；它是只读派生品，只读不回写。digest 缺失或解析失败时标注「digest 未验证」，按 `evidence.md` 手工提取，不编造字段值。
 - 消费四类字段与覆盖数据：`q_items`、`s_items`、`levels`、`playtime_minutes`、`causal_triples`、`coverage_gaps`、`coverage_used`、`coverage_invalid_touches`、`evidence_rows`、`suspected_gaming`（字段消费点见分析报告模板的「混合 verifier 判定」一节）。
 - 读取 GOAL 末态（`<project-dir>/GOAL.md`，若存在）：`state`、`acceptance`、`completionEvidence`、`blocker`；与报告头部「GOAL 终态」对照，不一致时以 digest 与报告为准并记录差异。
-- 读取 `report/HARNESS_LIBRARY.md` 条目表作为冻结快照基线：只记录读到的 id 与状态，供共享库增量合并比对，不据此直接下结论。
+- 读取共享改进库条目表作为冻结快照基线：只记录读到的 id 与状态，供共享库增量合并比对，不据此直接下结论。
 
 ## 准备证据源
 
