@@ -10,6 +10,7 @@ import {
   extractIds,
   extractLevels,
   extractPlaytimeMinutes,
+  parseRoundStartMs,
   parseTraceJsonl,
   runHarnessCoverage,
   runHarnessDigest,
@@ -116,7 +117,7 @@ describe("IF-01 setup", () => {
       ["gda", "start", "--project", "/proj/demo"],
       ["gda", "list"],
       ["gda", "status", "--project", "/proj/demo", "--json"],
-      ["gda", "ping"],
+      ["gda", "ping", "--project", "/proj/demo"],
       ["gda", "tools", "list"],
     ]);
   });
@@ -239,6 +240,28 @@ describe("coverage parsing and computation", () => {
     expect(countEvidenceRows(["- 截图：`img/a.png`", "- trace：`trace-x#seq=1`"].join("\n"))).toBe(2);
     expect(countEvidenceRows("")).toBe(0);
   });
+
+  test("scopes coverage to the round start parsed from the directory name", () => {
+    const roundStart = new Date(2026, 10, 20, 3, 28, 0, 0).getTime();
+    expect(parseRoundStartMs("2026-11-20_03-28")).toBe(roundStart);
+    expect(parseRoundStartMs("round")).toBeUndefined();
+    expect(parseRoundStartMs("2026-11-20_03-28-2")).toBeUndefined();
+
+    const records = parseTraceJsonl(
+      [
+        traceLine("property_get", { wall_end_ms: roundStart - 86_400_000 }),
+        traceLine("property_set", { ok: false, wall_end_ms: roundStart - 3_600_000 }),
+        traceLine("property_get", { wall_end_ms: roundStart + 1_000 }),
+        traceLine("create_scene_node", { ok: false, wall_end_ms: roundStart + 2_000 }),
+      ].join("\n"),
+    );
+    const result = computeCoverage(records, FAKE_CATALOG, 1, roundStart);
+    expect(result.round_start_ms).toBe(roundStart);
+    expect(result.used).toEqual(["create_scene_node", "property_get"]);
+    expect(result.coverage_used).toBe(2);
+    expect(result.coverage_invalid_touches).toBe(1);
+    expect(result.used).not.toContain("property_set");
+  });
 });
 
 describe("IF-02 coverage command", () => {
@@ -303,6 +326,38 @@ describe("IF-02 coverage command", () => {
     };
     expect(coverage.used).toEqual(["property_set"]);
     expect(capture.read()).toContain('"catalog_total": 252');
+  });
+
+  test("writes coverage scoped to the round start for a named round directory", () => {
+    const round = path.join(tmp, "2026-11-20_03-28");
+    const roundStart = new Date(2026, 10, 20, 3, 28, 0, 0).getTime();
+    fs.mkdirSync(round, { recursive: true });
+    fs.writeFileSync(
+      path.join(round, "evidence.md"),
+      "| 证据 | 路径 |\n| --- | --- |\n| 截图 | img/a.png |\n",
+      "utf8",
+    );
+    const runner: CaptureRunner = () => ({
+      exitCode: 0,
+      stdout: [
+        traceLine("property_get", { wall_end_ms: roundStart - 86_400_000 }),
+        traceLine("property_get", { wall_end_ms: roundStart + 1_000 }),
+      ].join("\n"),
+    });
+    const capture = captureStdout();
+    try {
+      expect(runHarnessCoverage({ round, trace: null, json: false }, { runner })).toBe(0);
+    } finally {
+      capture.restore();
+    }
+    const coverage = JSON.parse(fs.readFileSync(path.join(round, "coverage.json"), "utf8")) as {
+      round_start_ms: number;
+      coverage_used: number;
+      coverage_invalid_touches: number;
+    };
+    expect(coverage.round_start_ms).toBe(roundStart);
+    expect(coverage.coverage_used).toBe(1);
+    expect(coverage.coverage_invalid_touches).toBe(0);
   });
 
   test("returns a non-zero code when trace export fails", () => {
