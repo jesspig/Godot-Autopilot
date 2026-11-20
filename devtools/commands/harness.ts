@@ -111,7 +111,7 @@ export function setupCommandSequence(project: string, headless: boolean): string
     start,
     ["gda", "list"],
     ["gda", "status", "--project", project, "--json"],
-    ["gda", "ping"],
+    ["gda", "ping", "--project", project],
     ["gda", "tools", "list"],
   ];
 }
@@ -165,6 +165,21 @@ export function parseTraceJsonl(text: string): CoverageTraceRecord[] {
   return records;
 }
 
+export function parseRoundStartMs(roundName: string): number | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})$/.exec(roundName);
+  if (match === null) return undefined;
+  const timestamp = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    0,
+    0,
+  ).getTime();
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
 export function countEvidenceRows(text: string): number {
   const lines = text.split(/\r?\n/);
   const tableRows = lines.filter((line) => {
@@ -184,13 +199,18 @@ export function computeCoverage(
   records: CoverageTraceRecord[],
   catalog: string[],
   evidenceRows: number,
+  roundStartMs?: number,
 ): CoverageResult {
   const canonical = new Set(catalog);
   const usedSet = new Set<string>();
   const aliasCounts = new Map<string, number>();
   let invalidTouches = 0;
   let roundStart = 0;
-  for (const record of records) {
+  const scoped =
+    roundStartMs === undefined
+      ? records
+      : records.filter((record) => record.wallEndMs === 0 || record.wallEndMs >= roundStartMs);
+  for (const record of scoped) {
     if (record.kind !== "tool_call" && record.tool === "") continue;
     if (record.wallEndMs > 0 && (roundStart === 0 || record.wallEndMs < roundStart)) {
       roundStart = record.wallEndMs;
@@ -223,7 +243,7 @@ export function computeCoverage(
     unused,
     by_domain,
     alias_excluded,
-    round_start_ms: roundStart,
+    round_start_ms: roundStartMs ?? roundStart,
     trace_snapshot: SNAPSHOT_NAME,
     coverage_used: coverageUsed,
     coverage_invalid_touches: invalidTouches,
@@ -264,7 +284,8 @@ export function runHarnessCoverage(
   const evidenceRows = fs.existsSync(evidencePath)
     ? countEvidenceRows(fs.readFileSync(evidencePath, "utf8"))
     : 0;
-  const result = computeCoverage(parseTraceJsonl(traceText), catalog, evidenceRows);
+  const roundStartMs = parseRoundStartMs(path.basename(roundDir));
+  const result = computeCoverage(parseTraceJsonl(traceText), catalog, evidenceRows, roundStartMs);
   fs.mkdirSync(roundDir, { recursive: true });
   fs.writeFileSync(path.join(roundDir, result.trace_snapshot), traceText, "utf8");
   fs.writeFileSync(path.join(roundDir, "coverage.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");

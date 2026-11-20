@@ -17,7 +17,7 @@ resource:
 
 # Game Jam 抽题与项目收集
 
-服务两类流程：比赛开发用 `gda-gamejam` 抽题、命名、创建并保留项目；端到端测试用 `gda-e2e-testing` 在固定沙盒 `examples/e2e` 中重置并开发，只记录工具问题。
+服务两类流程：比赛开发用 `gda-game-develop` 抽题、命名、创建并保留项目；端到端测试用 `gda-e2e-testing` 在固定沙盒 `examples/e2e` 中重置并开发，只记录工具问题。
 
 程序化测试（ctest、`bun test`、单元/集成/守卫）不依赖抽题或 `examples/` 生成物；只有生成器自身的单测在临时目录覆盖它。
 
@@ -124,7 +124,7 @@ bun run gda-dev-tools jam index [--json]
 
 `used` 判定基于比赛最终项目：某个主题下至少存在一个 `kind=project` 才计入“已用”；intake 与 `kind=e2e` 都不算。
 
-## 比赛开发流程（gda-gamejam）
+## 比赛开发流程（gda-game-develop）
 
 1. `jam --json` 抽题，得到 `theme_id`、`intake_path`、`draw_id`。
 2. 读 `intake_path/GAMEJAM.md` 与 `jam.json`；不要在 intake 中开发或打开 Godot。
@@ -135,7 +135,7 @@ bun run gda-dev-tools jam index [--json]
 7. 开发中遵守 `GAMEJAM.md` 的「创意约束」；它与模板建议冲突时以创意约束为准。
 8. 收尾执行 `jam index`，刷新 `examples/INDEX.md`。
 
-详细流程见 [gda-gamejam 技能](../../.agents/skills/gda-gamejam/SKILL.md)。
+详细流程见 [gda-game-develop 技能](../../.agents/skills/gda-game-develop/SKILL.md)。
 
 ## 端到端测试流程（gda-e2e-testing）
 

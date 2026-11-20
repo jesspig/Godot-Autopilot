@@ -2272,6 +2272,7 @@ void register_listener() {
     register_input_bridge_classes();
     register_verify_bridge_classes();
     godot::ClassDB::register_class<GameBridgeCaptureAwaiter>();
+    godot::ClassDB::register_class<GameBridgeUiClickAwaiter>();
     godot::ClassDB::register_class<GameBridgeLogger>();
     class_registered = true;
   }
