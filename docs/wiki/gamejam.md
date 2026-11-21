@@ -143,7 +143,7 @@ bun run gda-dev-tools jam index [--json]
 2. 取返回的 `path` 作为 `<project-dir>`，用固定覆盖任务书（技能内 `assets/fixed-task-brief.md`）覆盖 `GAMEJAM.md`；不抽题。
 3. 环境准备全程自主：`bun run gda-dev-tools harness setup --project <project-dir>`（默认完整编辑器，不请用户打开/关闭工程）。
 4. 按固定任务书做真实开发操作与组合测试，串起测试—分析—授权修复闭环；覆盖全部 252 个 canonical 工具为硬验收。
-5. 报告写到 `report/<YYYY-MM-DD_HH-MM>/`（`report.md` / `evidence.md` / `img/` / `analysis.md`）；不执行 `jam index`，`examples/INDEX.md` 只收比赛项目。
+5. 报告写到 `.handoff/report/<YYYY-MM-DD_HH-MM>/`（`report.md` / `evidence.md` / `img/` / `analysis.md`），不再放项目根目录；`harness coverage/digest --round` 指向该目录即可。不执行 `jam index`，`examples/INDEX.md` 只收比赛项目。
 
 详细流程见 [gda-e2e-loop 技能](../../.agents/skills/gda-e2e-loop/SKILL.md)。
 
