@@ -9,6 +9,7 @@
 #include "tools/base/tool_invoke.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <cctype>
 #include <chrono>
@@ -662,25 +663,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         } else {
           return true;
         }
-        bool valid = !middle.empty();
-        size_t pos = 0;
-        if (valid && middle[0] == '-') {
-          pos = 1;
-          if (middle.size() == 1)
-            valid = false;
-        }
-        for (; valid && pos < middle.size(); ++pos) {
-          if (!std::isdigit(static_cast<unsigned char>(middle[pos])))
-            valid = false;
-        }
-        long long n = 0;
-        if (valid) {
-          try {
-            n = std::stoll(middle);
-          } catch (...) {
-            valid = false;
-          }
-        }
+        int64_t parsed = 0;
+        const bool valid = util::parse_signed_decimal_int64(middle, parsed);
+        const long long n = static_cast<long long>(parsed);
         if (!valid || n < 0 ||
             n >= static_cast<long long>(arr.size())) {
           error_out =

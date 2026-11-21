@@ -1,6 +1,8 @@
 #ifndef GODOT_AUTOPILOT_HTTP_PARSE_HPP
 #define GODOT_AUTOPILOT_HTTP_PARSE_HPP
 
+#include "util/input_guards.hpp"
+
 #include <cstddef>
 #include <string>
 #include <unordered_map>
@@ -47,13 +49,7 @@ inline bool is_control_char(char c) {
 }
 
 inline std::string to_lower(const std::string &text) {
-  std::string result = text;
-  for (char &c : result) {
-    if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c + ('a' - 'A'));
-    }
-  }
-  return result;
+  return util::ascii_lowercase(text);
 }
 
 inline bool query_param_name_is_valid(const std::string &name) {

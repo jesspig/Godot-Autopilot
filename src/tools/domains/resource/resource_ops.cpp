@@ -3,8 +3,10 @@
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/path_util.hpp"
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/readback_util.hpp"
 #include "util/json_godot.hpp"
 #include "util/project_path.hpp"
@@ -1324,10 +1326,6 @@ struct RefHit {
 
 godot::String make_token(const char *prefix, const std::string &value) {
   return godot::String(prefix) + godot::String(value.c_str()) + "\"";
-}
-
-std::string join_path(const std::string &dir, const std::string &name) {
-  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
 }
 
 bool has_binary_reference_extension(const std::string &path) {
@@ -2898,8 +2896,9 @@ mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args) {
 namespace {
 
 bool has_string_param(const mcp::JsonValue &args, const char *name) {
-  const mcp::JsonValue *value = args.Find(name);
-  return value != nullptr && value->IsString();
+  std::string out;
+  return util::string_arg_status(args, name, out, false) ==
+         util::StringArgStatus::Ok;
 }
 
 mcp::JsonValue missing_action_parameter(const std::string &action,
@@ -3298,13 +3297,11 @@ resolve_resource(const mcp::JsonValue &args, bool &out_has_oid,
   bool has_oid = false;
   auto *it_oid_str = args.Find("object_id_str");
   if (it_oid_str && it_oid_str->IsString()) {
-    try {
-      obj_id = std::stoll(it_oid_str->GetString());
-      has_oid = true;
-    } catch (...) {
+    if (!util::parse_decimal_int64(it_oid_str->GetString(), obj_id)) {
       out_error = "invalid object_id_str: not a valid 64-bit integer";
       return godot::Ref<godot::Resource>();
     }
+    has_oid = true;
   } else {
     auto *it_oid = args.Find("object_id");
     if (it_oid && it_oid->IsInt()) {

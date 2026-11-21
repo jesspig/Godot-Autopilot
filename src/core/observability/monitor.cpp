@@ -9,6 +9,7 @@
 #include "core/observability/log_persist.hpp"
 #include "core/observability/sanitize_policy.hpp"
 #include "core/observability/trace_recorder.hpp"
+#include "util/string_util.hpp"
 
 namespace godot_autopilot {
 namespace monitor {
@@ -490,43 +491,7 @@ std::string sanitize_field(const std::string &text) {
 }
 
 std::string json_escape(const std::string &text) {
-  std::string out;
-  out.reserve(text.size() + 2);
-  for (unsigned char c : text) {
-    switch (c) {
-      case '"':
-        out += "\\\"";
-        break;
-      case '\\':
-        out += "\\\\";
-        break;
-      case '\b':
-        out += "\\b";
-        break;
-      case '\f':
-        out += "\\f";
-        break;
-      case '\n':
-        out += "\\n";
-        break;
-      case '\r':
-        out += "\\r";
-        break;
-      case '\t':
-        out += "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          char buf[8];
-          std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned>(c));
-          out += buf;
-        } else {
-          out += static_cast<char>(c);
-        }
-        break;
-    }
-  }
-  return out;
+  return util::json_escape(text);
 }
 
 std::string build_attrs(

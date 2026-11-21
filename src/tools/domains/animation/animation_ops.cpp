@@ -6,6 +6,7 @@
 #include <vector>
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/animation.hpp>
@@ -42,12 +43,6 @@ constexpr int64_t MAX_TRACKS_LIMIT = 4096;
 constexpr int64_t MAX_KEYS_LIMIT = 4096;
 constexpr std::size_t CANDIDATE_LIMIT = 8;
 
-mcp::JsonValue make_error(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
-  return e;
-}
-
 bool read_string_arg(const mcp::JsonValue &args, const char *key,
                      std::string &out) {
   auto *v = args.Find(key);
@@ -60,7 +55,7 @@ bool read_string_arg(const mcp::JsonValue &args, const char *key,
 
 bool require_string_arg(const mcp::JsonValue &args, const char *key,
                         std::string &out) {
-  return read_string_arg(args, key, out) && !out.empty();
+  return util::require_nonempty_string_arg(args, key, out);
 }
 
 double read_number_arg(const mcp::JsonValue &args, const char *key,
@@ -427,18 +422,18 @@ bool resolve_tree_and_machine(const mcp::JsonValue &args,
                               godot::AnimationNodeStateMachine *&state_machine,
                               mcp::JsonValue &error) {
   if (!require_string_arg(args, "animation_tree_path", tree_path)) {
-    error = make_error("missing required parameter: animation_tree_path");
+    error = util::error_json("missing required parameter: animation_tree_path");
     return false;
   }
   std::string msg;
   tree = resolve_tree(tree_path, msg);
   if (!tree) {
-    error = make_error(msg);
+    error = util::error_json(msg);
     return false;
   }
   state_machine = resolve_state_machine(tree);
   if (!state_machine) {
-    error = make_error(
+    error = util::error_json(
         "tree_root of " + tree_path +
         " is not an AnimationNodeStateMachine — recreate the tree with "
         "animation_tree action=create");
@@ -506,7 +501,7 @@ bool parse_advance_mode(const mcp::JsonValue &value, int32_t &out) {
 mcp::JsonValue handle_create_player(const mcp::JsonValue &args) {
   std::string parent_path;
   if (!require_string_arg(args, "parent_path", parent_path))
-    return make_error("missing required parameter: parent_path");
+    return util::error_json("missing required parameter: parent_path");
 
   std::string name = DEFAULT_PLAYER_NAME;
   read_string_arg(args, "name", name);
@@ -515,7 +510,7 @@ mcp::JsonValue handle_create_player(const mcp::JsonValue &args) {
   godot::Node *scene_root =
       editor ? editor->get_edited_scene_root() : nullptr;
   if (!scene_root) {
-    return make_error(
+    return util::error_json(
         "no scene currently open in the editor — open or create a scene first");
   }
 
@@ -523,7 +518,7 @@ mcp::JsonValue handle_create_player(const mcp::JsonValue &args) {
   godot::Node *parent =
       util::resolve_scene_node(parent_path, scene_root, &hint);
   if (!parent)
-    return make_error("parent node not found: " + parent_path + " — " + hint);
+    return util::error_json("parent node not found: " + parent_path + " — " + hint);
 
   godot::AnimationPlayer *player = memnew(godot::AnimationPlayer);
   player->set_name(godot::StringName(name.c_str()));
@@ -547,36 +542,36 @@ mcp::JsonValue handle_create_animation(const mcp::JsonValue &args) {
   std::string player_path;
   std::string name;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   if (!require_string_arg(args, "name", name))
-    return make_error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
 
   double length_sec =
       read_number_arg(args, "length_sec", DEFAULT_ANIMATION_LENGTH);
   if (length_sec <= 0.0)
-    return make_error("length_sec must be > 0 (got " +
+    return util::error_json("length_sec must be > 0 (got " +
                       std::to_string(length_sec) + ")");
 
   int64_t loop_mode =
       static_cast<int64_t>(read_number_arg(args, "loop_mode", 0.0));
   if (loop_mode < 0 || loop_mode > LOOP_MODE_MAX)
-    return make_error("loop_mode must be 0 (none), 1 (linear) or 2 "
+    return util::error_json("loop_mode must be 0 (none), 1 (linear) or 2 "
                       "(pingpong), got " +
                       std::to_string(loop_mode));
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::StringName anim_name(name.c_str());
   if (player->has_animation(anim_name))
-    return make_error("animation already exists on " + player_path + ": " +
+    return util::error_json("animation already exists on " + player_path + ": " +
                       name);
 
   godot::Ref<godot::AnimationLibrary> lib = ensure_default_library(player, msg);
   if (lib.is_null())
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::Ref<godot::Animation> anim;
   anim.instantiate();
@@ -585,7 +580,7 @@ mcp::JsonValue handle_create_animation(const mcp::JsonValue &args) {
 
   godot::Error err = lib->add_animation(anim_name, anim);
   if (err != godot::Error::OK)
-    return make_error("failed to add animation \"" + name +
+    return util::error_json("failed to add animation \"" + name +
                       "\" to the default library (Error " +
                       std::to_string(static_cast<int>(err)) + ")");
 
@@ -604,18 +599,18 @@ mcp::JsonValue handle_remove_animation(const mcp::JsonValue &args) {
   std::string player_path;
   std::string name;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   if (!require_string_arg(args, "name", name))
-    return make_error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::StringName anim_name(name.c_str());
   if (!player->has_animation(anim_name))
-    return make_error("animation not found on " + player_path + ": " + name);
+    return util::error_json("animation not found on " + player_path + ": " + name);
 
   godot::TypedArray<godot::StringName> libs =
       player->get_animation_library_list();
@@ -634,24 +629,24 @@ mcp::JsonValue handle_remove_animation(const mcp::JsonValue &args) {
       return r;
     }
   }
-  return make_error("animation not found in any library: " + name);
+  return util::error_json("animation not found in any library: " + name);
 }
 
 mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
   std::string player_path;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   std::string action = "list";
   auto *action_p = args.Find("action");
   if (action_p) {
     if (!action_p->IsString() || action_p->GetString().empty())
-      return make_error(
+      return util::error_json(
           "action must be a non-empty string: list, inspect or library");
     action = action_p->GetString();
   }
@@ -685,24 +680,24 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
   if (action == "inspect") {
     std::string anim_name;
     if (!require_string_arg(args, "anim_name", anim_name))
-      return make_error(
+      return util::error_json(
           "missing required parameter for action 'inspect': anim_name");
     godot::StringName anim_sn(anim_name.c_str());
     if (!player->has_animation(anim_sn))
-      return make_error("animation not found on " + player_path + ": " +
+      return util::error_json("animation not found on " + player_path + ": " +
                         anim_name + unknown_animation_hint(player));
     godot::Ref<godot::Animation> anim = player->get_animation(anim_sn);
     if (anim.is_null())
-      return make_error("animation is not readable on " + player_path + ": " +
+      return util::error_json("animation is not readable on " + player_path + ": " +
                         anim_name);
 
     int64_t max_tracks = DEFAULT_MAX_TRACKS;
     if (args.Find("max_tracks") != nullptr) {
       if (!read_int_arg(args, "max_tracks", max_tracks))
-        return make_error("max_tracks must be an integer (0 or -1 means "
+        return util::error_json("max_tracks must be an integer (0 or -1 means "
                           "unlimited)");
       if (max_tracks < -1 || max_tracks > MAX_TRACKS_LIMIT)
-        return make_error("max_tracks must be between -1 and " +
+        return util::error_json("max_tracks must be between -1 and " +
                           std::to_string(MAX_TRACKS_LIMIT) + " (0 or -1 means "
                           "unlimited)");
       if (max_tracks == 0)
@@ -711,10 +706,10 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     int64_t max_keys = DEFAULT_MAX_KEYS;
     if (args.Find("max_keys") != nullptr) {
       if (!read_int_arg(args, "max_keys", max_keys))
-        return make_error("max_keys must be an integer (0 or -1 means "
+        return util::error_json("max_keys must be an integer (0 or -1 means "
                           "unlimited, applies per track)");
       if (max_keys < -1 || max_keys > MAX_KEYS_LIMIT)
-        return make_error("max_keys must be between -1 and " +
+        return util::error_json("max_keys must be between -1 and " +
                           std::to_string(MAX_KEYS_LIMIT) + " (0 or -1 means "
                           "unlimited)");
       if (max_keys == 0)
@@ -722,7 +717,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     }
     double time = read_number_arg(args, "time", 0.0);
     if (time < 0.0)
-      return make_error("time must be >= 0 (got " + std::to_string(time) + ")");
+      return util::error_json("time must be >= 0 (got " + std::to_string(time) + ")");
 
     int64_t track_count = anim->get_track_count();
     int64_t returned_tracks =
@@ -780,14 +775,14 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
   if (action == "library") {
     auto *op_p = args.Find("library_action");
     if (!op_p || !op_p->IsString() || op_p->GetString().empty())
-      return make_error(
+      return util::error_json(
           "missing required parameter for action 'library': library_action "
           "(list, add, remove or rename)");
     const std::string op = op_p->GetString();
     const bool has_library = args.Find("library") != nullptr;
     std::string library;
     if (has_library && !read_string_arg(args, "library", library))
-      return make_error("library must be a string (\"\" is the default "
+      return util::error_json("library must be a string (\"\" is the default "
                         "library)");
 
     if (op == "list") {
@@ -801,23 +796,23 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     }
 
     if (op != "add" && op != "remove" && op != "rename")
-      return make_error("unknown library_action '" + op +
+      return util::error_json("unknown library_action '" + op +
                         "' — expected list, add, remove or rename");
 
     if (!has_library)
-      return make_error("missing required parameter for library_action '" +
+      return util::error_json("missing required parameter for library_action '" +
                         op + "': library (\"\" is the default library)");
 
     godot::StringName lib_sn(library.c_str());
     if (op == "add") {
       if (player->has_animation_library(lib_sn))
-        return make_error("animation library already exists on " + player_path +
+        return util::error_json("animation library already exists on " + player_path +
                           ": \"" + library + "\"");
       godot::Ref<godot::AnimationLibrary> lib;
       lib.instantiate();
       godot::Error err = player->add_animation_library(lib_sn, lib);
       if (err != godot::Error::OK)
-        return make_error("failed to add animation library \"" + library +
+        return util::error_json("failed to add animation library \"" + library +
                           "\" (Error " +
                           std::to_string(static_cast<int>(err)) + ")");
       mcp::JsonValue inner = library_snapshot(player);
@@ -833,11 +828,11 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     }
 
     if (library.empty())
-      return make_error("the default library (\"\") cannot be removed or "
+      return util::error_json("the default library (\"\") cannot be removed or "
                         "renamed — operate on a named library, or remove "
                         "individual animations with remove_animation");
     if (!player->has_animation_library(lib_sn))
-      return make_error("animation library not found on " + player_path +
+      return util::error_json("animation library not found on " + player_path +
                         ": \"" + library + "\"");
 
     if (op == "remove") {
@@ -846,7 +841,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
       int64_t count =
           lib.is_valid() ? lib->get_animation_list().size() : 0;
       if (count > 0)
-        return make_error("animation library \"" + library + "\" still holds " +
+        return util::error_json("animation library \"" + library + "\" still holds " +
                           std::to_string(count) +
                           " animations — remove them with remove_animation "
                           "first (that tool requires confirm)");
@@ -865,11 +860,11 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
 
     std::string new_name;
     if (!require_string_arg(args, "new_name", new_name))
-      return make_error(
+      return util::error_json(
           "missing required parameter for library_action 'rename': new_name");
     godot::StringName new_sn(new_name.c_str());
     if (player->has_animation_library(new_sn))
-      return make_error("animation library already exists on " + player_path +
+      return util::error_json("animation library already exists on " + player_path +
                         ": \"" + new_name + "\"");
     player->rename_animation_library(lib_sn, new_sn);
     mcp::JsonValue inner = library_snapshot(player);
@@ -885,7 +880,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     return r;
   }
 
-  return make_error("unknown action '" + action +
+  return util::error_json("unknown action '" + action +
                     "' for get_animation_list — expected list, inspect or "
                     "library");
 }
@@ -896,14 +891,14 @@ mcp::JsonValue handle_create_track(const mcp::JsonValue &args) {
   std::string track_type;
   std::string node_path;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   if (!require_string_arg(args, "anim_name", anim_name))
-    return make_error("missing required parameter: anim_name");
+    return util::error_json("missing required parameter: anim_name");
   if (!require_string_arg(args, "track_type", track_type))
-    return make_error(
+    return util::error_json(
         "missing required parameter: track_type (\"value\" or \"method\")");
   if (!require_string_arg(args, "node_path", node_path))
-    return make_error("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
 
   std::string property;
   bool has_property = read_string_arg(args, "property", property);
@@ -912,7 +907,7 @@ mcp::JsonValue handle_create_track(const mcp::JsonValue &args) {
   std::string track_path;
   if (track_type == "value") {
     if (!has_property || property.empty())
-      return make_error("value tracks require 'property' (e.g. \"position:x\", "
+      return util::error_json("value tracks require 'property' (e.g. \"position:x\", "
                         "\"modulate\") — the track path becomes "
                         "<node_path>:<property>");
     type = godot::Animation::TYPE_VALUE;
@@ -921,24 +916,24 @@ mcp::JsonValue handle_create_track(const mcp::JsonValue &args) {
     type = godot::Animation::TYPE_METHOD;
     track_path = node_path;
   } else {
-    return make_error("unsupported track_type: " + track_type +
+    return util::error_json("unsupported track_type: " + track_type +
                       " — use \"value\" or \"method\"");
   }
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::StringName anim_sn(anim_name.c_str());
   if (!player->has_animation(anim_sn))
-    return make_error("animation not found on " + player_path + ": " +
+    return util::error_json("animation not found on " + player_path + ": " +
                       anim_name);
 
   godot::Ref<godot::Animation> anim = player->get_animation(anim_sn);
   godot::NodePath path(track_path.c_str());
   if (anim->find_track(path, type) >= 0)
-    return make_error("a " + track_type + " track for \"" + track_path +
+    return util::error_json("a " + track_type + " track for \"" + track_path +
                       "\" already exists in animation \"" + anim_name + "\"");
 
   int32_t idx = anim->add_track(type);
@@ -963,37 +958,37 @@ mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args) {
   std::string player_path;
   std::string anim_name;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   if (!require_string_arg(args, "anim_name", anim_name))
-    return make_error("missing required parameter: anim_name");
+    return util::error_json("missing required parameter: anim_name");
 
   auto *idx_v = args.Find("track_index");
   if (!idx_v || !idx_v->IsInt())
-    return make_error("missing required parameter: track_index (int)");
+    return util::error_json("missing required parameter: track_index (int)");
   int64_t track_index = idx_v->GetInt();
 
   double time = read_number_arg(args, "time", -1.0);
   if (time < 0.0)
-    return make_error("missing or invalid parameter: time (seconds since "
+    return util::error_json("missing or invalid parameter: time (seconds since "
                       "animation start, must be >= 0)");
 
   auto *value_v = args.Find("value");
   if (!value_v || value_v->IsNull())
-    return make_error("missing required parameter: value");
+    return util::error_json("missing required parameter: value");
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::StringName anim_sn(anim_name.c_str());
   if (!player->has_animation(anim_sn))
-    return make_error("animation not found on " + player_path + ": " +
+    return util::error_json("animation not found on " + player_path + ": " +
                       anim_name);
 
   godot::Ref<godot::Animation> anim = player->get_animation(anim_sn);
   if (track_index < 0 || track_index >= anim->get_track_count())
-    return make_error("track_index out of range: " +
+    return util::error_json("track_index out of range: " +
                       std::to_string(track_index) + " (animation \"" +
                       anim_name + "\" has " +
                       std::to_string(anim->get_track_count()) + " tracks)");
@@ -1003,12 +998,12 @@ mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args) {
   godot::Variant key_value;
   if (track_type == godot::Animation::TYPE_METHOD) {
     if (!value_v->IsObject())
-      return make_error("method track keys need an object value of the form "
+      return util::error_json("method track keys need an object value of the form "
                         "{\"method\": \"do_something\", \"args\": [...]}, got "
                         "a non-object JSON value");
     auto *method_v = value_v->Find("method");
     if (!method_v || !method_v->IsString() || method_v->GetString().empty())
-      return make_error("method track key object requires a non-empty string "
+      return util::error_json("method track key object requires a non-empty string "
                         "field 'method'");
     godot::Dictionary key;
     key[godot::StringName("method")] =
@@ -1047,32 +1042,32 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
   std::string track_type;
   std::string node_path;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   if (!require_string_arg(args, "anim_name", anim_name))
-    return make_error("missing required parameter: anim_name");
+    return util::error_json("missing required parameter: anim_name");
   if (!require_string_arg(args, "track_type", track_type))
-    return make_error(
+    return util::error_json(
         "missing required parameter: track_type (\"value\" or \"method\")");
   if (!require_string_arg(args, "node_path", node_path))
-    return make_error("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
 
   std::string property;
   bool has_property = read_string_arg(args, "property", property);
 
   auto *keys_v = args.Find("keys");
   if (!keys_v || !keys_v->IsArray())
-    return make_error("missing required parameter: keys (array of 1-256 "
+    return util::error_json("missing required parameter: keys (array of 1-256 "
                       "{\"time\": <number >= 0>, \"value\": <json>} objects)");
   const mcp::JsonValue::Array &keys_arr = keys_v->GetArray();
   if (keys_arr.empty() || keys_arr.size() > 256)
-    return make_error("keys must contain 1-256 entries (got " +
+    return util::error_json("keys must contain 1-256 entries (got " +
                       std::to_string(keys_arr.size()) + ")");
 
   bool overwrite = false;
   auto *overwrite_v = args.Find("overwrite");
   if (overwrite_v) {
     if (!overwrite_v->IsBool())
-      return make_error("overwrite must be a boolean");
+      return util::error_json("overwrite must be a boolean");
     overwrite = overwrite_v->GetBool();
   }
 
@@ -1080,7 +1075,7 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
   std::string track_path;
   if (track_type == "value") {
     if (!has_property || property.empty())
-      return make_error("value tracks require 'property' (e.g. \"position:x\", "
+      return util::error_json("value tracks require 'property' (e.g. \"position:x\", "
                         "\"modulate\") — the track path becomes "
                         "<node_path>:<property>");
     type = godot::Animation::TYPE_VALUE;
@@ -1089,24 +1084,24 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
     type = godot::Animation::TYPE_METHOD;
     track_path = node_path;
   } else {
-    return make_error("unsupported track_type: " + track_type +
+    return util::error_json("unsupported track_type: " + track_type +
                       " — use \"value\" or \"method\"");
   }
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::StringName anim_sn(anim_name.c_str());
   if (!player->has_animation(anim_sn))
-    return make_error("animation not found on " + player_path + ": " +
+    return util::error_json("animation not found on " + player_path + ": " +
                       anim_name);
 
   godot::Ref<godot::Animation> anim = player->get_animation(anim_sn);
   godot::NodePath path(track_path.c_str());
   if (anim->find_track(path, type) >= 0)
-    return make_error("a " + track_type + " track for \"" + track_path +
+    return util::error_json("a " + track_type + " track for \"" + track_path +
                       "\" already exists in animation \"" + anim_name + "\"");
 
   int32_t idx = anim->add_track(type);
@@ -1127,31 +1122,31 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
     std::string where = "keys[" + std::to_string(i) + "]";
     if (!entry.IsObject()) {
       anim->remove_track(idx);
-      return make_error(where + " must be an object of the form {\"time\": "
+      return util::error_json(where + " must be an object of the form {\"time\": "
                                "<number >= 0>, \"value\": <json>}");
     }
     auto *time_v = entry.Find("time");
     if (!time_v || !time_v->IsNumber()) {
       anim->remove_track(idx);
-      return make_error(where + " requires 'time' (number, seconds since "
+      return util::error_json(where + " requires 'time' (number, seconds since "
                                "animation start, must be >= 0)");
     }
     double time = time_v->IsInt() ? static_cast<double>(time_v->GetInt())
                                   : time_v->GetDouble();
     if (time < 0.0) {
       anim->remove_track(idx);
-      return make_error(where + " requires 'time' >= 0 (got " +
+      return util::error_json(where + " requires 'time' >= 0 (got " +
                         std::to_string(time) + ")");
     }
     auto *value_v = entry.Find("value");
     if (!value_v || value_v->IsNull()) {
       anim->remove_track(idx);
-      return make_error(where + " requires 'value'");
+      return util::error_json(where + " requires 'value'");
     }
     if (type == godot::Animation::TYPE_METHOD) {
       if (!value_v->IsObject()) {
         anim->remove_track(idx);
-        return make_error(where + " method track keys need an object value of "
+        return util::error_json(where + " method track keys need an object value of "
                                  "the form {\"method\": \"do_something\", "
                                  "\"args\": [...]}, got a non-object JSON "
                                  "value");
@@ -1160,13 +1155,13 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
       if (!method_v || !method_v->IsString() ||
           method_v->GetString().empty()) {
         anim->remove_track(idx);
-        return make_error(where + " method track key object requires a "
+        return util::error_json(where + " method track key object requires a "
                                  "non-empty string field 'method'");
       }
       auto *args_v = value_v->Find("args");
       if (args_v && !args_v->IsArray()) {
         anim->remove_track(idx);
-        return make_error(where + " method track key field 'args' must be an "
+        return util::error_json(where + " method track key field 'args' must be an "
                                  "array when present");
       }
     }
@@ -1188,7 +1183,7 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
     for (size_t i = 1; i < work.size(); i++) {
       if (work[i].time == work[i - 1].time) {
         anim->remove_track(idx);
-        return make_error("duplicate key time " +
+        return util::error_json("duplicate key time " +
                           std::to_string(work[i].time) +
                           " — pass overwrite=true to keep the last key at a "
                           "repeated time");
@@ -1248,28 +1243,28 @@ mcp::JsonValue handle_remove_track(const mcp::JsonValue &args) {
   std::string player_path;
   std::string anim_name;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   if (!require_string_arg(args, "anim_name", anim_name))
-    return make_error("missing required parameter: anim_name");
+    return util::error_json("missing required parameter: anim_name");
 
   auto *idx_v = args.Find("track_index");
   if (!idx_v || !idx_v->IsInt())
-    return make_error("missing required parameter: track_index (int)");
+    return util::error_json("missing required parameter: track_index (int)");
   int64_t track_index = idx_v->GetInt();
 
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::StringName anim_sn(anim_name.c_str());
   if (!player->has_animation(anim_sn))
-    return make_error("animation not found on " + player_path + ": " +
+    return util::error_json("animation not found on " + player_path + ": " +
                       anim_name);
 
   godot::Ref<godot::Animation> anim = player->get_animation(anim_sn);
   if (track_index < 0 || track_index >= anim->get_track_count())
-    return make_error("track_index out of range: " +
+    return util::error_json("track_index out of range: " +
                       std::to_string(track_index) + " (animation \"" +
                       anim_name + "\" has " +
                       std::to_string(anim->get_track_count()) + " tracks)");
@@ -1293,7 +1288,7 @@ mcp::JsonValue handle_remove_track(const mcp::JsonValue &args) {
 mcp::JsonValue handle_create_tree(const mcp::JsonValue &args) {
   std::string parent_path;
   if (!require_string_arg(args, "parent_path", parent_path))
-    return make_error("missing required parameter: parent_path");
+    return util::error_json("missing required parameter: parent_path");
 
   std::string name = DEFAULT_TREE_NAME;
   read_string_arg(args, "name", name);
@@ -1302,7 +1297,7 @@ mcp::JsonValue handle_create_tree(const mcp::JsonValue &args) {
   godot::Node *scene_root =
       editor ? editor->get_edited_scene_root() : nullptr;
   if (!scene_root) {
-    return make_error(
+    return util::error_json(
         "no scene currently open in the editor — open or create a scene first");
   }
 
@@ -1310,7 +1305,7 @@ mcp::JsonValue handle_create_tree(const mcp::JsonValue &args) {
   godot::Node *parent =
       util::resolve_scene_node(parent_path, scene_root, &hint);
   if (!parent)
-    return make_error("parent node not found: " + parent_path + " — " + hint);
+    return util::error_json("parent node not found: " + parent_path + " — " + hint);
 
   std::string anim_player_path;
   godot::Node *player_node = nullptr;
@@ -1319,10 +1314,10 @@ mcp::JsonValue handle_create_tree(const mcp::JsonValue &args) {
     player_node =
         util::resolve_scene_node(anim_player_path, scene_root, &hint);
     if (!player_node)
-      return make_error("anim_player node not found: " + anim_player_path +
+      return util::error_json("anim_player node not found: " + anim_player_path +
                         " — " + hint);
     if (!godot::Object::cast_to<godot::AnimationPlayer>(player_node))
-      return make_error("anim_player is not an AnimationPlayer: " +
+      return util::error_json("anim_player is not an AnimationPlayer: " +
                         anim_player_path + " (found " +
                         util::to_std(player_node->get_class()) + ")");
   }
@@ -1366,14 +1361,14 @@ mcp::JsonValue handle_add_state(const mcp::JsonValue &args) {
   std::string tree_path;
   std::string state_name;
   if (!require_string_arg(args, "animation_tree_path", tree_path))
-    return make_error("missing required parameter: animation_tree_path");
+    return util::error_json("missing required parameter: animation_tree_path");
   if (!require_string_arg(args, "state_name", state_name))
-    return make_error("missing required parameter: state_name");
+    return util::error_json("missing required parameter: state_name");
   if (state_name == "Start" || state_name == "End")
-    return make_error("state name \"" + state_name +
+    return util::error_json("state name \"" + state_name +
                       "\" is reserved by the implicit Start/End states");
   if (state_name.find('/') != std::string::npos)
-    return make_error("state_name must not contain '/', got: " + state_name);
+    return util::error_json("state_name must not contain '/', got: " + state_name);
 
   std::string animation;
   bool has_animation = read_string_arg(args, "animation", animation);
@@ -1381,17 +1376,17 @@ mcp::JsonValue handle_add_state(const mcp::JsonValue &args) {
   std::string msg;
   godot::AnimationTree *tree = resolve_tree(tree_path, msg);
   if (!tree)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::AnimationNodeStateMachine *sm = resolve_state_machine(tree);
   if (!sm)
-    return make_error("tree_root of " + tree_path +
+    return util::error_json("tree_root of " + tree_path +
                       " is not an AnimationNodeStateMachine — recreate the "
                       "tree with animation_tree action=create");
 
   godot::StringName state_sn(state_name.c_str());
   if (sm->has_node(state_sn))
-    return make_error("state already exists in " + tree_path + ": " +
+    return util::error_json("state already exists in " + tree_path + ": " +
                       state_name);
 
   godot::Ref<godot::AnimationNodeAnimation> node;
@@ -1424,40 +1419,40 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
   std::string from_state;
   std::string to_state;
   if (!require_string_arg(args, "animation_tree_path", tree_path))
-    return make_error("missing required parameter: animation_tree_path");
+    return util::error_json("missing required parameter: animation_tree_path");
   if (!require_string_arg(args, "from_state", from_state))
-    return make_error("missing required parameter: from_state");
+    return util::error_json("missing required parameter: from_state");
   if (!require_string_arg(args, "to_state", to_state))
-    return make_error("missing required parameter: to_state");
+    return util::error_json("missing required parameter: to_state");
 
   std::string condition;
   bool has_condition = read_string_arg(args, "condition", condition);
   if (has_condition && !condition.empty() &&
       (condition.find('/') != std::string::npos ||
        condition.find(':') != std::string::npos))
-    return make_error("condition must not contain '/' or ':', got: " +
+    return util::error_json("condition must not contain '/' or ':', got: " +
                       condition);
 
   std::string msg;
   godot::AnimationTree *tree = resolve_tree(tree_path, msg);
   if (!tree)
-    return make_error(msg);
+    return util::error_json(msg);
 
   godot::AnimationNodeStateMachine *sm = resolve_state_machine(tree);
   if (!sm)
-    return make_error("tree_root of " + tree_path +
+    return util::error_json("tree_root of " + tree_path +
                       " is not an AnimationNodeStateMachine — recreate the "
                       "tree with animation_tree action=create");
 
   godot::StringName from_sn(from_state.c_str());
   godot::StringName to_sn(to_state.c_str());
   if (!sm->has_node(from_sn))
-    return make_error("from_state not found in " + tree_path + ": " +
+    return util::error_json("from_state not found in " + tree_path + ": " +
                       from_state);
   if (!sm->has_node(to_sn))
-    return make_error("to_state not found in " + tree_path + ": " + to_state);
+    return util::error_json("to_state not found in " + tree_path + ": " + to_state);
   if (sm->has_transition(from_sn, to_sn))
-    return make_error("transition already exists: " + from_state + " -> " +
+    return util::error_json("transition already exists: " + from_state + " -> " +
                       to_state);
 
   godot::Ref<godot::AnimationNodeStateMachineTransition> transition;
@@ -1481,17 +1476,17 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
   }
   if (const mcp::JsonValue *priority_v = args.Find("priority")) {
     if (!priority_v->IsInt())
-      return make_error("priority must be an integer");
+      return util::error_json("priority must be an integer");
     transition->set_priority(static_cast<int32_t>(priority_v->GetInt()));
     inner["priority"] = *priority_v;
   }
   if (const mcp::JsonValue *xfade_v = args.Find("xfade")) {
     if (!xfade_v->IsNumber())
-      return make_error("xfade must be a number >= 0");
+      return util::error_json("xfade must be a number >= 0");
     double xfade = xfade_v->IsInt() ? static_cast<double>(xfade_v->GetInt())
                                     : xfade_v->GetDouble();
     if (xfade < 0.0)
-      return make_error("xfade must be >= 0 (got " + std::to_string(xfade) +
+      return util::error_json("xfade must be >= 0 (got " + std::to_string(xfade) +
                         ")");
     transition->set_xfade_time(static_cast<float>(xfade));
     inner["xfade"] = mcp::JsonValue(xfade);
@@ -1499,7 +1494,7 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
   if (const mcp::JsonValue *switch_v = args.Find("switch_mode")) {
     int32_t mode = 0;
     if (!parse_switch_mode(*switch_v, mode))
-      return make_error("switch_mode must be immediate, sync or at_end "
+      return util::error_json("switch_mode must be immediate, sync or at_end "
                         "(or 0, 1, 2)");
     transition->set_switch_mode(
         static_cast<godot::AnimationNodeStateMachineTransition::SwitchMode>(
@@ -1509,7 +1504,7 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
   if (const mcp::JsonValue *advance_v = args.Find("advance_mode")) {
     int32_t mode = 0;
     if (!parse_advance_mode(*advance_v, mode))
-      return make_error("advance_mode must be disabled, enabled or auto "
+      return util::error_json("advance_mode must be disabled, enabled or auto "
                         "(or 0, 1, 2)");
     transition->set_advance_mode(
         static_cast<godot::AnimationNodeStateMachineTransition::AdvanceMode>(
@@ -1588,15 +1583,15 @@ mcp::JsonValue remove_state_node(const mcp::JsonValue &args) {
 
   std::string state_name;
   if (!require_string_arg(args, "state_name", state_name))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'remove_node': state_name");
   if (state_name == "Start" || state_name == "End")
-    return make_error("state \"" + state_name +
+    return util::error_json("state \"" + state_name +
                       "\" is an implicit state of the state machine and "
                       "cannot be removed");
   godot::StringName state_sn(state_name.c_str());
   if (!state_machine->has_node(state_sn))
-    return make_error("state not found in " + tree_path + ": " + state_name +
+    return util::error_json("state not found in " + tree_path + ": " + state_name +
                       unknown_state_hint(state_machine));
   state_machine->remove_node(state_sn);
 
@@ -1625,29 +1620,29 @@ mcp::JsonValue rename_state_node(const mcp::JsonValue &args) {
   std::string state_name;
   std::string new_name;
   if (!require_string_arg(args, "state_name", state_name))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'rename_node': state_name");
   if (!require_string_arg(args, "new_name", new_name))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'rename_node': new_name");
   if (new_name == "Start" || new_name == "End")
-    return make_error("state name \"" + new_name +
+    return util::error_json("state name \"" + new_name +
                       "\" is reserved by the implicit Start/End states");
   if (new_name.find('/') != std::string::npos)
-    return make_error("new_name must not contain '/', got: " + new_name);
+    return util::error_json("new_name must not contain '/', got: " + new_name);
   if (state_name == "Start" || state_name == "End")
-    return make_error("state \"" + state_name +
+    return util::error_json("state \"" + state_name +
                       "\" is an implicit state and cannot be renamed");
   if (state_name == new_name)
-    return make_error("new_name must differ from state_name (" + state_name +
+    return util::error_json("new_name must differ from state_name (" + state_name +
                       ")");
   godot::StringName state_sn(state_name.c_str());
   godot::StringName new_sn(new_name.c_str());
   if (!state_machine->has_node(state_sn))
-    return make_error("state not found in " + tree_path + ": " + state_name +
+    return util::error_json("state not found in " + tree_path + ": " + state_name +
                       unknown_state_hint(state_machine));
   if (state_machine->has_node(new_sn))
-    return make_error("state already exists in " + tree_path + ": " + new_name);
+    return util::error_json("state already exists in " + tree_path + ": " + new_name);
   state_machine->rename_node(state_sn, new_sn);
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
@@ -1675,16 +1670,16 @@ mcp::JsonValue remove_transition_action(const mcp::JsonValue &args) {
   std::string from_state;
   std::string to_state;
   if (!require_string_arg(args, "from_state", from_state))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'remove_transition': "
         "from_state");
   if (!require_string_arg(args, "to_state", to_state))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'remove_transition': to_state");
   godot::StringName from_sn(from_state.c_str());
   godot::StringName to_sn(to_state.c_str());
   if (!state_machine->has_transition(from_sn, to_sn)) {
-    mcp::JsonValue e = make_error("transition not found: " + from_state +
+    mcp::JsonValue e = util::error_json("transition not found: " + from_state +
                                   " -> " + to_state +
                                   " — available transitions: " +
                                   join_limited(transition_names(state_machine)));
@@ -1718,15 +1713,15 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
   std::string from_state;
   std::string to_state;
   if (!require_string_arg(args, "from_state", from_state))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'set_transition': from_state");
   if (!require_string_arg(args, "to_state", to_state))
-    return make_error(
+    return util::error_json(
         "missing required parameter for action 'set_transition': to_state");
   godot::StringName from_sn(from_state.c_str());
   godot::StringName to_sn(to_state.c_str());
   if (!state_machine->has_transition(from_sn, to_sn)) {
-    mcp::JsonValue e = make_error("transition not found: " + from_state +
+    mcp::JsonValue e = util::error_json("transition not found: " + from_state +
                                   " -> " + to_state +
                                   " — available transitions: " +
                                   join_limited(transition_names(state_machine)));
@@ -1740,7 +1735,7 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
   const mcp::JsonValue *condition_v = args.Find("advance_condition");
   const mcp::JsonValue *xfade_v = args.Find("xfade");
   if (!priority_v && !switch_v && !advance_v && !condition_v && !xfade_v)
-    return make_error(
+    return util::error_json(
         "action 'set_transition' requires at least one of priority, "
         "switch_mode, advance_mode, advance_condition or xfade");
 
@@ -1750,35 +1745,35 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
   bool has_advance_mode = false;
   if (switch_v) {
     if (!parse_switch_mode(*switch_v, switch_mode))
-      return make_error("switch_mode must be immediate, sync or at_end "
+      return util::error_json("switch_mode must be immediate, sync or at_end "
                         "(or 0, 1, 2)");
     has_switch_mode = true;
   }
   if (advance_v) {
     if (!parse_advance_mode(*advance_v, advance_mode))
-      return make_error("advance_mode must be disabled, enabled or auto "
+      return util::error_json("advance_mode must be disabled, enabled or auto "
                         "(or 0, 1, 2)");
     has_advance_mode = true;
   }
   if (condition_v && !condition_v->IsString())
-    return make_error(
+    return util::error_json(
         "advance_condition must be a string (use \"\" to clear it)");
   if (condition_v) {
     const std::string condition = condition_v->GetString();
     if (!condition.empty() &&
         (condition.find('/') != std::string::npos ||
          condition.find(':') != std::string::npos))
-      return make_error("advance_condition must not contain '/' or ':', "
+      return util::error_json("advance_condition must not contain '/' or ':', "
                         "got: " + condition);
   }
   double xfade = 0.0;
   if (xfade_v) {
     if (!xfade_v->IsNumber())
-      return make_error("xfade must be a number >= 0");
+      return util::error_json("xfade must be a number >= 0");
     xfade = xfade_v->IsInt() ? static_cast<double>(xfade_v->GetInt())
                              : xfade_v->GetDouble();
     if (xfade < 0.0)
-      return make_error("xfade must be >= 0 (got " + std::to_string(xfade) +
+      return util::error_json("xfade must be >= 0 (got " + std::to_string(xfade) +
                         ")");
   }
 
@@ -1786,11 +1781,11 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
   godot::Ref<godot::AnimationNodeStateMachineTransition> transition =
       state_machine->get_transition(index);
   if (transition.is_null())
-    return make_error("transition not found: " + from_state + " -> " +
+    return util::error_json("transition not found: " + from_state + " -> " +
                       to_state);
   if (priority_v) {
     if (!priority_v->IsInt())
-      return make_error("priority must be an integer");
+      return util::error_json("priority must be an integer");
     transition->set_priority(static_cast<int32_t>(priority_v->GetInt()));
   }
   if (has_switch_mode)
@@ -1825,7 +1820,7 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
 mcp::JsonValue handle_tree(const mcp::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty())
-    return make_error(
+    return util::error_json(
         "missing required parameter: action (one of: create, inspect, "
         "add_node, remove_node, rename_node, connect, remove_transition, "
         "set_transition)");
@@ -1846,7 +1841,7 @@ mcp::JsonValue handle_tree(const mcp::JsonValue &args) {
     return remove_transition_action(args);
   if (action == "set_transition")
     return set_transition_params(args);
-  return make_error("unknown action '" + action +
+  return util::error_json("unknown action '" + action +
                     "' for animation_tree — expected create, inspect, "
                     "add_node, remove_node, rename_node, connect, "
                     "remove_transition or set_transition");
@@ -1856,18 +1851,18 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
   std::string tree_path;
   std::string path;
   if (!require_string_arg(args, "animation_tree_path", tree_path))
-    return make_error("missing required parameter: animation_tree_path");
+    return util::error_json("missing required parameter: animation_tree_path");
   if (!require_string_arg(args, "path", path))
-    return make_error(
+    return util::error_json(
         "missing required parameter: path (e.g. "
         "\"parameters/conditions/is_running\")");
   if (path.rfind(PARAMETER_PREFIX, 0) != 0)
-    return make_error("parameter path must start with \"" +
+    return util::error_json("parameter path must start with \"" +
                       std::string(PARAMETER_PREFIX) + "\", got: " + path);
   std::string msg;
   godot::AnimationTree *tree = resolve_tree(tree_path, msg);
   if (!tree)
-    return make_error(msg);
+    return util::error_json(msg);
 
   std::vector<std::string> names = parameter_names(tree);
   if (std::find(names.begin(), names.end(), path) == names.end()) {
@@ -1899,7 +1894,7 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
 
   auto *value_v = args.Find("value");
   if (!value_v || value_v->IsNull())
-    return make_error("missing required parameter for action 'set_parameter': "
+    return util::error_json("missing required parameter for action 'set_parameter': "
                       "value");
   godot::Variant desired = VariantJson::deserialize(*value_v);
   mcp::JsonValue old_value = parameter_value_json(tree->get(name));
@@ -1907,7 +1902,7 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
   mcp::JsonValue new_value = parameter_value_json(tree->get(name));
   if (new_value.Dump() == old_value.Dump() &&
       parameter_value_json(desired).Dump() != old_value.Dump())
-    return make_error("animation tree parameter is read-only or rejected the "
+    return util::error_json("animation tree parameter is read-only or rejected the "
                       "value: " + path);
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
@@ -1928,7 +1923,7 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
 mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty())
-    return make_error(
+    return util::error_json(
         "missing required parameter: action (one of: play, pause, stop, seek, "
         "play_backwards, set_speed, queue, current, get_parameter, "
         "set_parameter)");
@@ -1941,11 +1936,11 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
 
   std::string player_path;
   if (!require_string_arg(args, "player_path", player_path))
-    return make_error("missing required parameter: player_path");
+    return util::error_json("missing required parameter: player_path");
   std::string msg;
   godot::AnimationPlayer *player = resolve_player(player_path, msg);
   if (!player)
-    return make_error(msg);
+    return util::error_json(msg);
 
   std::string animation;
   bool has_animation =
@@ -1955,7 +1950,7 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
     if (has_animation) {
       godot::StringName anim_sn(animation.c_str());
       if (!player->has_animation(anim_sn))
-        return make_error("animation not found on " + player_path + ": " +
+        return util::error_json("animation not found on " + player_path + ": " +
                           animation +
                           unknown_animation_hint(player));
       if (action == "play")
@@ -1983,7 +1978,7 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
     bool keep_state = false;
     if (const mcp::JsonValue *keep_v = args.Find("keep_state")) {
       if (!keep_v->IsBool())
-        return make_error("keep_state must be a boolean");
+        return util::error_json("keep_state must be a boolean");
       keep_state = keep_v->GetBool();
     }
     player->stop(keep_state);
@@ -1993,19 +1988,19 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
   if (action == "seek") {
     auto *position_v = args.Find("position");
     if (!position_v || !position_v->IsNumber())
-      return make_error(
+      return util::error_json(
           "missing required parameter for action 'seek': position (number, "
           "seconds >= 0)");
     double position =
         position_v->IsInt() ? static_cast<double>(position_v->GetInt())
                             : position_v->GetDouble();
     if (position < 0.0)
-      return make_error("position must be >= 0 (got " +
+      return util::error_json("position must be >= 0 (got " +
                         std::to_string(position) + ")");
     bool update = false;
     if (const mcp::JsonValue *update_v = args.Find("update")) {
       if (!update_v->IsBool())
-        return make_error("update must be a boolean");
+        return util::error_json("update must be a boolean");
       update = update_v->GetBool();
     }
     player->seek(position, update);
@@ -2015,13 +2010,13 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
   if (action == "set_speed") {
     auto *speed_v = args.Find("speed_scale");
     if (!speed_v || !speed_v->IsNumber())
-      return make_error(
+      return util::error_json(
           "missing required parameter for action 'set_speed': speed_scale "
           "(number, 1.0 is normal speed)");
     double speed = speed_v->IsInt() ? static_cast<double>(speed_v->GetInt())
                                     : speed_v->GetDouble();
     if (!std::isfinite(speed))
-      return make_error("speed_scale must be a finite number");
+      return util::error_json("speed_scale must be a finite number");
     float old_speed = player->get_speed_scale();
     player->set_speed_scale(static_cast<float>(speed));
     mcp::JsonValue out = player_result(player_path, action, player);
@@ -2036,7 +2031,7 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
     if (has_animation) {
       godot::StringName anim_sn(animation.c_str());
       if (!player->has_animation(anim_sn))
-        return make_error("animation not found on " + player_path + ": " +
+        return util::error_json("animation not found on " + player_path + ": " +
                           animation +
                           unknown_animation_hint(player));
       player->queue(anim_sn);
@@ -2051,7 +2046,7 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
   if (action == "current")
     return player_result(player_path, action, player);
 
-  return make_error("unknown action '" + action +
+  return util::error_json("unknown action '" + action +
                     "' for animation_runtime — expected play, pause, stop, "
                     "seek, play_backwards, set_speed, queue, current, "
                     "get_parameter or set_parameter");

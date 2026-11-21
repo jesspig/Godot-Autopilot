@@ -1,4 +1,5 @@
 import { parseTransport, type GlobalOptions } from "../args";
+import { fnv1a32 } from "../hash";
 import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
 import { callTool, ensureConnection, getHandshakeInfo } from "../mcp/client";
@@ -8,15 +9,6 @@ import { resolveTarget, type ResolvedTarget, type TargetContext } from "../targe
 import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
-
-function fnv1a(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
@@ -53,7 +45,7 @@ function buildStatus(
     mcp_url: target.mcpUrl,
     transport,
     ipc_kind: target.ipcEndpoint?.kind ?? "",
-    toolset_hash: fnv1a(`${pluginVersion}:${toolCount}`),
+    toolset_hash: fnv1a32(`${pluginVersion}:${toolCount}`),
     server: payload,
   };
 }

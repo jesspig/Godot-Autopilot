@@ -1,6 +1,7 @@
 #include "tools/domains/analyze/analyze_ops.hpp"
 
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
 #include "util/variant_json.hpp"
@@ -38,12 +39,6 @@ constexpr int64_t DEFAULT_MAX_DEPTH = 3;
 constexpr int64_t DEFAULT_MAX_STATE_NODES = 200;
 constexpr const char *AUTOLOAD_PREFIX = "autoload/";
 
-mcp::JsonValue make_error(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
-  return e;
-}
-
 bool read_string_arg(const mcp::JsonValue &args, const char *key,
                      std::string &out) {
   auto *v = args.Find(key);
@@ -56,7 +51,7 @@ bool read_string_arg(const mcp::JsonValue &args, const char *key,
 
 bool require_string_arg(const mcp::JsonValue &args, const char *key,
                         std::string &out) {
-  return read_string_arg(args, key, out) && !out.empty();
+  return util::require_nonempty_string_arg(args, key, out);
 }
 
 int64_t read_int_arg(const mcp::JsonValue &args, const char *key,
@@ -345,7 +340,7 @@ mcp::JsonValue scene_state_summary(const godot::Ref<godot::SceneState> &state,
 mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
-    return make_error(
+    return util::error_json(
         "missing required parameter: action (one of: validate_scene, "
         "unused_resources, signal_flow)");
   }
@@ -356,7 +351,7 @@ mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
     return handle_find_unused_resources(args);
   if (action == "signal_flow")
     return handle_trace_signal_flow(args);
-  return make_error("unknown action '" + action +
+  return util::error_json("unknown action '" + action +
                     "' for analyze_project — expected validate_scene, "
                     "unused_resources or signal_flow");
 }
@@ -364,24 +359,24 @@ mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
 mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))
-    return make_error("missing required parameter: path (res:// scene file, "
+    return util::error_json("missing required parameter: path (res:// scene file, "
                       "e.g. \"res://levels/level_01.tscn\")");
   bool include_state = false;
   if (auto *include_state_p = args.Find("include_state")) {
     if (!include_state_p->IsBool())
-      return make_error("parameter 'include_state' must be a boolean");
+      return util::error_json("parameter 'include_state' must be a boolean");
     include_state = include_state_p->GetBool();
   }
   int64_t max_nodes = DEFAULT_MAX_STATE_NODES;
   if (auto *max_nodes_p = args.Find("max_nodes")) {
     if (!max_nodes_p->IsInt() || max_nodes_p->GetInt() < 1)
-      return make_error("parameter 'max_nodes' must be an integer >= 1");
+      return util::error_json("parameter 'max_nodes' must be an integer >= 1");
     max_nodes = max_nodes_p->GetInt();
   }
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader)
-    return make_error("ResourceLoader is unavailable");
+    return util::error_json("ResourceLoader is unavailable");
 
   godot::String res_path(path.c_str());
   mcp::JsonValue problems(mcp::JsonValue::array_tag);
@@ -466,30 +461,28 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
   auto *editor = godot::EditorInterface::get_singleton();
   auto *efs = editor ? editor->get_resource_filesystem() : nullptr;
   if (!efs)
-    return make_error("editor resource filesystem is unavailable");
+    return util::error_json("editor resource filesystem is unavailable");
   const bool efs_scanning = efs->is_scanning();
 
   godot::EditorFileSystemDirectory *start_dir = nullptr;
   if (directory.empty() || directory == "res://" || directory == "/") {
     start_dir = efs->get_filesystem();
   } else {
-    std::string normalized = directory;
-    if (!begins_with(normalized, "res://"))
-      normalized = "res://" + normalized;
+    std::string normalized = util::res_uri(directory);
     start_dir = efs->get_filesystem_path(godot::String(normalized.c_str()));
     if (!start_dir)
-      return make_error("directory not found in the editor filesystem: " +
+      return util::error_json("directory not found in the editor filesystem: " +
                         directory);
   }
   if (!start_dir)
-    return make_error("editor filesystem root is unavailable");
+    return util::error_json("editor filesystem root is unavailable");
 
   std::vector<std::pair<std::string, std::string>> files;
   collect_files(start_dir, files);
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader)
-    return make_error("ResourceLoader is unavailable");
+    return util::error_json("ResourceLoader is unavailable");
 
   std::set<std::string> referenced;
   std::set<std::string> unresolved_uids;
@@ -596,20 +589,20 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
 mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))
-    return make_error("missing required parameter: path (edited-scene node "
+    return util::error_json("missing required parameter: path (edited-scene node "
                       "path, e.g. \"Player\")");
 
   std::string direction = "both";
   read_string_arg(args, "direction", direction);
   if (direction != "outgoing" && direction != "incoming" &&
       direction != "both")
-    return make_error("direction must be \"outgoing\", \"incoming\" or "
+    return util::error_json("direction must be \"outgoing\", \"incoming\" or "
                       "\"both\" (got \"" +
                       direction + "\")");
 
   int64_t max_depth = read_int_arg(args, "max_depth", DEFAULT_MAX_DEPTH);
   if (max_depth < 1)
-    return make_error("max_depth must be >= 1 (got " +
+    return util::error_json("max_depth must be >= 1 (got " +
                       std::to_string(max_depth) + ")");
 
   auto *editor = godot::EditorInterface::get_singleton();
@@ -618,7 +611,7 @@ mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
   std::string hint;
   godot::Node *root_node = util::resolve_scene_node(path, scene_root, &hint);
   if (!root_node)
-    return make_error("node not found: " + path + " — " + hint);
+    return util::error_json("node not found: " + path + " — " + hint);
 
   bool do_outgoing = direction == "outgoing" || direction == "both";
   bool do_incoming = direction == "incoming" || direction == "both";

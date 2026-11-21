@@ -5,6 +5,7 @@
 #include "core/observability/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/readback_util.hpp"
 #include "util/json_godot.hpp"
 #include "util/project_path.hpp"
@@ -171,18 +172,6 @@ namespace {
 
 constexpr size_t kMeshMaxVertices = 65536;
 
-bool is_digits(const std::string &s) {
-  if (s.empty()) {
-    return false;
-  }
-  for (char c : s) {
-    if (c < '0' || c > '9') {
-      return false;
-    }
-  }
-  return true;
-}
-
 bool primitive_class_for_type(const std::string &type, std::string &out_cls) {
   out_cls.clear();
   if (type == "box") {
@@ -246,15 +235,11 @@ bool resolve_resource_value_ref(const mcp::JsonValue &v,
     if (s.compare(0, res_prefix.size(), res_prefix) == 0) {
       return load_resource_or_error(s, out, error, {}, "");
     }
-    if (is_digits(s)) {
+    if (util::is_decimal_digits(s)) {
       out = resolve_memory_resource(s);
       if (out.is_null()) {
         int64_t oid = 0;
-        try {
-          oid = std::stoll(s);
-        } catch (...) {
-          oid = 0;
-        }
+        util::parse_decimal_int64(s, oid);
         auto *obj = godot::ObjectDB::get_instance(static_cast<uint64_t>(oid));
         if (obj) {
           auto *robj = godot::Object::cast_to<godot::Resource>(obj);

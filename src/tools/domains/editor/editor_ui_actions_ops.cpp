@@ -3,6 +3,7 @@
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/domains/input/input_click_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include <cctype>
 #include <cstdlib>
 #include <godot_cpp/classes/control.hpp>
@@ -43,16 +44,16 @@ std::string trim_ascii(const std::string &text) {
 
 bool read_required_string_arg(const mcp::JsonValue &args, const char *name,
                               std::string *out, std::string *error) {
-  const mcp::JsonValue *value = args.Find(name);
-  if (!value) {
+  const util::StringArgStatus status =
+      util::string_arg_status(args, name, *out, false);
+  if (status == util::StringArgStatus::Missing) {
     *error = std::string("missing required parameter: ") + name;
     return false;
   }
-  if (!value->IsString()) {
+  if (status != util::StringArgStatus::Ok) {
     *error = std::string("invalid parameter: ") + name + " must be a string";
     return false;
   }
-  *out = value->GetString();
   return true;
 }
 

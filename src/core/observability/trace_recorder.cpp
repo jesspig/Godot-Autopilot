@@ -1,4 +1,6 @@
 #include "core/observability/trace_recorder.hpp"
+#include "util/hash_util.hpp"
+#include "util/string_util.hpp"
 
 #include <atomic>
 #include <cctype>
@@ -170,40 +172,7 @@ std::string strip_key_values(const std::string &text) {
 }
 
 void append_escaped(std::string &out, const std::string &value) {
-  for (unsigned char c : value) {
-    switch (c) {
-      case '"':
-        out += "\\\"";
-        break;
-      case '\\':
-        out += "\\\\";
-        break;
-      case '\b':
-        out += "\\b";
-        break;
-      case '\f':
-        out += "\\f";
-        break;
-      case '\n':
-        out += "\\n";
-        break;
-      case '\r':
-        out += "\\r";
-        break;
-      case '\t':
-        out += "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          char buf[8];
-          std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned>(c));
-          out += buf;
-        } else {
-          out += static_cast<char>(c);
-        }
-        break;
-    }
-  }
+  util::append_json_escaped(out, value);
 }
 
 void append_string_field(std::string &out, const char *name, const std::string &value, bool first) {
@@ -422,14 +391,7 @@ SanitizeResult TraceRecorder::sanitize_args(const std::string &args_dump, bool d
 }
 
 std::string TraceRecorder::fnv1a_hex(const std::string &text) {
-  uint64_t hash = 14695981039346656037ULL;
-  for (unsigned char c : text) {
-    hash ^= static_cast<uint64_t>(c);
-    hash *= 1099511628211ULL;
-  }
-  char buf[17];
-  std::snprintf(buf, sizeof(buf), "%016llx", static_cast<unsigned long long>(hash));
-  return std::string(buf);
+  return util::fnv1a64_hex_printf(text);
 }
 
 std::string TraceRecorder::decode_base64(const std::string &input) {

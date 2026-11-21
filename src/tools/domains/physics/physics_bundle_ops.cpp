@@ -4,6 +4,7 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/json_godot.hpp"
 #include "util/rid_registry.hpp"
 #include "util/scene_path.hpp"
@@ -843,9 +844,7 @@ JV handle_collision_shape_assign(const JV &args) {
       } else if (oids_v && oids_v->IsString() && !res_v && !path_v) {
         oid_handled = true;
         int64_t oid = 0;
-        try {
-          oid = std::stoll(oids_v->GetString());
-        } catch (...) {
+        if (!util::parse_decimal_int64(oids_v->GetString(), oid)) {
           JV r(JV::object_tag);
           r["error"] = JV("invalid object_id_str: not a valid 64-bit integer");
           return r;

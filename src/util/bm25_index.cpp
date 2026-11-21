@@ -1,4 +1,5 @@
 #include "util/bm25_index.hpp"
+#include "util/input_guards.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -79,7 +80,7 @@ std::vector<std::string> Bm25Index::tokenize(const std::string &text) const {
     if (c < 0x80) {
       flush_cjk_bigrams();
       if (std::isalnum(c)) {
-        ascii_word.push_back(static_cast<char>(std::tolower(c)));
+        ascii_word.push_back(godot_autopilot::util::ascii_tolower(static_cast<char>(c)));
       } else {
         flush_ascii_word();
       }
@@ -234,7 +235,7 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
       const unsigned char c = static_cast<unsigned char>(source[i]);
       if (c < 0x80) {
         if (std::isalnum(c)) {
-          out.push_back(static_cast<char>(std::tolower(c)));
+          out.push_back(godot_autopilot::util::ascii_tolower(static_cast<char>(c)));
         }
         ++i;
         continue;

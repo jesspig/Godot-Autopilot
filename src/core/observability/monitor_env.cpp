@@ -12,6 +12,7 @@
 #include <version.hpp>
 
 #include "core/observability/log_persist.hpp"
+#include "util/error_util.hpp"
 #include "core/mode_detector.hpp"
 #include "core/plugin_config.hpp"
 #include "core/observability/sanitize_policy.hpp"
@@ -19,17 +20,11 @@
 namespace godot_autopilot {
 namespace monitor {
 
-namespace {
-
-std::string to_std(const godot::String &value) {
-  return std::string(value.utf8().get_data());
-}
-
 std::string version_field(const godot::Dictionary &info, const char *key) {
   if (!info.has(key)) {
     return std::string();
   }
-  return to_std(godot::String(info[key]));
+  return util::to_std(godot::String(info[key]));
 }
 
 } // namespace
@@ -52,8 +47,8 @@ void environment_snapshot() {
   std::string os_version;
   int64_t processors = 0;
   if (auto *os = godot::OS::get_singleton()) {
-    os_name = to_std(os->get_name());
-    os_version = to_std(os->get_version());
+    os_name = util::to_std(os->get_name());
+    os_version = util::to_std(os->get_version());
     processors = os->get_processor_count();
   }
 
@@ -62,8 +57,8 @@ void environment_snapshot() {
   if (auto *editor = godot::EditorInterface::get_singleton()) {
     godot::Node *root = editor->get_edited_scene_root();
     if (root) {
-      scene_path = to_std(root->get_scene_file_path());
-      scene_root = to_std(root->get_name());
+      scene_path = util::to_std(root->get_scene_file_path());
+      scene_root = util::to_std(root->get_name());
     }
   }
 

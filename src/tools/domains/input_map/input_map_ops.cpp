@@ -1,6 +1,7 @@
 #include "tools/domains/input_map/input_map_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <cctype>
@@ -241,15 +242,8 @@ int64_t resolve_key_name_code(const std::string &name) {
   if (it != key_code_by_bare_name().end())
     return it->second;
 
-  bool all_digits = true;
-  for (char c : u) {
-    if (c < '0' || c > '9') {
-      all_digits = false;
-      break;
-    }
-  }
-  if (all_digits && u.size() <= 8) {
-    const int64_t value = std::stoll(u);
+  int64_t value = 0;
+  if (u.size() <= 8 && util::parse_decimal_int64(u, value)) {
     if (value > 0 && value <= 0xFFFFFF)
       return value;
   }

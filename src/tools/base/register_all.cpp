@@ -5,6 +5,7 @@
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
 #include "core/transport/godot_transport.hpp"
+#include "util/input_guards.hpp"
 #include <version.hpp>
 #include "tools/base/code_exec_ops.hpp"
 #include "tools/base/dispatch.hpp"
@@ -271,29 +272,12 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     return result;
 }
 
-static std::string received_keys_text(const mcp::JsonValue& args) {
-    if (!args.IsObject() || args.GetObject().empty()) {
-        return "(received no parameters)";
-    }
-    std::string text = "(received keys: ";
-    bool first = true;
-    for (const auto& entry : args.GetObject()) {
-        if (!first) {
-            text += ", ";
-        }
-        first = false;
-        text += entry.first;
-    }
-    text += ")";
-    return text;
-}
-
 static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
     auto *name_p = args.Find("name");
     if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: name " + received_keys_text(args));
+        e["error"] = mcp::JsonValue("missing required parameter: name " + util::received_keys_text(args, false));
         return e;
     }
 
@@ -305,14 +289,14 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
 
     if (auto *a = args.Find("arguments"); a && !a->IsObject()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + received_keys_text(args));
+        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + util::received_keys_text(args, false));
         return e;
     }
     for (const auto &entry : args.GetObject()) {
         if (entry.first != "name" && entry.first != "arguments" &&
             entry.first != "confirm") {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + received_keys_text(args));
+            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + util::received_keys_text(args, false));
             return e;
         }
     }

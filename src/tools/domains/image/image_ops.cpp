@@ -43,12 +43,6 @@ namespace {
 constexpr int kMaxDimension = 4096;
 constexpr int kDefaultDimension = 256;
 
-mcp::JsonValue make_error(const std::string &message) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(message);
-  return e;
-}
-
 mcp::JsonValue make_result(mcp::JsonValue value) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(value);
@@ -71,40 +65,19 @@ std::string invalid_param(const char *name, const std::string &expected) {
   return std::string("invalid parameter: ") + name + " must be " + expected;
 }
 
-std::string lowercase(std::string text) {
-  for (char &c : text) {
-    if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c + ('a' - 'A'));
-    }
-  }
-  return text;
-}
-
-bool is_digits(const std::string &text) {
-  if (text.empty()) {
-    return false;
-  }
-  for (char c : text) {
-    if (c < '0' || c > '9') {
-      return false;
-    }
-  }
-  return true;
-}
-
 bool read_required_string(const mcp::JsonValue &args, const char *key,
                           const std::string &action, std::string &out,
                           std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
-  if (value == nullptr) {
+  const util::StringArgStatus status =
+      util::string_arg_status(args, key, out, true);
+  if (status == util::StringArgStatus::Missing) {
     error = missing_param(action, key);
     return false;
   }
-  if (!value->IsString() || value->GetString().empty()) {
+  if (status != util::StringArgStatus::Ok) {
     error = invalid_param(key, "a non-empty string");
     return false;
   }
-  out = value->GetString();
   return true;
 }
 
@@ -321,7 +294,7 @@ std::string format_name_of(godot::Image::Format format) {
 }
 
 bool parse_format(const std::string &name, godot::Image::Format &out) {
-  const std::string key = lowercase(name);
+  const std::string key = util::ascii_lowercase(name);
   for (const FormatName &entry : kFormatNames) {
     if (key == entry.name) {
       out = entry.format;
@@ -346,7 +319,7 @@ const InterpolationName kInterpolations[] = {
 
 bool parse_interpolation(const std::string &name,
                          godot::Image::Interpolation &out) {
-  const std::string key = lowercase(name);
+  const std::string key = util::ascii_lowercase(name);
   for (const InterpolationName &entry : kInterpolations) {
     if (key == entry.name) {
       out = entry.interpolation;
@@ -371,7 +344,7 @@ const CompressModeName kCompressModes[] = {
 
 bool parse_compress_mode(const std::string &name,
                          godot::Image::CompressMode &out) {
-  const std::string key = lowercase(name);
+  const std::string key = util::ascii_lowercase(name);
   for (const CompressModeName &entry : kCompressModes) {
     if (key == entry.name) {
       out = entry.mode;
@@ -394,7 +367,7 @@ const CompressSourceName kCompressSources[] = {
 
 bool parse_compress_source(const std::string &name,
                            godot::Image::CompressSource &out) {
-  const std::string key = lowercase(name);
+  const std::string key = util::ascii_lowercase(name);
   for (const CompressSourceName &entry : kCompressSources) {
     if (key == entry.name) {
       out = entry.source;
@@ -406,7 +379,7 @@ bool parse_compress_source(const std::string &name,
 
 bool parse_astc_format(const std::string &name,
                        godot::Image::ASTCFormat &out) {
-  const std::string key = lowercase(name);
+  const std::string key = util::ascii_lowercase(name);
   if (key == "4x4") {
     out = godot::Image::ASTC_FORMAT_4x4;
     return true;
@@ -458,80 +431,49 @@ bool load_image_file(const std::string &path, godot::Ref<godot::Image> &out,
 bool resolve_image_locator(const mcp::JsonValue &value,
                            godot::Ref<godot::Image> &out,
                            std::string &error) {
-  std::string name;
-  std::string path;
-  bool has_object_id = false;
-  int64_t object_id = 0;
+  util::ObjectLocatorFields fields;
   std::string other_class;
   std::string descriptor = "locator";
   if (value.IsString()) {
-    const std::string text = value.GetString();
-    descriptor = text;
-    if (text.rfind("memory://", 0) == 0) {
-      name = text.substr(9);
-    } else if (text.rfind("res://", 0) == 0 ||
-               text.rfind("user://", 0) == 0) {
-      path = text;
-    } else if (is_digits(text)) {
-      if (!util::parse_decimal_int64(text, object_id)) {
-        error = "invalid image locator: object_id is out of range";
-        return false;
-      }
-      has_object_id = true;
-    } else if (!text.empty()) {
-      name = text;
+    bool out_of_range = false;
+    descriptor = util::parse_locator_string(value.GetString(), true, fields,
+                                            out_of_range);
+    if (out_of_range) {
+      error = "invalid image locator: object_id is out of range";
+      return false;
     }
   } else if (value.IsObject()) {
-    for (const auto &entry : value.GetObject()) {
-      if (entry.first != "name" && entry.first != "path" &&
-          entry.first != "object_id" && entry.first != "object_id_str") {
-        error = "invalid image locator: unknown field '" + entry.first +
-                "' (allowed: name, path, object_id, object_id_str)";
-        return false;
-      }
+    const char *bad_field = nullptr;
+    const util::LocatorFieldStatus status =
+        util::parse_object_locator(value, true, fields, &bad_field);
+    if (status == util::LocatorFieldStatus::UnknownField) {
+      error = "invalid image locator: unknown field '" +
+              std::string(bad_field) +
+              "' (allowed: name, path, object_id, object_id_str)";
+      return false;
     }
-    const mcp::JsonValue *name_p = value.Find("name");
-    if (name_p != nullptr) {
-      if (!name_p->IsString()) {
-        error = invalid_param("image.name", "a string");
-        return false;
-      }
-      name = name_p->GetString();
+    if (status == util::LocatorFieldStatus::WrongType) {
+      const std::string field = bad_field != nullptr ? bad_field : "locator";
+      const char *expected = std::string(field) == "object_id"
+                                 ? "a number"
+                                 : (std::string(field) == "object_id_str"
+                                        ? "a decimal integer string"
+                                        : "a string");
+      error = invalid_param(("image." + field).c_str(), expected);
+      return false;
     }
-    const mcp::JsonValue *path_p = value.Find("path");
-    if (path_p != nullptr) {
-      if (!path_p->IsString()) {
-        error = invalid_param("image.path", "a string");
-        return false;
-      }
-      path = path_p->GetString();
-    }
-    const mcp::JsonValue *oid_p = value.Find("object_id");
-    if (oid_p != nullptr) {
-      if (!oid_p->IsNumber()) {
-        error = invalid_param("image.object_id", "a number");
-        return false;
-      }
-      has_object_id = true;
-      object_id = oid_p->IsInt() ? oid_p->GetInt()
-                                 : static_cast<int64_t>(oid_p->GetDouble());
-    }
-    const mcp::JsonValue *oid_str_p = value.Find("object_id_str");
-    if (oid_str_p != nullptr) {
-      if (!oid_str_p->IsString() || !is_digits(oid_str_p->GetString())) {
-        error = invalid_param("image.object_id_str", "a decimal integer string");
-        return false;
-      }
-      if (!util::parse_decimal_int64(oid_str_p->GetString(), object_id)) {
-        error = "invalid image locator: object_id_str is out of range";
-        return false;
-      }
-      has_object_id = true;
+    if (status == util::LocatorFieldStatus::OutOfRange) {
+      error = "invalid image locator: object_id_str is out of range";
+      return false;
     }
   } else {
     error = "invalid image locator: expected a string or object";
     return false;
   }
+  const std::string &name = fields.name;
+  const std::string &path = fields.path;
+  const bool has_object_id = fields.has_object_id;
+  const int64_t object_id = fields.object_id;
 
   if (has_object_id) {
     godot::Object *object =
@@ -846,7 +788,7 @@ bool build_noise(const mcp::JsonValue &args,
     return false;
   }
   if (!noise_type.empty()) {
-    const std::string key = lowercase(noise_type);
+    const std::string key = util::ascii_lowercase(noise_type);
     bool found = false;
     for (const NoiseTypeName &entry : kNoiseTypes) {
       if (key == entry.name) {
@@ -867,7 +809,7 @@ bool build_noise(const mcp::JsonValue &args,
     return false;
   }
   if (!fractal_type.empty()) {
-    const std::string key = lowercase(fractal_type);
+    const std::string key = util::ascii_lowercase(fractal_type);
     bool found = false;
     for (const FractalTypeName &entry : kFractalTypes) {
       if (key == entry.name) {
@@ -955,7 +897,7 @@ bool build_gradient(const mcp::JsonValue &args, bool default_preset,
     return false;
   }
   if (!interpolation.empty()) {
-    const std::string key = lowercase(interpolation);
+    const std::string key = util::ascii_lowercase(interpolation);
     if (key == "linear") {
       out->set_interpolation_mode(godot::Gradient::GRADIENT_INTERPOLATE_LINEAR);
     } else if (key == "constant") {
@@ -1009,48 +951,48 @@ mcp::JsonValue handle_noise_image(const mcp::JsonValue &args,
   int width = kDefaultDimension;
   int height = kDefaultDimension;
   if (!resolve_generation_size(args, width, height, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   godot::Ref<godot::FastNoiseLite> noise;
   if (!build_noise(args, noise, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   bool seamless = false;
   bool normalize = true;
   bool invert = false;
   if (!read_bool_or(args, "seamless", false, seamless, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   if (!read_bool_or(args, "normalize", true, normalize, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   if (!read_bool_or(args, "invert", false, invert, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   double skirt = 0.1;
   if (!read_double_or(args, "skirt", 0.1, skirt, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   std::string name;
   if (!read_optional_string(args, "name", name, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   std::string image_name;
   if (!read_optional_string(args, "image_name", image_name, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   if (!name.empty() && image_name.empty()) {
     image_name = name + "_image";
   }
   godot::Ref<godot::Gradient> color_ramp;
   if (!build_gradient(args, false, color_ramp, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   godot::Ref<godot::Image> image =
       render_noise_image(noise, width, height, seamless, invert, normalize,
                          static_cast<float>(skirt));
   if (image.is_null() || image->is_empty()) {
-    return make_error("failed to render noise image at " +
+    return util::error_json("failed to render noise image at " +
                       std::to_string(width) + "x" + std::to_string(height));
   }
   if (as_texture) {
@@ -1102,29 +1044,29 @@ mcp::JsonValue handle_gradient_image(const mcp::JsonValue &args) {
   int width = kDefaultDimension;
   int height = kDefaultDimension;
   if (!resolve_generation_size(args, width, height, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   godot::Ref<godot::Gradient> gradient;
   if (!build_gradient(args, true, gradient, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   std::string axis = "horizontal";
   if (!read_optional_string(args, "axis", axis, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
-  axis = lowercase(axis);
+  axis = util::ascii_lowercase(axis);
   if (axis != "horizontal" && axis != "vertical") {
-    return make_error(
+    return util::error_json(
         "invalid parameter: axis must be horizontal or vertical");
   }
   std::string name;
   if (!read_optional_string(args, "name", name, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   godot::Ref<godot::Image> image =
       render_gradient_image(gradient, width, height, axis);
   if (image.is_null() || image->is_empty()) {
-    return make_error("failed to render gradient image at " +
+    return util::error_json("failed to render gradient image at " +
                       std::to_string(width) + "x" + std::to_string(height));
   }
   register_named_resource(image, name);
@@ -1142,27 +1084,27 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
   int width = kDefaultDimension;
   int height = kDefaultDimension;
   if (!resolve_generation_size(args, width, height, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   godot::Ref<godot::Gradient> gradient;
   if (!build_gradient(args, true, gradient, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   std::string dimension = "2d";
   if (!read_optional_string(args, "dimension", dimension, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
-  dimension = lowercase(dimension);
+  dimension = util::ascii_lowercase(dimension);
   if (dimension != "1d" && dimension != "2d") {
-    return make_error("invalid parameter: dimension must be 1d or 2d");
+    return util::error_json("invalid parameter: dimension must be 1d or 2d");
   }
   std::string name;
   if (!read_optional_string(args, "name", name, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   std::string image_name;
   if (!read_optional_string(args, "image_name", image_name, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   if (!name.empty() && image_name.empty()) {
     image_name = name + "_image";
@@ -1185,20 +1127,20 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     std::string fill = "linear";
     std::string repeat = "none";
     if (!read_optional_string(args, "fill", fill, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (!read_optional_string(args, "repeat", repeat, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
-    fill = lowercase(fill);
-    repeat = lowercase(repeat);
+    fill = util::ascii_lowercase(fill);
+    repeat = util::ascii_lowercase(repeat);
     if (fill != "linear" && fill != "radial" && fill != "square" &&
         fill != "conic") {
-      return make_error(
+      return util::error_json(
           "invalid parameter: fill must be linear, radial, square or conic");
     }
     if (repeat != "none" && repeat != "repeat" && repeat != "mirror") {
-      return make_error(
+      return util::error_json(
           "invalid parameter: repeat must be none, repeat or mirror");
     }
     godot::Vector2 fill_from(0.0f, 0.0f);
@@ -1207,7 +1149,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     if (from_p != nullptr) {
       if (!from_p->IsObject()) {
         error = invalid_param("fill_from", "an object {x, y}");
-        return make_error(error);
+        return util::error_json(error);
       }
       fill_from = util::json_to_vec2(*from_p);
     }
@@ -1215,7 +1157,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     if (to_p != nullptr) {
       if (!to_p->IsObject()) {
         error = invalid_param("fill_to", "an object {x, y}");
-        return make_error(error);
+        return util::error_json(error);
       }
       fill_to = util::json_to_vec2(*to_p);
     }
@@ -1251,7 +1193,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     result["texture"] = texture_to_json(texture, name);
   }
   if (image.is_null() || image->is_empty()) {
-    return make_error("failed to render gradient preview image");
+    return util::error_json("failed to render gradient preview image");
   }
   register_named_resource(image, image_name);
   result["image"] = image_to_json(image, image_name);
@@ -1263,7 +1205,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
 mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
-    return make_error("missing required parameter: action");
+    return util::error_json("missing required parameter: action");
   }
   std::string error;
   if (action == "create") {
@@ -1273,21 +1215,21 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
         !read_required_int(args, "height", action, height, error) ||
         !check_dimension(width, "width", error) ||
         !check_dimension(height, "height", error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     godot::Image::Format format = godot::Image::FORMAT_RGBA8;
     std::string format_text;
     if (!read_optional_string(args, "format", format_text, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (!format_text.empty()) {
       if (!parse_format(format_text, format)) {
-        return make_error("invalid parameter: format '" + format_text +
+        return util::error_json("invalid parameter: format '" + format_text +
                           "' is not a known image format");
       }
       if (format >= godot::Image::FORMAT_DXT1 &&
           format <= godot::Image::FORMAT_ASTC_8x8_HDR) {
-        return make_error(
+        return util::error_json(
             "invalid parameter: format must be an uncompressed format");
       }
     }
@@ -1295,20 +1237,20 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
         static_cast<int32_t>(width), static_cast<int32_t>(height), false,
         format);
     if (image.is_null() || image->is_empty()) {
-      return make_error("failed to create image at " + std::to_string(width) +
+      return util::error_json("failed to create image at " + std::to_string(width) +
                         "x" + std::to_string(height));
     }
     godot::Color color;
     bool has_color = false;
     if (!read_optional_color(args, "color", color, has_color, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (has_color) {
       image->fill(color);
     }
     std::string name;
     if (!read_optional_string(args, "name", name, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     register_named_resource(image, name);
     return make_result(image_to_json(image, name));
@@ -1316,16 +1258,16 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   if (action == "load") {
     std::string path;
     if (!read_required_string(args, "path", action, path, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     godot::Ref<godot::Image> image;
     std::string normalized;
     if (!load_image_file(path, image, normalized, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     std::string name;
     if (!read_optional_string(args, "name", name, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     register_named_resource(image, name);
     resource_registry::register_resource(image, normalized);
@@ -1336,7 +1278,7 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   if (action == "info") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     mcp::JsonValue result = image_to_json(image, "");
     result["data_size"] =
@@ -1350,7 +1292,7 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   if (action == "resize") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     int64_t width = 0;
     int64_t height = 0;
@@ -1358,18 +1300,18 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
         !read_required_int(args, "height", action, height, error) ||
         !check_dimension(width, "width", error) ||
         !check_dimension(height, "height", error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     godot::Image::Interpolation interpolation =
         godot::Image::INTERPOLATE_BILINEAR;
     std::string interpolation_text;
     if (!read_optional_string(args, "interpolation", interpolation_text,
                               error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (!interpolation_text.empty() &&
         !parse_interpolation(interpolation_text, interpolation)) {
-      return make_error("invalid parameter: interpolation must be nearest, "
+      return util::error_json("invalid parameter: interpolation must be nearest, "
                         "bilinear, cubic, trilinear or lanczos");
     }
     image->resize(static_cast<int32_t>(width), static_cast<int32_t>(height),
@@ -1379,23 +1321,23 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   if (action == "crop") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     int64_t width = 0;
     int64_t height = 0;
     if (!read_required_int(args, "width", action, width, error) ||
         !read_required_int(args, "height", action, height, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     int64_t x = 0;
     int64_t y = 0;
     if (!read_int_or(args, "x", 0, x, error) ||
         !read_int_or(args, "y", 0, y, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (x < 0 || y < 0 || width < 1 || height < 1 ||
         x + width > image->get_width() || y + height > image->get_height()) {
-      return make_error(
+      return util::error_json(
           "invalid parameter: crop region is outside the image bounds");
     }
     if (x == 0 && y == 0) {
@@ -1406,7 +1348,7 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
                         static_cast<int32_t>(width),
                         static_cast<int32_t>(height)));
       if (region.is_null() || region->is_empty()) {
-        return make_error("failed to crop image region");
+        return util::error_json("failed to crop image region");
       }
       image->copy_from(region);
     }
@@ -1415,13 +1357,13 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   if (action == "flip") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     std::string axis = "y";
     if (!read_optional_string(args, "axis", axis, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
-    axis = lowercase(axis);
+    axis = util::ascii_lowercase(axis);
     if (axis == "x") {
       image->flip_x();
     } else if (axis == "y") {
@@ -1430,29 +1372,29 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
       image->flip_x();
       image->flip_y();
     } else {
-      return make_error("invalid parameter: axis must be x, y or both");
+      return util::error_json("invalid parameter: axis must be x, y or both");
     }
     return make_result(image_to_json(image, ""));
   }
   if (action == "rotate") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     int64_t degrees = 0;
     if (!read_required_int(args, "degrees", action, degrees, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (degrees != 90 && degrees != 180 && degrees != 270) {
-      return make_error("invalid parameter: degrees must be 90, 180 or 270");
+      return util::error_json("invalid parameter: degrees must be 90, 180 or 270");
     }
     std::string direction = "clockwise";
     if (!read_optional_string(args, "direction", direction, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
-    direction = lowercase(direction);
+    direction = util::ascii_lowercase(direction);
     if (direction != "clockwise" && direction != "counterclockwise") {
-      return make_error(
+      return util::error_json(
           "invalid parameter: direction must be clockwise or counterclockwise");
     }
     const int clockwise = direction == "clockwise" ? 0 : 1;
@@ -1468,36 +1410,36 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   if (action == "fill") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     const mcp::JsonValue *color_p = args.Find("color");
     if (color_p == nullptr) {
-      return make_error(missing_param(action, "color"));
+      return util::error_json(missing_param(action, "color"));
     }
     godot::Color color;
     if (!read_color(*color_p, "color", color, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     image->fill(color);
     return make_result(image_to_json(image, ""));
   }
-  return make_error("unknown action: " + action);
+  return util::error_json("unknown action: " + action);
 }
 
 mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
-    return make_error("missing required parameter: action");
+    return util::error_json("missing required parameter: action");
   }
   std::string error;
   if (action == "blit" || action == "blend") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     godot::Ref<godot::Image> source;
     if (!resolve_required_image(args, action, "src", source, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     int64_t x = 0;
     int64_t y = 0;
@@ -1511,12 +1453,12 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
         !read_int_or(args, "src_y", 0, src_y, error) ||
         !read_int_or(args, "src_width", src_width, src_width, error) ||
         !read_int_or(args, "src_height", src_height, src_height, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (src_x < 0 || src_y < 0 || src_width < 1 || src_height < 1 ||
         src_x + src_width > source->get_width() ||
         src_y + src_height > source->get_height()) {
-      return make_error(
+      return util::error_json(
           "invalid parameter: source region is outside the source image "
           "bounds");
     }
@@ -1524,7 +1466,7 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
     if (source->get_format() != image->get_format()) {
       prepared = source->duplicate();
       if (prepared.is_null()) {
-        return make_error("failed to duplicate source image for format "
+        return util::error_json("failed to duplicate source image for format "
                           "conversion");
       }
       prepared->convert(image->get_format());
@@ -1551,17 +1493,17 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
   if (action == "get_pixel" || action == "set_pixel") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     int64_t x = 0;
     int64_t y = 0;
     if (!read_required_int(args, "x", action, x, error) ||
         !read_required_int(args, "y", action, y, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     if (x < 0 || y < 0 || x >= image->get_width() ||
         y >= image->get_height()) {
-      return make_error("pixel out of bounds: (" + std::to_string(x) + ", " +
+      return util::error_json("pixel out of bounds: (" + std::to_string(x) + ", " +
                         std::to_string(y) + ") outside " +
                         std::to_string(image->get_width()) + "x" +
                         std::to_string(image->get_height()));
@@ -1577,11 +1519,11 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
     }
     const mcp::JsonValue *color_p = args.Find("color");
     if (color_p == nullptr) {
-      return make_error(missing_param(action, "color"));
+      return util::error_json(missing_param(action, "color"));
     }
     godot::Color color;
     if (!read_color(*color_p, "color", color, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     image->set_pixel(static_cast<int32_t>(x), static_cast<int32_t>(y), color);
     mcp::JsonValue result(mcp::JsonValue::object_tag);
@@ -1593,7 +1535,7 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
   if (action == "compress") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     std::string mode_text = "s3tc";
     std::string source_text = "generic";
@@ -1601,26 +1543,26 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
     if (!read_optional_string(args, "mode", mode_text, error) ||
         !read_optional_string(args, "source", source_text, error) ||
         !read_optional_string(args, "astc_format", astc_text, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     godot::Image::CompressMode mode = godot::Image::COMPRESS_S3TC;
     if (!parse_compress_mode(mode_text, mode)) {
-      return make_error(
+      return util::error_json(
           "invalid parameter: mode must be s3tc, etc, etc2, bptc or astc");
     }
     godot::Image::CompressSource source =
         godot::Image::COMPRESS_SOURCE_GENERIC;
     if (!parse_compress_source(source_text, source)) {
-      return make_error(
+      return util::error_json(
           "invalid parameter: source must be generic, srgb or normal");
     }
     godot::Image::ASTCFormat astc_format = godot::Image::ASTC_FORMAT_4x4;
     if (!parse_astc_format(astc_text, astc_format)) {
-      return make_error("invalid parameter: astc_format must be 4x4 or 8x8");
+      return util::error_json("invalid parameter: astc_format must be 4x4 or 8x8");
     }
     const godot::Error save_error = image->compress(mode, source, astc_format);
     if (save_error != godot::OK) {
-      return make_error("compress failed with error code " +
+      return util::error_json("compress failed with error code " +
                         std::to_string(static_cast<int>(save_error)) +
                         " (the image may already be compressed)");
     }
@@ -1631,11 +1573,11 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
   if (action == "decompress") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     const godot::Error decompress_error = image->decompress();
     if (decompress_error != godot::OK) {
-      return make_error("decompress failed with error code " +
+      return util::error_json("decompress failed with error code " +
                         std::to_string(static_cast<int>(decompress_error)) +
                         " (the image may not be compressed)");
     }
@@ -1646,16 +1588,16 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
   if (action == "to_texture") {
     godot::Ref<godot::Image> image;
     if (!resolve_required_image(args, action, "image", image, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     std::string name;
     if (!read_optional_string(args, "name", name, error)) {
-      return make_error(error);
+      return util::error_json(error);
     }
     godot::Ref<godot::ImageTexture> texture =
         godot::ImageTexture::create_from_image(image);
     if (texture.is_null()) {
-      return make_error("failed to create ImageTexture from image");
+      return util::error_json("failed to create ImageTexture from image");
     }
     register_named_resource(texture, name);
     mcp::JsonValue result(mcp::JsonValue::object_tag);
@@ -1663,46 +1605,46 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
     result["image"] = image_to_json(image, "");
     return make_result(std::move(result));
   }
-  return make_error("unknown action: " + action);
+  return util::error_json("unknown action: " + action);
 }
 
 mcp::JsonValue handle_save_action(const mcp::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
-    return make_error("missing required parameter: action");
+    return util::error_json("missing required parameter: action");
   }
   if (action != "save") {
-    return make_error("unknown action: " + action);
+    return util::error_json("unknown action: " + action);
   }
   std::string error;
   godot::Ref<godot::Image> image;
   if (!resolve_required_image(args, action, "image", image, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   std::string path;
   if (!read_required_string(args, "path", action, path, error)) {
-    return make_error(error);
+    return util::error_json(error);
   }
   const util::ProjectPath project_path =
       util::normalize_project_path(path, false, false);
   if (!project_path.valid()) {
-    return make_error("invalid path: " + project_path.error);
+    return util::error_json("invalid path: " + project_path.error);
   }
-  if (lowercase(project_path.value).size() < 4 ||
-      lowercase(project_path.value).substr(lowercase(project_path.value).size() -
+  if (util::ascii_lowercase(project_path.value).size() < 4 ||
+      util::ascii_lowercase(project_path.value).substr(util::ascii_lowercase(project_path.value).size() -
                                             4) != ".png") {
-    return make_error("invalid parameter: path must end with .png");
+    return util::error_json("invalid parameter: path must end with .png");
   }
   std::string dir_created;
   std::string dir_error;
   if (!resource_fs::ensure_parent_directory(project_path.value, dir_created,
                                             dir_error)) {
-    return make_error(dir_error);
+    return util::error_json(dir_error);
   }
   const godot::String target(project_path.value.c_str());
   const godot::Error save_error = image->save_png(target);
   if (save_error != godot::OK) {
-    return make_error("save_png failed with error code " +
+    return util::error_json("save_png failed with error code " +
                       std::to_string(static_cast<int>(save_error)) +
                       " for " + project_path.value);
   }
@@ -1728,7 +1670,7 @@ mcp::JsonValue handle_save_action(const mcp::JsonValue &args) {
 mcp::JsonValue handle_texture_gen_action(const mcp::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
-    return make_error("missing required parameter: action");
+    return util::error_json("missing required parameter: action");
   }
   if (action == "noise" || action == "noise_texture") {
     return handle_noise_image(args, action == "noise_texture");
@@ -1739,7 +1681,7 @@ mcp::JsonValue handle_texture_gen_action(const mcp::JsonValue &args) {
   if (action == "gradient_texture") {
     return handle_gradient_texture(args);
   }
-  return make_error("unknown action: " + action);
+  return util::error_json("unknown action: " + action);
 }
 
 } // namespace image_ops
