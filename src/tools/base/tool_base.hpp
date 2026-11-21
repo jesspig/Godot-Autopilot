@@ -34,6 +34,24 @@ inline const char* side_effect_name(SideEffect e) {
   return "none";
 }
 
+inline bool parse_side_effect(const std::string& text, SideEffect& out) {
+  if (text.empty()) {
+    out = SideEffect::None;
+    return true;
+  }
+  if (text == "writes_file") out = SideEffect::WritesFile;
+  else if (text == "writes_config") out = SideEffect::WritesConfig;
+  else if (text == "shows_alert") out = SideEffect::ShowsAlert;
+  else if (text == "modifies_window") out = SideEffect::ModifiesWindow;
+  else if (text == "process") out = SideEffect::Process;
+  else if (text == "code_execute") out = SideEffect::CodeExecute;
+  else if (text == "game_runtime") out = SideEffect::GameRuntime;
+  else if (text == "writes_scene") out = SideEffect::WritesScene;
+  else if (text == "destructive") out = SideEffect::Destructive;
+  else return false;
+  return true;
+}
+
 struct ToolMeta {
   std::string name;
   std::string description;

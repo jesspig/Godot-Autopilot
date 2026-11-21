@@ -26,6 +26,7 @@
 
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
+#include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
 #include "tools/base/dispatch.hpp"
@@ -67,31 +68,6 @@ std::string string_field(const godot::Dictionary &dict, const char *key,
     return fallback;
   }
   return util::to_std(value.operator godot::String());
-}
-
-bool parse_side_effect(const std::string &text, SideEffect &out) {
-  if (text.empty()) {
-    out = SideEffect::None;
-    return true;
-  }
-  if (text == "writes_file") {
-    out = SideEffect::WritesFile;
-  } else if (text == "writes_config") {
-    out = SideEffect::WritesConfig;
-  } else if (text == "shows_alert") {
-    out = SideEffect::ShowsAlert;
-  } else if (text == "modifies_window") {
-    out = SideEffect::ModifiesWindow;
-  } else if (text == "process") {
-    out = SideEffect::Process;
-  } else if (text == "code_execute") {
-    out = SideEffect::CodeExecute;
-  } else if (text == "game_runtime") {
-    out = SideEffect::GameRuntime;
-  } else {
-    return false;
-  }
-  return true;
 }
 
 int64_t reject_registration(const std::string &message) {
@@ -597,6 +573,12 @@ godot::Dictionary AutopilotTools::get_tool(const godot::String &name) const {
 
 godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
                                             const godot::Dictionary &args) {
+  if (ExportGuard::is_exporting()) {
+    godot::Dictionary blocked;
+    blocked["error"] = godot::String::utf8(
+        dispatch::export_blocked_error_text().c_str());
+    return blocked;
+  }
   const std::string tool_name = util::to_std(name);
   auto invoke = [tool_name, args]() -> mcp::JsonValue {
     mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
