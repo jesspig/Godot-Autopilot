@@ -64,6 +64,7 @@ const std::vector<ParamSpec> kCallScriptNodeParams = {
 
 const std::vector<ParamSpec> kReloadScriptParams = {
     {"path", "string", "Script file path (e.g. res://player.gd)", true},
+    {"keep_state", "boolean", "Passed to the final reload(true/false): when the script has live instances (a node already uses it) keep_state must be true, otherwise Godot returns ERR_ALREADY_IN_USE (22); default false", false},
 };
 
 const std::vector<ParamSpec> kGetScriptPropertyListParams = {
