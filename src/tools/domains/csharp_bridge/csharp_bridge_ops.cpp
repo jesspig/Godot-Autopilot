@@ -284,6 +284,19 @@ bool check_allowed(const JV &args, const std::string &tool,
   return true;
 }
 
+JV without_action(const JV &args) {
+  JV out(JV::object_tag);
+  if (!args.IsObject()) {
+    return out;
+  }
+  for (const auto &entry : args.GetObject()) {
+    if (entry.first != "action") {
+      out[entry.first] = entry.second;
+    }
+  }
+  return out;
+}
+
 bool fetch_editor_bridge(godot::Object *&out_bridge,
                          godot::Variant &out_holder, JV &err) {
   out_bridge = nullptr;
@@ -1170,17 +1183,18 @@ mcp::JsonValue handle_csharp_member(const mcp::JsonValue &args) {
     return util::error_json("missing required parameter: action");
   }
   const std::string action = ap->GetString();
+  const JV sub_args = without_action(args);
   if (action == "get") {
-    return handle_csharp_get(args);
+    return handle_csharp_get(sub_args);
   }
   if (action == "set") {
-    return handle_csharp_set(args);
+    return handle_csharp_set(sub_args);
   }
   if (action == "call") {
-    return handle_csharp_call(args);
+    return handle_csharp_call(sub_args);
   }
   if (action == "list") {
-    return handle_csharp_list(args);
+    return handle_csharp_list(sub_args);
   }
   return util::error_json("unknown action '" + action +
                           "': expected get, set, call or list");
@@ -1192,11 +1206,12 @@ mcp::JsonValue handle_csharp_event(const mcp::JsonValue &args) {
     return util::error_json("missing required parameter: action");
   }
   const std::string action = ap->GetString();
+  const JV sub_args = without_action(args);
   if (action == "subscribe") {
-    return handle_csharp_subscribe(args);
+    return handle_csharp_subscribe(sub_args);
   }
   if (action == "unsubscribe") {
-    return handle_csharp_unsubscribe(args);
+    return handle_csharp_unsubscribe(sub_args);
   }
   return util::error_json("unknown action '" + action +
                           "': expected subscribe or unsubscribe");
