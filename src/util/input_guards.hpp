@@ -10,6 +10,12 @@
 #include <string>
 #include <vector>
 
+#ifdef GetObject
+#pragma push_macro("GetObject")
+#undef GetObject
+#define GDA_INPUT_GUARDS_POP_GETOBJECT 1
+#endif
+
 namespace godot_autopilot {
 namespace util {
 
@@ -315,5 +321,10 @@ inline bool normalize_resource_uri_path(const std::string &raw,
 
 } // namespace util
 } // namespace godot_autopilot
+
+#ifdef GDA_INPUT_GUARDS_POP_GETOBJECT
+#pragma pop_macro("GetObject")
+#undef GDA_INPUT_GUARDS_POP_GETOBJECT
+#endif
 
 #endif

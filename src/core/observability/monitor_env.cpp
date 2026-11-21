@@ -27,8 +27,6 @@ std::string version_field(const godot::Dictionary &info, const char *key) {
   return util::to_std(godot::String(info[key]));
 }
 
-} // namespace
-
 void environment_snapshot() {
   std::string godot_version;
   if (auto *engine = godot::Engine::get_singleton()) {
