@@ -7,6 +7,7 @@
 #include <string>
 
 #include "core/observability/trace_recorder.hpp"
+#include "tools/base/tool_args.hpp"
 #include "tools/base/tool_registry.hpp"
 #include "tools/base/tool_spec.hpp"
 
@@ -113,4 +114,71 @@ TEST(CodeQualityC6Test, AddRejectsNameCollidingWithMetaTool) {
                std::invalid_argument);
   EXPECT_EQ(registry.meta_size(), 1u);
   EXPECT_EQ(registry.size(), 0u);
+}
+
+namespace {
+
+std::string dynamic_validation_error(
+    const mcp::JsonValue &args,
+    const std::vector<godot_autopilot::ParamSpec> &params) {
+  const mcp::JsonValue result =
+      godot_autopilot::spec_detail::validate_dynamic_args(args, params);
+  const mcp::JsonValue *error = result.Find("error");
+  return error != nullptr && error->IsString() ? error->GetString()
+                                               : std::string("<no error>");
+}
+
+} // namespace
+
+TEST(CodeQualityC4Test, ValidateDeclaredChecksRequiredAndTypes) {
+  const std::vector<godot_autopilot::ParamSpec> params = {
+      {"path", "string", "", true},
+      {"count", "integer", "", false},
+      {"scale", "number", "", false},
+      {"flag", "boolean", "", false},
+      {"payload", "object", "", false},
+      {"items", "array", "", false},
+  };
+
+  godot_autopilot::Args missing(parse("{}"), params);
+  EXPECT_EQ(dynamic_validation_error(parse("{}"), params),
+            "missing required parameter: path");
+  EXPECT_THROW(missing.validate_declared(), godot_autopilot::ToolArgError);
+
+  godot_autopilot::Args wrong(parse(R"({"path":3,"count":1.5})"), params);
+  EXPECT_THROW(wrong.validate_declared(), godot_autopilot::ToolArgError);
+
+  godot_autopilot::Args valid(
+      parse(R"({"path":"res://x","count":2.0,"scale":3,"flag":true,"payload":{},"items":[1]})"),
+      params);
+  EXPECT_NO_THROW(valid.validate_declared());
+}
+
+TEST(CodeQualityC4Test, DynamicToolRuntimeMatchesSchemaDeclaration) {
+  const std::vector<godot_autopilot::ParamSpec> params = {
+      {"path", "string", "", true},
+      {"count", "integer", "", false},
+  };
+
+  EXPECT_EQ(dynamic_validation_error(parse("{}"), params),
+            "missing required parameter: path");
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"path":"res://x","count":"3"})"), params),
+            "invalid parameter: count must be a integer");
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"path":"res://x"})"), params),
+            "<no error>");
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"path":"res://x","count":3.0})"), params),
+            "<no error>");
+}
+
+TEST(CodeQualityC4Test, DynamicToolWithoutParamsIsUnchanged) {
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"arbitrary":{"nested":1}})"), {}),
+            "<no error>");
+}
+
+TEST(CodeQualityC4Test, NullTreatedAsAbsentForDeclaredParam) {
+  const std::vector<godot_autopilot::ParamSpec> params = {
+      {"path", "string", "", true},
+  };
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"path":null})"), params),
+            "missing required parameter: path");
 }

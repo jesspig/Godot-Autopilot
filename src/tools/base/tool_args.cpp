@@ -171,6 +171,41 @@ bool Args::get_bool(const std::string &name, bool fallback) const {
   return value ? *value : fallback;
 }
 
+void Args::validate_declared() const {
+  for (const auto &param : params_) {
+    const mcp::JsonValue *value = find_present(raw_, param.name);
+    if (!value) {
+      if (param.required) {
+        throw_missing(param.name);
+      }
+      continue;
+    }
+    if (param.type == "string") {
+      if (!value->IsString())
+        throw_invalid(param.name, "string");
+    } else if (param.type == "integer") {
+      if (value->IsInt())
+        continue;
+      if (value->IsDouble() && is_integral(value->GetDouble()) &&
+          fits_int64_range(value->GetDouble()))
+        continue;
+      throw_invalid(param.name, "integer");
+    } else if (param.type == "number") {
+      if (!value->IsInt() && !value->IsDouble())
+        throw_invalid(param.name, "number");
+    } else if (param.type == "boolean") {
+      if (!value->IsBool())
+        throw_invalid(param.name, "boolean");
+    } else if (param.type == "object") {
+      if (!value->IsObject())
+        throw_invalid(param.name, "object");
+    } else if (param.type == "array") {
+      if (!value->IsArray())
+        throw_invalid(param.name, "array");
+    }
+  }
+}
+
 void Args::reject_unknown() const {
   if (!raw_.IsObject())
     return;
