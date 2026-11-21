@@ -281,7 +281,8 @@ class CommandQueue {
     out.future = task->promise.get_future();
     out.id = enqueue(std::move(task));
     if (budget_ms <= 0) {
-      out.future.wait();
+      out.timed_out = true;
+      out.cancelled = cancel(out.id);
       out.waited_ms = elapsed_ms_since(start);
       return out;
     }

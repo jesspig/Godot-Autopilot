@@ -47,6 +47,13 @@ inline size_t http_pump_connection_write_budget(size_t total, size_t count,
   return std::min(total, per_cap);
 }
 
+inline bool http_outbox_can_append(size_t current, size_t addition, size_t cap) {
+  if (addition > cap) {
+    return false;
+  }
+  return current <= cap - addition;
+}
+
 inline std::string transport_final_chunk() { return "0\r\n\r\n"; }
 
 inline bool transport_idle_expired(

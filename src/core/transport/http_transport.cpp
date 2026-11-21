@@ -612,6 +612,7 @@ void transport_collect_replies(TransportConnection &connection) {
     std::lock_guard<std::mutex> lock(connection.channel->mutex);
     replies.swap(connection.channel->replies);
   }
+  const size_t cap = http_pump_limits().max_outbox_bytes_per_connection;
   for (CompletedReply &reply : replies) {
     const std::string stream_id =
         transport_find_header(reply.response.headers, kStreamIdHeader);
@@ -621,8 +622,14 @@ void transport_collect_replies(TransportConnection &connection) {
       connection.outbox += transport_build_stream_response(reply.response);
       continue;
     }
-    connection.outbox += transport_build_response(reply.response, reply.keep_alive,
-                                                   reply.is_head);
+    const std::string encoded =
+        transport_build_response(reply.response, reply.keep_alive, reply.is_head);
+    if (!http_outbox_can_append(connection.outbox.size(), encoded.size(), cap)) {
+      connection.close_after_write = true;
+      connection.dead = true;
+      break;
+    }
+    connection.outbox += encoded;
     if (!reply.keep_alive) {
       connection.close_after_write = true;
       break;
