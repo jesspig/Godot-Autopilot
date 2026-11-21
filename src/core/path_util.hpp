@@ -3,8 +3,10 @@
 
 #include <cctype>
 #include <cstddef>
+#include <cstdio>
 #include <filesystem>
 #include <string>
+#include <system_error>
 
 namespace godot_autopilot {
 
@@ -96,6 +98,49 @@ inline std::string sanitize_path_component(const std::string &value) {
     }
   }
   return out;
+}
+
+inline std::string sibling_temp_path(const std::string &path,
+                                     const std::string &suffix) {
+  return path + suffix;
+}
+
+inline bool write_file_atomically(const std::string &path,
+                                  const std::string &content) {
+  if (path.empty()) {
+    return false;
+  }
+  const std::string temp_path = sibling_temp_path(path, ".tmp");
+  const std::filesystem::path fs_target = to_fs_path(path);
+  const std::filesystem::path fs_temp = to_fs_path(temp_path);
+  {
+    FILE *handle = std::fopen(fs_temp.u8string().c_str(), "wb");
+    if (handle == nullptr) {
+      return false;
+    }
+    const bool wrote = content.empty() ||
+                       std::fwrite(content.data(), 1, content.size(), handle) ==
+                           content.size();
+    const bool closed = std::fclose(handle) == 0;
+    if (!wrote || !closed) {
+      std::error_code cleanup_ec;
+      std::filesystem::remove(fs_temp, cleanup_ec);
+      return false;
+    }
+  }
+  std::error_code ec;
+  std::filesystem::rename(fs_temp, fs_target, ec);
+  if (!ec) {
+    return true;
+  }
+  std::filesystem::remove(fs_target, ec);
+  std::filesystem::rename(fs_temp, fs_target, ec);
+  if (ec) {
+    std::error_code cleanup_ec;
+    std::filesystem::remove(fs_temp, cleanup_ec);
+    return false;
+  }
+  return true;
 }
 
 } // namespace godot_autopilot
