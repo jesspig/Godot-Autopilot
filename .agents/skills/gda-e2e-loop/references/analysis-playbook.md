@@ -18,7 +18,7 @@
 
 - 运行 `bun run gda-dev-tools harness digest --round <轮目录>` 取得 `digest.json`（只读派生品）；缺失或解析失败时标注「digest 未验证」，按 `evidence.md` 手工提取，不编造字段值。消费 `q_items`、`s_items`、`levels`、`playtime_minutes`、`causal_triples`、`coverage_gaps`、`coverage_used`、`coverage_invalid_touches`、`evidence_rows`、`suspected_gaming`、`round`、`schema`（消费点见 `goal-and-verifier.md`）。
 - 读 GOAL 末态（`<project-dir>/GOAL.md`）的 `state`/`acceptance`/`completionEvidence`/`blocker`，与报告头部对照，不一致以 digest 与报告为准并记录差异。
-- 冻结快照：记录当前 `HARNESS_LIBRARY.md` 的条目 id 与状态，供增量合并比对。
+- 冻结快照：读取被 git 忽略的运行时数据 `.handoff/library/HARNESS_LIBRARY.md`（规则见技能册 `HARNESS_LIBRARY.md` 模板），记录当前条目 id 与状态，供增量合并比对；文件不存在视为空库。
 - 校验绑定层目录（含 `include/godot_cpp/` 与 `src/`）：记录 `git -C <dir> describe --tags --always` 与 `rev-parse --short HEAD`；引擎侧行为以 GDExtension API 的 C++ 绑定契约为准，不依赖引擎源码。
 - 校验 MCP SDK `third_party/mcp-cpp-sdk`（含 `include/` 与 `src/`）：记录 commit；缺失时停止并请用户初始化子模块。
 - 记录本项目基线：`git rev-parse --short HEAD`、`git diff HEAD` 范围。建立回放材料清单；记录降本指标基线「真实轮次调用数 / 候选探索数」。
@@ -81,7 +81,7 @@
 6. 覆盖缺口自动成为候选来源：`digest.coverage_gaps` 逐项检查是否有真实功能需求；有则登记候选，无则记原因。禁止为补缺口做无开发意图的调用。
 7. 禁止编造历史证据或行号；缺失或证据不足时标「未验证」。
 
-共享改进库按 `HARNESS_LIBRARY.md` 的 IF-05 schema 写条目，按 id 增量合并、不重写整库：只有 deep 深挖且对照为直接证据的结论可写「采纳」；broad 阶段仅间接证据的写「候选」，待下轮真实操作复核写「待验证」；证据不足写观察不写条目。`suspected_gaming=true` 轮次覆盖数据不进经验库。报告列出「共享库更新清单」（id、状态、可编辑面、动作、依据）。库长期为空是合法状态，写明「当前无条目，待真实轮次证据写入」。
+共享改进库条目写到被 git 忽略的运行时数据 `.handoff/library/HARNESS_LIBRARY.md`（字段/状态/合并规则见技能册 `HARNESS_LIBRARY.md` 模板），按 id 增量合并、不重写整库：只有 deep 深挖且对照为直接证据的结论可写「采纳」；broad 阶段仅间接证据的写「候选」，待下轮真实操作复核写「待验证」；证据不足写观察不写条目。`suspected_gaming=true` 轮次覆盖数据不进经验库。报告列出「共享库更新清单」（id、状态、可编辑面、动作、依据）。库长期为空是合法状态，写明「当前无条目，待真实轮次证据写入」。
 
 ## 外部 MCP 同类工具调研（按需）
 
