@@ -9,17 +9,39 @@ export function extractZip(zipPath: string, destDir: string): void {
     stdout: "pipe",
     stderr: "pipe",
   });
-  if (tar.exitCode === 0) return;
+  if (tar.exitCode === 0) {
+    assertNoZipSlip(destDir);
+    return;
+  }
   const unzip = Bun.spawnSync(["unzip", "-q", zipPath, "-d", destDir], {
     stdout: "pipe",
     stderr: "pipe",
   });
-  if (unzip.exitCode === 0) return;
+  if (unzip.exitCode === 0) {
+    assertNoZipSlip(destDir);
+    return;
+  }
   throw new CliError(
     ExitCode.Transport,
     `cannot extract ${zipPath}: ${tar.stderr.toString() || unzip.stderr.toString()}`,
     "Install tar or unzip, or pass an already extracted directory.",
   );
+}
+
+function assertNoZipSlip(destDir: string): void {
+  const root = fs.realpathSync(path.resolve(destDir));
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      const real = fs.realpathSync(full);
+      const relative = path.relative(root, real);
+      if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new CliError(ExitCode.Transport, `unsafe path in archive: ${entry.name}`);
+      }
+      if (entry.isDirectory() && !entry.isSymbolicLink()) walk(full);
+    }
+  };
+  walk(root);
 }
 
 export function readTree(root: string): Record<string, string> {

@@ -1,5 +1,7 @@
+import net from "node:net";
+
 import { afterEach, describe, expect, test } from "bun:test";
-import { callTool } from "../src/mcp/client";
+import { callTool, request } from "../src/mcp/client";
 import { CLI_VERSION } from "../src/version";
 import { CliError, ExitCode } from "../src/errors";
 import { extractPayload } from "../src/payload";
@@ -243,6 +245,55 @@ describe("callTool", () => {
     const err = await catchError(callTool("x", {}, { port }));
     expect(err.code).toBe(ExitCode.Transport);
     expect(err.message).toContain("cannot reach the server (");
+  });
+
+  test("IPC token 失败时 auto 模式不回退到无认证 HTTP", async () => {
+    let httpHits = 0;
+    const port = serve(() => {
+      httpHits += 1;
+      return sseResponse({ jsonrpc: "2.0", id: 1, result: { content: [] } });
+    });
+    const frame = (value: unknown): Buffer => {
+      const payload = Buffer.from(JSON.stringify(value), "utf8");
+      const header = Buffer.alloc(4);
+      header.writeUInt32BE(payload.length, 0);
+      return Buffer.concat([header, payload]);
+    };
+    let presentedToken: unknown;
+    const ipcServer = net.createServer((socket) => {
+      let buffer = Buffer.alloc(0);
+      socket.on("data", (chunk: Buffer) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        while (buffer.length >= 4) {
+          const size = buffer.readUInt32BE(0);
+          if (buffer.length < 4 + size) break;
+          const message = JSON.parse(buffer.subarray(4, 4 + size).toString("utf8")) as Record<string, unknown>;
+          buffer = buffer.subarray(4 + size);
+          if (message.method === "initialize") {
+            const meta = (message.params as Record<string, unknown> | undefined)?._meta as Record<string, unknown> | undefined;
+            presentedToken = meta?.gda_token;
+          }
+          socket.write(frame({ jsonrpc: "2.0", id: message.id, error: { code: -32001, message: "IPC token rejected" } }));
+        }
+      });
+    });
+    await new Promise<void>((resolve) => ipcServer.listen(0, "127.0.0.1", resolve));
+    const address = ipcServer.address();
+    const ipcPort = typeof address === "object" && address !== null ? address.port : 0;
+    try {
+      const err = await catchError(request("resources/list", {}, {
+        port,
+        timeoutSec: 5,
+        transport: "auto",
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: ipcPort, token: "registry-token" },
+      }));
+      expect(err.code).toBe(ExitCode.Transport);
+      expect(err.message).toContain("IPC authentication failed");
+      expect(presentedToken).toBe("registry-token");
+      expect(httpHits).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => ipcServer.close(() => resolve()));
+    }
   });
 
   test("请求体超过 4 MiB 在发送前报错", async () => {

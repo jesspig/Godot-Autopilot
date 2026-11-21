@@ -143,10 +143,6 @@ export class IpcSession {
 
   private onData(chunk: Buffer): void {
     this.buffer = Buffer.concat([this.buffer, chunk]);
-    if (this.buffer.length > MAX_FRAME_BYTES + 4) {
-      this.failAll(new CliError(ExitCode.Transport, "the IPC response exceeds the 4 MiB frame limit."));
-      return;
-    }
     const decoded = decodeFrames(this.buffer);
     this.buffer = decoded.remainder;
     if (decoded.overflow) {

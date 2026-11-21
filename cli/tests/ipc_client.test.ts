@@ -150,6 +150,48 @@ describe("ipc client", () => {
     }
   });
 
+  test("分块累计缓冲超过 4 MiB 但单帧合法时按完整帧接收", async () => {
+    const big = "a".repeat(4_000_000);
+    const server = await listenLoopback(socketPath, (socket) => {
+      socket.on("data", () => {
+        const frame = encodeFrame({ id: 1, result: { data: big } });
+        for (let offset = 0; offset < frame.length; offset += 64 * 1024) {
+          socket.write(frame.subarray(offset, offset + 64 * 1024));
+        }
+      });
+    });
+    try {
+      const response = await requestOverIpc({ path: socketPath, timeoutMs: 5000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+      expect(response.error).toBeUndefined();
+      expect((response.result as { data: string }).data).toBe(big);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("单帧声明超过 4 MiB 上限时拒绝", async () => {
+    const payload = Buffer.from(JSON.stringify({ id: 1, result: "x" }), "utf8");
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(4 * 1024 * 1024 + 1, 0);
+    const oversized = Buffer.concat([header, payload]);
+    const server = await listenLoopback(socketPath, (socket) => {
+      socket.on("data", () => socket.write(oversized));
+    });
+    try {
+      let caught: unknown;
+      try {
+        await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(CliError);
+      expect((caught as CliError).code).toBe(ExitCode.Transport);
+      expect((caught as CliError).message).toContain("4 MiB frame limit");
+    } finally {
+      await closeServer(server);
+    }
+  });
+
   test("连接提前关闭映射为传输错误", async () => {
     const server = await listenLoopback(socketPath, (socket) => {
       socket.on("data", () => socket.destroy());

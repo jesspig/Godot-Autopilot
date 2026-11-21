@@ -55,6 +55,7 @@ const KNOWN_PROTOCOL_VERSIONS: readonly string[] = [
   "2026-07-28",
 ];
 const CLIENT_NAME = "gda-cli";
+const IPC_TOKEN_ERROR_CODES: ReadonlySet<number> = new Set([-32001, -32002]);
 
 const CONNECT_FAILURE_SUGGESTION =
   "Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT.";
@@ -441,20 +442,26 @@ export async function request(
     };
   }
   if (transportMode !== "http" && ipcEndpoint !== undefined) {
+    let ipcResponse: JsonRpcResponse | undefined;
+    let ipcError: unknown;
     try {
-      const response = await requestOverIpc(method, requestParams, ipcEndpoint, timeoutMs, opts.ipcSession);
-      const tokenFailure = response.error?.code === -32001 || response.error?.code === -32002;
-      if (!tokenFailure) {
-        opts.transportSink?.("ipc");
-        return response;
-      }
-      if (transportMode === "ipc" || opts.noFallback === true) {
-        return response;
-      }
+      ipcResponse = await requestOverIpc(method, requestParams, ipcEndpoint, timeoutMs, opts.ipcSession);
     } catch (error) {
-      if (transportMode === "ipc" || opts.noFallback === true) {
-        throw error;
+      ipcError = error;
+    }
+    if (ipcResponse !== undefined) {
+      if (ipcResponse.error !== undefined && IPC_TOKEN_ERROR_CODES.has(ipcResponse.error.code)) {
+        throw new CliError(
+          ExitCode.Transport,
+          `IPC authentication failed: ${ipcResponse.error.message ?? "token rejected"} (code ${ipcResponse.error.code}).`,
+          "Refusing to fall back to unauthenticated HTTP; check the IPC token from the instance registry.",
+        );
       }
+      opts.transportSink?.("ipc");
+      return ipcResponse;
+    }
+    if (transportMode === "ipc" || opts.noFallback === true) {
+      throw ipcError;
     }
   }
   if (transportMode === "ipc") {

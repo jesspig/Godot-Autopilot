@@ -1,4 +1,4 @@
-import type { GlobalOptions } from "../args";
+import { parseTransport, type GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { request } from "../mcp/client";
 import { callTimeoutSec } from "../payload";
@@ -30,11 +30,14 @@ async function call(
   opts: GlobalOptions,
 ): Promise<{ response: unknown; result: unknown }> {
   const target = resolveTarget(opts, TARGET_CONTEXT);
+  const ipcEndpoint = opts.socketText !== undefined
+    ? { path: opts.socketText, token: process.env.GODOT_AUTOPILOT_IPC_TOKEN ?? "" }
+    : target.ipcEndpoint;
   const response = await request(method, params, {
     port: target.port,
     timeoutSec: callTimeoutSec(opts),
-    transport: opts.transportText === undefined ? "auto" : (opts.transportText as "auto" | "ipc" | "http"),
-    socketPath: opts.socketText,
+    transport: parseTransport(opts.transportText),
+    ipcEndpoint,
     noFallback: opts.noFallback,
   });
   if (response.error !== undefined) {
