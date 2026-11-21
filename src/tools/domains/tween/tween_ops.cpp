@@ -549,8 +549,11 @@ JV handle_tween_editor_property(const JV &args) {
   if (action == "property") {
     const std::string property = args.Find("property")->GetString();
     const double duration = util::json_number(args.Find("duration"), 0.0);
+    godot::Variant initial = node->get(godot::StringName(property.c_str()));
+    const std::string type_hint =
+        util::to_std(godot::Variant::get_type_name(initial.get_type()));
     godot::Variant final_value =
-        VariantJson::deserialize(*args.Find("target_value"));
+        VariantJson::deserialize(*args.Find("target_value"), type_hint);
     godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
         node, godot::NodePath(godot::String(property.c_str())), final_value,
         duration);
