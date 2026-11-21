@@ -136,18 +136,6 @@ mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
   return j;
 }
 
-[[maybe_unused]] bool invalidate_cached_resource(const std::string &path) {
-  auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader || !loader->has_cached(godot::String::utf8(path.c_str()))) {
-    return false;
-  }
-  auto cached = loader->get_cached_ref(godot::String::utf8(path.c_str()));
-  if (cached.is_valid()) {
-    cached->set_path("");
-  }
-  return true;
-}
-
 bool load_script_resource(const std::string &path, bool fresh,
                           godot::Ref<godot::Script> &out_script,
                           mcp::JsonValue &err_out) {

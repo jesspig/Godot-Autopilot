@@ -131,20 +131,6 @@ public:
     return result;
   }
 
-  std::vector<ToolAlias> all_aliases() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<ToolAlias> result;
-    result.reserve(aliases_.size());
-    for (const auto& entry : aliases_) {
-      result.push_back(entry.second);
-    }
-    std::sort(result.begin(), result.end(),
-              [](const ToolAlias& lhs, const ToolAlias& rhs) {
-                return lhs.name < rhs.name;
-              });
-    return result;
-  }
-
   size_t alias_count() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return aliases_.size();

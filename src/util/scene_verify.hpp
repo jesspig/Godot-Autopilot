@@ -15,7 +15,6 @@ namespace scene_verify {
 
 constexpr std::size_t kMaxMissingPaths = 50;
 
-uint64_t fnv1a_64(const std::string &data);
 uint64_t hash_sorted_paths(const std::vector<std::string> &sorted_paths);
 
 void collect_memory_paths(godot::Node *root, std::vector<std::string> &out_paths);

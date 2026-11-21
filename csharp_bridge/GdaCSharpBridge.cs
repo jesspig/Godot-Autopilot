@@ -11,8 +11,6 @@ public partial class GdaCSharpBridge : RefCounted
 
     private const BindingFlags MemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
-    private bool _allowNonPublic = false;
-
     public Godot.Collections.Dictionary ping()
     {
         return new Godot.Collections.Dictionary
@@ -27,10 +25,6 @@ public partial class GdaCSharpBridge : RefCounted
 
     private BindingFlags ResolveFlags()
     {
-        if (_allowNonPublic)
-        {
-            return MemberFlags;
-        }
         return BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
     }
 

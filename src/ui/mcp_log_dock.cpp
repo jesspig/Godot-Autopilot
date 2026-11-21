@@ -195,11 +195,6 @@ godot::String McpLogDock::format_hms(std::chrono::system_clock::time_point tp) {
   return godot::String(buf);
 }
 
-void McpLogDock::set_show_time(bool show) {
-  show_time_ = show;
-  _rebuild_log();
-}
-
 void McpLogDock::_notification(int p_what) {
   switch (p_what) {
   case NOTIFICATION_ENTER_TREE:

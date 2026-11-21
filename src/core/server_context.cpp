@@ -677,62 +677,11 @@ void ServerContext::stop() {
                                            {"port", std::to_string(port_)}}));
 }
 
-bool ServerContext::restart(uint16_t port) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                            "MCP server restart requested on port " +
-                                std::to_string(port));
-  LogSystem::instance().log_detailed(
-      LogLevel::Info, LogCategory::Transport, "MCP server restart requested",
-      "endpoint=" + host_ + ":" + std::to_string(port) +
-          " previous_port=" + std::to_string(port_));
-  monitor::lifecycle("server_restart",
-                     monitor::build_attrs({{"host", host_},
-                                           {"port", std::to_string(port)}}));
-  stop();
-  requested_port_ = port;
-  port_ = port;
-  return start();
-}
-
-bool ServerContext::restart(const PortAssignment &assignment) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                            "MCP server restart requested on port " +
-                                std::to_string(assignment.port));
-  LogSystem::instance().log_detailed(
-      LogLevel::Info, LogCategory::Transport, "MCP server restart requested",
-      "port=" + std::to_string(assignment.port) +
-          " previous_port=" + std::to_string(port_));
-  stop();
-  requested_port_ = assignment.port;
-  port_ = assignment.port;
-  if (!start()) {
-    return false;
-  }
-  if (assignment.port > 0 && assignment.source != PortSource::kUserApplied) {
-    port_assignment_ = assignment;
-  }
-  return true;
-}
-
 int ServerContext::get_port() const { return port_; }
 
 const std::string &ServerContext::get_host() const { return host_; }
 
 bool ServerContext::is_running() const { return running_; }
-
-const PortAssignment &ServerContext::port_assignment() const {
-  return port_assignment_;
-}
-
-void ServerContext::set_port_assignment(const PortAssignment &assignment) {
-  port_assignment_ = assignment;
-}
-
-const EndpointTable &ServerContext::endpoints() const { return endpoints_; }
-
-void ServerContext::set_endpoints(const EndpointTable &endpoints) {
-  endpoints_ = endpoints;
-}
 
 void ServerContext::register_tools() {
   const ToolSurface surface = resolve_tool_surface();

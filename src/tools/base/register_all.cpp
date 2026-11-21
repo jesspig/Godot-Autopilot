@@ -49,6 +49,7 @@
 #include "tools/base/tool_base.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "tools/base/tool_registry.hpp"
+#include "tools/base/side_effect_policy.hpp"
 #include "tools/base/tool_spec.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
@@ -77,6 +78,35 @@ static mcp::McpServer *g_surface_server = nullptr;
 static ToolSurface g_tool_surface = ToolSurface::Meta;
 
 static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog);
+
+static void audit_destructive_declarations(const ToolRegistry &registry) {
+  std::vector<side_effect_policy::ToolDeclaration> declarations;
+  for (const auto &tool : registry.all_any()) {
+    side_effect_policy::ToolDeclaration entry;
+    entry.name = tool->meta().name;
+    entry.description = tool->meta().description;
+    entry.destructive = side_effect_of(*tool) == SideEffect::Destructive;
+    declarations.push_back(std::move(entry));
+  }
+  const std::vector<std::string> suspects =
+      side_effect_policy::destructive_suspects(declarations);
+  if (suspects.empty()) {
+    return;
+  }
+  std::string names;
+  for (const std::string &name : suspects) {
+    if (!names.empty())
+      names += ", ";
+    names += name;
+  }
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Tools,
+      "tools with destruction-shaped names or descriptions are not declared "
+      "destructive: " + names);
+  monitor::lifecycle(
+      "destructive_declaration_audit",
+      monitor::build_attrs({{"suspects", std::to_string(suspects.size())}}));
+}
 
 static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
                                              Bm25Index& index,
@@ -692,6 +722,8 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             registry->add(make_spec_tool(spec));
         }
     }
+
+    audit_destructive_declarations(*registry);
 
     const int64_t registry_duration_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(

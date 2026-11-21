@@ -36,8 +36,6 @@ Args::Args(const mcp::JsonValue &raw,
            const std::vector<schema::ParamDef> &params)
     : raw_(raw), params_(params) {}
 
-const mcp::JsonValue &Args::raw() const { return raw_; }
-
 bool Args::has(const std::string &name) const {
   return find_present(raw_, name) != nullptr;
 }
