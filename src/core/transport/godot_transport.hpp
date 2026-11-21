@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -48,6 +49,10 @@ public:
   bool IsStateless() const override;
   void SendMessageAsync(mcp::JsonRpcMessage message) override;
 
+  using InboundRewrite = std::function<void(mcp::JsonRpcMessage &)>;
+
+  void set_inbound_rewrite(InboundRewrite rewrite);
+
   bool submit(const mcp_wire::ParsedRequest &parsed,
               const std::string &connection_id, std::string &error);
   bool await_response(const std::string &connection_id,
@@ -83,6 +88,7 @@ private:
   std::unordered_map<std::string, PendingExchange> pending_;
   std::unordered_map<std::string, std::string> id_index_;
   std::atomic<int64_t> next_internal_id_{kInitialInternalId};
+  InboundRewrite inbound_rewrite_;
 
   void expire_stale_pending();
   void fail_pending_exchanges();

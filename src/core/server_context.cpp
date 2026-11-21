@@ -305,6 +305,37 @@ bool ServerContext::start() {
     }
 
     transport_ = godot_transport_reset();
+    transport_->set_inbound_rewrite([](mcp::JsonRpcMessage &message) {
+      auto *request = std::get_if<mcp::JsonRpcRequest>(&message);
+      if (request == nullptr || request->method != "tools/call" ||
+          !request->params || !request->params->IsObject()) {
+        return;
+      }
+      mcp::JsonValue *params = &*request->params;
+      const mcp::JsonValue *name_value = params->Find("name");
+      if (name_value == nullptr || !name_value->IsString()) {
+        return;
+      }
+      const std::string name = name_value->GetString();
+      auto canonical = dispatch::resolve_alias_canonical(name);
+      if (!canonical) {
+        return;
+      }
+      mcp::JsonValue inner(mcp::JsonValue::object_tag);
+      inner["name"] = mcp::JsonValue(name);
+      if (const mcp::JsonValue *arguments = params->Find("arguments")) {
+        inner["arguments"] = *arguments;
+      } else {
+        inner["arguments"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+      }
+      mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+      wrapped["name"] = mcp::JsonValue("call_tool");
+      wrapped["arguments"] = std::move(inner);
+      *params = std::move(wrapped);
+      LogSystem::instance().log(
+          LogLevel::Debug, LogCategory::Tools,
+          "direct tool alias '" + name + "' rewritten to call_tool wrapper");
+    });
 
     ipc_transport::ipc_transport_instance().set_line_handler(
         [transport = transport_](std::uint64_t connection_id,

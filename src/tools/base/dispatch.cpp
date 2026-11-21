@@ -310,6 +310,18 @@ void emit_dispatch_timeout_observation(const std::string &name,
 
 } // namespace
 
+std::optional<std::string> resolve_alias_canonical(const std::string &name) {
+  auto registry = get_active_registry();
+  if (!registry) {
+    return std::nullopt;
+  }
+  auto alias = registry->resolve_alias(name);
+  if (!alias) {
+    return std::nullopt;
+  }
+  return alias->canonical;
+}
+
 std::string dispatch_exception_message(const std::string &name,
                                        const std::string &reason,
                                        const mcp::JsonValue &args) {
@@ -630,8 +642,9 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
     const int64_t rid = pending_p->GetInt();
     mcp::JsonValue pending_options = result;
     mcp::JsonValue awaited = runtime_ops::wait_pending_response(rid, timeout);
-    if (name == "capture_game_viewport" ||
-        (awaited.IsObject() && awaited.Contains("path"))) {
+    const bool is_capture_tool =
+        name == "capture_game_viewport" || name == "capture_editor_viewport";
+    if (is_capture_tool) {
       awaited =
           runtime_ops::finalize_capture_response(awaited, pending_options);
     }
