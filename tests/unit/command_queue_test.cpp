@@ -186,14 +186,23 @@ TEST(CommandQueueTest, BoundedSubmitOwnerThreadExecutesInline) {
     EXPECT_EQ(q.stats().pending, 0u);
 }
 
-TEST(CommandQueueTest, BoundedSubmitNonPositiveBudgetWaitsForCompletion) {
+TEST(CommandQueueTest, BoundedSubmitNonPositiveBudgetRejectsImmediately) {
     CommandQueue q;
-    QueueDrainer drainer(q);
+    const uint64_t cancelled_before = q.stats().cancelled;
     auto submission = q.submit_tracked_bounded([] { return 5; }, 0);
-    EXPECT_FALSE(submission.timed_out);
-    EXPECT_FALSE(submission.cancelled);
+    EXPECT_TRUE(submission.timed_out);
+    EXPECT_TRUE(submission.cancelled);
     EXPECT_GE(submission.waited_ms, 0);
-    EXPECT_EQ(submission.future.get(), 5);
+    EXPECT_EQ(q.stats().cancelled, cancelled_before + 1);
+    EXPECT_THROW(submission.future.get(), std::runtime_error);
+}
+
+TEST(CommandQueueTest, BoundedSubmitNegativeBudgetRejectsImmediately) {
+    CommandQueue q;
+    auto submission = q.submit_tracked_bounded([] { return 5; }, -5);
+    EXPECT_TRUE(submission.timed_out);
+    EXPECT_TRUE(submission.cancelled);
+    EXPECT_THROW(submission.future.get(), std::runtime_error);
 }
 
 TEST(CommandQueueTest, BoundedSubmitTimeoutCancelsPendingTask) {

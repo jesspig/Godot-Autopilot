@@ -920,9 +920,14 @@ static void register_surface_tool(
                         return surface_tool->execute(args);
                     });
             }
+            if (!run_on_transport_thread &&
+                dispatch::has_deferred_marker(res)) {
+                res = dispatch::resolve_deferred_wait(tool_name,
+                                                      std::move(res));
+            }
             int64_t new_errors = error_watermark::count_response_errors(res);
             if (new_errors > 0) {
-                error_watermark::record_error(new_errors);
+                error_watermark::record_error(new_errors, gda_request_id);
             }
             if (progress_token.has_value()) {
                 send_progress(static_cast<double>(progress_total),
@@ -933,8 +938,8 @@ static void register_surface_tool(
                 mcp_result.is_error = true;
             }
             if (res.IsObject()) {
-                res["new_errors_since_last_call"] =
-                    mcp::JsonValue(error_watermark::consume_new_errors());
+                res["new_errors_since_last_call"] = mcp::JsonValue(
+                    error_watermark::consume_new_errors(gda_request_id));
             }
             std::vector<mcp::ContentVariant> image_content;
             if (tool_name == "call_tool") {

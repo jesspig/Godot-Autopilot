@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TOOL_SPEC_HPP
 #define GODOT_AUTOPILOT_TOOL_SPEC_HPP
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -201,6 +202,11 @@ inline std::unordered_map<std::string, DeferredTrace> &deferred_traces() {
   return traces;
 }
 
+inline std::vector<std::string> &deferred_trace_order() {
+  static std::vector<std::string> order;
+  return order;
+}
+
 inline bool deferred_key_of(const mcp::JsonValue &result, std::string *key) {
   if (!result.IsObject()) {
     return false;
@@ -228,8 +234,13 @@ inline bool deferred_key_of(const mcp::JsonValue &result, std::string *key) {
 inline void stash_deferred_trace(const std::string &key, DeferredTrace record) {
   std::lock_guard<std::mutex> lock(deferred_trace_mutex());
   std::unordered_map<std::string, DeferredTrace> &traces = deferred_traces();
-  if (traces.size() >= kDeferredTraceCap) {
-    traces.erase(traces.begin());
+  std::vector<std::string> &order = deferred_trace_order();
+  if (traces.find(key) == traces.end()) {
+    while (traces.size() >= kDeferredTraceCap && !order.empty()) {
+      traces.erase(order.front());
+      order.erase(order.begin());
+    }
+    order.push_back(key);
   }
   traces[key] = std::move(record);
 }
@@ -243,6 +254,8 @@ inline bool take_deferred_trace(const std::string &key, DeferredTrace *record) {
   }
   *record = std::move(it->second);
   traces.erase(it);
+  std::vector<std::string> &order = deferred_trace_order();
+  order.erase(std::remove(order.begin(), order.end(), key), order.end());
   return true;
 }
 

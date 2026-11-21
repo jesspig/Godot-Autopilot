@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <stdexcept>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -33,6 +34,9 @@ public:
   void add(std::unique_ptr<ToolBase> tool) {
     std::lock_guard<std::mutex> lock(mutex_);
     const std::string name = tool->meta().name;
+    if (find_instantiated_locked(name) != nullptr) {
+      throw std::invalid_argument("duplicate tool name: " + name);
+    }
     aliases_.erase(name);
     auto *spec_tool = dynamic_cast<SpecTool *>(tool.get());
     if ((tool->tool_flags() & tool_flags::kMeta) != 0) {
@@ -147,6 +151,16 @@ public:
   }
 
 private:
+  std::shared_ptr<ToolBase> find_instantiated_locked(
+      const std::string& name) const {
+    auto tool = tools_.find(name);
+    if (tool != tools_.end()) {
+      return tool->second;
+    }
+    auto meta = meta_.find(name);
+    return meta != meta_.end() ? meta->second : nullptr;
+  }
+
   void register_alias_locked(const ToolAlias& alias) {
     if (alias.name.empty() || alias.canonical.empty() ||
         alias.name == alias.canonical) {
