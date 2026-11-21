@@ -10,6 +10,7 @@
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <cmath>
@@ -31,6 +32,10 @@
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
+#include <godot_cpp/classes/tween.hpp>
+#include <godot_cpp/classes/property_tweener.hpp>
+#include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/viewport_texture.hpp>
@@ -1745,6 +1750,170 @@ void send_ready_message(bool scene_ready) {
   dbg->send_message(gda_string(GDA_MSG_READY), payload);
 }
 
+std::unordered_map<int64_t, godot::Ref<godot::Tween>> &game_tweens() {
+  static std::unordered_map<int64_t, godot::Ref<godot::Tween>> store;
+  return store;
+}
+
+bool tween_number(const JV &params, const char *key, double &out) {
+  const JV *value = params.Find(key);
+  if (!value || !value->IsNumber())
+    return false;
+  out = util::json_number(value, 0.0);
+  return true;
+}
+
+JV op_tween_create(const JV &params) {
+  const JV *path_p = params.Find("node_path");
+  if (!path_p || !path_p->IsString() || path_p->GetString().empty())
+    return error_result("missing required parameter: node_path");
+  const JV *kind_p = params.Find("kind");
+  const std::string kind =
+      (kind_p && kind_p->IsString()) ? kind_p->GetString() : std::string("property");
+  godot::Node *node = resolve_node(path_p->GetString());
+  if (!node)
+    return error_result("node not found: " + path_p->GetString());
+  godot::SceneTree *tree = node->get_tree();
+  if (!tree)
+    return error_result("no scene tree for node " + path_p->GetString());
+  godot::Ref<godot::Tween> tween = tree->create_tween();
+  if (!tween.is_valid())
+    return error_result("SceneTree::create_tween returned null");
+  if (const JV *trans = params.Find("trans"))
+    tween->set_trans(
+        static_cast<godot::Tween::TransitionType>(trans->GetInt()));
+  if (const JV *ease = params.Find("ease"))
+    tween->set_ease(static_cast<godot::Tween::EaseType>(ease->GetInt()));
+  if (const JV *loops = params.Find("loops"))
+    tween->set_loops(static_cast<int>(loops->GetInt()));
+  const JV *parallel = params.Find("parallel");
+  tween->set_parallel(parallel && parallel->IsBool() && parallel->GetBool());
+
+  JV inner(JV::object_tag);
+  inner["kind"] = JV(kind);
+  inner["path"] = *path_p;
+  if (kind == "property") {
+    const JV *prop_p = params.Find("property");
+    if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
+      return error_result("missing required parameter: property");
+    const JV *target_p = params.Find("target_value");
+    double duration = 0.0;
+    if (!target_p || !tween_number(params, "duration", duration) ||
+        duration <= 0.0)
+      return error_result("missing required parameter: duration");
+    godot::Variant final_value = VariantJson::deserialize(*target_p);
+    godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
+        node, godot::NodePath(godot::String(prop_p->GetString().c_str())),
+        final_value, duration);
+    if (!tweener.is_valid())
+      return error_result("tween_property rejected property '" +
+                          prop_p->GetString() + "'");
+    inner["property"] = *prop_p;
+  } else if (kind == "method") {
+    const JV *method_p = params.Find("method");
+    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+      return error_result("missing required parameter: method");
+    const std::string method = method_p->GetString();
+    if (!node->has_method(godot::StringName(method.c_str())))
+      return error_result("method not found on the target node: " + method);
+    const JV *from_p = params.Find("from");
+    const JV *to_p = params.Find("to");
+    double duration = 0.0;
+    if (!from_p || !to_p || !tween_number(params, "duration", duration) ||
+        duration <= 0.0)
+      return error_result("missing required parameters: from/to/duration");
+    tween->tween_method(
+        godot::Callable(node, godot::StringName(method.c_str())),
+        VariantJson::deserialize(*from_p), VariantJson::deserialize(*to_p),
+        duration);
+    inner["method"] = *method_p;
+  } else if (kind == "callback") {
+    const JV *method_p = params.Find("method");
+    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+      return error_result("missing required parameter: method");
+    const std::string method = method_p->GetString();
+    if (!node->has_method(godot::StringName(method.c_str())))
+      return error_result("method not found on the target node: " + method);
+    godot::Callable callable(node, godot::StringName(method.c_str()));
+    if (const JV *args_p = params.Find("callback_args")) {
+      if (args_p->IsArray()) {
+        godot::Array bound;
+        for (const auto &item : args_p->GetArray())
+          bound.push_back(VariantJson::deserialize(item));
+        callable = callable.bindv(bound);
+      }
+    }
+    tween->tween_callback(callable);
+    inner["method"] = *method_p;
+  } else if (kind == "interval") {
+    double duration = 0.0;
+    if (!tween_number(params, "duration", duration) || duration <= 0.0)
+      return error_result("missing required parameter: duration");
+    tween->tween_interval(duration);
+  } else {
+    return error_result("invalid tween kind: " + kind);
+  }
+
+  const int64_t tween_id = tween->get_instance_id();
+  game_tweens()[tween_id] = tween;
+  inner["tween_id"] = JV(tween_id);
+  inner["running"] = JV(tween->is_running());
+  return ok_result(std::move(inner));
+}
+
+JV op_tween_control(const JV &params) {
+  const JV *id_p = params.Find("tween_id");
+  if (!id_p || !id_p->IsInt())
+    return error_result("missing required parameter: tween_id");
+  const JV *action_p = params.Find("action");
+  if (!action_p || !action_p->IsString())
+    return error_result("missing required parameter: action");
+  const std::string action = action_p->GetString();
+  auto &store = game_tweens();
+  auto it = store.find(id_p->GetInt());
+  if (it == store.end() || !it->second.is_valid())
+    return error_result("tween not found: " + std::to_string(id_p->GetInt()));
+  godot::Ref<godot::Tween> tween = it->second;
+  if (action == "play") {
+    tween->play();
+  } else if (action == "pause") {
+    tween->pause();
+  } else if (action == "stop") {
+    tween->stop();
+  } else if (action == "kill") {
+    tween->kill();
+    store.erase(it);
+  } else {
+    return error_result("invalid action: expected play|pause|stop|kill");
+  }
+  JV inner(JV::object_tag);
+  inner["tween_id"] = *id_p;
+  inner["action"] = *action_p;
+  inner["running"] = JV(tween.is_valid() && tween->is_running());
+  return ok_result(std::move(inner));
+}
+
+JV op_tween_list(const JV &params) {
+  (void)params;
+  JV items(JV::array_tag);
+  auto &store = game_tweens();
+  for (auto it = store.begin(); it != store.end();) {
+    if (!it->second.is_valid()) {
+      it = store.erase(it);
+      continue;
+    }
+    JV item(JV::object_tag);
+    item["tween_id"] = JV(it->first);
+    item["running"] = JV(it->second->is_running());
+    items.PushBack(std::move(item));
+    ++it;
+  }
+  JV inner(JV::object_tag);
+  inner["tweens"] = std::move(items);
+  inner["count"] = JV(static_cast<int64_t>(store.size()));
+  return ok_result(std::move(inner));
+}
+
 class GameBridgeListener : public godot::RefCounted {
   GDCLASS(GameBridgeListener, godot::RefCounted)
 
@@ -1848,6 +2017,12 @@ public:
       body = op_get_tree();
     } else if (op == GDA_OP_SCENE_TREE) {
       body = op_scene_tree(params);
+    } else if (op == GDA_OP_TWEEN_CREATE) {
+      body = op_tween_create(params);
+    } else if (op == GDA_OP_TWEEN_CONTROL) {
+      body = op_tween_control(params);
+    } else if (op == GDA_OP_TWEEN_LIST) {
+      body = op_tween_list(params);
     } else {
       body = error_result("unknown op: " + op);
     }
