@@ -32,8 +32,6 @@ constexpr const char *kDesensitizeKey = "desensitize";
 
 namespace {
 
-enum class ConfigReadStatus { kOk, kMissing, kParseFailed };
-
 std::string global_config_file_path() {
   return StoragePaths::global_config_path();
 }
@@ -146,26 +144,21 @@ bool write_config_value(const std::string &path, const char *key,
   }
   mcp::JsonValue::Object doc;
   std::string error;
-  if (read_config_object(path, doc, error) == ConfigReadStatus::kParseFailed) {
+  const ConfigReadStatus status = read_config_object(path, doc, error);
+  std::string content;
+  if (!PluginConfig::merge_value(status, doc, key, value, content)) {
     LogSystem::instance().log_detailed(
         LogLevel::Error, LogCategory::System,
-        "Plugin config parse failed, overwriting",
+        "Plugin config parse failed, refusing to overwrite",
         std::string("path=") + path + " reason=" + error);
-  }
-  doc[key] = value;
-  godot::Ref<godot::FileAccess> file =
-      godot::FileAccess::open(godot::String::utf8(path.c_str()),
-                              godot::FileAccess::WRITE);
-  if (file.is_null()) {
-    LogSystem::instance().log_detailed(
-        LogLevel::Error, LogCategory::System, "Plugin config write failed",
-        std::string("path=") + path +
-            " reason=FileAccess::open returned null");
     return false;
   }
-  file->store_string(
-      godot::String(mcp::JsonValue(std::move(doc)).Dump(2).c_str()));
-  file->close();
+  if (!write_file_atomically(path, content)) {
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::System, "Plugin config write failed",
+        std::string("path=") + path + " reason=atomic write failed");
+    return false;
+  }
   return true;
 }
 

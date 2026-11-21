@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 
@@ -24,6 +25,10 @@ public:
                              HostPlatform platform,
                              const DirectoryProbe &probe);
   static std::string gda_home();
+  static std::string resolve_override(
+      const std::string &override_home,
+      const std::vector<std::string> &fallback_candidates,
+      const DirectoryProbe &probe);
   static bool validate(const std::string &path);
   static bool validate_shape(const std::string &path);
   static bool validate_exists(const std::string &path);

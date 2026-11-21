@@ -1,11 +1,13 @@
 #include "core/storage/gda_home.hpp"
 #include "core/path_util.hpp"
+#include "support/test_temp.hpp"
 
 #include <gtest/gtest.h>
 
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 using godot_autopilot::HomeResolver;
 
@@ -135,4 +137,47 @@ TEST(HomeResolverTest, EnvironmentOverrideWins) {
   set_home_env("GODOT_AUTOPILOT_HOME", "C:/gda/home-override");
   EXPECT_EQ(HomeResolver::gda_home(), "C:/gda/home-override");
   unset_home_env("GODOT_AUTOPILOT_HOME");
+}
+
+TEST(HomeResolverTest, ValidOverrideIsAccepted) {
+  const std::vector<std::string> fallback{"C:/fallback"};
+  EXPECT_EQ(HomeResolver::resolve_override("C:/gda/home-override", fallback,
+                                           probe_accept_all),
+            "C:/gda/home-override");
+}
+
+TEST(HomeResolverTest, EmptyOverrideFallsBackToDefault) {
+  const std::vector<std::string> fallback{"C:/fallback"};
+  EXPECT_EQ(HomeResolver::resolve_override("", fallback, probe_accept_all),
+            "C:/fallback");
+}
+
+TEST(HomeResolverTest, ShapeInvalidOverrideIsRejected) {
+  const std::vector<std::string> fallback{"C:/fallback"};
+  EXPECT_EQ(HomeResolver::resolve_override("/", fallback, probe_accept_all),
+            "C:/fallback");
+  EXPECT_EQ(HomeResolver::resolve_override("C:/", fallback, probe_accept_all),
+            "C:/fallback");
+  EXPECT_EQ(HomeResolver::resolve_override("C:", fallback, probe_accept_all),
+            "C:/fallback");
+  EXPECT_EQ(HomeResolver::resolve_override("", fallback, probe_accept_all),
+            "C:/fallback");
+}
+
+TEST(HomeResolverTest, ShapeInvalidOverrideSkipsBadFallback) {
+  const std::vector<std::string> fallback{"/", "C:/fallback"};
+  EXPECT_EQ(HomeResolver::resolve_override("C:/", fallback, probe_accept_all),
+            "C:/fallback");
+}
+
+TEST(HomeResolverTest, InvalidOverrideEnvFallsBackToEnvironmentHome) {
+  const std::string existing_home = godot_autopilot::normalize_path_separators(
+      gda_test::test_temp_root().u8string());
+  set_home_env("GODOT_AUTOPILOT_HOME", "C:/");
+  set_home_env("HOME", existing_home.c_str());
+  HomeResolver::set_data_dir_provider([]() { return std::string(); });
+  EXPECT_EQ(HomeResolver::gda_home(), existing_home);
+  HomeResolver::set_data_dir_provider(HomeResolver::DataDirProvider());
+  unset_home_env("GODOT_AUTOPILOT_HOME");
+  unset_home_env("HOME");
 }

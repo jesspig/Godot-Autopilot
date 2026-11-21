@@ -7,6 +7,8 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -227,3 +229,100 @@ TEST(InstanceRegistryTest, WrittenRegistryFileIsOwnerOnly) {
   std::filesystem::remove_all(base, ec);
 }
 #endif
+
+TEST(InstanceRegistryTest, AtomicWriteLeavesNoTempFiles) {
+  const std::filesystem::path base =
+      gda_test::test_temp_root() / "gda_instance_registry_atomic_test";
+  std::error_code ec;
+  std::filesystem::remove_all(base, ec);
+  ASSERT_TRUE(std::filesystem::create_directories(base, ec));
+  ASSERT_FALSE(ec);
+
+  set_registry_env("GODOT_AUTOPILOT_HOME", base.u8string().c_str());
+  InstanceRecord record = sample_record();
+  record.instance_id = "instance-atomic";
+  ASSERT_TRUE(InstanceRegistry::write(record));
+
+  const std::filesystem::path index =
+      base / ".godot-autopilot" / "instances.json";
+  EXPECT_TRUE(std::filesystem::exists(index));
+
+  int temp_count = 0;
+  for (const std::filesystem::directory_entry &entry :
+       std::filesystem::recursive_directory_iterator(base, ec)) {
+    if (entry.is_regular_file(ec) && entry.path().extension() == ".tmp") {
+      ++temp_count;
+    }
+  }
+  EXPECT_EQ(temp_count, 0);
+
+  unset_registry_env("GODOT_AUTOPILOT_HOME");
+  std::filesystem::remove_all(base, ec);
+}
+
+TEST(InstanceRegistryTest, IndexAlwaysReflectsCompleteRecords) {
+  const std::filesystem::path base =
+      gda_test::test_temp_root() / "gda_instance_registry_index_test";
+  std::error_code ec;
+  std::filesystem::remove_all(base, ec);
+  ASSERT_TRUE(std::filesystem::create_directories(base, ec));
+  ASSERT_FALSE(ec);
+
+  set_registry_env("GODOT_AUTOPILOT_HOME", base.u8string().c_str());
+  InstanceRecord first = sample_record();
+  first.instance_id = "index-first";
+  ASSERT_TRUE(InstanceRegistry::write(first));
+  InstanceRecord second = sample_record();
+  second.instance_id = "index-second";
+  ASSERT_TRUE(InstanceRegistry::write(second));
+
+  const std::vector<InstanceRecord> listed = InstanceRegistry::list_all();
+  ASSERT_EQ(listed.size(), 2u);
+
+  const std::filesystem::path index =
+      base / ".godot-autopilot" / "instances.json";
+  std::ifstream in(index, std::ios::binary);
+  ASSERT_TRUE(in.good());
+  const std::string text((std::istreambuf_iterator<char>(in)),
+                         std::istreambuf_iterator<char>());
+  mcp::JsonValue index_doc;
+  ASSERT_NO_THROW(index_doc = mcp::JsonValue::Parse(text));
+  const mcp::JsonValue *instances = index_doc.Find("instances");
+  ASSERT_NE(instances, nullptr);
+  ASSERT_TRUE(instances->IsArray());
+  EXPECT_EQ(instances->GetArray().size(), 2u);
+
+  unset_registry_env("GODOT_AUTOPILOT_HOME");
+  std::filesystem::remove_all(base, ec);
+}
+
+TEST(InstanceRegistryTest, RemoveUpdatesIndexAtomically) {
+  const std::filesystem::path base =
+      gda_test::test_temp_root() / "gda_instance_registry_remove_test";
+  std::error_code ec;
+  std::filesystem::remove_all(base, ec);
+  ASSERT_TRUE(std::filesystem::create_directories(base, ec));
+  ASSERT_FALSE(ec);
+
+  set_registry_env("GODOT_AUTOPILOT_HOME", base.u8string().c_str());
+  InstanceRecord record = sample_record();
+  record.instance_id = "remove-me";
+  ASSERT_TRUE(InstanceRegistry::write(record));
+  ASSERT_TRUE(InstanceRegistry::remove("remove-me"));
+
+  const std::filesystem::path index =
+      base / ".godot-autopilot" / "instances.json";
+  std::ifstream in(index, std::ios::binary);
+  ASSERT_TRUE(in.good());
+  const std::string text((std::istreambuf_iterator<char>(in)),
+                         std::istreambuf_iterator<char>());
+  mcp::JsonValue index_doc = mcp::JsonValue::Parse(text);
+  const mcp::JsonValue *instances = index_doc.Find("instances");
+  ASSERT_NE(instances, nullptr);
+  ASSERT_TRUE(instances->IsArray());
+  EXPECT_TRUE(instances->GetArray().empty());
+  EXPECT_FALSE(std::filesystem::exists(index.string() + ".tmp"));
+
+  unset_registry_env("GODOT_AUTOPILOT_HOME");
+  std::filesystem::remove_all(base, ec);
+}
