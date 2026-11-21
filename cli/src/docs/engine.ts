@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { CliError, ExitCode } from "../errors";
+import { CliError, errorMessage, ExitCode } from "../errors";
 import { resolveGodotBin } from "../process";
 import { findLiveByProject } from "../registry";
 import {
@@ -82,10 +82,6 @@ export interface CacheStatusReport {
 
 const EXPORT_TIMEOUT_MS = 120_000;
 const VERSION_TIMEOUT_MS = 30_000;
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function readGodotVersion(bin: string): EngineVersion {
   const result = spawnSync(bin, ["--version"], {

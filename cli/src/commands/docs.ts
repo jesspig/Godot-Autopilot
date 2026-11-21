@@ -13,14 +13,10 @@ import {
 } from "../docs/engine";
 import { getClassView, parseKind, parseSection, resolveMember, searchDocs } from "../docs/search";
 import { clearBuckets, listBuckets } from "../docs/store";
-import { CliError, ExitCode } from "../errors";
+import { CliError, errorMessage, ExitCode } from "../errors";
 import { resolveGodotBin } from "../process";
 import { findLiveByProject } from "../registry";
 import { writeJson } from "./json-output";
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function parseLimit(text: string | undefined): number {
   if (text === undefined) return 20;

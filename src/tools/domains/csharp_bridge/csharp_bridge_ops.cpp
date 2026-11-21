@@ -7,6 +7,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -106,9 +107,7 @@ CSharpTarget resolve_locator(const JV &args, const std::string &prefix,
       return out;
     }
     int64_t obj_id = 0;
-    try {
-      obj_id = std::stoll(p_oid_str->GetString());
-    } catch (...) {
+    if (!util::parse_decimal_int64(p_oid_str->GetString(), obj_id)) {
       out.error = util::error_json("invalid " + k_oid_str +
                                    ": not a valid 64-bit integer");
       return out;

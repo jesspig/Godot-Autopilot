@@ -392,15 +392,6 @@ struct UiElementFilter {
   bool visible_only = false;
 };
 
-std::string ui_lowercase(const std::string &text) {
-  std::string lowered = text;
-  for (char &c : lowered) {
-    if (c >= 'A' && c <= 'Z')
-      c = static_cast<char>(c - 'A' + 'a');
-  }
-  return lowered;
-}
-
 bool ui_element_matches_filter(const UiElement &element,
                                const UiElementFilter &filter) {
   if (filter.visible_only && !element.visible)
@@ -420,7 +411,7 @@ bool ui_element_matches_filter(const UiElement &element,
     std::string haystack = element.path + "\n" + element.type + "\n";
     if (element.has_text)
       haystack += element.text;
-    if (ui_lowercase(haystack).find(filter.filter_lower) == std::string::npos)
+    if (util::ascii_lowercase(haystack).find(filter.filter_lower) == std::string::npos)
       return false;
   }
   return true;
@@ -1606,7 +1597,7 @@ JV op_ui_elements_impl(const JV &params, int64_t request_id) {
   if (auto *filter_p = params.Find("filter"); filter_p && filter_p->IsString()) {
     const std::string filter_text = filter_p->GetString();
     filter.has_filter = !filter_text.empty();
-    filter.filter_lower = ui_lowercase(filter_text);
+    filter.filter_lower = util::ascii_lowercase(filter_text);
   }
   if (auto *types_p = params.Find("types"); types_p && types_p->IsArray()) {
     for (const auto &item : types_p->GetArray()) {

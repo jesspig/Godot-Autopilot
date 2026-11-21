@@ -1,6 +1,7 @@
 #include "util/scene_verify.hpp"
 
 #include "util/error_util.hpp"
+#include "util/hash_util.hpp"
 
 #include <algorithm>
 #include <godot_cpp/classes/file_access.hpp>
@@ -17,14 +18,14 @@ namespace godot_autopilot {
 namespace scene_verify {
 
 uint64_t hash_sorted_paths(const std::vector<std::string> &sorted_paths) {
-  uint64_t hash = 14695981039346656037ULL;
+  uint64_t hash = util::kFnvOffsetBasis;
   for (const std::string &p : sorted_paths) {
     for (unsigned char c : p) {
       hash ^= static_cast<uint64_t>(c);
-      hash *= 1099511628211ULL;
+      hash *= util::kFnvPrime;
     }
     hash ^= static_cast<uint64_t>('\n');
-    hash *= 1099511628211ULL;
+    hash *= util::kFnvPrime;
   }
   return hash;
 }

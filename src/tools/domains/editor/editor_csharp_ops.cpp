@@ -12,6 +12,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -322,11 +323,7 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     char ch = (idx < combined.size()) ? combined[idx] : '\n';
     if (ch == '\n' || ch == '\r') {
       if (!line_buf.empty()) {
-        std::string lowered = line_buf;
-        std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                       [](unsigned char c) {
-                         return static_cast<char>(std::tolower(c));
-                       });
+        const std::string lowered = util::ascii_lowercase(line_buf);
         if (lowered.find("error") != std::string::npos) {
           if (error_total < kMaxErrors) {
             errors_arr.PushBack(mcp::JsonValue(line_buf));

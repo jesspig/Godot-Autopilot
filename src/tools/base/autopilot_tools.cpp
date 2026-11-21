@@ -1,5 +1,8 @@
 #include "tools/base/autopilot_tools.hpp"
 
+#include "core/path_util.hpp"
+#include "util/input_guards.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -153,18 +156,8 @@ bool has_gd_suffix(const std::string &filename) {
   if (filename.size() < 4) {
     return false;
   }
-  std::string lower = filename;
-  std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
-    return static_cast<char>(std::tolower(c));
-  });
+  const std::string lower = util::ascii_lowercase(filename);
   return lower.compare(lower.size() - 3, 3, ".gd") == 0;
-}
-
-std::string join_scan_path(const std::string &dir, const std::string &entry) {
-  if (!dir.empty() && dir.back() == '/') {
-    return dir + entry;
-  }
-  return dir + "/" + entry;
 }
 
 std::set<std::string> dynamic_tool_name_set() {
@@ -194,7 +187,7 @@ void collect_rescan_files(const std::string &root,
       if (entry != "." && entry != "..") {
         const std::string name = util::to_std(entry);
         if (!name.empty() && name[0] != '.') {
-          const std::string full = join_scan_path(top.first, name);
+          const std::string full = join_path(top.first, name);
           if (dir->current_is_dir()) {
             if (top.second < kRescanMaxDepth) {
               pending.emplace_back(full, top.second + 1);

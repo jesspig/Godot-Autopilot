@@ -1,4 +1,4 @@
-import { CliError, ExitCode } from "../errors";
+import { CliError, errorMessage, ExitCode } from "../errors";
 
 export interface DumpHeader {
   version_major: number;
@@ -144,10 +144,6 @@ function asBoolean(value: unknown, fallback = false): boolean {
 
 function asNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function plainText(value: string): string {

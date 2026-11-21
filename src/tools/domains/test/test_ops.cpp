@@ -1,5 +1,6 @@
 #include "tools/domains/test/test_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/path_util.hpp"
 #include "tools/domains/debugger/debugger_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
@@ -538,8 +539,7 @@ mcp::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
 }
 
 std::string join_dir_file(const std::string &dir, const std::string &name) {
-  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") +
-         name;
+  return join_path(dir, name);
 }
 
 bool wildcard_match(const std::string &text, const std::string &pattern) {

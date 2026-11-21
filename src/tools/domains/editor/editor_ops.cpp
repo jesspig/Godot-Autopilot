@@ -13,6 +13,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -289,19 +290,12 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
   }
 }
 
-std::string tree_to_lower(const std::string &s) {
-  std::string out = s;
-  std::transform(out.begin(), out.end(), out.begin(),
-                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-  return out;
-}
-
 bool tree_entry_matches(const std::string &name, const std::string &path,
                         const std::string &filter_lower) {
   if (filter_lower.empty())
     return true;
-  return tree_to_lower(name).find(filter_lower) != std::string::npos ||
-         tree_to_lower(path).find(filter_lower) != std::string::npos;
+  return util::ascii_lowercase(name).find(filter_lower) != std::string::npos ||
+         util::ascii_lowercase(path).find(filter_lower) != std::string::npos;
 }
 
 bool dir_to_json(godot::EditorFileSystemDirectory *dir, mcp::JsonValue &j,
@@ -942,7 +936,7 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
   std::string filter_lower;
   auto *filter_p = args.Find("filter");
   if (filter_p && filter_p->IsString())
-    filter_lower = tree_to_lower(filter_p->GetString());
+    filter_lower = util::ascii_lowercase(filter_p->GetString());
   mcp::JsonValue result(mcp::JsonValue::object_tag);
   bool filtered = false;
   bool truncated = dir_to_json(dir, result, 0, max_depth, filter_lower, filtered);

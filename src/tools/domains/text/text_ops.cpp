@@ -2,6 +2,7 @@
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/path_util.hpp"
 #include "tools/domains/script/script_ops.hpp"
 #include "util/csharp_project_setup.hpp"
 #include "util/dotnet_env.hpp"
@@ -1071,7 +1072,7 @@ int count_occurrences(const std::string &text, const std::string &query,
 
 std::string join_search_path(const std::string &dir,
                              const std::string &name) {
-  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
+  return join_path(dir, name);
 }
 
 void find_in_files_recursive(const std::string &dir,

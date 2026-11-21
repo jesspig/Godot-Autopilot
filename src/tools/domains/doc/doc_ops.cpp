@@ -64,14 +64,6 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
   }
 }
 
-std::string lower_text(const std::string &s) {
-  std::string out = s;
-  std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-    return static_cast<char>(std::tolower(c));
-  });
-  return out;
-}
-
 std::string trim_text(const std::string &s) {
   size_t begin = s.find_first_not_of(" \t\r\n");
   if (begin == std::string::npos) {
@@ -84,7 +76,7 @@ std::string trim_text(const std::string &s) {
 std::string compact_name(const std::string &s) {
   std::string out;
   out.reserve(s.size());
-  for (char c : lower_text(s)) {
+  for (char c : util::ascii_lowercase(s)) {
     if (c != '_') {
       out.push_back(c);
     }
@@ -495,7 +487,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     size_t pos = 0;
     while (pos <= section_param.size()) {
       size_t comma = section_param.find(',', pos);
-      std::string token = lower_text(trim_text(section_param.substr(
+      std::string token = util::ascii_lowercase(trim_text(section_param.substr(
           pos, comma == std::string::npos ? comma : comma - pos)));
       if (token == "methods") {
         want_methods = true;
@@ -521,7 +513,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
       pos = comma + 1;
     }
   }
-  std::string member_lower = lower_text(member_param);
+  std::string member_lower = util::ascii_lowercase(member_param);
   auto member_ok = [&member_lower, &member_param, exact](
                        const std::string &name) {
     if (member_param.empty()) {
@@ -530,7 +522,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     if (exact) {
       return name == member_param;
     }
-    return lower_text(name).find(member_lower) != std::string::npos;
+    return util::ascii_lowercase(name).find(member_lower) != std::string::npos;
   };
   bool any_match = false;
   auto exact_missing_error = [&]() {

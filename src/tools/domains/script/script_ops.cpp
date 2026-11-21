@@ -6,6 +6,7 @@
 #include "tools/domains/scene/scene_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/hash_util.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
 #include "util/variant_json.hpp"
@@ -43,23 +44,11 @@ bool wants_fresh_load(const mcp::JsonValue &args) {
 }
 
 uint64_t fnv1a64(const std::string &bytes) {
-  uint64_t hash = 14695981039346656037ULL;
-  for (unsigned char c : bytes) {
-    hash ^= static_cast<uint64_t>(c);
-    hash *= 1099511628211ULL;
-  }
-  return hash;
+  return util::fnv1a64(bytes);
 }
 
 std::string fnv1a64_hex(const std::string &bytes) {
-  static const char *digits = "0123456789abcdef";
-  uint64_t hash = fnv1a64(bytes);
-  std::string out(16, '0');
-  for (int i = 15; i >= 0; --i) {
-    out[static_cast<size_t>(i)] = digits[hash & 0xFULL];
-    hash >>= 4;
-  }
-  return out;
+  return util::fnv1a64_hex(bytes);
 }
 
 void collect_autoload_names(std::vector<std::string> &out) {

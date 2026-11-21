@@ -1,5 +1,6 @@
 #include "tools/domains/os/os_file_dir_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/path_util.hpp"
 #include "tools/domains/os/os_ops.hpp"
 #include "tools/domains/text/text_ops.hpp"
 #include "util/error_util.hpp"
@@ -18,10 +19,6 @@ namespace file_dir_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string join_file_path(const std::string &dir, const std::string &name) {
-  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
-}
 
 bool is_hidden_entry(const std::string &name) {
   return !name.empty() && name[0] == '.';
@@ -77,7 +74,7 @@ JV handle_list_directory(const JV &args) {
   for (const auto &item : collected) {
     JV obj(JV::object_tag);
     obj["name"] = JV(item.first);
-    obj["path"] = JV(join_file_path(dir, item.first));
+    obj["path"] = JV(join_path(dir, item.first));
     obj["is_dir"] = JV(item.second);
     entries.PushBack(std::move(obj));
   }

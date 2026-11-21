@@ -99,40 +99,19 @@ std::string mesh_invalid_param(const char *name, const std::string &expected) {
   return std::string("invalid parameter: ") + name + " must be " + expected;
 }
 
-std::string mesh_lowercase(std::string text) {
-  for (char &c : text) {
-    if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c + ('a' - 'A'));
-    }
-  }
-  return text;
-}
-
-bool mesh_is_digits(const std::string &text) {
-  if (text.empty()) {
-    return false;
-  }
-  for (char c : text) {
-    if (c < '0' || c > '9') {
-      return false;
-    }
-  }
-  return true;
-}
-
 bool mesh_read_required_string(const mcp::JsonValue &args, const char *key,
                                const std::string &action, std::string &out,
                                std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
-  if (value == nullptr) {
+  const util::StringArgStatus status =
+      util::string_arg_status(args, key, out, true);
+  if (status == util::StringArgStatus::Missing) {
     error = mesh_missing_param(action, key);
     return false;
   }
-  if (!value->IsString() || value->GetString().empty()) {
+  if (status != util::StringArgStatus::Ok) {
     error = mesh_invalid_param(key, "a non-empty string");
     return false;
   }
-  out = value->GetString();
   return true;
 }
 
@@ -380,7 +359,7 @@ bool mesh_parse_primitive(const std::string &name,
       {"triangles", godot::Mesh::PRIMITIVE_TRIANGLES},
       {"triangle_strip", godot::Mesh::PRIMITIVE_TRIANGLE_STRIP},
   };
-  const std::string key = mesh_lowercase(name);
+  const std::string key = util::ascii_lowercase(name);
   for (const PrimitiveName &entry : kPrimitiveNames) {
     if (key == entry.name) {
       out = entry.type;
@@ -494,79 +473,54 @@ bool mesh_parse_float_list(const mcp::JsonValue &value, const char *name,
 bool mesh_resolve_resource_locator(const mcp::JsonValue &value,
                                    godot::Ref<godot::Resource> &out,
                                    std::string &error) {
-  std::string name;
-  std::string path;
-  bool has_object_id = false;
-  int64_t object_id = 0;
+  util::ObjectLocatorFields fields;
   std::string other_class;
   const std::string descriptor = mesh_describe_locator(value);
   if (value.IsString()) {
-    const std::string text = value.GetString();
-    if (text.rfind("memory://", 0) == 0) {
-      name = text.substr(9);
-    } else if (text.rfind("res://", 0) == 0) {
-      path = text;
-    } else if (mesh_is_digits(text)) {
-      if (!util::parse_decimal_int64(text, object_id)) {
-        error = "invalid locator: object_id is out of range";
-        return false;
-      }
-      has_object_id = true;
-      name = text;
-    } else if (!text.empty()) {
-      name = text;
+    bool out_of_range = false;
+    util::parse_locator_string(value.GetString(), true, fields, out_of_range);
+    if (out_of_range) {
+      error = "invalid locator: object_id is out of range";
+      return false;
+    }
+    if (fields.path.rfind("user://", 0) == 0) {
+      fields.name = value.GetString();
+      fields.path.clear();
+    }
+    if (fields.has_object_id) {
+      fields.name = value.GetString();
     }
   } else if (value.IsObject()) {
-    for (const auto &entry : value.GetObject()) {
-      if (entry.first != "name" && entry.first != "path" &&
-          entry.first != "object_id" && entry.first != "object_id_str") {
-        error = "invalid locator: unknown field '" + entry.first +
-                "' (allowed: name, path, object_id, object_id_str)";
-        return false;
-      }
+    const char *bad_field = nullptr;
+    const util::LocatorFieldStatus status =
+        util::parse_object_locator(value, true, fields, &bad_field);
+    if (status == util::LocatorFieldStatus::UnknownField) {
+      error = "invalid locator: unknown field '" + std::string(bad_field) +
+              "' (allowed: name, path, object_id, object_id_str)";
+      return false;
     }
-    const mcp::JsonValue *name_p = value.Find("name");
-    if (name_p != nullptr) {
-      if (!name_p->IsString()) {
-        error = mesh_invalid_param("name", "a string");
-        return false;
-      }
-      name = name_p->GetString();
+    if (status == util::LocatorFieldStatus::WrongType) {
+      const std::string field = bad_field != nullptr ? bad_field : "locator";
+      const char *expected = std::string(field) == "object_id"
+                                 ? "a number"
+                                 : (std::string(field) == "object_id_str"
+                                        ? "a decimal integer string"
+                                        : "a string");
+      error = mesh_invalid_param(field.c_str(), expected);
+      return false;
     }
-    const mcp::JsonValue *path_p = value.Find("path");
-    if (path_p != nullptr) {
-      if (!path_p->IsString()) {
-        error = mesh_invalid_param("path", "a string");
-        return false;
-      }
-      path = path_p->GetString();
-    }
-    const mcp::JsonValue *oid_p = value.Find("object_id");
-    if (oid_p != nullptr) {
-      if (!oid_p->IsNumber()) {
-        error = mesh_invalid_param("object_id", "a number");
-        return false;
-      }
-      has_object_id = true;
-      object_id = oid_p->IsInt() ? oid_p->GetInt()
-                                 : static_cast<int64_t>(oid_p->GetDouble());
-    }
-    const mcp::JsonValue *oid_str_p = value.Find("object_id_str");
-    if (oid_str_p != nullptr) {
-      if (!oid_str_p->IsString() || !mesh_is_digits(oid_str_p->GetString())) {
-        error = mesh_invalid_param("object_id_str", "a decimal integer string");
-        return false;
-      }
-      if (!util::parse_decimal_int64(oid_str_p->GetString(), object_id)) {
-        error = mesh_invalid_param("object_id_str", "an in-range decimal integer");
-        return false;
-      }
-      has_object_id = true;
+    if (status == util::LocatorFieldStatus::OutOfRange) {
+      error = mesh_invalid_param("object_id_str", "an in-range decimal integer");
+      return false;
     }
   } else {
     error = "invalid locator: expected a string or object";
     return false;
   }
+  const std::string &name = fields.name;
+  const std::string &path = fields.path;
+  const bool has_object_id = fields.has_object_id;
+  const int64_t object_id = fields.object_id;
 
   if (has_object_id) {
     godot::Object *object =
@@ -874,9 +828,7 @@ MeshSessionState *mesh_find_session(const mcp::JsonValue &args,
     error = "missing required parameter: session";
     return nullptr;
   }
-  std::string name;
-  bool has_object_id = false;
-  int64_t object_id = 0;
+  util::ObjectLocatorFields fields;
   const std::string descriptor = mesh_describe_locator(*value);
   if (value->IsString()) {
     const std::string text = value->GetString();
@@ -885,62 +837,48 @@ MeshSessionState *mesh_find_session(const mcp::JsonValue &args,
       resolved = named->first;
       return &named->second;
     }
-    if (text.rfind("memory://", 0) == 0) {
-      name = text.substr(9);
-    } else if (mesh_is_digits(text)) {
-      if (!util::parse_decimal_int64(text, object_id)) {
-        error = "invalid session locator: object_id is out of range";
-        return nullptr;
-      }
-      has_object_id = true;
-    } else if (!text.empty()) {
-      name = text;
+    bool out_of_range = false;
+    util::parse_locator_string(text, true, fields, out_of_range);
+    if (out_of_range) {
+      error = "invalid session locator: object_id is out of range";
+      return nullptr;
+    }
+    if (!fields.path.empty()) {
+      fields.name = text;
+      fields.path.clear();
     }
   } else if (value->IsObject()) {
-    for (const auto &entry : value->GetObject()) {
-      if (entry.first != "name" && entry.first != "object_id" &&
-          entry.first != "object_id_str") {
-        error = "invalid session locator: unknown field '" + entry.first +
-                "' (allowed: name, object_id, object_id_str)";
-        return nullptr;
-      }
+    const char *bad_field = nullptr;
+    const util::LocatorFieldStatus status =
+        util::parse_object_locator(*value, false, fields, &bad_field);
+    if (status == util::LocatorFieldStatus::UnknownField) {
+      error = "invalid session locator: unknown field '" +
+              std::string(bad_field) +
+              "' (allowed: name, object_id, object_id_str)";
+      return nullptr;
     }
-    const mcp::JsonValue *name_p = value->Find("name");
-    if (name_p != nullptr) {
-      if (!name_p->IsString()) {
-        error = mesh_invalid_param("session.name", "a string");
-        return nullptr;
-      }
-      name = name_p->GetString();
+    if (status == util::LocatorFieldStatus::WrongType) {
+      const std::string field = bad_field != nullptr ? bad_field : "locator";
+      const char *expected = std::string(field) == "object_id"
+                                 ? "a number"
+                                 : (std::string(field) == "object_id_str"
+                                        ? "a decimal integer string"
+                                        : "a string");
+      error = mesh_invalid_param(("session." + field).c_str(), expected);
+      return nullptr;
     }
-    const mcp::JsonValue *oid_p = value->Find("object_id");
-    if (oid_p != nullptr) {
-      if (!oid_p->IsNumber()) {
-        error = mesh_invalid_param("session.object_id", "a number");
-        return nullptr;
-      }
-      has_object_id = true;
-      object_id = oid_p->IsInt() ? oid_p->GetInt()
-                                 : static_cast<int64_t>(oid_p->GetDouble());
-    }
-    const mcp::JsonValue *oid_str_p = value->Find("object_id_str");
-    if (oid_str_p != nullptr) {
-      if (!oid_str_p->IsString() || !mesh_is_digits(oid_str_p->GetString())) {
-        error = mesh_invalid_param("session.object_id_str",
-                                   "a decimal integer string");
-        return nullptr;
-      }
-      if (!util::parse_decimal_int64(oid_str_p->GetString(), object_id)) {
-        error = mesh_invalid_param("session.object_id_str",
-                                   "an in-range decimal integer");
-        return nullptr;
-      }
-      has_object_id = true;
+    if (status == util::LocatorFieldStatus::OutOfRange) {
+      error = mesh_invalid_param("session.object_id_str",
+                                 "an in-range decimal integer");
+      return nullptr;
     }
   } else {
     error = "invalid session locator: expected a string or object";
     return nullptr;
   }
+  const std::string &name = fields.name;
+  const bool has_object_id = fields.has_object_id;
+  const int64_t object_id = fields.object_id;
   if (!name.empty()) {
     auto it = g_mesh_sessions.find(name);
     if (it != g_mesh_sessions.end()) {
@@ -1011,7 +949,7 @@ bool mesh_read_object_id_locator(const mcp::JsonValue &value, int64_t &out,
                                  std::string &descriptor, std::string &error) {
   if (value.IsString()) {
     const std::string text = value.GetString();
-    if (!mesh_is_digits(text)) {
+    if (!util::is_decimal_digits(text)) {
       error = mesh_invalid_param("node", "a decimal object_id string");
       return false;
     }
@@ -1047,7 +985,7 @@ bool mesh_read_object_id_locator(const mcp::JsonValue &value, int64_t &out,
   }
   const mcp::JsonValue *oid_str_p = value.Find("object_id_str");
   if (oid_str_p == nullptr || !oid_str_p->IsString() ||
-      !mesh_is_digits(oid_str_p->GetString())) {
+      !util::is_decimal_digits(oid_str_p->GetString())) {
     error = mesh_invalid_param("node", "object_id or object_id_str");
     return false;
   }
@@ -1714,7 +1652,7 @@ mcp::JsonValue mesh_handle_csg_bake(const mcp::JsonValue &args) {
   if (!mesh_read_optional_string(args, "shape", shape_text, error)) {
     return util::error_json(error);
   }
-  const std::string shape_mode = mesh_lowercase(shape_text);
+  const std::string shape_mode = util::ascii_lowercase(shape_text);
   if (shape_mode != "mesh" && shape_mode != "collision" &&
       shape_mode != "both") {
     return util::error_json(
@@ -1888,7 +1826,7 @@ mcp::JsonValue mesh_handle_multimesh_create(const mcp::JsonValue &args) {
                                  error)) {
     return util::error_json(error);
   }
-  const std::string format_key = mesh_lowercase(transform_format);
+  const std::string format_key = util::ascii_lowercase(transform_format);
   if (format_key != "3d" && format_key != "2d") {
     return util::error_json(
         "invalid parameter: transform_format must be 3d or 2d");

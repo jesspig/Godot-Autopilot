@@ -1,9 +1,11 @@
 #include "tools/domains/input_map/input_map_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_map.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
@@ -241,19 +243,52 @@ int64_t resolve_key_name_code(const std::string &name) {
   if (it != key_code_by_bare_name().end())
     return it->second;
 
-  bool all_digits = true;
-  for (char c : u) {
-    if (c < '0' || c > '9') {
-      all_digits = false;
-      break;
-    }
-  }
-  if (all_digits && u.size() <= 8) {
-    const int64_t value = std::stoll(u);
+  int64_t value = 0;
+  if (u.size() <= 8 && util::parse_decimal_int64(u, value)) {
     if (value > 0 && value <= 0xFFFFFF)
       return value;
   }
   return 0;
+}
+
+godot::Key resolve_input_key(const std::string &name) {
+  std::string u = name;
+  for (char &c : u)
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  const bool key_prefixed = u.rfind("KEY_", 0) == 0;
+  std::string bare = u;
+  if (key_prefixed)
+    bare = bare.substr(4);
+  if (!key_prefixed && bare.size() >= 2 && bare[0] == 'F' &&
+      std::all_of(bare.begin() + 1, bare.end(), [](char c) {
+        return c >= '0' && c <= '9';
+      }))
+    return godot::KEY_NONE;
+  const int64_t code = resolve_key_name_code(name);
+  if (code > 0 && code <= 0xFFFFFF)
+    return static_cast<godot::Key>(code);
+  if (name.size() == 1) {
+    const unsigned char c = static_cast<unsigned char>(name[0]);
+    if (c >= 0x20 && c <= 0x7E)
+      return static_cast<godot::Key>(c);
+  }
+  return godot::KEY_NONE;
+}
+
+godot::Key resolve_function_key(const std::string &name) {
+  if (name.size() < 2 || name.size() > 3 || name[0] != 'f')
+    return godot::KEY_NONE;
+  for (size_t i = 1; i < name.size(); ++i) {
+    if (name[i] < '0' || name[i] > '9')
+      return godot::KEY_NONE;
+  }
+  const int index = std::atoi(name.c_str() + 1);
+  if (index < 1 || index > 12)
+    return godot::KEY_NONE;
+  const int64_t code = resolve_key_name_code("KEY_F" + std::to_string(index));
+  if (code <= 0 || code > 0xFFFFFF)
+    return godot::KEY_NONE;
+  return static_cast<godot::Key>(code);
 }
 
 JV handle_action_add_event(const JV &args) {

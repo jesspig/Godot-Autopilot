@@ -1,5 +1,6 @@
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
+#include "util/input_guards.hpp"
 #include "core/observability/log_persist.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
@@ -97,23 +98,6 @@ void record_dispatch_exception(const std::string &name,
           " queue=0ms args=" + args_text + " err=internal");
 }
 
-std::string received_keys_suffix(const mcp::JsonValue &args) {
-  if (!args.IsObject() || args.GetObject().empty()) {
-    return " (received no parameters)";
-  }
-  std::string text = " (received keys: ";
-  bool first = true;
-  for (const auto &entry : args.GetObject()) {
-    if (!first) {
-      text += ", ";
-    }
-    first = false;
-    text += entry.first;
-  }
-  text += ")";
-  return text;
-}
-
 void log_alias_hit(const ToolAlias &alias) {
   LogSystem::instance().log(
       LogLevel::Warning, LogCategory::Tools,
@@ -177,7 +161,7 @@ mcp::JsonValue call_handler_impl(const std::string &name,
     result = mcp::JsonValue(mcp::JsonValue::object_tag);
     result["error"] =
         mcp::JsonValue("domain tool '" + lookup_name +
-                       "' not found" + received_keys_suffix(args) +
+                       "' not found" + util::received_keys_suffix(args) +
                        " — use search_tools to discover available "
                        "tools");
   }

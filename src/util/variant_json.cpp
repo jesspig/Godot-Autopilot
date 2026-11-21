@@ -1,6 +1,7 @@
 #include "variant_json.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
+#include "util/input_guards.hpp"
 #include "util/owned_exception.hpp"
 #include <cctype>
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -63,17 +64,16 @@ godot::Variant resolve_whitelisted_object_id(const std::string &oid_str) {
   if (scene_root == nullptr) {
     return godot::Variant();
   }
-  try {
-    const int64_t id = std::stoll(oid_str);
-    auto *object = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
-    auto *node = godot::Object::cast_to<godot::Node>(object);
-    if (!node_is_within_scene_root(node, scene_root)) {
-      return godot::Variant();
-    }
-    return godot::Variant(static_cast<godot::Object *>(node));
-  } catch (...) {
+  int64_t id = 0;
+  if (!util::parse_decimal_int64(oid_str, id)) {
     return godot::Variant();
   }
+  auto *object = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
+  auto *node = godot::Object::cast_to<godot::Node>(object);
+  if (!node_is_within_scene_root(node, scene_root)) {
+    return godot::Variant();
+  }
+  return godot::Variant(static_cast<godot::Object *>(node));
 }
 
 godot::Variant resolve_whitelisted_object_id(int64_t id) {
@@ -98,15 +98,6 @@ std::string str_from_variant(const godot::Variant &v) {
 std::string to_std_string(const godot::String &s) {
   godot::CharString utf8 = s.utf8();
   return std::string(utf8.ptr());
-}
-
-std::string to_lower(const std::string &s) {
-  std::string r;
-  r.reserve(s.size());
-  for (char c : s) {
-    r.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-  }
-  return r;
 }
 
 std::optional<godot::Variant::Type> parse_type_hint(const std::string &hint) {
@@ -164,7 +155,7 @@ std::optional<godot::Variant::Type> parse_type_hint(const std::string &hint) {
       {"packed_vector4_array", godot::Variant::PACKED_VECTOR4_ARRAY},
       {"packedvector4array", godot::Variant::PACKED_VECTOR4_ARRAY},
   };
-  auto it = map.find(to_lower(hint));
+  auto it = map.find(util::ascii_lowercase(hint));
   if (it != map.end())
     return it->second;
   return std::nullopt;
