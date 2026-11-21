@@ -135,12 +135,13 @@ TEST(LogSystemTest, SdkLogBridgeRoutesStoreFailureReason) {
     const mcp::LogHandler previous_handler = mcp::GetLogHandler();
     godot_autopilot::route_sdk_logs();
 
-    const std::filesystem::path blocked_path =
+    const std::filesystem::path blocked_parent =
         gda_test::test_temp_root() / "gda_sdk_log_bridge_blocked";
     std::error_code ec;
-    std::filesystem::remove(blocked_path, ec);
-    std::filesystem::create_directories(blocked_path, ec);
+    std::filesystem::remove_all(blocked_parent, ec);
     ASSERT_FALSE(ec);
+    const std::filesystem::path blocked_path =
+        blocked_parent / "missing-dir" / "tasks.json";
 
     {
         mcp::FileTaskStore store(blocked_path);
@@ -162,7 +163,7 @@ TEST(LogSystemTest, SdkLogBridgeRoutesStoreFailureReason) {
     }
     EXPECT_TRUE(found);
 
-    std::filesystem::remove(blocked_path, ec);
+    std::filesystem::remove_all(blocked_parent, ec);
     mcp::SetLogHandler(previous_handler);
     mcp::SetLogLevel(previous_level);
 }
