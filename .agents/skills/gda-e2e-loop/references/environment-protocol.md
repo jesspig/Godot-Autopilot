@@ -4,15 +4,16 @@
 
 ## 环境准备（全程自主，默认完整编辑器）
 
-- 构建、部署、装插件、启动引擎都自行完成，默认启动**完整编辑器**（非 headless）；仅无显示环境才回退到 headless。不向命令传业务参数，也不需要用户打开工程、启用插件或关闭编辑器。
-- 未收到工程路径时使用固定沙盒 `examples/e2e`：每个新轮次先执行 `bun run gda-dev-tools jam e2e --reset --json` 重置；仅用户明确要求继续上一轮时跳过重置。读取返回的 `path` 作为 `<project-dir>`，并读取 `<project-dir>/GAMEJAM.md` 与 `jam.json`。创建/重置成功后执行一次 `bun run gda-dev-tools harness setup --project <project-dir>`，它按序完成 build、deploy、`gda start`、list、status、ping、tools list。
-- 收到工程路径时直接使用该工程，不重新抽题；若路径就是 `examples/e2e`，仍按新轮次先重置（用户明确要求续跑时除外）；随后同样执行环境准备。
+- 构建、部署、装插件、启动引擎都自行完成，默认启动**完整编辑器**（非 headless）；仅无显示环境才回退 headless。不向命令传业务参数，也不需要用户打开工程、启用插件或关闭编辑器。
+- 固定沙盒 `examples/e2e`：新轮次先执行 `bun run gda-dev-tools jam e2e --reset --json` 重置，读取返回的 `path` 作为 `<project-dir>`；随后用 `assets/fixed-task-brief.md` 覆盖 `<project-dir>/GAMEJAM.md` 作为本轮固定任务书（忽略 `jam e2e` 内部随机主题）。仅用户明确要求续跑时跳过重置。
+- 收到用户指定工程时直接使用该工程，不重新抽题；若路径就是 `examples/e2e`，仍按新轮次先重置（续跑除外）。
+- 创建/重置后用 `bun run gda-dev-tools harness setup --project <project-dir>` 完成环境准备（它按序执行 build、deploy、`gda start`、list、status、ping、tools list）；必要时可单独 `build` / `deploy`。读取命令输出，不读实现源码。
 - 已知缺陷：若 setup 因末尾 `gda ping` 缺 `--project` 失败并终止刚启动的编辑器，先记录上下文（见下），再用 `gda start --project <project-dir>` 恢复并确认 `gda status` ok=true、`gda list` live=true；不反复重试 setup。
-- 可接收本轮聚焦目标（如「重点验证脚本工具」），它调整验证侧重，但不降低分域必覆盖与总体 ≥50% 的门槛。
+- 可接收本轮聚焦工具域（如「重点验证脚本工具」），它调整验证侧重，但不降低覆盖全部 252 工具的硬门槛。
 
 ## 先记录上下文再自重启
 
-任何重启（含重置沙盒、中毒兜底、崩溃恢复）都先记录：当前工具调用、工程未保存增量清单、CLI 与插件 trace/log 尾部、`GOAL.md` 末态，再执行重启。进程已消失时从 `~/.godot-autopilot/projects/.../logs/gda-*.log` 与 `~/.godot-autopilot/cli-traces/trace-YYYYMMDD.jsonl` 取最后记录。未记录不得重启，也不再请用户关闭或打开编辑器。
+任何重启（含重置沙盒、中毒兜底、崩溃恢复）都先记录：当前工具调用、工程未保存增量清单、CLI 与插件 trace/log 尾部、`GOAL.md` 末态，再执行重启。进程已消失时从 `<集中根>/projects/.../logs/gda-*.log` 与 `~/.godot-autopilot/cli-traces/trace-YYYYMMDD.jsonl` 取最后记录。未记录不得重启，也不再请用户关闭或打开编辑器。
 
 ## 前置检查 CLI 探针（只读，在仓库根执行）
 
@@ -37,7 +38,7 @@
 ## 模态工具受限
 
 - `show_display_dialog`、`open_os_path`、`show_os_alert` 列为受限工具：放在每轮最后、仅人工值守时调用、调用前先保存全部工作。
-- `show_os_alert` 已有无人值守保护（返回 notice 不弹窗），为正面范例。无人值守会话不调用前两者；调用超时后须记录后续工具是否连锁超时。
+- `show_os_alert` 已有无人值守保护（返回 notice 不弹窗），为正面范例。无人值守会话不调用前两者；调用超时后须记录后续工具是否连锁超时。这类工具在覆盖报告中逐项写明「需人工值守」理由，不记缺口。
 
 ## 崩溃恢复与定位
 

@@ -1,8 +1,12 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-19；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-21；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
 >
 > changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
+
+## 2026-11-21
+
+- **e2e 技能合并为多子代理四阶段闭环**：删除 `gda-e2e-testing` 与 `gda-e2e-analysis`，新建 [`gda-e2e-loop`](../../.agents/skills/gda-e2e-loop/SKILL.md)，全程由四个独立子代理分工（主代理只做总控）：阶段1 盲测不读源码 → 阶段2 分析定案 + 独立审查复核（真伪三分类）→ 阶段3 修复子代理在独立 feature 分支逐步修复（需授权）→ 阶段4 盲测复测回归。新增固定覆盖任务书 `assets/fixed-task-brief.md`（12 功能单元 + 6 组合场景），不抽题、以覆盖全部 252 canonical 工具为硬验收，新增组合链连锁反应表；共享改进库 HARNESS_LIBRARY 随新技能迁移。「同上下文自审偏差」前提已联网核实（属实、证据强），并据文献把「独立 + 外部 grounding + 盲测」写成硬机制。同步更新 tests.md / gamejam.md / tests/README.md 及历史 changelog 引用。详见 [changelog/2026-11-21-log.md](changelog/2026-11-21-log.md)。
 
 ## 2026-11-19
 
@@ -16,11 +20,11 @@
 
 ## 2026-11-17
 
-- **文档批量优化（信噪比收口，零代码改动）**：范围 `docs/wiki/`（非 changelog）、根 `AGENTS.md`、五语 `README*.md`、`.agents/skills/`。[tests.md](tests.md) 数值核算总表重基线到当前实测（单元 589 / ctest 885 / 域工具 246（35 域）/ 类别 28 / 破坏类 7 声明者 + 3 豁免 / add_library 117），CLI 单测统一为 37 文件 348 项（325 pass + 23 skip，本轮实测复跑）；清理 0.3.2 授权移除后的文档残留（tool_base_design 执行链改 confirm 门、conventions 守卫表更新为 12 个 `.ts` 载体、core.md 删除已不存在的 `allow`/`auth_mode` 函数、engine-behavior-checklist 域 2 改确认门口径、roadmap 控制面二期标注 0.3.2 移除、入口注册类 5→4、mermaid 端口 9527→20000–29999）；同步 4 个技能（cpp-registration/thread-security-gate/gda-e2e-testing/domain-tool-authoring）；四语 README 删除与安全说明重复的 confirm 提示行；AGENTS.md 双登记条目按现行 cmake/sources 机制精确化。所有数值均先静态复算或实测核验再写入。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
+- **文档批量优化（信噪比收口，零代码改动）**：范围 `docs/wiki/`（非 changelog）、根 `AGENTS.md`、五语 `README*.md`、`.agents/skills/`。[tests.md](tests.md) 数值核算总表重基线到当前实测（单元 589 / ctest 885 / 域工具 246（35 域）/ 类别 28 / 破坏类 7 声明者 + 3 豁免 / add_library 117），CLI 单测统一为 37 文件 348 项（325 pass + 23 skip，本轮实测复跑）；清理 0.3.2 授权移除后的文档残留（tool_base_design 执行链改 confirm 门、conventions 守卫表更新为 12 个 `.ts` 载体、core.md 删除已不存在的 `allow`/`auth_mode` 函数、engine-behavior-checklist 域 2 改确认门口径、roadmap 控制面二期标注 0.3.2 移除、入口注册类 5→4、mermaid 端口 9527→20000–29999）；同步 4 个技能（cpp-registration/thread-security-gate/gda-e2e-loop/domain-tool-authoring）；四语 README 删除与安全说明重复的 confirm 提示行；AGENTS.md 双登记条目按现行 cmake/sources 机制精确化。所有数值均先静态复算或实测核验再写入。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 
-- **GDA Game Jam 技能与 e2e 沙盒分流**：新增 `gda-game-develop` 创作向技能（原名 `gda-gamejam`），默认走比赛流程 `jam` → `jam create` → `examples/<theme_id>/<slug>-<hash8>`，创建后立即 `build` + `deploy`，收尾 `jam index`。`gda-e2e-testing` 恢复 Game Jam 之前的 RSI 基线（保留 `Q`/`S`、递归闭环与证据体系），只补固定沙盒 `examples/e2e`、每轮 `jam e2e --reset`、创建/重置后装插件、报告目录 `report/<YYYY-MM-DD_HH-MM>/` 与“只记录不修复”边界。新增 `jam e2e [--reset]`；`jam.json.kind=e2e` 的沙盒不进入自动发现、`used` 与 `index`；比赛流程不变。同步更新 `gda-e2e-analysis` 的报告路径扫描。验证：`bun run typecheck` 通过，`bun test cli/tests` 37 文件 / 348 项（325 pass + 23 skip + 0 fail）。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
+- **GDA Game Jam 技能与 e2e 沙盒分流**：新增 `gda-game-develop` 创作向技能（原名 `gda-gamejam`），默认走比赛流程 `jam` → `jam create` → `examples/<theme_id>/<slug>-<hash8>`，创建后立即 `build` + `deploy`，收尾 `jam index`。`gda-e2e-loop` 恢复 Game Jam 之前的 RSI 基线（保留 `Q`/`S`、递归闭环与证据体系），只补固定沙盒 `examples/e2e`、每轮 `jam e2e --reset`、创建/重置后装插件、报告目录 `report/<YYYY-MM-DD_HH-MM>/` 与“只记录不修复”边界。新增 `jam e2e [--reset]`；`jam.json.kind=e2e` 的沙盒不进入自动发现、`used` 与 `index`；比赛流程不变。同步更新 `gda-e2e-loop` 的报告路径扫描。验证：`bun run typecheck` 通过，`bun test cli/tests` 37 文件 / 348 项（325 pass + 23 skip + 0 fail）。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 
-- **Game Jam 生成器 v2 与 e2e 抽题**：题库升为 `schema_version: 2`、50 条，新增 `organizer` / `event` / `edition` / `year` / `source_title` / `source_kind` / `rules_url` / `verified_at` / `tags` / `design_constraints`，`source_url` 必填，官方来源优先、历史主题允许归档；每条只记录真实的设计/内容层创意约束（时间、引擎、团队、提交平台、素材授权、AI 限制等不写入）；赛事模板由用户固定维护，当前模板不渲染创意约束，约束仅保留在题库与 `jam.json`。抽题时关键词与概念灵感各自随机抽 3–5 条并打乱；`jam` 只生成 `examples/<theme_id>/project/` intake，`jam create` 再复制为 `examples/<theme_id>/<slug>-<hash8>/`，写入 `jam.json`；作品说明文档完全按 `GAMEJAM.md` 的提交要求处理，技能不额外约束。新增 `jam list [--projects]`、`jam index`、`devtools/lib/jam_projects.ts` 递归发现与 intake 跳过；`gda-e2e-testing` 改为「抽题 → 读题 → 命名 → 创建 → 按模板准备作品说明文档 → 开发 → 索引」。验证：`bun run typecheck` 通过，`bun test cli/tests` 37 文件 / 345 项（322 pass + 23 skip + 0 fail），`jam --list` 50 条与 CLI 抽题/创建/索引冒烟通过。完整 e2e 需用户在 Godot 中打开最终项目，未声称跑通。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
+- **Game Jam 生成器 v2 与 e2e 抽题**：题库升为 `schema_version: 2`、50 条，新增 `organizer` / `event` / `edition` / `year` / `source_title` / `source_kind` / `rules_url` / `verified_at` / `tags` / `design_constraints`，`source_url` 必填，官方来源优先、历史主题允许归档；每条只记录真实的设计/内容层创意约束（时间、引擎、团队、提交平台、素材授权、AI 限制等不写入）；赛事模板由用户固定维护，当前模板不渲染创意约束，约束仅保留在题库与 `jam.json`。抽题时关键词与概念灵感各自随机抽 3–5 条并打乱；`jam` 只生成 `examples/<theme_id>/project/` intake，`jam create` 再复制为 `examples/<theme_id>/<slug>-<hash8>/`，写入 `jam.json`；作品说明文档完全按 `GAMEJAM.md` 的提交要求处理，技能不额外约束。新增 `jam list [--projects]`、`jam index`、`devtools/lib/jam_projects.ts` 递归发现与 intake 跳过；`gda-e2e-loop` 改为「抽题 → 读题 → 命名 → 创建 → 按模板准备作品说明文档 → 开发 → 索引」。验证：`bun run typecheck` 通过，`bun test cli/tests` 37 文件 / 345 项（322 pass + 23 skip + 0 fail），`jam --list` 50 条与 CLI 抽题/创建/索引冒烟通过。完整 e2e 需用户在 Godot 中打开最终项目，未声称跑通。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 
 ## 2026-11-16
 
@@ -28,7 +32,7 @@
 
 - **工具面压缩收口（T-25 文档）**：catalog 459→**252**（246 域 + 5 元 + `system_status`）、生产别名 **325**、schema **235/17**、能力矩阵 561 行 mapped 315 / missing 0；35 个域文件（新增 Image、Mesh）。重写 [overview.md](overview.md) 工具面与 [modules/tools_ops_a.md](modules/tools_ops_a.md) / [modules/tools_ops_b.md](modules/tools_ops_b.md)（按 canonical action 工具列表，旧名只留别名列与迁移说明），[tool_surface_baseline.md](tool_surface_baseline.md) 改为最终 252 基线，新增 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md) 压缩段；五语 README 的 badge/描述改为 252 并换用 canonical 示例名，非 EN/ZH 版标注以 EN 为准。旧名残留与相对链接已自查；本轮未编译、未测试，真实引擎 e2e 留待 T-26。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
 
-- **示例工程退场（devtools 目标解耦）**：删除五语 README 的 `examples/` 素材声明；`deploy`/`clean` 改为可重复 `--project <dir>`（省略时自动发现 `examples/*`），`package` 默认从本机构建产物打包并新增 `--preset debug|release`；release workflow 直接从 `build/release/` 上传平台库；[gda-e2e-testing](../../.agents/skills/gda-e2e-testing/SKILL.md) 扩展为任意 Godot 工程路径。验证：typecheck、临时工程 deploy/clean 冒烟、`package --preset debug`、4 个守卫 6/6 通过。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
+- **示例工程退场（devtools 目标解耦）**：删除五语 README 的 `examples/` 素材声明；`deploy`/`clean` 改为可重复 `--project <dir>`（省略时自动发现 `examples/*`），`package` 默认从本机构建产物打包并新增 `--preset debug|release`；release workflow 直接从 `build/release/` 上传平台库；[gda-e2e-loop](../../.agents/skills/gda-e2e-loop/SKILL.md) 扩展为任意 Godot 工程路径。验证：typecheck、临时工程 deploy/clean 冒烟、`package --preset debug`、4 个守卫 6/6 通过。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
 
 ## 2026-11-14
 
@@ -46,7 +50,7 @@
 
 - **仓库组织重构（`feature/repo-org-refactor` 分支，10 个提交）**：测试体系由「四层 + L1/L2 等级」改为**单元 / 边界 / 集成三层 + 守卫与 CLI**（新增 `tests/boundary/` 与 `gda_boundary_tests`，三层打 ctest 标签 `unit`/`boundary`/`integration`，注册点守恒 **996** = 636 + 239 + 109 + 10 + 2；CI 改分层作业并加注册点守恒断言）；`src/core` 按职责下放 `transport/` 29 + `observability/` 13 + `storage/` 12（根保留 22）；`src/tools` 拆 `base/` 33 + `domains/<域>/` 33 目录 112 文件，工具域 glob 改递归；5 个超 2000 行实现文件拆分（editor / scene / property / physics / resource）；`tests/runner` 并入 `tests/support`。守卫同步递归化——`tool_domain_guard` 曾因非递归 glob 在目录下放后**扫不到文件却仍报 OK**（假绿），已改 `rglob`。明细见 [changelog/2026-11-09-log.md](changelog/2026-11-09-log.md)。最终 `ctest` **996/996** 全绿。
 
-- **测试体系重构收口（L2 引擎轨删除 + 程序化四层落地 + 数值重基线）**：历史 L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool` 池化编排）整体删除（提交 `c023a5c`，脚本编排收敛 `bf31e8a` / `8997db9`），测试体系改为「程序化四层（单元 875 / 集成 109 / 守卫与脚本 10，ctest 注册总数 994）+ Agent e2e（`gda-e2e-testing` 工作流）」；48 份 L2 用例语义蒸馏入集成层 gtest，不可进程内复现的引擎触达断言划回 Agent e2e。数值权威与逐项证据见 [测试体系](tests.md) 2026-11-09 审计行与「历史口径迁移」；引擎行为验收清单与 A 类迁移对照见 [engine-behavior-checklist.md](engine-behavior-checklist.md)。本轮同批次完成 wiki 与技能引用的措辞收口（deploy/clean 目标收敛为仅 demo、产物清单与目录树重述、索引与授权面语义同步），不涉代码；文档改动只落本地工作树，`git add` / `git commit` 由主代理执行。
+- **测试体系重构收口（L2 引擎轨删除 + 程序化四层落地 + 数值重基线）**：历史 L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool` 池化编排）整体删除（提交 `c023a5c`，脚本编排收敛 `bf31e8a` / `8997db9`），测试体系改为「程序化四层（单元 875 / 集成 109 / 守卫与脚本 10，ctest 注册总数 994）+ Agent e2e（`gda-e2e-loop` 工作流）」；48 份 L2 用例语义蒸馏入集成层 gtest，不可进程内复现的引擎触达断言划回 Agent e2e。数值权威与逐项证据见 [测试体系](tests.md) 2026-11-09 审计行与「历史口径迁移」；引擎行为验收清单与 A 类迁移对照见 [engine-behavior-checklist.md](engine-behavior-checklist.md)。本轮同批次完成 wiki 与技能引用的措辞收口（deploy/clean 目标收敛为仅 demo、产物清单与目录树重述、索引与授权面语义同步），不涉代码；文档改动只落本地工作树，`git add` / `git commit` 由主代理执行。
 
 ## 2026-10-28
 

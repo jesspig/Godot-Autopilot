@@ -17,7 +17,7 @@ resource:
 
 # Game Jam 抽题与项目收集
 
-服务两类流程：比赛开发用 `gda-game-develop` 抽题、命名、创建并保留项目；端到端测试用 `gda-e2e-testing` 在固定沙盒 `examples/e2e` 中重置并开发，只记录工具问题。
+服务两类流程：比赛开发用 `gda-game-develop` 抽题、命名、创建并保留项目；端到端测试用 `gda-e2e-loop` 在固定沙盒 `examples/e2e` 中按固定覆盖任务书做真实开发与组合测试，串起测试—分析—授权修复闭环，以覆盖全部 252 个 canonical 工具为硬验收。
 
 程序化测试（ctest、`bun test`、单元/集成/守卫）不依赖抽题或 `examples/` 生成物；只有生成器自身的单测在临时目录覆盖它。
 
@@ -137,17 +137,15 @@ bun run gda-dev-tools jam index [--json]
 
 详细流程见 [gda-game-develop 技能](../../.agents/skills/gda-game-develop/SKILL.md)。
 
-## 端到端测试流程（gda-e2e-testing）
+## 端到端测试流程（gda-e2e-loop）
 
-1. 请用户关闭正打开 `examples/e2e` 的 Godot。
-2. 每个新轮次先重置：`jam e2e --reset --json`；只有用户明确要求续跑时才跳过。
-3. 读取 `examples/e2e/GAMEJAM.md` 与 `jam.json`。
-4. 立即执行 `build` + `deploy --project examples/e2e`。
-5. 请用户打开 `examples/e2e` 并启用插件；校验 `gda status --project examples/e2e --json`。
-6. 按端到端测试技能推进，只记录工具问题，不做修复。
-7. 报告写到 `report/<YYYY-MM-DD_HH-MM>/`，不执行 `jam index`；`examples/INDEX.md` 只收比赛项目。
+1. 每个新轮次先重置：`bun run gda-dev-tools jam e2e --reset --json`；只有用户明确要求续跑时才跳过。
+2. 取返回的 `path` 作为 `<project-dir>`，用固定覆盖任务书（技能内 `assets/fixed-task-brief.md`）覆盖 `GAMEJAM.md`；不抽题。
+3. 环境准备全程自主：`bun run gda-dev-tools harness setup --project <project-dir>`（默认完整编辑器，不请用户打开/关闭工程）。
+4. 按固定任务书做真实开发操作与组合测试，串起测试—分析—授权修复闭环；覆盖全部 252 个 canonical 工具为硬验收。
+5. 报告写到 `report/<YYYY-MM-DD_HH-MM>/`（`report.md` / `evidence.md` / `img/` / `analysis.md`）；不执行 `jam index`，`examples/INDEX.md` 只收比赛项目。
 
-详细流程见 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)。
+详细流程见 [gda-e2e-loop 技能](../../.agents/skills/gda-e2e-loop/SKILL.md)。
 
 ## 本地收藏
 
