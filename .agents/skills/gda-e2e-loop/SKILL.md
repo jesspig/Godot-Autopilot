@@ -153,7 +153,7 @@ description: "用 GDA 做端到端测试—分析—修复—复测闭环：全�
 
 ## 报告与产物契约
 
-- 轮目录 `report/<YYYY-MM-DD_HH-MM>/`（本地开始时间，冲突追加 `-2`/`-3`）。阶段 1 产出 `report.md`、`evidence.md`、`img/`；阶段 2 产出 `analysis.md`；阶段 4 产出 `retest.md`（或新轮 `report.md`）；`digest.json`/`coverage.json`/`trace-snapshot.jsonl` 只读。
+- 轮目录 `.handoff/report/<YYYY-MM-DD_HH-MM>/`（本地开始时间，冲突追加 `-2`/`-3`）。报告与分析产物不再放在项目根目录，统一收进 `.handoff/report/`（已被 `.gitignore` 忽略，保持本地）；`harness coverage/digest --round <轮目录>` 接受任意路径，指向 `.handoff/report/<轮目录>` 即可。阶段 1 产出 `report.md`、`evidence.md`、`img/`；阶段 2 产出 `analysis.md`；阶段 4 产出 `retest.md`（或新轮 `report.md`）；`digest.json`/`coverage.json`/`trace-snapshot.jsonl` 只读。
 - `report.md` 必含功能闭环验证表、分域与覆盖率表、工具真实操作流程表、组合链与连锁反应表；头部与第 4 节写固定口径行。Q/S 与因果三元组格式见 `references/report-templates.md`，阶段 4 的 `retest.md` 结构同见该模板。
 - 覆盖口径行固定写：`覆盖 <N>/252，有效 <M>，无效触碰 <K>，suspected_gaming=<是|否>（依据：...）`；分域覆盖行逐域列 `达标|缺失|不适用`。
 - 所有报告与证据用占位路径，不写真实用户名或本机绝对路径；截图用相对路径引用。

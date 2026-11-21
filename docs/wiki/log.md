@@ -6,7 +6,7 @@
 
 ## 2026-11-21
 
-- **e2e 技能合并为多子代理四阶段闭环**：删除 `gda-e2e-testing` 与 `gda-e2e-analysis`，新建 [`gda-e2e-loop`](../../.agents/skills/gda-e2e-loop/SKILL.md)，全程由四个独立子代理分工（主代理只做总控）：阶段1 盲测不读源码 → 阶段2 分析定案 + 独立审查复核（真伪三分类）→ 阶段3 修复子代理在独立 feature 分支逐步修复（需授权）→ 阶段4 盲测复测回归。新增固定覆盖任务书 `assets/fixed-task-brief.md`（12 功能单元 + 6 组合场景），不抽题、以覆盖全部 252 canonical 工具为硬验收，新增组合链连锁反应表；共享改进库 HARNESS_LIBRARY 随新技能迁移。「同上下文自审偏差」前提已联网核实（属实、证据强），并据文献把「独立 + 外部 grounding + 盲测」写成硬机制。同步更新 tests.md / gamejam.md / tests/README.md 及历史 changelog 引用。详见 [changelog/2026-11-21-log.md](changelog/2026-11-21-log.md)。
+- **e2e 技能合并为多子代理四阶段闭环**：删除 `gda-e2e-testing` 与 `gda-e2e-analysis`，新建 [`gda-e2e-loop`](../../.agents/skills/gda-e2e-loop/SKILL.md)，全程由四个独立子代理分工（主代理只做总控）：阶段1 盲测不读源码 → 阶段2 分析定案 + 独立审查复核（真伪三分类）→ 阶段3 修复子代理在独立 feature 分支逐步修复（需授权）→ 阶段4 盲测复测回归。新增固定覆盖任务书 `assets/fixed-task-brief.md`（12 功能单元 + 6 组合场景），不抽题、以覆盖全部 252 canonical 工具为硬验收，新增组合链连锁反应表；共享改进库 HARNESS_LIBRARY 随新技能迁移。「同上下文自审偏差」前提已联网核实（属实、证据强），并据文献把「独立 + 外部 grounding + 盲测」写成硬机制；报告产物统一改到 `.handoff/report/<轮目录>/`（不再放项目根目录）。同步更新 tests.md / gamejam.md / tests/README.md 及历史 changelog 引用。详见 [changelog/2026-11-21-log.md](changelog/2026-11-21-log.md)。
 
 ## 2026-11-19
 

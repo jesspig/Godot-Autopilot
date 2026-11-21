@@ -4,15 +4,15 @@
 
 ## 定位与读取报告
 
-用户指定轮目录时直接用；未指定时：
+用户指定轮目录时直接用；未指定时（所有轮目录都在 `.handoff/report/` 下）：
 
-1. 扫描 `report/*/report.md`（轮目录名 `YYYY-MM-DD_HH-MM`），把 `_` 归一化为 `-` 后按时间前缀字典序取最大；同分钟多轮按 `-2`/`-3` 后缀数字取最大。
-2. 扫描 `report/*/*/report.md`（旧结构 `YYYY-MM-DD-HH-mm`）作兼容候选。
-3. 目录名缺失或格式不符时回退按文件修改时间取最新；新/旧结构都无时兼容 `report/**/*-report.md`。
+1. 扫描 `.handoff/report/*/report.md`（轮目录名 `YYYY-MM-DD_HH-MM`），把 `_` 归一化为 `-` 后按时间前缀字典序取最大；同分钟多轮按 `-2`/`-3` 后缀数字取最大。
+2. 扫描 `.handoff/report/*/*/report.md`（旧结构 `YYYY-MM-DD-HH-mm`）作兼容候选。
+3. 目录名缺失或格式不符时回退按文件修改时间取最新；新/旧结构都无时兼容 `.handoff/report/**/*-report.md`。
 4. 同一时间多个候选时列出并等待用户选择，不擅自挑。
 5. 仍无报告时停止，说明需先完成阶段 1。
 
-读取：最新轮 `report.md`（重点第 4 节分域覆盖、第 7 节问题、第 8 节建议、第 5 节组合链）、同目录 `evidence.md`、`img/`；历史轮的 `analysis.md`「可复用经验条目」与「回放索引」；全部 `report/*/` 作模拟器池。保持只读。提取 Q/S 编号（沿用报告编号，报告未编号时按顺序分配并注明「本编号由分析侧分配」）；从 `evidence.md` 取工具名、error_code、duration_ms、request_id。报告无失败项时输出「本轮无失败项」，只评估建议，不虚构。
+读取：最新轮 `report.md`（重点第 4 节分域覆盖、第 7 节问题、第 8 节建议、第 5 节组合链）、同目录 `evidence.md`、`img/`；历史轮的 `analysis.md`「可复用经验条目」与「回放索引」；全部 `.handoff/report/*/` 作模拟器池。保持只读。提取 Q/S 编号（沿用报告编号，报告未编号时按顺序分配并注明「本编号由分析侧分配」）；从 `evidence.md` 取工具名、error_code、duration_ms、request_id。报告无失败项时输出「本轮无失败项」，只评估建议，不虚构。
 
 ## 消费 digest 与准备证据
 
@@ -71,7 +71,7 @@
 
 ## Dream-RSI 离线回放与共享库
 
-把 `report/` 下全部历史轮当离线模拟器，不重跑整轮、不重放真实工具调用：
+把 `.handoff/report/` 下全部历史轮当离线模拟器，不重跑整轮、不重放真实工具调用：
 
 1. 模拟器输入：各历史轮 `report.md`、`evidence.md`、`img/`、已有 `analysis.md`、`digest.json`、`coverage.json`、`trace-snapshot.jsonl`（存在时）；逐轮记录轮目录名与 Q/S 来源，跨 demo 经验标注并用当前证据重验。
 2. broad 批量探索：一次列出所有候选，每个只做轻量对照并标注证据强度，不对每个做完整调用链分析。
