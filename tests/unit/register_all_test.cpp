@@ -171,6 +171,24 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
   EXPECT_GT(empty, 0);
 }
 
+TEST_F(RegisteredServerFixture, ReloadScriptSchemaExposesKeepStateOptional) {
+  auto info = catalog.get_tool("reload_script");
+  ASSERT_TRUE(info.has_value());
+  const mcp::JsonValue *props = info->input_schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  ASSERT_TRUE(props->IsObject());
+  const mcp::JsonValue *keep = props->Find("keep_state");
+  ASSERT_NE(keep, nullptr);
+  ASSERT_TRUE(keep->IsObject());
+  EXPECT_EQ(keep->At("type").GetString(), "boolean");
+  const mcp::JsonValue *required = info->input_schema.Find("required");
+  ASSERT_NE(required, nullptr);
+  ASSERT_TRUE(required->IsArray());
+  for (const auto &item : required->GetArray()) {
+    EXPECT_NE(item.GetString(), "keep_state");
+  }
+}
+
 TEST_F(RegisteredServerFixture, ToolDetailSideEffectIsMachineReadable) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
   args["name"] = mcp::JsonValue("code_execute");

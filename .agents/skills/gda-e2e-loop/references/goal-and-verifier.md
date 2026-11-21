@@ -37,7 +37,7 @@
 
 ## 反作弊联动
 
-- 以 `digest.suspected_gaming` 为准：`true` 表示该轮证据与所声称功能数不匹配，其覆盖数据**不进经验库**（不写 HARNESS_LIBRARY），分析报告中只作观察或把相关条目标「候选」/「弃用」，等待下一轮真实操作复核；不自评「通过」。
+- 以 `digest.suspected_gaming` 为准：`true` 表示该轮证据与所声称功能数不匹配，其覆盖数据**不进经验库**（不写被 git 忽略的运行时数据 `.handoff/library/HARNESS_LIBRARY.md`），分析报告中只作观察或把相关条目标「候选」/「弃用」，等待下一轮真实操作复核；不自评「通过」。
 - 证据一致性校验不设数字门槛；不因 `coverage_used` 数值高就认定证据有效。`coverage_invalid_touches` 计入的无效触碰须从有效覆盖中剔除，不进经验库。
 - 在 `analysis.md` 写明 `suspected_gaming` 依据与无效触碰剔除情况，供下一轮复核。
 

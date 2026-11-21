@@ -1764,18 +1764,28 @@ bool tween_number(const JV &params, const char *key, double &out) {
 }
 
 JV op_tween_create(const JV &params) {
-  const JV *path_p = params.Find("node_path");
-  if (!path_p || !path_p->IsString() || path_p->GetString().empty())
-    return error_result("missing required parameter: node_path");
   const JV *kind_p = params.Find("kind");
   const std::string kind =
       (kind_p && kind_p->IsString()) ? kind_p->GetString() : std::string("property");
-  godot::Node *node = resolve_node(path_p->GetString());
-  if (!node)
-    return error_result("node not found: " + path_p->GetString());
-  godot::SceneTree *tree = node->get_tree();
-  if (!tree)
-    return error_result("no scene tree for node " + path_p->GetString());
+  const bool needs_node = kind != "interval";
+  const JV *path_p = params.Find("node_path");
+  if (needs_node &&
+      (!path_p || !path_p->IsString() || path_p->GetString().empty()))
+    return error_result("missing required parameter: node_path");
+  godot::Node *node = nullptr;
+  godot::SceneTree *tree = nullptr;
+  if (needs_node) {
+    node = resolve_node(path_p->GetString());
+    if (!node)
+      return error_result("node not found: " + path_p->GetString());
+    tree = node->get_tree();
+    if (!tree)
+      return error_result("no scene tree for node " + path_p->GetString());
+  } else {
+    tree = godot::SceneTree::get_singleton();
+    if (!tree)
+      return error_result("no scene tree available for tween interval");
+  }
   godot::Ref<godot::Tween> tween = tree->create_tween();
   if (!tween.is_valid())
     return error_result("SceneTree::create_tween returned null");
@@ -1791,7 +1801,9 @@ JV op_tween_create(const JV &params) {
 
   JV inner(JV::object_tag);
   inner["kind"] = JV(kind);
-  inner["path"] = *path_p;
+  if (path_p) {
+    inner["path"] = *path_p;
+  }
   if (kind == "property") {
     const JV *prop_p = params.Find("property");
     if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
@@ -1801,7 +1813,11 @@ JV op_tween_create(const JV &params) {
     if (!target_p || !tween_number(params, "duration", duration) ||
         duration <= 0.0)
       return error_result("missing required parameter: duration");
-    godot::Variant final_value = VariantJson::deserialize(*target_p);
+    godot::Variant initial =
+        node->get(godot::StringName(prop_p->GetString().c_str()));
+    const std::string type_hint =
+        util::to_std(godot::Variant::get_type_name(initial.get_type()));
+    godot::Variant final_value = VariantJson::deserialize(*target_p, type_hint);
     godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
         node, godot::NodePath(godot::String(prop_p->GetString().c_str())),
         final_value, duration);

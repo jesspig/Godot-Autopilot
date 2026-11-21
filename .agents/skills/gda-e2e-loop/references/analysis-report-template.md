@@ -16,7 +16,7 @@
 - MCP SDK 路径与 commit / 绑定层路径与 commit
 - digest 路径 / schema / 来源轮次（digest.round）
 - GOAL 终态：active | paused | budgetLimited | usageLimited | complete | unmet（取自对应工程 GOAL.md 末态，与报告头部对照）
-- 冻结快照：本轮读到的 HARNESS_LIBRARY 条目 id 与状态清单；digest.json / coverage.json / trace-snapshot.jsonl 版本
+- 冻结快照：本轮读到的运行时数据 `.handoff/library/HARNESS_LIBRARY.md` 条目 id 与状态清单（规则见 `HARNESS_LIBRARY.md` 模板）；digest.json / coverage.json / trace-snapshot.jsonl 版本
 - 分析范围与未覆盖范围；历史轮是否可用（无历史轮标注「未验证」）
 
 ## 1. 结论摘要

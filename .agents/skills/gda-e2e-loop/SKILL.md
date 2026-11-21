@@ -188,4 +188,5 @@ description: "用 GDA 做端到端测试—分析—修复—复测闭环：全�
 | 根因分析、真伪三分类、建议评估、Dream-RSI、外部调研 | `references/analysis-playbook.md` |
 | analysis.md 结构 | `references/analysis-report-template.md` |
 | 授权修复、增强设计、验证、feature 分支 | `references/repair-and-verify.md` |
-| 共享改进库（条目化记忆，按 id 增量合并） | `HARNESS_LIBRARY.md` |
+| 共享改进库规则（模板） | `HARNESS_LIBRARY.md` |
+| 共享改进库条目（运行时数据，被 git 忽略） | `.handoff/library/HARNESS_LIBRARY.md` |

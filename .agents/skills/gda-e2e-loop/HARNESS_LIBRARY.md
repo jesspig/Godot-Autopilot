@@ -1,8 +1,15 @@
-# GDA Harness 改进库
+# GDA Harness 改进库（模板）
 
-> 跨轮、跨 demo 共享的条目化改进记忆，是 `gda-e2e-loop` 技能阶段 2 的副产物，由该技能以增量条目更新与消费。
-> 只登记条目与状态，不写结论性叙述；判定规则见 `gda-e2e-loop` 技能册。
-> 条目来自真实轮次的 deep 深挖与直接证据；无对照证据不得写入条目。当前条目 L1–L3 来自 `2026-11-20_03-28` 轮次（已实施并通过构建/静态测试，真实 e2e probe 待下一轮）。
+> 本文件只定义**规则**：字段、状态流转、与 digest 的对齐、合并规则。
+> **实际条目是运行时数据**，存放在被 git 忽略的 `.handoff/library/HARNESS_LIBRARY.md`，与 `report.md` / `analysis.md` 同生命周期——跨轮读取做增量合并，但不进版本历史、不进技能定义。
+> 这样项目本身与迭代隔离：过时的结论不会进入 git 历史，也不会作为持久权威常驻上下文。
+> 阶段 2 每轮按下方规则读取运行时数据文件做冻结快照与增量合并；若文件不存在则视为空库（合法状态，写明「当前无条目，待真实轮次证据写入」）。
+
+## 运行时数据位置
+
+- 条目表：`<repo>/.handoff/library/HARNESS_LIBRARY.md`（被 `.gitignore` 的 `.handoff/` 覆盖，不提交）
+- 首次使用：若该文件不存在，复制本模板的「条目表」表头到该路径创建空库，再按 id 写入条目。
+- 条目来自真实轮次的 deep 深挖与直接证据；无对照证据不得写入条目。本模板不预置任何具体条目。
 
 ## 条目字段
 
@@ -38,17 +45,13 @@
 
 ## 合并规则
 
-1. 合并前先读取当前条目表作为冻结快照；按 id 定位，同 id 只修订字段并追加「更新历史」，不新建副本。
+1. 合并前先读取运行时数据文件中当前条目表作为冻结快照；按 id 定位，同 id 只修订字段并追加「更新历史」，不新建副本。
 2. 按 id 增量合并去重：只写入本次涉及条目，其余条目原样保留，不重写整库；串行写入，避免并发冲突。
 3. 教训语义相同的条目合并到既有 id；跨 demo 复用前必须用当前证据重验。
 4. 失效条目改状态为「冻结」或「弃用」，不删除历史条目。
 5. `digest.json.suspected_gaming=true` 轮次的覆盖数据不进经验库，相关条目只能标「候选」或「弃用」；证据不足的观察不写条目。
 
-## 条目
+## 条目表（表头模板，运行时复制到 `.handoff/library/HARNESS_LIBRARY.md`）
 
 | id | 状态 | 可编辑面 | 适用条件 | 教训（动作→条件→后果） | 证据 | 置信度 | 可复用范围 | 来源轮次 | 更新历史 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| L1 | 采纳 | `src/runtime/game_bridge.cpp:2275` + `docs/wiki/modules/entry_runtime.md:165` | 新增 `GDCLASS` 派生运行时类 | 动作=定义并 `memnew`/`add_child` 新 awaiter；条件=`register_listener()` 注册块漏 `register_class`；后果=ClassDB 查类失败、异步回包不发、game op 超时 | Q2/S1 + `game_bridge.cpp:1286/1582/2268-2277` + 日志类名 + 构建/844 ctest | 高 | 跨 demo | 2026-11-20_03-28 | 2026-11-20: 新增（根因证实并实施） |
-| L2 | 采纳 | `devtools/commands/harness.ts:114` + `cli/tests/harness.test.ts:120` | `harness setup --project` 且 cwd≠目标工程 | 动作=setup 序列末步无参 `gda ping`；条件=cwd 回退仓库根而实例按 `--project` 注册；后果=定位失败 exit 2、编辑器被作业对象连带终止 | Q1/S2 + `harness.ts:114`/`target.ts:139`/`process.ts:82-96` + 21 CLI 单测 | 高 | 跨 demo | 2026-11-20_03-28 | 2026-11-20: 新增（根因证实并实施） |
-| L3 | 采纳 | `devtools/commands/harness.ts:168-181/198-253/287` + `docs/wiki/build.md:40` | `harness coverage --round` 统计 | 动作=全量 trace 导出取最小 `wall_end_ms` 当 `round_start_ms`；条件=trace 跨多会话；后果=起始时间落到最早历史轮、coverage/invalid 跨轮膨胀 | Q3/S3 + `harness.ts:192-197/226/255` + 74,215 条实测 + 2 新增单测 | 高 | 跨 demo | 2026-11-20_03-28 | 2026-11-20: 新增（根因证实并实施） |
-

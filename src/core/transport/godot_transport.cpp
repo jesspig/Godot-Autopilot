@@ -273,6 +273,10 @@ std::string GodotTransport::client_request_id_text(
   return internal_key;
 }
 
+void GodotTransport::set_inbound_rewrite(InboundRewrite rewrite) {
+  inbound_rewrite_ = std::move(rewrite);
+}
+
 bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
                             const std::string &connection_id,
                             std::string &error) {
@@ -282,6 +286,9 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
   }
   expire_stale_pending();
   mcp::JsonRpcMessage message = parsed.message;
+  if (inbound_rewrite_) {
+    inbound_rewrite_(message);
+  }
   std::string internal_key;
   if (parsed.is_request) {
     auto promise = std::make_shared<std::promise<mcp::JsonRpcMessage>>();

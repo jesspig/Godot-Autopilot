@@ -4,6 +4,7 @@
 #include "core/command_queue.hpp"
 #include <cstdint>
 #include <exception>
+#include <optional>
 #include <functional>
 #include <memory>
 #include <string>
@@ -110,6 +111,8 @@ mcp::JsonValue call_handler(const std::string &name,
 mcp::CallToolResult export_blocked_result();
 
 std::string export_blocked_error_text();
+
+std::optional<std::string> resolve_alias_canonical(const std::string &name);
 
 } // namespace dispatch
 } // namespace godot_autopilot
