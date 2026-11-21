@@ -43,6 +43,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <algorithm>
+#include <functional>
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
@@ -2084,11 +2085,16 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
 
   godot::String from_gs(from.c_str());
   godot::String to_gs(to.c_str());
+  const std::string old_source_name =
+      from.substr(from.find_last_of("/\\") == std::string::npos
+                      ? 0
+                      : from.find_last_of("/\\") + 1);
 
+  godot::Ref<godot::Resource> old_cached;
   if (loader && loader->has_cached(from_gs)) {
-    auto cached = loader->get_cached_ref(from_gs);
-    if (cached.is_valid()) {
-      cached->set_path(to_gs);
+    old_cached = loader->get_cached_ref(from_gs);
+    if (old_cached.is_valid()) {
+      old_cached->set_path(to_gs);
     }
   }
 
@@ -2102,7 +2108,46 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     if (efs) {
       efs->update_file(from_gs);
       efs->update_file(to_gs);
+      if (import_sidecar_present && import_err == godot::OK &&
+          !efs->is_importing()) {
+        godot::PackedStringArray files;
+        files.push_back(to_gs);
+        efs->reimport_files(files);
+      }
     }
+  }
+
+  godot::Ref<godot::Resource> reloaded;
+  if (loader && import_sidecar_present) {
+    reloaded = loader->load(to_gs, godot::String(),
+                            godot::ResourceLoader::CACHE_MODE_REPLACE);
+    if (reloaded.is_valid()) {
+      r["reloaded_resource"] = mcp::JsonValue(to);
+    } else {
+      r["reload_resource_warning"] = mcp::JsonValue(
+          "renamed imported resource " + to +
+          " could not be reloaded with CACHE_MODE_REPLACE; in-memory "
+          "instances may still reference the old path — run resource_reload "
+          "or reload the scene if property_get reports a stale load_path");
+    }
+  }
+
+  if (editor && !affected_open_scenes.empty()) {
+    const std::string active_before =
+        editor->get_edited_scene_root()
+            ? util::to_std(editor->get_edited_scene_root()->get_scene_file_path())
+            : std::string();
+    for (const std::string &scene_path : affected_open_scenes) {
+      editor->open_scene_from_path(godot::String(scene_path.c_str()));
+    }
+    if (!active_before.empty()) {
+      editor->open_scene_from_path(godot::String(active_before.c_str()));
+    }
+    mcp::JsonValue reopened(mcp::JsonValue::array_tag);
+    for (const std::string &scene_path : affected_open_scenes) {
+      reopened.PushBack(mcp::JsonValue(scene_path));
+    }
+    r["reloaded_open_scenes"] = std::move(reopened);
   }
 
   struct RemapRec {
@@ -2205,6 +2250,47 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   }
   r["saved_scenes"] = std::move(saved_arr);
   r["reloaded_scenes"] = std::move(reloaded_arr);
+
+  if (reloaded.is_valid() && old_cached.is_valid() && editor &&
+      !affected_open_scenes.empty()) {
+    int64_t rebound = 0;
+    const godot::String old_source_gs(old_source_name.c_str());
+    std::function<void(godot::Node *)> rebind_node_properties =
+        [&](godot::Node *node) {
+          if (node == nullptr) return;
+          godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+          for (int64_t i = 0; i < props.size(); i++) {
+            godot::Dictionary prop = props[i];
+            if (!prop.has("name")) continue;
+            const godot::StringName pname =
+                prop["name"].operator godot::StringName();
+            const godot::Variant current = node->get(pname);
+            if (current.get_type() != godot::Variant::OBJECT) continue;
+            godot::Object *held = current.operator godot::Object *();
+            if (held == nullptr) continue;
+            godot::Resource *held_res =
+                godot::Object::cast_to<godot::Resource>(held);
+            const godot::String held_path =
+                held_res != nullptr ? held_res->get_path() : godot::String();
+            const bool held_old =
+                held == old_cached.ptr() ||
+                (!held_path.is_empty() && held_path.contains(old_source_gs));
+            if (!held_old) continue;
+            node->set(pname, godot::Variant(reloaded.ptr()));
+            rebound++;
+          }
+          godot::Array children = node->get_children();
+          for (int64_t i = 0; i < children.size(); i++) {
+            rebind_node_properties(
+                godot::Object::cast_to<godot::Node>(children[i]));
+          }
+        };
+    godot::Node *root = editor->get_edited_scene_root();
+    if (root != nullptr) {
+      rebind_node_properties(root);
+    }
+    r["rebound_properties"] = mcp::JsonValue(rebound);
+  }
   return r;
 }
 
