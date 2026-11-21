@@ -188,6 +188,7 @@ TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("update_autoloads"), "writes_config");
   EXPECT_EQ(side_effect_of_tool("os_process"), "process");
   EXPECT_EQ(side_effect_of_tool("execute_script"), "code_execute");
+  EXPECT_EQ(side_effect_of_tool("run_gdscript_tests"), "code_execute");
   EXPECT_EQ(side_effect_of_tool("game_script"), "game_runtime");
   EXPECT_EQ(side_effect_of_tool("property_set"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("scene_camera"), "writes_scene");

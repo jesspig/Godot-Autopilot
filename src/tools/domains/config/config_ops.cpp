@@ -29,6 +29,8 @@ namespace config_ops {
 
 namespace {
 
+constexpr const char *kProtectedSettingPrefixes[] = {"autoload/"};
+
 mcp::JsonValue parse_enum_hint_options(const std::string &hint_string) {
   mcp::JsonValue options(mcp::JsonValue::array_tag);
   size_t start = 0;
@@ -227,6 +229,16 @@ mcp::JsonValue scan_autoload_refs(const std::string &autoload_name,
 
 } // namespace
 
+bool setting_key_is_protected(const std::string &key) {
+  for (const char *prefix : kProtectedSettingPrefixes) {
+    const std::string p(prefix);
+    if (key.size() >= p.size() && key.compare(0, p.size(), p) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_project_settings called");
@@ -279,6 +291,14 @@ mcp::JsonValue handle_project_settings_set(const mcp::JsonValue &args) {
     return e;
   }
   std::string name = np->GetString();
+  if (setting_key_is_protected(name)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "setting key '" + name +
+        "' is protected; use the dedicated tool for this setting (e.g. "
+        "update_autoloads for autoloads)");
+    return e;
+  }
   godot::Variant value;
   if (vp->IsObject()) {
     auto *type_field = vp->Find("type");

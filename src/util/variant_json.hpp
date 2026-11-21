@@ -6,6 +6,8 @@
 
 namespace godot_autopilot {
 
+bool node_ref_path_is_safe(const std::string &path);
+
 struct VariantJson {
   static mcp::JsonValue serialize(const godot::Variant &v);
   static godot::Variant deserialize(const mcp::JsonValue &j,

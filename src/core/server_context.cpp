@@ -253,13 +253,13 @@ bool ServerContext::start() {
                               "MCP server initializing: host=" + host_ +
                                   " port=" + std::to_string(port_));
 
-    {
-      ipc_token_ = api_token::generate_token();
-      if (ipc_token_.empty()) {
-        LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
-                                  "IPC token generation failed; IPC will be "
-                                  "disabled");
-      }
+    ipc_token_ = api_token::generate_token();
+    if (ipc_token_.empty()) {
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "IPC token generation failed; IPC will be "
+                                "disabled");
+    }
+    if (!ipc_token_.empty()) {
 #ifdef _WIN32
       std::string ipc_error;
       if (ipc_transport::ipc_transport_instance().listen_tcp(

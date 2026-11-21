@@ -9,6 +9,10 @@
 #include <utility>
 #include <vector>
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+
 #include "core/observability/log_system.hpp"
 #include "core/path_util.hpp"
 #include "core/storage/project_store.hpp"
@@ -39,6 +43,13 @@ bool write_registry_file(const std::string &path, const std::string &content) {
                                "Instance registry write failed: " + path);
     return false;
   }
+#ifndef _WIN32
+  if (::chmod(to_fs_path(path).c_str(), S_IRUSR | S_IWUSR) != 0) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::System,
+        "Instance registry permission hardening failed: " + path);
+  }
+#endif
   return true;
 }
 

@@ -9,6 +9,7 @@
 
 #include <mcp/JsonValue.hpp>
 
+#include "core/transport/api_token.hpp"
 #include "core/transport/ipc_framing.hpp"
 
 #ifdef _WIN32
@@ -187,7 +188,12 @@ std::size_t IpcTransport::connection_count() const {
 const IpcConnectionStats &IpcTransport::stats() const { return stats_; }
 
 bool IpcTransport::listen(const std::string &socket_path, std::string &error) {
-  return listen_unix(socket_path, std::string(), error);
+  const std::string generated = api_token::generate_token();
+  if (generated.empty()) {
+    error = "IPC token generation failed; refusing to listen";
+    return false;
+  }
+  return listen_unix(socket_path, generated, error);
 }
 
 bool IpcTransport::listen_unix(const std::string &socket_path,
@@ -197,6 +203,10 @@ bool IpcTransport::listen_unix(const std::string &socket_path,
     return false;
   }
   if (!ensure_sockets(error)) {
+    return false;
+  }
+  if (token.empty()) {
+    error = "IPC token is empty; refusing to listen";
     return false;
   }
   sockaddr_un address;
@@ -241,6 +251,10 @@ bool IpcTransport::listen_tcp(const std::string &host, int requested_port,
     return false;
   }
   if (!ensure_sockets(error)) {
+    return false;
+  }
+  if (token.empty()) {
+    error = "IPC token is empty; refusing to listen";
     return false;
   }
   sockaddr_in address;
@@ -334,7 +348,9 @@ void IpcTransport::queue_line(std::uint64_t connection_id, std::string text) {
 bool IpcTransport::authenticate(std::uint64_t connection_id,
                                 const std::string &frame) {
   if (token_.empty()) {
-    return true;
+    queue_line(connection_id,
+               error_frame("null", -32003, "IPC token unavailable"));
+    return false;
   }
   mcp::JsonValue doc;
   try {
@@ -370,7 +386,7 @@ bool IpcTransport::authenticate(std::uint64_t connection_id,
       }
     }
   }
-  if (presented != token_) {
+  if (!api_token::constant_time_equals(token_, presented)) {
     queue_line(connection_id,
                error_frame(id_text, -32001, "IPC token rejected"));
     return false;
