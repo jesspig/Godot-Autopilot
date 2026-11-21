@@ -43,6 +43,43 @@ std::string home_default_data_dir(const std::string &env_home,
 #endif
 }
 
+std::vector<std::string> default_home_candidates(
+    const std::string &env_home, const std::string &env_userprofile,
+    const std::string &env_appdata, const std::string &data_dir,
+    HomeResolver::HostPlatform platform) {
+  std::vector<std::string> candidates;
+  if (!env_home.empty()) {
+    candidates.push_back(env_home);
+  }
+  if (platform == HomeResolver::HostPlatform::kWindows &&
+      !env_userprofile.empty()) {
+    candidates.push_back(env_userprofile);
+  }
+  if (platform == HomeResolver::HostPlatform::kWindows &&
+      !env_appdata.empty()) {
+    candidates.push_back(parent_dir(env_appdata, 2));
+  }
+  if (platform == HomeResolver::HostPlatform::kPosix && !data_dir.empty()) {
+    candidates.push_back(parent_dir(data_dir, 2));
+  }
+  return candidates;
+}
+
+std::string pick_valid_candidate(
+    const std::vector<std::string> &candidates,
+    const HomeResolver::DirectoryProbe &probe) {
+  for (const std::string &candidate : candidates) {
+    if (!HomeResolver::validate_shape(candidate)) {
+      continue;
+    }
+    if (probe && !probe(candidate)) {
+      continue;
+    }
+    return candidate;
+  }
+  return std::string();
+}
+
 } // namespace
 
 HomeResolver::DataDirProvider &HomeResolver::data_dir_provider() {
@@ -101,43 +138,22 @@ std::string HomeResolver::resolve(const std::string &env_home,
                                   const std::string &data_dir,
                                   HostPlatform platform,
                                   const DirectoryProbe &probe) {
-  std::vector<std::string> candidates;
-  if (!env_home.empty()) {
-    candidates.push_back(env_home);
+  const std::vector<std::string> candidates = default_home_candidates(
+      env_home, env_userprofile, env_appdata, data_dir, platform);
+  return pick_valid_candidate(candidates, probe);
+}
+
+std::string HomeResolver::resolve_override(
+    const std::string &override_home,
+    const std::vector<std::string> &fallback_candidates,
+    const DirectoryProbe &probe) {
+  if (!override_home.empty() && validate_shape(override_home)) {
+    return override_home;
   }
-  if (platform == HostPlatform::kWindows && !env_userprofile.empty()) {
-    candidates.push_back(env_userprofile);
-  }
-  if (platform == HostPlatform::kWindows && !env_appdata.empty()) {
-    candidates.push_back(parent_dir(env_appdata, 2));
-  }
-  if (platform == HostPlatform::kPosix && !data_dir.empty()) {
-    candidates.push_back(parent_dir(data_dir, 2));
-  }
-  for (const std::string &candidate : candidates) {
-    if (!validate_shape(candidate)) {
-      continue;
-    }
-    if (probe && !probe(candidate)) {
-      continue;
-    }
-    return candidate;
-  }
-  return std::string();
+  return pick_valid_candidate(fallback_candidates, probe);
 }
 
 std::string HomeResolver::gda_home() {
-  const std::string override_home = read_home_env(kHomeOverrideEnv);
-  if (!override_home.empty()) {
-    if (!validate_shape(override_home)) {
-      LogSystem::instance().log(
-          LogLevel::Warning, LogCategory::System,
-          "GDA home override is not a usable directory path: " +
-              override_home);
-    }
-    return override_home;
-  }
-
   const std::string env_home = read_home_env(kHomeEnv);
   const std::string env_userprofile = read_home_env(kUserProfileEnv);
   const std::string env_appdata = read_home_env(kAppDataEnv);
@@ -145,9 +161,12 @@ std::string HomeResolver::gda_home() {
   const std::string data_dir =
       provider ? provider()
                : home_default_data_dir(env_home, env_appdata);
-
+  const std::vector<std::string> fallback_candidates = default_home_candidates(
+      env_home, env_userprofile, env_appdata, data_dir, current_platform());
+  const DirectoryProbe probe(&HomeResolver::validate_exists);
+  const std::string override_home = read_home_env(kHomeOverrideEnv);
   const std::string resolved =
-      resolve(env_home, env_userprofile, env_appdata, data_dir);
+      resolve_override(override_home, fallback_candidates, probe);
   if (resolved.empty()) {
     LogSystem::instance().log(LogLevel::Warning, LogCategory::System,
                                "Unable to resolve the GDA home directory");
