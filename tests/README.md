@@ -12,7 +12,7 @@
 - **回归属性**（跨载体）：各层基线断言承载——schema 基线、工具面动态枚举契约、错误全串契约、CLI wire 形状、skill 白名单；清单与更新 SOP 见 wiki「回归属性清单」小节。
 - **守卫与脚本项**（ctest 常驻）：源码守卫（注释 / 主线程契约 / 版本同步 / 迁移 / 源清单 / 工具域）+ 4 个守卫自测 + 2 个 CLI 脚本项（标签 `guard` / `cli`），全部零构建依赖（读源码断言）。
 
-真实引擎行为的端到端验证**不在仓库基建内**：由 `gda-e2e-testing` Agent 工作流在任意 Godot 工程场地自然发生（工具调用随实际操作驱动），问题经 `gda-e2e-analysis` 闭环分析。历史 L2 引擎轨（`gda_test_runner` / `tests/config/*.json` / `tests/testbed/` / 池化编排）已于 2026-11 删除，语义蒸馏落点见 wiki「引擎行为验收清单」。
+真实引擎行为的端到端验证**不在仓库基建内**：由 `gda-e2e-loop` Agent 闭环在固定沙盒或任意 Godot 工程场地自然发生（工具调用随真实开发操作驱动），串起测试—分析—授权修复，以覆盖全部 252 个 canonical 工具为硬验收。历史 L2 引擎轨（`gda_test_runner` / `tests/config/*.json` / `tests/testbed/` / 池化编排）已于 2026-11 删除，语义蒸馏落点见 wiki「引擎行为验收清单」。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 registry（`build_registry`，经 `refresh_derived` 派生 dispatch 映射）分发。
 
@@ -80,4 +80,4 @@ ctest 上除单元/集成层外的守卫与脚本项（源码守卫含 `no_pytho
 
 ## 7. 引擎行为验收
 
-真实编辑器行为的验收清单（原 48 份 L2 用例的语义蒸馏，按工具域组织、附 e2e 抽查建议）见 [docs/wiki/engine-behavior-checklist.md](../docs/wiki/engine-behavior-checklist.md)；迁移对照（源 JSON 步骤 ↔ 集成层 gtest 断言 ↔ 等价结论 ↔ 划回 e2e 项）见同页「A 类迁移对照表」。验收以 `gda-e2e-testing` 工作流在 example 场地执行，本仓库测试基建不承载引擎内断言。
+真实编辑器行为的验收清单（原 48 份 L2 用例的语义蒸馏，按工具域组织、附 e2e 抽查建议）见 [docs/wiki/engine-behavior-checklist.md](../docs/wiki/engine-behavior-checklist.md)；迁移对照（源 JSON 步骤 ↔ 集成层 gtest 断言 ↔ 等价结论 ↔ 划回 e2e 项）见同页「A 类迁移对照表」。验收以 `gda-e2e-loop` 闭环在 example 场地执行，本仓库测试基建不承载引擎内断言。
