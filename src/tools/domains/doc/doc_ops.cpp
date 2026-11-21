@@ -1,6 +1,7 @@
 #include "tools/domains/doc/doc_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -750,17 +751,13 @@ mcp::JsonValue handle_search(const mcp::JsonValue &args) {
     e["error"] = mcp::JsonValue("ClassDBSingleton not available");
     return e;
   }
-  std::string query_lower = query;
-  std::transform(query_lower.begin(), query_lower.end(), query_lower.begin(),
-                 ::tolower);
+  const std::string query_lower = util::ascii_lowercase(query);
   godot::PackedStringArray all_classes = cd->get_class_list();
   mcp::JsonValue results_arr(mcp::JsonValue::array_tag);
   int count = 0;
   for (int i = 0; i < all_classes.size() && count < 50; i++) {
     std::string name = util::to_std(all_classes[i]);
-    std::string name_lower = name;
-    std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(),
-                   ::tolower);
+    const std::string name_lower = util::ascii_lowercase(name);
     if (name_lower.find(query_lower) != std::string::npos) {
       mcp::JsonValue item(mcp::JsonValue::object_tag);
       item["name"] = mcp::JsonValue(name);

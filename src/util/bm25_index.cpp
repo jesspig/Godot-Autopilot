@@ -140,13 +140,26 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
   }
 
   if (query.text.empty()) {
-    if (!query.category) {
+    if (!query.category && !query.tags) {
       return {};
     }
     std::vector<Bm25Result> results;
     for (const auto &doc : docs_) {
-      if (doc.category != *query.category) {
+      if (query.category && doc.category != *query.category) {
         continue;
+      }
+      if (query.tags) {
+        bool all_found = true;
+        for (const auto &tag : *query.tags) {
+          if (std::find(doc.tags.begin(), doc.tags.end(), tag) ==
+              doc.tags.end()) {
+            all_found = false;
+            break;
+          }
+        }
+        if (!all_found) {
+          continue;
+        }
       }
       results.push_back({doc.name, 0.0});
     }
@@ -207,14 +220,12 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
 
   size_t N = candidates.size();
 
-  double avg_dl = 0.0;
-  for (const auto &d : docs_) {
-    avg_dl += static_cast<double>(d.tokens.size());
+  std::vector<size_t> candidate_lengths;
+  candidate_lengths.reserve(candidates.size());
+  for (size_t idx : candidates) {
+    candidate_lengths.push_back(docs_[idx].tokens.size());
   }
-  avg_dl /= static_cast<double>(docs_.size());
-  if (avg_dl == 0.0) {
-    avg_dl = 1.0;
-  }
+  const double avg_dl = bm25_average_document_length(candidate_lengths);
 
   auto compact = [](const std::string &source) {
     std::string out;

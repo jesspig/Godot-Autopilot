@@ -45,8 +45,15 @@ bool need_string(const mcp::JsonValue &args, const char *key,
 bool load_theme_or_error(const std::string &path,
                          godot::Ref<godot::Theme> &out_theme,
                          std::string &out_error) {
-  if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
-    out_error = "file does not exist: " + path +
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, true, false);
+  if (!checked.valid()) {
+    out_error = "invalid theme path: " + path + " — " + checked.error;
+    return false;
+  }
+  const std::string normalized_path = checked.value;
+  if (!godot::FileAccess::file_exists(godot::String(normalized_path.c_str()))) {
+    out_error = "file does not exist: " + normalized_path +
                 " — create it with create_theme_resource first";
     return false;
   }
@@ -55,17 +62,17 @@ bool load_theme_or_error(const std::string &path,
     out_error = "ResourceLoader not available";
     return false;
   }
-  godot::Ref<godot::Resource> res =
-      loader->load(godot::String(path.c_str()), godot::String("Theme"));
+  godot::Ref<godot::Resource> res = loader->load(
+      godot::String(normalized_path.c_str()), godot::String("Theme"));
   if (res.is_null()) {
-    out_error = "failed to load resource: " + path +
+    out_error = "failed to load resource: " + normalized_path +
                 " (file exists but failed to load — not a Theme .tres or not "
                 "imported)";
     return false;
   }
   auto *theme = godot::Object::cast_to<godot::Theme>(res.ptr());
   if (!theme) {
-    out_error = "resource is not a Theme: " + path + " (" +
+    out_error = "resource is not a Theme: " + normalized_path + " (" +
                 util::to_std(res->get_class()) + ")";
     return false;
   }

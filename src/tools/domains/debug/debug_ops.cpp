@@ -1,6 +1,7 @@
 #include "tools/domains/debug/debug_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_settings.hpp>
@@ -193,6 +194,13 @@ mcp::JsonValue handle_set_physics_fps(const mcp::JsonValue &args) {
   }
   int64_t fps =
       fp->IsDouble() ? static_cast<int64_t>(fp->GetDouble()) : fp->GetInt();
+  if (!util::physics_fps_is_valid(fps)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("invalid parameter: fps must be between " +
+                                std::to_string(util::kMinPhysicsFps) + " and " +
+                                std::to_string(util::kMaxPhysicsFps));
+    return e;
+  }
   auto *engine = godot::Engine::get_singleton();
   if (!engine) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);

@@ -2,6 +2,7 @@
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/project_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
@@ -473,6 +474,13 @@ mcp::JsonValue handle_engine_set_time_scale(const mcp::JsonValue &args) {
   }
   double scale =
       sp->IsDouble() ? sp->GetDouble() : static_cast<double>(sp->GetInt());
+  if (!util::time_scale_is_valid(scale)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "invalid parameter: scale must be a finite number between 0 and " +
+        std::to_string(util::kMaxTimeScale));
+    return e;
+  }
   engine->set_time_scale(scale);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
@@ -514,6 +522,13 @@ mcp::JsonValue handle_engine_set_max_fps(const mcp::JsonValue &args) {
     return e;
   }
   int64_t fps = fp->GetInt();
+  if (!util::max_fps_is_valid(fps)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("invalid parameter: fps must be between " +
+                                std::to_string(util::kMinMaxFps) + " and " +
+                                std::to_string(util::kMaxMaxFps));
+    return e;
+  }
   engine->set_max_fps(static_cast<int32_t>(fps));
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");

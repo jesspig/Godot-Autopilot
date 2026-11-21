@@ -10,6 +10,7 @@
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/json_godot.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
@@ -1968,8 +1969,8 @@ public:
     if (p_data.size() < 1)
       return true;
     std::string req_str = util::to_std(godot::String(p_data[0]));
-    JV request = JV::Parse(req_str);
-    if (!request.IsObject()) {
+    JV request(JV::object_tag);
+    if (!util::try_parse_json(req_str, request) || !request.IsObject()) {
       push_game_error("game_bridge.cpp", "on_gda_message", 0,
                       "malformed gda request", req_str.substr(0, 200), false,
                       {});
