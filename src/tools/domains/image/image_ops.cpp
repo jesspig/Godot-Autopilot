@@ -1,6 +1,7 @@
 #include "tools/domains/image/image_ops.hpp"
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/json_godot.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
@@ -472,8 +473,11 @@ bool resolve_image_locator(const mcp::JsonValue &value,
                text.rfind("user://", 0) == 0) {
       path = text;
     } else if (is_digits(text)) {
+      if (!util::parse_decimal_int64(text, object_id)) {
+        error = "invalid image locator: object_id is out of range";
+        return false;
+      }
       has_object_id = true;
-      object_id = std::stoll(text);
     } else if (!text.empty()) {
       name = text;
     }
@@ -518,8 +522,11 @@ bool resolve_image_locator(const mcp::JsonValue &value,
         error = invalid_param("image.object_id_str", "a decimal integer string");
         return false;
       }
+      if (!util::parse_decimal_int64(oid_str_p->GetString(), object_id)) {
+        error = "invalid image locator: object_id_str is out of range";
+        return false;
+      }
       has_object_id = true;
-      object_id = std::stoll(oid_str_p->GetString());
     }
   } else {
     error = "invalid image locator: expected a string or object";

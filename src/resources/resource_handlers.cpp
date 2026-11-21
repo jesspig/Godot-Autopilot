@@ -8,6 +8,7 @@
 #include "tools/base/dispatch.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <mcp/McpError.hpp>
 #include <ctime>
@@ -255,13 +256,6 @@ void dir_to_json(godot::EditorFileSystemDirectory *dir,
   }
 }
 
-godot::String to_godot_path(const std::string &path) {
-  if (path.find("res://") == 0) {
-    return godot::String(path.c_str());
-  }
-  return godot::String(("res://" + path).c_str());
-}
-
 const std::vector<skill_gen::SkillSpec> &embedded_skills() {
   static const std::vector<skill_gen::SkillSpec> skills =
       skill_gen::all_skills();
@@ -416,7 +410,11 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
       [&queue](const std::string &uri,
                const std::map<std::string, std::string> &vars)
           -> mcp::ReadResourceResult {
-        std::string path = vars.at("path");
+        std::string path;
+        if (!util::resource_template_value(vars, "path", path)) {
+          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+                              "missing template variable: path");
+        }
         if (godot_autopilot::ExportGuard::is_exporting()) {
           throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
@@ -523,7 +521,17 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
       [&queue](const std::string &uri,
                const std::map<std::string, std::string> &vars)
           -> mcp::ReadResourceResult {
-        std::string path = vars.at("path");
+        std::string path;
+        if (!util::resource_template_value(vars, "path", path)) {
+          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+                              "missing template variable: path");
+        }
+        std::string normalized_path;
+        if (!util::normalize_resource_uri_path(path, normalized_path)) {
+          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+                              "invalid template variable: path");
+        }
+        path = normalized_path;
         if (godot_autopilot::ExportGuard::is_exporting()) {
           throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
@@ -546,7 +554,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 return;
               }
 
-              godot::String gd_path = to_godot_path(path);
+              godot::String gd_path(path.c_str());
 
               auto *dir = fs->get_filesystem_path(gd_path);
               if (dir) {
@@ -645,7 +653,11 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
       [&queue](const std::string &uri,
                const std::map<std::string, std::string> &vars)
           -> mcp::ReadResourceResult {
-        std::string key = vars.at("key");
+        std::string key;
+        if (!util::resource_template_value(vars, "key", key)) {
+          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+                              "missing template variable: key");
+        }
         if (godot_autopilot::ExportGuard::is_exporting()) {
           throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }

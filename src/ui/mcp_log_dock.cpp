@@ -11,6 +11,7 @@
 #include "core/observability/monitor.hpp"
 #include "core/plugin_config.hpp"
 #include "core/observability/trace_recorder.hpp"
+#include "util/input_guards.hpp"
 
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -317,7 +318,8 @@ bool McpLogDock::_add_log_line(const LogEntry &entry, int count) {
   } else {
     text = entry.message.c_str();
   }
-  log_display->add_text(text);
+  const std::string escaped_text = util::escape_bbcode(text.utf8().get_data());
+  log_display->append_text(godot::String(escaped_text.c_str()));
   if (!entry.trace_id.empty()) {
     log_display->push_meta(godot::String(entry.trace_id.c_str()));
     log_display->add_text(" [trace]");
@@ -325,7 +327,9 @@ bool McpLogDock::_add_log_line(const LogEntry &entry, int count) {
   }
   log_display->newline();
   if (show_detail_ && !entry.detail.empty()) {
-    log_display->add_text(godot::String("    ") + entry.detail.c_str());
+    const std::string escaped_detail =
+        util::escape_bbcode(std::string("    ") + entry.detail);
+    log_display->append_text(godot::String(escaped_detail.c_str()));
     log_display->newline();
   }
   log_display->pop();
@@ -558,8 +562,9 @@ void McpLogDock::_rebuild_trace_view() {
       TraceRecorder::instance().query_by_trace(id);
   if (events.empty()) {
     _apply_entry_style(LogLevel::Warning);
-    log_display->add_text(godot::String("No trace events for ") +
-                          godot::String(id.c_str()));
+    const std::string escaped_id =
+        util::escape_bbcode(std::string("No trace events for ") + id);
+    log_display->append_text(godot::String(escaped_id.c_str()));
     log_display->newline();
     log_display->pop();
     _update_filter_counts();
@@ -588,7 +593,8 @@ void McpLogDock::_rebuild_trace_view() {
     }
     line += " ok=" + godot::String(event.ok ? "true" : "false");
 
-    log_display->add_text(line);
+    const std::string escaped_line = util::escape_bbcode(line.utf8().get_data());
+    log_display->append_text(godot::String(escaped_line.c_str()));
     log_display->newline();
     log_display->pop();
 

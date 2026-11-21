@@ -3,7 +3,9 @@
 
 #include <godot_cpp/classes/project_settings.hpp>
 #include "error_util.hpp"
+#include <filesystem>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace godot_autopilot {
@@ -82,6 +84,28 @@ inline bool project_path_equal_prefix(const std::string &path,
   return path.size() == root.size() || path[root.size()] == '/';
 }
 
+enum class ProjectPathResolveStatus { Inside, Outside, Unresolved };
+
+inline ProjectPathResolveStatus project_path_resolve_status(
+    const std::string &absolute_path, const std::string &absolute_root) {
+  std::error_code ec;
+  const std::filesystem::path canonical_root =
+      std::filesystem::weakly_canonical(std::filesystem::path(absolute_root), ec);
+  if (ec)
+    return ProjectPathResolveStatus::Unresolved;
+  const std::filesystem::path canonical_path = std::filesystem::weakly_canonical(
+      std::filesystem::path(absolute_path), ec);
+  if (ec)
+    return ProjectPathResolveStatus::Unresolved;
+  std::string root_str = project_path_slashes(canonical_root.generic_string());
+  const std::string path_str = project_path_slashes(canonical_path.generic_string());
+  while (root_str.size() > 1 && root_str.back() == '/')
+    root_str.pop_back();
+  return project_path_equal_prefix(path_str, root_str)
+             ? ProjectPathResolveStatus::Inside
+             : ProjectPathResolveStatus::Outside;
+}
+
 inline ProjectPath normalize_project_path(const std::string &raw,
                                           bool allow_user, bool allow_root) {
   const std::string input = project_path_slashes(raw);
@@ -101,6 +125,9 @@ inline ProjectPath normalize_project_path(const std::string &raw,
     if (absolute_escaped || absolute.empty() ||
         !project_path_equal_prefix(absolute, absolute_root))
       return {{}, "absolute path is outside the project root"};
+    if (project_path_resolve_status(absolute, absolute_root) ==
+        ProjectPathResolveStatus::Outside)
+      return {{}, "absolute path resolves outside the project root"};
     std::string relative = absolute.substr(absolute_root.size());
     if (!relative.empty() && relative[0] == '/')
       relative.erase(0, 1);

@@ -3,6 +3,7 @@
 #include "core/resource_registry.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/json_godot.hpp"
 #include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
@@ -523,8 +524,11 @@ bool mesh_resolve_resource_locator(const mcp::JsonValue &value,
     } else if (text.rfind("res://", 0) == 0) {
       path = text;
     } else if (mesh_is_digits(text)) {
+      if (!util::parse_decimal_int64(text, object_id)) {
+        error = "invalid locator: object_id is out of range";
+        return false;
+      }
       has_object_id = true;
-      object_id = std::stoll(text);
       name = text;
     } else if (!text.empty()) {
       name = text;
@@ -570,8 +574,11 @@ bool mesh_resolve_resource_locator(const mcp::JsonValue &value,
         error = mesh_invalid_param("object_id_str", "a decimal integer string");
         return false;
       }
+      if (!util::parse_decimal_int64(oid_str_p->GetString(), object_id)) {
+        error = mesh_invalid_param("object_id_str", "an in-range decimal integer");
+        return false;
+      }
       has_object_id = true;
-      object_id = std::stoll(oid_str_p->GetString());
     }
   } else {
     error = "invalid locator: expected a string or object";
@@ -898,8 +905,11 @@ MeshSessionState *mesh_find_session(const mcp::JsonValue &args,
     if (text.rfind("memory://", 0) == 0) {
       name = text.substr(9);
     } else if (mesh_is_digits(text)) {
+      if (!util::parse_decimal_int64(text, object_id)) {
+        error = "invalid session locator: object_id is out of range";
+        return nullptr;
+      }
       has_object_id = true;
-      object_id = std::stoll(text);
     } else if (!text.empty()) {
       name = text;
     }
@@ -937,8 +947,12 @@ MeshSessionState *mesh_find_session(const mcp::JsonValue &args,
                                    "a decimal integer string");
         return nullptr;
       }
+      if (!util::parse_decimal_int64(oid_str_p->GetString(), object_id)) {
+        error = mesh_invalid_param("session.object_id_str",
+                                   "an in-range decimal integer");
+        return nullptr;
+      }
       has_object_id = true;
-      object_id = std::stoll(oid_str_p->GetString());
     }
   } else {
     error = "invalid session locator: expected a string or object";
@@ -1018,7 +1032,10 @@ bool mesh_read_object_id_locator(const mcp::JsonValue &value, int64_t &out,
       error = mesh_invalid_param("node", "a decimal object_id string");
       return false;
     }
-    out = std::stoll(text);
+    if (!util::parse_decimal_int64(text, out)) {
+      error = mesh_invalid_param("node", "an in-range decimal object_id string");
+      return false;
+    }
     descriptor = "object_id=" + text;
     return true;
   }
@@ -1051,7 +1068,10 @@ bool mesh_read_object_id_locator(const mcp::JsonValue &value, int64_t &out,
     error = mesh_invalid_param("node", "object_id or object_id_str");
     return false;
   }
-  out = std::stoll(oid_str_p->GetString());
+  if (!util::parse_decimal_int64(oid_str_p->GetString(), out)) {
+    error = mesh_invalid_param("node", "an in-range object_id_str");
+    return false;
+  }
   descriptor = "object_id=" + std::to_string(out);
   return true;
 }

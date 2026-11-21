@@ -3,6 +3,7 @@
 #include "tools/domains/debugger/debugger_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/project_path.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <cctype>
@@ -536,18 +537,6 @@ mcp::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
   return r;
 }
 
-std::string normalize_res_dir(const std::string &dir) {
-  std::string d = dir;
-  if (d.rfind("res://", 0) != 0) {
-    while (!d.empty() && d.front() == '/')
-      d.erase(d.begin());
-    d = "res://" + d;
-  }
-  while (d.size() > 6 && d.back() == '/')
-    d.pop_back();
-  return d;
-}
-
 std::string join_dir_file(const std::string &dir, const std::string &name) {
   return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") +
          name;
@@ -647,7 +636,12 @@ mcp::JsonValue handle_run_gdscript_test_files(const mcp::JsonValue &args) {
   }
   int timeout_ms = parse_timeout_ms(args);
 
-  std::string dir_norm = normalize_res_dir(directory);
+  const util::ProjectPath checked_dir =
+      util::normalize_project_path(directory, false, true);
+  if (!checked_dir.valid()) {
+    return util::error_json("invalid directory: " + checked_dir.error);
+  }
+  const std::string dir_norm = checked_dir.value;
   if (!godot::DirAccess::dir_exists_absolute(
           godot::String(dir_norm.c_str()))) {
     return util::error_json("directory not found: " + dir_norm);
