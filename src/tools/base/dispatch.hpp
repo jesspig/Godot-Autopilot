@@ -105,6 +105,8 @@ mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &lab
 mcp::JsonValue resolve_deferred_wait(const std::string &name,
                                       mcp::JsonValue result);
 
+bool has_deferred_marker(const mcp::JsonValue &result);
+
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args);
 

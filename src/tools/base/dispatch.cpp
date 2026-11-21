@@ -114,15 +114,6 @@ std::string received_keys_suffix(const mcp::JsonValue &args) {
   return text;
 }
 
-bool has_deferred_marker(const mcp::JsonValue &result) {
-  if (!result.IsObject()) {
-    return false;
-  }
-  return result.Find("__gda_pending") != nullptr ||
-         result.Find("__gda_wait") != nullptr ||
-         result.Find("__gda_job") != nullptr;
-}
-
 void log_alias_hit(const ToolAlias &alias) {
   LogSystem::instance().log(
       LogLevel::Warning, LogCategory::Tools,
@@ -309,6 +300,15 @@ void emit_dispatch_timeout_observation(const std::string &name,
 }
 
 } // namespace
+
+bool has_deferred_marker(const mcp::JsonValue &result) {
+  if (!result.IsObject()) {
+    return false;
+  }
+  return result.Find("__gda_pending") != nullptr ||
+         result.Find("__gda_wait") != nullptr ||
+         result.Find("__gda_job") != nullptr;
+}
 
 std::optional<std::string> resolve_alias_canonical(const std::string &name) {
   auto registry = get_active_registry();
