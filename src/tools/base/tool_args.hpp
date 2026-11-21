@@ -42,6 +42,7 @@ public:
   int64_t get_int(const std::string &name, int64_t fallback) const;
   double get_number(const std::string &name, double fallback) const;
   bool get_bool(const std::string &name, bool fallback) const;
+  void validate_declared() const;
   void reject_unknown() const;
 
 private:

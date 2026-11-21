@@ -22,6 +22,7 @@
 #include <tools/base/runtime_ops.hpp>
 #include <tools/base/schema_builder.hpp>
 #include <tools/base/confirmation.hpp>
+#include <tools/base/tool_args.hpp>
 #include <tools/base/tool_base.hpp>
 #include <tools/base/tool_invoke.hpp>
 
@@ -318,6 +319,23 @@ inline bool finish_deferred_trace(const std::string &key,
   return true;
 }
 
+inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
+                                            const std::vector<ParamSpec> &params) {
+  mcp::JsonValue accepted(mcp::JsonValue::object_tag);
+  if (params.empty()) {
+    return accepted;
+  }
+  try {
+    Args declared(args, params);
+    declared.validate_declared();
+  } catch (const ToolArgError &ex) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue(ex.what());
+    return error;
+  }
+  return accepted;
+}
+
 } // namespace spec_detail
 
 namespace pipeline {
@@ -380,6 +398,13 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
       }
     }
     call_args = std::move(clean);
+  }
+  if ((spec_.flags & tool_flags::kDynamic) != 0) {
+    mcp::JsonValue validation =
+        spec_detail::validate_dynamic_args(call_args, spec_.params);
+    if (validation.Find("error") != nullptr) {
+      return validation;
+    }
   }
   mcp::JsonValue result = spec_.handler(call_args);
   result = pipeline::run_post(spec_, call_args, std::move(result));
