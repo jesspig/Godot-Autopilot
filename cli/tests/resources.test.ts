@@ -1,12 +1,14 @@
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { run as runPrompts } from "../src/commands/prompts";
 import { run as runResources } from "../src/commands/resources";
 import { CliError, ExitCode } from "../src/errors";
+import { pluginIndexPath } from "../src/instances";
 
 const servers: ReturnType<typeof Bun.serve>[] = [];
 
@@ -14,7 +16,103 @@ afterEach(() => {
   while (servers.length > 0) {
     servers.pop()!.stop();
   }
+  if (previousHome === undefined) delete process.env.GODOT_AUTOPILOT_HOME;
+  else process.env.GODOT_AUTOPILOT_HOME = previousHome;
+  if (tmpHome !== undefined) fs.rmSync(tmpHome, { recursive: true, force: true });
 });
+
+let tmpHome: string | undefined;
+let previousHome: string | undefined;
+
+beforeEach(() => {
+  const base = process.env.GDA_TEST_TMPDIR ?? path.join(process.cwd(), "build", "cli-test-tmp");
+  fs.mkdirSync(base, { recursive: true });
+  tmpHome = fs.mkdtempSync(path.join(base, "gda-resources-ipc-"));
+  previousHome = process.env.GODOT_AUTOPILOT_HOME;
+  process.env.GODOT_AUTOPILOT_HOME = tmpHome;
+});
+
+function writeIndexWithIpc(httpPort: number, ipcPort: number, token: string): void {
+  const file = pluginIndexPath();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    JSON.stringify([
+      {
+        instance_id: "gda-res-ipc",
+        port: httpPort,
+        pid: process.pid,
+        project_path: process.cwd(),
+        api_token: "token",
+        endpoints: {
+          mcp: { host: "127.0.0.1", port: httpPort, path: "/mcp", protocol: "mcp", auth: "none" },
+          ipc: {
+            kind: "tcp",
+            host: "127.0.0.1",
+            port: ipcPort,
+            token,
+            protocol: "mcp-jsonrpc",
+            framing: "length-prefixed-json",
+            auth: "token",
+            version: 1,
+          },
+        },
+        gda_home: tmpHome,
+        started_at: Date.now(),
+        version: "0.3.4",
+      },
+    ]),
+    "utf8",
+  );
+}
+
+function frame(value: unknown): Buffer {
+  const payload = Buffer.from(JSON.stringify(value), "utf8");
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(payload.length, 0);
+  return Buffer.concat([header, payload]);
+}
+
+function startIpcServer(
+  onRequest: (message: Record<string, unknown>) => Record<string, unknown>,
+): Promise<{ server: net.Server; port: number }> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer((socket) => {
+      let buffer = Buffer.alloc(0);
+      socket.on("data", (chunk: Buffer) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        while (buffer.length >= 4) {
+          const size = buffer.readUInt32BE(0);
+          if (buffer.length < 4 + size) break;
+          const text = buffer.subarray(4, 4 + size).toString("utf8");
+          buffer = buffer.subarray(4 + size);
+          const message = JSON.parse(text) as Record<string, unknown>;
+          socket.write(frame(onRequest(message)));
+        }
+      });
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+      resolve({ server, port });
+    });
+    server.once("error", reject);
+  });
+}
+
+function closeIpcServer(server: net.Server): Promise<void> {
+  return new Promise((resolve) => server.close(() => resolve()));
+}
+
+async function rejectWith(fn: () => Promise<number>): Promise<CliError> {
+  try {
+    await fn();
+  } catch (error) {
+    if (error instanceof CliError) return error;
+    throw error;
+  }
+  throw new Error("expected CliError but the command resolved");
+}
 
 function serve(handler: (req: Request) => Response | Promise<Response>): number {
   const server = Bun.serve({ port: 0, fetch: handler });
@@ -145,6 +243,42 @@ describe("gda resources", () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
+  test("非法 --transport 值报 usage 错误", async () => {
+    const error = await rejectWith(() =>
+      runResources(["list"], { portText: "9601", transportText: "bogus" }),
+    );
+    expect(error.code).toBe(ExitCode.Usage);
+    expect(error.message).toContain("--transport must be auto, ipc, or http");
+  });
+
+  test("IPC 鉴权失败不静默降级到无认证 HTTP", async () => {
+    const httpPort = serve(() => new Response("should not be reached", { status: 500 }));
+    const seen: string[] = [];
+    const presentedTokens: unknown[] = [];
+    const { server, port: ipcPort } = await startIpcServer((message) => {
+      seen.push(String(message.method));
+      if (message.method === "initialize") {
+        const meta = (message.params as Record<string, unknown> | undefined)?._meta as Record<string, unknown> | undefined;
+        presentedTokens.push(meta?.gda_token);
+        return { jsonrpc: "2.0", id: message.id, error: { code: -32001, message: "IPC token rejected" } };
+      }
+      return { jsonrpc: "2.0", id: message.id, result: { resources: [] } };
+    });
+    writeIndexWithIpc(httpPort, ipcPort, "correct-token");
+    try {
+      const error = await rejectWith(() =>
+        runResources(["list"], { transportText: "ipc", noFallback: false }),
+      );
+      expect(error.code).toBe(ExitCode.Transport);
+      expect(error.message).toContain("IPC authentication failed");
+      expect(error.suggestion).toContain("Refusing to fall back");
+      expect(presentedTokens).toEqual(["correct-token"]);
+      expect(seen).toEqual(["initialize"]);
+    } finally {
+      await closeIpcServer(server);
+    }
+  });
+
   test("未知 URI 返回工具失败", async () => {
     const { port } = recordingServer(() => sseError(-32602, "resource not found"));
     let caught: unknown;
@@ -199,5 +333,33 @@ describe("gda prompts", () => {
     }
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.ToolFailure);
+  });
+
+  test("IPC 鉴权失败不静默降级到无认证 HTTP", async () => {
+    const httpPort = serve(() => new Response("should not be reached", { status: 500 }));
+    const seen: string[] = [];
+    const presentedTokens: unknown[] = [];
+    const { server, port: ipcPort } = await startIpcServer((message) => {
+      seen.push(String(message.method));
+      if (message.method === "initialize") {
+        const meta = (message.params as Record<string, unknown> | undefined)?._meta as Record<string, unknown> | undefined;
+        presentedTokens.push(meta?.gda_token);
+        return { jsonrpc: "2.0", id: message.id, error: { code: -32002, message: "IPC initialize required" } };
+      }
+      return { jsonrpc: "2.0", id: message.id, result: { prompts: [] } };
+    });
+    writeIndexWithIpc(httpPort, ipcPort, "correct-token");
+    try {
+      const error = await rejectWith(() =>
+        runPrompts(["list"], { transportText: "ipc", noFallback: false }),
+      );
+      expect(error.code).toBe(ExitCode.Transport);
+      expect(error.message).toContain("IPC authentication failed");
+      expect(error.suggestion).toContain("Refusing to fall back");
+      expect(presentedTokens).toEqual(["correct-token"]);
+      expect(seen).toEqual(["initialize"]);
+    } finally {
+      await closeIpcServer(server);
+    }
   });
 });
