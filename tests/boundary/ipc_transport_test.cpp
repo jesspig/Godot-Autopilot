@@ -254,3 +254,57 @@ TEST(IpcTransportTest, RejectsWrongTokenAndAcceptsCorrectToken) {
   transport.stop();
   EXPECT_EQ(handled.load(), 1);
 }
+
+TEST(IpcTransportTest, RejectsEmptyTokenOnTcpListen) {
+  godot_autopilot::ipc_transport::IpcTransport transport;
+  std::string error;
+  EXPECT_FALSE(transport.listen_tcp("127.0.0.1", 0, "", error));
+  EXPECT_NE(error.find("token"), std::string::npos);
+  EXPECT_FALSE(transport.is_listening());
+}
+
+TEST(IpcTransportTest, RejectsEmptyTokenOnUnixListen) {
+  const fs::path path = short_socket("i-empty-token.sock");
+  godot_autopilot::ipc_transport::IpcTransport transport;
+  std::string error;
+  EXPECT_FALSE(transport.listen_unix(path.string(), "", error));
+  EXPECT_NE(error.find("token"), std::string::npos);
+  EXPECT_FALSE(transport.is_listening());
+}
+
+TEST(IpcTransportTest, RejectsMissingTokenInInitialize) {
+  godot_autopilot::ipc_transport::IpcTransport transport;
+  std::string error;
+  ASSERT_TRUE(transport.listen_tcp("127.0.0.1", 0, "real-token", error))
+      << error;
+  std::atomic<bool> running{true};
+  std::atomic<int> handled{0};
+  transport.set_line_handler([&](std::uint64_t connection_id,
+                                 const std::string &) {
+    handled.fetch_add(1);
+    transport.queue_line(connection_id,
+                         "{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{}}");
+  });
+  std::thread pump([&]() {
+    while (running.load()) {
+      transport.pump();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  });
+
+  const test_socket socket = connect_tcp(transport.port());
+  ASSERT_NE(socket, kInvalidTestSocket);
+  const std::string request =
+      godot_autopilot::ipc_framing::encode_length_prefixed(
+          "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"initialize\","
+          "\"params\":{}}");
+  ASSERT_TRUE(send_all(socket, request));
+  const std::string response = recv_frame(socket);
+  close_test_socket(socket);
+  EXPECT_NE(response.find("-32001"), std::string::npos) << response;
+
+  running.store(false);
+  pump.join();
+  transport.stop();
+  EXPECT_EQ(handled.load(), 0);
+}
