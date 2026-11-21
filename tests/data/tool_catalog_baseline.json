@@ -5408,9 +5408,9 @@
       "name": "run_gdscript_tests",
       "category": "Testing",
       "domain": "Testing",
-      "side_effect": "None",
+      "side_effect": "CodeExecute",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
       "param_count": 4,
       "has_action_schema": false,
