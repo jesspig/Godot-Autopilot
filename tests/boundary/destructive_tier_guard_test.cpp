@@ -4,12 +4,15 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
+#include "core/observability/log_system.hpp"
+#include "tools/base/dynamic_spec_store.hpp"
 #include "tools/base/register_all.hpp"
 #include "tools/base/side_effect_policy.hpp"
 #include "tools/base/tool_base.hpp"
 #include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <cstdlib>
 #include <string>
@@ -241,4 +244,54 @@ TEST(DestructiveTierGuardTest, TierCriteriaCoverEverySideEffect) {
   EXPECT_FALSE(std::string(side_effect_policy::kBoundaryDiskDeletion).empty());
   EXPECT_FALSE(std::string(side_effect_policy::kBoundaryHostObject).empty());
   EXPECT_FALSE(std::string(side_effect_policy::kBoundarySceneWrite).empty());
+}
+
+TEST(DestructiveTierGuardTest, RegistrationAuditsUndeclaredDestructiveTools) {
+  ensure_registry();
+  const size_t marker = godot_autopilot::LogSystem::instance().next_index();
+  {
+    godot_autopilot::ToolSpec suspect;
+    suspect.name = "wipe_all_records";
+    suspect.description = "Wipe all records permanently.";
+    suspect.category = "Test";
+    suspect.handler = [](const mcp::JsonValue &) {
+      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    };
+    std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
+    godot_autopilot::dynamic_specs::store().push_back(std::move(suspect));
+  }
+
+  auto pair = mcp::InMemoryTransport::CreatePair();
+  auto audit_server = mcp::McpServer::Create(pair.server);
+  godot_autopilot::register_all_tools(
+      *audit_server, queue_handle(), catalog_handle(), index_handle(), 9527);
+
+  {
+    std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
+    auto &specs = godot_autopilot::dynamic_specs::store();
+    specs.erase(std::remove_if(specs.begin(), specs.end(),
+                               [](const godot_autopilot::ToolSpec &spec) {
+                                 return spec.name == "wipe_all_records";
+                               }),
+                specs.end());
+  }
+  auto restore_pair = mcp::InMemoryTransport::CreatePair();
+  auto restore_server = mcp::McpServer::Create(restore_pair.server);
+  godot_autopilot::register_all_tools(
+      *restore_server, queue_handle(), catalog_handle(), index_handle(), 9527);
+
+  godot_autopilot::LogSystem::Query query;
+  query.min_level = godot_autopilot::LogLevel::Warning;
+  query.filter_text = "not declared destructive";
+  const auto entries = godot_autopilot::LogSystem::instance().query(query);
+  bool found = false;
+  for (const auto &entry : entries) {
+    if (entry.serial >= marker &&
+        entry.message.find("wipe_all_records") != std::string::npos) {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found) << "registration-period side_effect_policy audit did not "
+                        "flag the undeclared destruction-shaped tool";
 }
