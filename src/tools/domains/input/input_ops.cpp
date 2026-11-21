@@ -1,5 +1,6 @@
 #include "tools/domains/input/input_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "tools/domains/input_map/input_map_ops.hpp"
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
@@ -15,52 +16,7 @@ namespace input_ops {
 namespace {
 
 godot::Key parse_key(const std::string &key_str) {
-  if (key_str.empty())
-    return godot::KEY_NONE;
-
-  if (key_str.size() == 1) {
-    char c = key_str[0];
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-    if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
-      return static_cast<godot::Key>(c);
-    }
-  }
-
-  std::string u = key_str;
-  for (auto &c : u) {
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-  }
-
-  if (u == "SPACE")
-    return godot::KEY_SPACE;
-  if (u == "ENTER")
-    return godot::KEY_ENTER;
-  if (u == "ESCAPE")
-    return godot::KEY_ESCAPE;
-  if (u == "SHIFT")
-    return godot::KEY_SHIFT;
-  if (u == "CONTROL" || u == "CTRL")
-    return godot::KEY_CTRL;
-  if (u == "ALT")
-    return godot::KEY_ALT;
-  if (u == "TAB")
-    return godot::KEY_TAB;
-  if (u == "BACKSPACE")
-    return godot::KEY_BACKSPACE;
-  if (u == "DELETE")
-    return godot::KEY_DELETE;
-  if (u == "LEFT")
-    return godot::KEY_LEFT;
-  if (u == "RIGHT")
-    return godot::KEY_RIGHT;
-  if (u == "UP")
-    return godot::KEY_UP;
-  if (u == "DOWN")
-    return godot::KEY_DOWN;
-
-  return godot::KEY_NONE;
+  return input_map_ops::resolve_input_key(key_str);
 }
 
 godot::MouseButton parse_mouse_button(const std::string &button_str) {
