@@ -12,6 +12,10 @@
 #include <utility>
 #include <vector>
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+
 using godot_autopilot::InstanceRecord;
 using godot_autopilot::InstanceRegistry;
 
@@ -198,3 +202,28 @@ TEST(InstanceRegistryTest, WriteListRemoveRoundTrip) {
   unset_registry_env("GODOT_AUTOPILOT_HOME");
   std::filesystem::remove_all(base, ec);
 }
+
+#ifndef _WIN32
+TEST(InstanceRegistryTest, WrittenRegistryFileIsOwnerOnly) {
+  const std::filesystem::path base =
+      gda_test::test_temp_root() / "gda_instance_registry_perm_test";
+  std::error_code ec;
+  std::filesystem::remove_all(base, ec);
+  ASSERT_TRUE(std::filesystem::create_directories(base, ec));
+  ASSERT_FALSE(ec);
+
+  set_registry_env("GODOT_AUTOPILOT_HOME", base.u8string().c_str());
+  InstanceRecord record = sample_record();
+  record.instance_id = "instance-perm-test";
+  ASSERT_TRUE(InstanceRegistry::write(record));
+
+  const std::filesystem::path instance_file =
+      base / "instances" / "instance-perm-test.json";
+  struct stat info {};
+  ASSERT_EQ(::stat(instance_file.c_str(), &info), 0);
+  EXPECT_EQ(info.st_mode & 0777, 0600);
+
+  unset_registry_env("GODOT_AUTOPILOT_HOME");
+  std::filesystem::remove_all(base, ec);
+}
+#endif
