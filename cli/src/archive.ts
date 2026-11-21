@@ -87,17 +87,3 @@ export function writeTree(
   }
 }
 
-export async function downloadToFile(url: string, target: string, timeoutMs = 60_000): Promise<void> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) {
-      throw new CliError(ExitCode.Transport, `download failed with HTTP ${response.status}: ${url}`);
-    }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    await Bun.write(target, await response.arrayBuffer());
-  } finally {
-    clearTimeout(timer);
-  }
-}

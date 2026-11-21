@@ -22,10 +22,6 @@ export function resolvePath(p: string): string {
   return joinPath(process.cwd(), p);
 }
 
-export function readTextFile(path: string): string {
-  return fs.readFileSync(path, "utf8");
-}
-
 export function gdaHome(): string {
   const override = process.env.GODOT_AUTOPILOT_HOME;
   if (override !== undefined && override.trim() !== "") return resolvePath(override.trim());

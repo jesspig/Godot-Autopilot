@@ -95,26 +95,6 @@ void release(const std::string &connection_id) {
   }
 }
 
-bool send_to(const std::string &connection_id, const std::string &frame) {
-  if (connection_id.empty()) {
-    return false;
-  }
-  std::shared_ptr<Sink> sink;
-  {
-    std::lock_guard<std::mutex> lock(registry_mutex());
-    const auto found = registry().find(connection_id);
-    if (found == registry().end()) {
-      return false;
-    }
-    sink = found->second;
-  }
-  if (!sink) {
-    return false;
-  }
-  sink->push(frame);
-  return true;
-}
-
 size_t broadcast(const std::string &frame) {
   std::vector<std::shared_ptr<Sink>> sinks;
   {
@@ -144,11 +124,6 @@ size_t broadcast(const std::string &frame) {
             std::to_string(delivered) + " sink(s) accepted it)");
   }
   return delivered;
-}
-
-size_t active_count() {
-  std::lock_guard<std::mutex> lock(registry_mutex());
-  return registry().size();
 }
 
 } // namespace http_stream

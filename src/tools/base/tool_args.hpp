@@ -22,7 +22,6 @@ class Args {
 public:
   Args(const mcp::JsonValue &raw, const std::vector<schema::ParamDef> &params);
 
-  const mcp::JsonValue &raw() const;
   bool has(const std::string &name) const;
   bool is_null(const std::string &name) const;
   std::optional<std::string> opt_string(const std::string &name) const;

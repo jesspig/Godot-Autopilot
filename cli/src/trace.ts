@@ -48,13 +48,6 @@ export function makeTraceparent(traceId: string = newTraceId()): string {
   return `00-${traceId}-${newSpanId()}-01`;
 }
 
-export function traceIdFromTraceparent(value: string | undefined): string {
-  if (value === undefined) return "";
-  const parts = value.split("-");
-  if (parts.length !== 4 || parts[1].length !== 32) return "";
-  return /^[0-9a-f]+$/i.test(parts[1]) ? parts[1].toLowerCase() : "";
-}
-
 export function cliTraceDir(): string {
   return path.join(gdaRoot(), CLI_TRACE_DIR);
 }

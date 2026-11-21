@@ -150,23 +150,6 @@ bool mesh_read_optional_string(const mcp::JsonValue &args, const char *key,
   return true;
 }
 
-bool mesh_read_required_int(const mcp::JsonValue &args, const char *key,
-                            const std::string &action, int64_t &out,
-                            std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
-  if (value == nullptr) {
-    error = mesh_missing_param(action, key);
-    return false;
-  }
-  if (!value->IsNumber()) {
-    error = mesh_invalid_param(key, "a number");
-    return false;
-  }
-  out = value->IsInt() ? value->GetInt()
-                       : static_cast<int64_t>(value->GetDouble());
-  return true;
-}
-
 bool mesh_read_int_or(const mcp::JsonValue &args, const char *key,
                       int64_t fallback, int64_t &out, std::string &error) {
   const mcp::JsonValue *value = args.Find(key);

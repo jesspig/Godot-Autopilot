@@ -56,7 +56,6 @@ public:
 
   void refresh();
   void poll_new_entries();
-  void set_show_time(bool show);
   static godot::String format_hms(std::chrono::system_clock::time_point tp);
 
   void _notification(int p_what);

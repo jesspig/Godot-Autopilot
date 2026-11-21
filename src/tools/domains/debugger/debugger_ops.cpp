@@ -79,45 +79,6 @@ public:
       log_buffer_.erase(log_buffer_.begin());
   }
 
-  void add_error(int hr, int min, int sec, int msec,
-                 const std::string &source_file, const std::string &source_func,
-                 int source_line, const std::string &error,
-                 const std::string &error_descr, bool is_warning,
-                 const std::vector<std::string> &stack_files,
-                 const std::vector<std::string> &stack_funcs,
-                 const std::vector<int> &stack_lines) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    errors_.push_back({hr, min, sec, msec, source_file, source_func,
-                       source_line, error, error_descr, is_warning, stack_files,
-                       stack_funcs, stack_lines});
-    if (errors_.size() > MAX_ERRORS)
-      errors_.erase(errors_.begin());
-  }
-
-  void add_game_output(const std::string &text, int type) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    game_output_.push_back({text, type, now_ms()});
-    if (game_output_.size() > MAX_GAME_OUTPUT)
-      game_output_.erase(game_output_.begin());
-  }
-
-  void set_stack_dump(const std::vector<StackFrame> &frames) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    stack_ = frames;
-  }
-
-  void set_scene_tree_raw(const std::vector<std::string> &node_lines) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    scene_tree_lines_ = node_lines;
-  }
-
-  void add_monitor_frame(const std::vector<double> &values) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    monitors_.push_back({values, now_ms()});
-    if (monitors_.size() > MAX_MONITORS)
-      monitors_.erase(monitors_.begin());
-  }
-
   size_t stack_size() {
     std::lock_guard<std::mutex> lock(mtx_);
     return stack_.size();

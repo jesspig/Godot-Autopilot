@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { extractZip, downloadToFile } from "./archive";
+import { extractZip } from "./archive";
 import { cacheRoot, selectLatest, verifyManifest, cacheAssetPath } from "./cache";
 import { CliError, ExitCode } from "./errors";
 import { isAlive, stopForce } from "./process";

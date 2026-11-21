@@ -24,7 +24,6 @@ private:
 } // namespace detail
 
 using RuntimeError = detail::OwnedMessageException<std::runtime_error>;
-using InvalidArgument = detail::OwnedMessageException<std::invalid_argument>;
 
 } // namespace godot_autopilot
 
