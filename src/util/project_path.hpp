@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include "error_util.hpp"
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -86,6 +87,19 @@ inline bool project_path_equal_prefix(const std::string &path,
 
 enum class ProjectPathResolveStatus { Inside, Outside, Unresolved };
 
+inline bool containment_status_allows(ProjectPathResolveStatus status) {
+  return status == ProjectPathResolveStatus::Inside;
+}
+
+inline std::function<std::string(const std::string &)> &scheme_globalize_provider() {
+  static std::function<std::string(const std::string &)> provider;
+  return provider;
+}
+
+inline void set_scheme_globalize_provider(std::function<std::string(const std::string &)> provider) {
+  scheme_globalize_provider() = std::move(provider);
+}
+
 inline ProjectPathResolveStatus project_path_resolve_status(
     const std::string &absolute_path, const std::string &absolute_root) {
   std::error_code ec;
@@ -158,6 +172,17 @@ inline ProjectPath normalize_project_path(const std::string &raw,
     return {{}, "path escapes the namespace root"};
   if (clean.empty() && !allow_root)
     return {{}, "path must name an item below the namespace root"};
+
+  const auto &provider = scheme_globalize_provider();
+  if (provider && scheme == "res") {
+    const std::string absolute_root = project_path_slashes(provider("res://"));
+    const std::string scheme_path = scheme + "://" + clean;
+    const std::string absolute = project_path_slashes(provider(scheme_path));
+    if (!absolute_root.empty() && !absolute.empty() &&
+        !containment_status_allows(
+            project_path_resolve_status(absolute, absolute_root)))
+      return {{}, "path resolves outside the project root"};
+  }
   return {scheme + "://" + clean, {}};
 }
 
