@@ -802,15 +802,16 @@ static void register_surface_tool(
         [tool_name, registry, &queue, surface_tool](
             const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
             -> mcp::CallToolResult {
+            const std::string gda_request_key =
+                mcp_wire::request_id_key(ctx.GetRequest().id);
             const std::string gda_request_id =
-                godot_transport_instance()->client_request_id_text(
-                    mcp_wire::request_id_key(ctx.GetRequest().id));
-            monitor::RequestScope gda_request_scope(gda_request_id);
+                godot_transport_instance()->client_request_id_text(gda_request_key);
+            monitor::RequestScope gda_request_scope(gda_request_key);
             monitor::RequestRecord gda_request_record;
             std::string gda_request_trace;
             std::string gda_request_span;
-            if (!gda_request_id.empty() &&
-                monitor::registry().get(gda_request_id, &gda_request_record)) {
+            if (!gda_request_key.empty() &&
+                monitor::registry().get(gda_request_key, &gda_request_record)) {
                 gda_request_trace = gda_request_record.trace_id;
                 gda_request_span = gda_request_record.span_id;
             }
