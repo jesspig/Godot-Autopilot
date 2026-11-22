@@ -1,4 +1,5 @@
 #include "tools/domains/scene/scene_ops.hpp"
+#include "tools/domains/scene/reparent_undo_order.hpp"
 #include "tools/domains/scene/scene_spec_ops.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
@@ -1320,17 +1321,32 @@ mcp::JsonValue handle_reparent(const mcp::JsonValue &args) {
                                new_local_var);
     undo_redo->add_do_method(node, godot::StringName("set_owner"),
                              old_owner);
-    undo_redo->add_undo_method(old_parent, godot::StringName("move_child"),
-                               node, old_index);
-    if (transform_managed)
-      undo_redo->add_undo_method(node, godot::StringName("set_transform"),
-                                 old_local_var);
-    undo_redo->add_undo_method(node, godot::StringName("set_owner"),
-                               old_owner);
-    undo_redo->add_undo_method(old_parent, godot::StringName("add_child"),
-                               node);
-    undo_redo->add_undo_method(new_parent, godot::StringName("remove_child"),
-                               node);
+    for (ReparentUndoStep step : reparent_undo_order(transform_managed)) {
+      switch (step) {
+        case ReparentUndoStep::kDetachFromNewParent:
+          undo_redo->add_undo_method(new_parent,
+                                     godot::StringName("remove_child"), node);
+          break;
+        case ReparentUndoStep::kAttachToOldParent:
+          undo_redo->add_undo_method(old_parent,
+                                     godot::StringName("add_child"), node);
+          break;
+        case ReparentUndoStep::kMoveChildToOldIndex:
+          undo_redo->add_undo_method(old_parent,
+                                     godot::StringName("move_child"), node,
+                                     old_index);
+          break;
+        case ReparentUndoStep::kRestoreTransform:
+          undo_redo->add_undo_method(node, godot::StringName("set_transform"),
+                                     old_local_var);
+          break;
+        case ReparentUndoStep::kRestoreOwner:
+          undo_redo->add_undo_method(node, godot::StringName("set_owner"),
+                                     old_owner);
+          break;
+      }
+    }
+    undo_redo->add_undo_reference(node);
     undo_redo->commit_action();
   } else {
     old_parent->remove_child(node);
