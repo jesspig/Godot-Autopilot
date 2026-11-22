@@ -11,6 +11,12 @@ const TERMINATE_POLL_MS = 100;
 
 export type TerminationOutcome = "already-exited" | "terminated" | "failed";
 
+export function shouldStopByPid(pidAlive: boolean, endpointPort: number | null | undefined, endpointAlive: boolean | null): boolean {
+  if (!pidAlive) return false;
+  if (typeof endpointPort === "number" && endpointPort > 0 && endpointAlive === false) return false;
+  return true;
+}
+
 export function isAlive(pid: number): boolean {
   if (process.platform === "win32") {
     return windowsProcessExists(pid);

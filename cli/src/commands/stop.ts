@@ -1,8 +1,9 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
-import { isAlive, stopForce, stopGraceful } from "../process";
-import { findLiveByProject, loadRegistry, saveRegistry, type InstanceEntry } from "../registry";
+import { isAlive, shouldStopByPid, stopForce, stopGraceful } from "../process";
+import { cachedEndpointAlive } from "../probe";
+import { findLiveByProject, withRegistryLock, type InstanceEntry } from "../registry";
 import { assertSingleSelector, parseTargetPort } from "../target";
 import { readRawEntries, readRawEntry } from "./registry-raw";
 import { collectTaskStorePoisoning, stopFailureHint } from "./stop-diagnosis";
@@ -35,7 +36,11 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
   const entry = resolveTarget(positional, opts);
   const method = stopMethod(opts.force, entry.headless);
 
-  if (isAlive(entry.pid)) {
+  const endpointPort = entry.instancePort ?? entry.port ?? null;
+  const endpointAlive = typeof endpointPort === "number" && endpointPort > 0
+    ? cachedEndpointAlive(endpointPort)
+    : null;
+  if (shouldStopByPid(isAlive(entry.pid), endpointPort, endpointAlive)) {
     if (method === "force") {
       stopForce(entry.pid);
     } else {
@@ -111,9 +116,9 @@ function entryByPort(port: number): InstanceEntry | undefined {
 }
 
 export function removeFromRegistry(id: string): void {
-  const data = loadRegistry();
-  data.instances = data.instances.filter((e) => e.id !== id);
-  saveRegistry(data);
+  withRegistryLock((data) => {
+    data.instances = data.instances.filter((e) => e.id !== id);
+  });
 }
 
 export async function waitUntilDead(pid: number, waitSec: number): Promise<boolean> {

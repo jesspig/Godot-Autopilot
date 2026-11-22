@@ -16,6 +16,26 @@ import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 
+export function batchFailureEntry(index: number, tool: string, error: string): {
+  index: number;
+  tool: string;
+  ok: boolean;
+  display: unknown;
+  error?: string;
+} {
+  return {
+    index,
+    tool,
+    ok: false,
+    display: { error },
+    error,
+  };
+}
+
+export function batchExitCode(results: readonly { ok: boolean }[]): number {
+  return results.every((result) => result.ok) ? ExitCode.Success : ExitCode.ToolFailure;
+}
+
 interface BatchOperation {
   tool: string;
   args: Record<string, unknown>;
@@ -109,32 +129,37 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const timeoutSec = callTimeoutSec(opts);
   const session = await createBatchIpcSession(endpoint, timeoutSec * 1000);
   try {
-    const results: { index: number; tool: string; ok: boolean; display: unknown }[] = [];
+    const results: { index: number; tool: string; ok: boolean; display: unknown; error?: string }[] = [];
     for (let index = 0; index < operations.length; index += 1) {
       const operation = operations[index];
       const args: Record<string, unknown> = { ...operation.args };
       if (operation.confirm === true) {
         args.confirm = true;
       }
-      const envelope = await callTool(operation.tool, args, {
-        port: 0,
-        timeoutSec,
-        direct: META_DIRECT_TOOLS.has(operation.tool),
-        ipcEndpoint: endpoint,
-        transport: "ipc",
-        noFallback: true,
-        ipcSession: session,
-      });
-      const extracted = extractPayload(envelope, { raw: opts.raw });
-      results.push({
-        index,
-        tool: operation.tool,
-        ok: !extracted.toolFailed,
-        display: extracted.display,
-      });
+      try {
+        const envelope = await callTool(operation.tool, args, {
+          port: 0,
+          timeoutSec,
+          direct: META_DIRECT_TOOLS.has(operation.tool),
+          ipcEndpoint: endpoint,
+          transport: "ipc",
+          noFallback: true,
+          ipcSession: session,
+        });
+        const extracted = extractPayload(envelope, { raw: opts.raw });
+        results.push({
+          index,
+          tool: operation.tool,
+          ok: !extracted.toolFailed,
+          display: extracted.display,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        results.push(batchFailureEntry(index, operation.tool, message));
+      }
     }
     writeJson({ results }, opts);
-    return results.every((result) => result.ok) ? ExitCode.Success : ExitCode.ToolFailure;
+    return batchExitCode(results);
   } finally {
     closeBatchIpcSession(session);
   }
