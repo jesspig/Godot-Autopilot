@@ -145,31 +145,33 @@ TEST(InputValidationHardening, ThemeReadPathUsesProjectNormalizer) {
 
 TEST(InputValidationHardening, ProjectPathResolvesSymlinkContainment) {
   std::error_code ec;
-  const std::filesystem::path root =
+  const std::filesystem::path base =
       std::filesystem::temp_directory_path(ec) / "gda_path_guard_test";
   if (ec) {
     return;
   }
-  const std::filesystem::path inside = root / "inside";
-  const std::filesystem::path outside = root / "outside";
-  std::filesystem::create_directories(inside, ec);
+  const std::filesystem::path root = base / "root";
+  const std::filesystem::path outside = base / "outside";
+  std::filesystem::remove_all(base, ec);
+  std::filesystem::create_directories(root, ec);
   if (ec) {
     return;
   }
   std::filesystem::create_directories(outside, ec);
   if (ec) {
+    std::filesystem::remove_all(base, ec);
     return;
   }
   const std::filesystem::path link = root / "link_to_outside";
   std::filesystem::create_directory_symlink(outside, link, ec);
   if (ec) {
-    std::filesystem::remove_all(root, ec);
-    return;
+    std::filesystem::remove_all(base, ec);
+    GTEST_SKIP() << "symlink creation not permitted on this platform";
   }
 
   const std::string root_str = root.generic_string();
   EXPECT_EQ(godot_autopilot::util::project_path_resolve_status(
-                inside.generic_string(), root_str),
+                root.generic_string(), root_str),
             ProjectPathResolveStatus::Inside);
   EXPECT_EQ(godot_autopilot::util::project_path_resolve_status(
                 outside.generic_string(), root_str),
@@ -178,7 +180,7 @@ TEST(InputValidationHardening, ProjectPathResolvesSymlinkContainment) {
                 link.generic_string(), root_str),
             ProjectPathResolveStatus::Outside);
 
-  std::filesystem::remove_all(root, ec);
+  std::filesystem::remove_all(base, ec);
 }
 
 TEST(InputValidationHardening, Bm25EmptyTextHonorsTags) {

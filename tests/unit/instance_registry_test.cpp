@@ -219,8 +219,18 @@ TEST(InstanceRegistryTest, WrittenRegistryFileIsOwnerOnly) {
   record.instance_id = "instance-perm-test";
   ASSERT_TRUE(InstanceRegistry::write(record));
 
-  const std::filesystem::path instance_file =
-      base / "instances" / "instance-perm-test.json";
+  std::filesystem::path instance_file;
+  for (const auto &entry :
+       std::filesystem::recursive_directory_iterator(base, ec)) {
+    if (entry.is_regular_file() && entry.path().filename() ==
+                                       std::filesystem::path(
+                                           "instance-perm-test.json")) {
+      instance_file = entry.path();
+      break;
+    }
+  }
+  ASSERT_FALSE(instance_file.empty())
+      << "registry instance file was not written under GDA home";
   struct stat info {};
   ASSERT_EQ(::stat(instance_file.c_str(), &info), 0);
   EXPECT_EQ(info.st_mode & 0777, 0600);
