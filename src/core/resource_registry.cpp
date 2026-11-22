@@ -50,8 +50,39 @@ godot::Ref<godot::Resource> lookup_memory(const std::string &name) {
   return godot::Ref<godot::Resource>();
 }
 
+bool name_key_points_to(const std::string &key, int64_t instance_id,
+                        int64_t candidate_instance_id) {
+  const std::string prefix = "name:";
+  return key.size() > prefix.size() && key.compare(0, prefix.size(), prefix) == 0 &&
+         instance_id == candidate_instance_id;
+}
+
+std::vector<std::string> stale_name_keys(
+    const std::vector<std::pair<std::string, int64_t>> &entries,
+    int64_t object_id) {
+  std::vector<std::string> result;
+  for (const auto &entry : entries) {
+    if (name_key_points_to(entry.first, entry.second, object_id)) {
+      result.push_back(entry.first);
+    }
+  }
+  return result;
+}
+
 void erase_oid(int64_t object_id) {
   std::lock_guard<std::mutex> lock(g_cache_mutex);
+  std::vector<std::pair<std::string, int64_t>> entries;
+  entries.reserve(g_cache.size());
+  for (const auto &entry : g_cache) {
+    if (entry.second.is_null()) {
+      continue;
+    }
+    entries.emplace_back(entry.first,
+                         static_cast<int64_t>(entry.second->get_instance_id()));
+  }
+  for (const std::string &key : stale_name_keys(entries, object_id)) {
+    g_cache.erase(key);
+  }
   g_cache.erase(oid_key(object_id));
 }
 
