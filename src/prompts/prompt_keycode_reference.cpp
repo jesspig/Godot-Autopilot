@@ -5,7 +5,7 @@ namespace godot_autopilot {
 std::string prompt_keycode_reference() {
   return R"gda(# Godot 按键码与 Variant 类型参考
 
-本文档提供 `set_input_map_action_bundle` 的 `events` 所需的按键码（keycode）和 Godot Variant 类型在 JSON 中的表示方式。
+本文档提供 `set_input_map_action`（action=set）的 `events` 所需的按键码（keycode）和 Godot Variant 类型在 JSON 中的表示方式。
 
 ---
 
@@ -54,44 +54,64 @@ Godot 使用 `Key` 枚举，大部分特殊键的码值以 `4194304`（`KEY_SPEC
 | KEY_SPACE | 32 | 空格 |
 | KEY_ESCAPE | 4194305 | Esc |
 | KEY_TAB | 4194306 | Tab |
-| KEY_SHIFT | 4194307 | Shift |
-| KEY_ALT | 4194308 | Alt |
-| KEY_CONTROL | 4194309 | Ctrl |
-| KEY_BACKSPACE | 4194311 | Backspace |
-| KEY_ENTER | 4194312 | Enter/Return |
-| KEY_KP_ENTER | 4194313 | 小键盘 Enter |
-| KEY_DELETE | 4194315 | Delete |
-| KEY_HOME | 4194318 | Home |
-| KEY_END | 4194321 | End |
+| KEY_BACKTAB | 4194307 | Back Tab |
+| KEY_BACKSPACE | 4194308 | Backspace |
+| KEY_ENTER | 4194309 | Enter/Return |
+| KEY_KP_ENTER | 4194310 | 小键盘 Enter |
+| KEY_INSERT | 4194311 | Insert |
+| KEY_DELETE | 4194312 | Delete |
+| KEY_PAUSE | 4194313 | Pause |
+| KEY_PRINT | 4194314 | Print Screen |
+| KEY_SYSREQ | 4194315 | SysReq |
+| KEY_CLEAR | 4194316 | Clear |
+| KEY_HOME | 4194317 | Home |
+| KEY_END | 4194318 | End |
+| KEY_LEFT | 4194319 | ← 方向键 |
+| KEY_UP | 4194320 | ↑ 方向键 |
+| KEY_RIGHT | 4194321 | → 方向键 |
+| KEY_DOWN | 4194322 | ↓ 方向键 |
 | KEY_PAGEUP | 4194323 | Page Up |
-| KEY_PAGEDOWN | 4194325 | Page Down |
-| KEY_UP | 4194326 | ↑ 方向键 |
-| KEY_DOWN | 4194327 | ↓ 方向键 |
-| KEY_LEFT | 4194328 | ← 方向键 |
-| KEY_RIGHT | 4194329 | → 方向键 |
-| KEY_CAPSLOCK | 4194334 | Caps Lock |
-| KEY_F1 | 4194385 | F1 |
-| KEY_F2 | 4194386 | F2 |
-| KEY_F3 | 4194387 | F3 |
-| KEY_F4 | 4194388 | F4 |
-| KEY_F5 | 4194389 | F5 |
-| KEY_F6 | 4194390 | F6 |
-| KEY_F7 | 4194391 | F7 |
-| KEY_F8 | 4194392 | F8 |
-| KEY_F9 | 4194393 | F9 |
-| KEY_F10 | 4194394 | F10 |
-| KEY_F11 | 4194395 | F11 |
-| KEY_F12 | 4194396 | F12 |
-| KEY_SHIFT | 4194307 | 左/右 Shift |
-| KEY_CTRL | 4194309 | 左/右 Ctrl |
-| KEY_META | 4194310 | Windows/Cmd 键 |
-| KEY_QUOTELEFT | 4194347 | 反引号 ` |
+| KEY_PAGEDOWN | 4194324 | Page Down |
+| KEY_SHIFT | 4194325 | Shift |
+| KEY_CTRL | 4194326 | Ctrl |
+| KEY_META | 4194327 | Windows/Cmd 键 |
+| KEY_ALT | 4194328 | Alt |
+| KEY_CAPSLOCK | 4194329 | Caps Lock |
+| KEY_NUMLOCK | 4194330 | Num Lock |
+| KEY_SCROLLLOCK | 4194331 | Scroll Lock |
+| KEY_F1 | 4194332 | F1 |
+| KEY_F2 | 4194333 | F2 |
+| KEY_F3 | 4194334 | F3 |
+| KEY_F4 | 4194335 | F4 |
+| KEY_F5 | 4194336 | F5 |
+| KEY_F6 | 4194337 | F6 |
+| KEY_F7 | 4194338 | F7 |
+| KEY_F8 | 4194339 | F8 |
+| KEY_F9 | 4194340 | F9 |
+| KEY_F10 | 4194341 | F10 |
+| KEY_F11 | 4194342 | F11 |
+| KEY_F12 | 4194343 | F12 |
+| KEY_KP_MULTIPLY | 4194433 | 小键盘 * |
+| KEY_KP_DIVIDE | 4194434 | 小键盘 / |
+| KEY_KP_SUBTRACT | 4194435 | 小键盘 - |
+| KEY_KP_PERIOD | 4194436 | 小键盘 . |
+| KEY_KP_ADD | 4194437 | 小键盘 + |
+| KEY_KP_0 | 4194438 | 小键盘 0 |
+| KEY_KP_1 | 4194439 | 小键盘 1 |
+| KEY_KP_2 | 4194440 | 小键盘 2 |
+| KEY_KP_3 | 4194441 | 小键盘 3 |
+| KEY_KP_4 | 4194442 | 小键盘 4 |
+| KEY_KP_5 | 4194443 | 小键盘 5 |
+| KEY_KP_6 | 4194444 | 小键盘 6 |
+| KEY_KP_7 | 4194445 | 小键盘 7 |
+| KEY_KP_8 | 4194446 | 小键盘 8 |
+| KEY_KP_9 | 4194447 | 小键盘 9 |
 
 ---
 
 ## 三、`event` 参数结构
 
-`set_input_map_action_bundle` 的 `events` 数组元素必须是包含 `"class"` 字段的 JSON 对象。
+`set_input_map_action`（action=set）的 `events` 数组元素必须是包含 `"class"` 字段的 JSON 对象。
 
 ### InputEventKey（键盘事件）
 
