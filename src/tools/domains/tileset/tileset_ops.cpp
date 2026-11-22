@@ -1,3 +1,4 @@
+#include "util/project_path.hpp"
 #include "tools/domains/tileset/tileset_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"
@@ -129,7 +130,13 @@ JV handle_add_atlas_source(const JV &args) {
   if (tileset->has_source(source_id))
     return util::error_json("source_id already exists: " + std::to_string(source_id));
 
-  godot::String tex_path = godot::String(tex->GetString().c_str());
+  const auto checked_tex = util::normalize_project_path(tex->GetString(), false, false);
+  if (!checked_tex.error.empty())
+    return util::error_detail("path rejected: " + checked_tex.error,
+                              "source_id " + std::to_string(source_id),
+                              "an in-project res:// texture path",
+                              "provide a valid texture path and retry");
+  godot::String tex_path = godot::String(checked_tex.value.c_str());
   if (!godot::FileAccess::file_exists(tex_path)) {
     return util::error_detail("failed to load texture: file does not exist: " +
                                   tex->GetString(),

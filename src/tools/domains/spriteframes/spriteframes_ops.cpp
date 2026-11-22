@@ -1,3 +1,4 @@
+#include "util/project_path.hpp"
 #include "tools/domains/spriteframes/spriteframes_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
@@ -174,7 +175,11 @@ JV handle_add_frame(const JV &args) {
   if (sf.is_null())
     return util::error_json(resolve_err);
 
-  godot::String tex_path(texture.c_str());
+  const auto checked_tex = util::normalize_project_path(texture, false, false);
+  if (!checked_tex.error.empty())
+    return util::error_detail("path rejected", texture,
+                              "an in-project res:// file path", checked_tex.error);
+  godot::String tex_path(checked_tex.value.c_str());
   if (!godot::FileAccess::file_exists(tex_path))
     return util::error_detail("file does not exist", texture,
                               "an existing file path",
