@@ -1,5 +1,6 @@
 #include "tools/domains/editor/editor_ops.hpp"
 #include "tools/domains/editor/editor_ui_ops.hpp"
+#include "tools/domains/editor/save_write_receipt.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
@@ -62,6 +63,24 @@
 #include <vector>
 
 namespace godot_autopilot {
+namespace editor_ops_detail {
+
+FileStamp file_stamp(const std::string &path) {
+  FileStamp stamp;
+  if (path.empty()) return stamp;
+  const godot::String gs(path.c_str());
+  if (!godot::FileAccess::file_exists(gs)) return stamp;
+  godot::Ref<godot::FileAccess> file = godot::FileAccess::open(gs, godot::FileAccess::READ);
+  if (file.is_null()) return stamp;
+  stamp.exists = true;
+  stamp.modified_ns = static_cast<uint64_t>(godot::FileAccess::get_modified_time(gs));
+  const int64_t len = file->get_length();
+  stamp.size_bytes = len > 0 ? len : 0;
+  return stamp;
+}
+
+} // namespace editor_ops_detail
+
 namespace editor_ops {
 
 namespace {
@@ -625,13 +644,17 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
       LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                                 "scene has no file path, saving as " +
                                     generated_path);
+      const editor_ops_detail::FileStamp before =
+          editor_ops_detail::file_stamp(generated_path);
       editor->save_scene_as(godot::String(generated_path.c_str()));
-      if (!godot::FileAccess::file_exists(
-              godot::String(generated_path.c_str()))) {
+      const editor_ops_detail::FileStamp after =
+          editor_ops_detail::file_stamp(generated_path);
+      if (editor_ops_detail::decide_write_outcome(before, after) ==
+          editor_ops_detail::WriteOutcome::kUnverifiable) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] =
             mcp::JsonValue("failed to save scene to \"" + generated_path +
-                           "\": no file was created after save_scene_as — use "
+                           "\": the write could not be confirmed — use "
                            "save_editor_scene_as with an explicit path");
         LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
                                   "save_editor_scene failed to save as " +
@@ -1536,10 +1559,14 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
       }
     }
   }
+  const editor_ops_detail::FileStamp before = editor_ops_detail::file_stamp(path);
   editor->save_scene_as(path_gs);
-  if (!godot::FileAccess::file_exists(path_gs)) {
-    return util::error_json("save failed — file not created at " + path +
-                      " (check editor output log)");
+  const editor_ops_detail::FileStamp after = editor_ops_detail::file_stamp(path);
+  if (editor_ops_detail::decide_write_outcome(before, after) ==
+      editor_ops_detail::WriteOutcome::kUnverifiable) {
+    return util::error_json(
+        "save could not be confirmed — the target file is unchanged or unavailable: " +
+        path + "; the current tab and unsaved state were preserved");
   }
   bool tab_path_registered = false;
   godot::PackedStringArray open_scenes = editor->get_open_scenes();
