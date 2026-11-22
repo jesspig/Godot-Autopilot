@@ -107,4 +107,29 @@ describe("cache manifests", () => {
     expect(result.removed).toHaveLength(1);
     expect(result.bytesAfter).toBeLessThanOrEqual(100);
   });
+
+  test("installer-written cli manifest is discoverable by self-update", () => {
+    const installerManifest: CacheManifest = {
+      artifact: "cli",
+      version: "0.3.4",
+      source: "github",
+      asset: "gda-0.3.4-linux-x64.tar.gz",
+      sha256: "b".repeat(64),
+      size: 123,
+      platform: "linux-x64",
+      lang: "",
+      fetched_at: "2026-11-23T00:00:00Z",
+      builtin: false,
+    };
+    writeManifest(installerManifest);
+    expect(listManifests().some((m) => m.artifact === "cli" && m.version === "0.3.4")).toBe(true);
+    expect(selectLatest("cli", undefined, "linux-x64")?.version).toBe("0.3.4");
+    expect(selectLatest("cli", undefined, "windows-x64")?.version).toBeUndefined();
+  });
+
+  test("cli candidates filtered by platform; higher wrong-platform version does not win", () => {
+    writeManifest(manifest({ artifact: "cli", version: "0.3.1", platform: "linux-x64" }));
+    writeManifest(manifest({ artifact: "cli", version: "0.9.0", platform: "windows-x64" }));
+    expect(selectLatest("cli", undefined, "linux-x64")?.version).toBe("0.3.1");
+  });
 });

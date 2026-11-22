@@ -3,6 +3,7 @@ import path from "node:path";
 
 import {
   BRIDGE_DIR,
+  BRIDGE_SOURCES,
   PLATFORM_LIBS,
   PLATFORM_PDB,
   addonDir,
@@ -12,7 +13,6 @@ import {
 } from "../lib/config";
 import { errorMessage } from "../lib/cmake";
 import { GDEXTENSION_NAME, generateGdextension, libraries } from "../lib/gdextension";
-import { cleanTargets } from "./clean";
 
 const RES_PREFIX = "res://";
 
@@ -129,6 +129,20 @@ export function deployArtifacts(preset: string, projects: readonly string[]): nu
   return 0;
 }
 
+export function missingDeployArtifacts(binaryDir: string, platform: string): string[] {
+  const libName = PLATFORM_LIBS[platform];
+  if (libName === undefined) return ["unsupported platform: " + platform];
+  const missing: string[] = [];
+  if (!fs.existsSync(path.join(binaryDir, libName))) missing.push(libName);
+  if (platform === "windows" && !fs.existsSync(path.join(binaryDir, PLATFORM_PDB))) {
+    missing.push(PLATFORM_PDB);
+  }
+  for (const name of BRIDGE_SOURCES) {
+    if (!fs.existsSync(path.join(BRIDGE_DIR, name))) missing.push(name);
+  }
+  return missing;
+}
+
 export async function runDeploy(options: DeployOptions): Promise<number> {
   if (options.release && options.debug) {
     console.log("[ERROR] Cannot specify both --release and --debug");
@@ -142,7 +156,13 @@ export async function runDeploy(options: DeployOptions): Promise<number> {
     return 1;
   }
   const preset = options.release ? "release" : "debug";
-  if (options.release) cleanTargets(projects);
+  const binaryDir = artifactDir(preset);
+  const missing = missingDeployArtifacts(binaryDir, hostPlatform());
+  if (missing.length > 0) {
+    console.log(`[ERROR] Deployment aborted; missing artifacts: ${missing.join(", ")}`);
+    console.log("[ERROR] Existing addons were left untouched.");
+    return 1;
+  }
   console.log(`\n[DEPLOY] Copying ${preset} artifacts to ${projects.length} project(s)...`);
   const code = deployArtifacts(preset, projects);
   if (code !== 0) return code;

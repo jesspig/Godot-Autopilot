@@ -16,6 +16,10 @@ import { writeJson } from "./json-output";
 
 type Source = "auto" | "online" | "cache" | "builtin" | "offline";
 
+export function shouldStopRunningForInstall(archiveReady: boolean): boolean {
+  return archiveReady;
+}
+
 function parseSource(text: string | undefined): Source {
   if (text === undefined) return "auto";
   if (text === "auto" || text === "online" || text === "cache" || text === "builtin") {
@@ -162,9 +166,6 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
   const running = readPluginInstanceIndex().filter(
     (record) => record.projectPath === project && record.pid !== null && isAlive(record.pid),
   );
-  for (const record of running) {
-    if (record.pid !== null) stopForce(record.pid);
-  }
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "plugin-install-"));
   try {
     let zip: string | undefined;
@@ -207,6 +208,11 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
     );
     if (sourceDir === undefined) {
       throw new CliError(ExitCode.Transport, "the plugin archive does not contain godot-autopilot.gdextension.");
+    }
+    if (shouldStopRunningForInstall(sourceDir !== undefined)) {
+      for (const record of running) {
+        if (record.pid !== null) stopForce(record.pid);
+      }
     }
     const backup = `${target}.old-${Date.now()}`;
     if (fs.existsSync(target)) {
