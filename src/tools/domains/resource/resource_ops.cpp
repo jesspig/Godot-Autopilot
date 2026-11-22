@@ -1016,8 +1016,14 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
     }
   }
   if (err == godot::OK && has_oid) {
-    resource_registry::erase_oid(obj_id);
+    const std::vector<std::string> preserved_names =
+        resource_registry::erase_oid_and_extract_names(obj_id);
     resource_registry::register_resource(res, name);
+    for (const std::string &alias : preserved_names) {
+      if (alias.rfind("name:", 0) == 0 && alias.substr(5) != name) {
+        resource_registry::register_resource(res, alias.substr(5));
+      }
+    }
   }
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
