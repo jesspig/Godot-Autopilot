@@ -231,9 +231,10 @@ mcp::JsonValue scan_autoload_refs(const std::string &autoload_name,
 } // namespace
 
 bool setting_key_is_protected(const std::string &key) {
+  const std::string lowered = util::ascii_lowercase(key);
   for (const char *prefix : kProtectedSettingPrefixes) {
     const std::string p(prefix);
-    if (key.size() >= p.size() && key.compare(0, p.size(), p) == 0) {
+    if (lowered.size() >= p.size() && lowered.compare(0, p.size(), p) == 0) {
       return true;
     }
   }
