@@ -2,7 +2,7 @@ import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
 import { isAlive, stopForce, stopGraceful } from "../process";
-import { findLiveByProject, loadRegistry, saveRegistry, type InstanceEntry } from "../registry";
+import { findLiveByProject, withRegistryLock, type InstanceEntry } from "../registry";
 import { assertSingleSelector, parseTargetPort } from "../target";
 import { readRawEntries, readRawEntry } from "./registry-raw";
 import { collectTaskStorePoisoning, stopFailureHint } from "./stop-diagnosis";
@@ -111,9 +111,9 @@ function entryByPort(port: number): InstanceEntry | undefined {
 }
 
 export function removeFromRegistry(id: string): void {
-  const data = loadRegistry();
-  data.instances = data.instances.filter((e) => e.id !== id);
-  saveRegistry(data);
+  withRegistryLock((data) => {
+    data.instances = data.instances.filter((e) => e.id !== id);
+  });
 }
 
 export async function waitUntilDead(pid: number, waitSec: number): Promise<boolean> {
