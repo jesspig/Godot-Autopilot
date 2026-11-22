@@ -1,4 +1,5 @@
 #include "tools/domains/resource/resource_ops.hpp"
+#include "tools/domains/resource/reimport_validation.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
@@ -73,6 +74,26 @@ mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("EditorFileSystem not available");
     return e;
+  }
+
+  const bool has_files = args.Contains("files");
+  const auto *it_files_raw = args.Find("files");
+  const bool files_is_array = it_files_raw != nullptr && it_files_raw->IsArray();
+  std::size_t string_count = 0;
+  if (files_is_array) {
+    for (const auto &f : it_files_raw->GetArray()) {
+      if (f.IsString()) string_count++;
+    }
+  }
+  const auto *it_path_raw = args.Find("path");
+  resource_ops_detail::ReimportCounts counts;
+  counts.has_files = has_files;
+  counts.files_is_array = files_is_array;
+  counts.string_count = string_count;
+  counts.path_is_string = it_path_raw != nullptr && it_path_raw->IsString();
+  if (!resource_ops_detail::validate_reimport_counts(counts, 256)) {
+    return util::error_json(
+        "import requires a non-empty 'files' string array (max 256) or a string 'path'");
   }
 
   int count = 0;
