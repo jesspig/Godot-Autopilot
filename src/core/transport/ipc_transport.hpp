@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include "core/transport/ipc_framing.hpp"
+
 namespace godot_autopilot {
 namespace ipc_transport {
 
@@ -18,7 +20,7 @@ constexpr std::size_t kMaxIpcConnections = 8;
 constexpr std::size_t kMaxIpcInFlight = 16;
 constexpr std::size_t kMaxIpcAcceptsPerFrame = 8;
 constexpr std::size_t kMaxIpcReadPerConnectionPerFrame = 32768;
-constexpr std::size_t kMaxIpcConnectionBuffer = 4 * 1024 * 1024;
+constexpr std::size_t kMaxIpcConnectionBuffer = ipc_framing::max_wire_buffer_bytes();
 constexpr std::chrono::minutes kIpcIdleTimeout{10};
 
 #ifdef _WIN32

@@ -9,6 +9,11 @@ namespace godot_autopilot {
 namespace ipc_framing {
 
 constexpr std::size_t kMaxFrameBytes = 4 * 1024 * 1024;
+constexpr std::size_t kLengthPrefixBytes = 4;
+
+inline constexpr std::size_t max_wire_buffer_bytes() {
+  return kMaxFrameBytes + kLengthPrefixBytes;
+}
 
 struct ExtractedFrames {
   std::vector<std::string> frames;
