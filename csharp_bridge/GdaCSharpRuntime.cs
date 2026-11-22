@@ -18,6 +18,19 @@ public partial class GdaCSharpRuntime : Node
         GetNode(BridgeNodeName).SetMeta("bridge", _bridge);
     }
 
+    public override void _ExitTree()
+    {
+        if (_bridge != null)
+        {
+            _bridge.unsubscribeAll();
+        }
+        Node holder = GetNodeOrNull(BridgeNodeName);
+        if (holder != null && holder.HasMeta("bridge"))
+        {
+            holder.RemoveMeta("bridge");
+        }
+    }
+
     public GdaCSharpBridge GetBridge()
     {
         return _bridge;
