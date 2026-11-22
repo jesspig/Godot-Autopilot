@@ -1,5 +1,7 @@
 #include "util/project_path.hpp"
 #include "tools/domains/tileset/tileset_ops.hpp"
+#include "tools/domains/spriteframes/grid_budget.hpp"
+#include "tools/domains/tileset/collision_validation.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"
 #include "core/observability/log_system.hpp"
@@ -165,6 +167,11 @@ JV handle_add_atlas_source(const JV &args) {
   if (src.is_null())
     return util::error_json("instantiated object is not a TileSetAtlasSource");
 
+  const int grid_x = compute_grid(texture->get_width(), tile_size.x, margin, spacing);
+  const int grid_y =
+      compute_grid(texture->get_height(), tile_size.y, margin, spacing);
+  if (grid_detail::grid_frame_count(grid_x, grid_y) < 0)
+    return util::error_json("texture grid exceeds the tile count limit; increase tile_size");
   src->set_texture(texture);
   src->set_texture_region_size(tile_size);
   src->set_margins(godot::Vector2i(margin, margin));
@@ -172,9 +179,6 @@ JV handle_add_atlas_source(const JV &args) {
 
   int32_t actual_id = tileset->add_source(src, source_id);
 
-  int grid_x = compute_grid(texture->get_width(), tile_size.x, margin, spacing);
-  int grid_y =
-      compute_grid(texture->get_height(), tile_size.y, margin, spacing);
   int created_tiles = 0;
   for (int y = 0; y < grid_y; ++y) {
     for (int x = 0; x < grid_x; ++x) {
@@ -278,6 +282,20 @@ JV handle_set_tile_collision(const JV &args) {
     return util::error_json("source " + std::to_string(source_id) +
                  " is not a TileSetAtlasSource");
 
+  const int physics_layer = static_cast<int>(pl->GetInt());
+  if (!tileset_detail::physics_layer_valid(physics_layer,
+                                           tileset->get_physics_layers_count())) {
+    std::string atlas_pos = "atlas_coords " + std::to_string(coords.x) + "," +
+                             std::to_string(coords.y) + " (source " +
+                             std::to_string(source_id) + ")";
+    return util::error_detail(
+        "TileSet '" + n->GetString() + "' has no physics layer " +
+            std::to_string(physics_layer),
+        atlas_pos,
+        "a physics layer must exist before setting collision polygons",
+        "call add_tilemap_physics_layer first, then retry");
+  }
+
   if (!src->has_tile(coords)) {
     src->create_tile(coords);
   }
@@ -292,18 +310,6 @@ JV handle_set_tile_collision(const JV &args) {
     return util::error_json("failed to get tile data at " + pos);
   }
 
-  int physics_layer = static_cast<int>(pl->GetInt());
-  if (physics_layer >= tileset->get_physics_layers_count()) {
-    std::string atlas_pos = "atlas_coords " + std::to_string(coords.x) + "," +
-                            std::to_string(coords.y) + " (source " +
-                            std::to_string(source_id) + ")";
-    return util::error_detail(
-        "TileSet '" + n->GetString() + "' has no physics layer " +
-            std::to_string(physics_layer),
-        atlas_pos,
-        "a physics layer must exist before setting collision polygons",
-        "call add_tilemap_physics_layer first, then retry");
-  }
   const auto &poly_arr = poly->GetArray();
 
   std::vector<godot::PackedVector2Array> polygons;
