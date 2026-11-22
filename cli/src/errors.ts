@@ -16,6 +16,26 @@ export class CliError extends Error {
   }
 }
 
+export function markIpcRequestSent(error: CliError): CliError {
+  (error as CliError & { ipcRequestSent?: boolean }).ipcRequestSent = true;
+  return error;
+}
+
+export function isIpcRequestSent(error: unknown): boolean {
+  return error instanceof CliError &&
+    (error as CliError & { ipcRequestSent?: boolean }).ipcRequestSent === true;
+}
+
+export function markIpcAuthRejected(error: CliError): CliError {
+  (error as CliError & { ipcAuthRejected?: boolean }).ipcAuthRejected = true;
+  return error;
+}
+
+export function isIpcAuthRejected(error: unknown): boolean {
+  return error instanceof CliError &&
+    (error as CliError & { ipcAuthRejected?: boolean }).ipcAuthRejected === true;
+}
+
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
