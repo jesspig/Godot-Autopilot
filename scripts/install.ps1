@@ -233,12 +233,21 @@ if (-not $bin) { throw "no gda binary in $unpack" }
 New-Item -ItemType Directory -Force -Path $Prefix | Out-Null
 $target = Join-Path $Prefix "gda.exe"
 $tmp = "$target.new-$PID"
+$old = ""
 Copy-Item -Force $bin.FullName $tmp
 if (Test-Path $target) {
   $old = "$target.old-$(Get-Date -UFormat %s)"
   Move-Item -Force $target $old
 }
-Move-Item -Force $tmp $target
+try {
+  Move-Item -Force $tmp $target -ErrorAction Stop
+} catch {
+  if ($old -ne "" -and (Test-Path $old)) {
+    Move-Item -Force $old $target -ErrorAction SilentlyContinue
+  }
+  Remove-Item -Force $tmp -ErrorAction SilentlyContinue
+  throw "failed to install new binary; previous version was restored"
+}
 
 if (-not $NoPath) {
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")

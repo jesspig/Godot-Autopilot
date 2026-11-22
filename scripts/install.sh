@@ -332,12 +332,20 @@ case "$EXT" in
   *) TARGET="$PREFIX/gda" ;;
 esac
 TMP="${TARGET}.new-$$"
+BACKUP=""
 run cp "$BIN" "$TMP"
 run chmod +x "$TMP"
 if [ -f "$TARGET" ]; then
-  run mv "$TARGET" "${TARGET}.old-$(date +%s)"
+  BACKUP="${TARGET}.old-$(date +%s)"
+  run mv "$TARGET" "$BACKUP"
 fi
-run mv "$TMP" "$TARGET"
+if ! mv "$TMP" "$TARGET"; then
+  if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
+    mv "$BACKUP" "$TARGET" || true
+  fi
+  rm -f "$TMP"
+  fail "failed to install new binary; previous version was restored"
+fi
 
 if [ "$NO_PATH" -eq 0 ]; then
   case ":$PATH:" in
