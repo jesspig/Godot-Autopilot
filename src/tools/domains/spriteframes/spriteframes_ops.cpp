@@ -1,5 +1,6 @@
 #include "util/project_path.hpp"
 #include "tools/domains/spriteframes/spriteframes_ops.hpp"
+#include "tools/domains/spriteframes/grid_budget.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -169,6 +170,8 @@ JV handle_add_frame(const JV &args) {
     return util::error_json("invalid parameter: vframes must be a positive integer");
   if (vframes < 1)
     return util::error_json("invalid parameter: vframes must be a positive integer");
+  if (grid_detail::grid_frame_count(hframes, vframes) < 0)
+    return util::error_json("invalid parameters: hframes*vframes exceeds the grid limit");
 
   std::string resolve_err;
   godot::Ref<godot::SpriteFrames> sf = resolve_spriteframes(name, resolve_err);
