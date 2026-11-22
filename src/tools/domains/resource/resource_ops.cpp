@@ -1,4 +1,5 @@
 #include "tools/domains/resource/resource_ops.hpp"
+#include "tools/domains/resource/sidecar_transaction.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
@@ -1822,6 +1823,12 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
         godot::String(to_import_path.c_str()));
   }
 
+  std::vector<resource_ops_detail::SidecarMove> sidecar_moves;
+  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kUid,
+                           !uid_sidecar_absent && uid_err == godot::OK});
+  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kImport,
+                           import_sidecar_present && import_err == godot::OK});
+
   ResourceScanBudget scan_budget;
   bool scan_truncated = false;
   std::vector<std::string> text_files;
@@ -1897,8 +1904,18 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   godot::Error err = godot::DirAccess::rename_absolute(
       godot::String(from.c_str()), godot::String(to.c_str()));
   if (err != godot::OK) {
+    for (resource_ops_detail::SidecarKind kind :
+         resource_ops_detail::rollback_order(sidecar_moves)) {
+      const std::string &moved_from =
+          kind == resource_ops_detail::SidecarKind::kUid ? from_uid_path : from_import_path;
+      const std::string &moved_to =
+          kind == resource_ops_detail::SidecarKind::kUid ? to_uid_path : to_import_path;
+      godot::DirAccess::rename_absolute(godot::String(moved_to.c_str()),
+                                        godot::String(moved_from.c_str()));
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    r["error"] = mcp::JsonValue("rename failed; sidecars were restored");
     return r;
   }
 
