@@ -2,7 +2,7 @@ import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { request } from "../mcp/client";
 import { err } from "../output";
-import { callTimeoutSec } from "../payload";
+import { callTimeoutSec, taskResultFailed } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type TargetContext } from "../target";
 import {
@@ -96,7 +96,11 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       }
       if (isTerminalStatus(status)) {
         writeJson(result, opts);
-        return status === "completed" ? ExitCode.Success : ExitCode.ToolFailure;
+        if (status === "completed") {
+          const taskResult = (result as { result?: unknown } | null)?.result;
+          return taskResultFailed(taskResult) ? ExitCode.ToolFailure : ExitCode.Success;
+        }
+        return ExitCode.ToolFailure;
       }
       if (Date.now() >= deadline) {
         throw new CliError(ExitCode.Transport, `task ${id} did not finish before the timeout (last status: ${status || "unknown"}).`);

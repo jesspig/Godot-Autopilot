@@ -227,6 +227,24 @@ export function extractPayload(envelope: JsonRpcResponse, opts: ExtractOptions =
   return { display, toolFailed };
 }
 
+export function taskResultFailed(result: unknown): boolean {
+  if (result === null || typeof result !== "object" || Array.isArray(result)) return false;
+  const record = result as { isError?: unknown; content?: unknown };
+  if (record.isError === true) return true;
+  if (!Array.isArray(record.content)) return false;
+  for (const item of record.content) {
+    if (item === null || typeof item !== "object") continue;
+    const part = item as { type?: unknown; text?: unknown };
+    if (part.type !== "text" || typeof part.text !== "string") continue;
+    try {
+      const parsed = JSON.parse(part.text);
+      if (hasInnerError(parsed)) return true;
+    } catch {
+    }
+  }
+  return false;
+}
+
 export function assertCallFamilyUsage(command: string, opts: GlobalOptions): void {
   if (command !== "search" && command !== "tools" && (opts.category !== undefined || opts.tagsText !== undefined)) {
     throw new CliError(ExitCode.Usage, "--category and --tags apply to the search and tools list commands.");
