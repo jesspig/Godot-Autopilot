@@ -1,4 +1,5 @@
 #include "tools/domains/audio/audio_ops.hpp"
+#include "util/project_path.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -539,7 +540,11 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
   }
   auto *sp = args.Find("stream_path");
   if (sp && sp->IsString()) {
-    godot::String stream_path(sp->GetString().c_str());
+    const auto checked = util::normalize_project_path(sp->GetString(), false, false);
+    if (!checked.error.empty())
+      return util::error_detail("path rejected", sp->GetString(),
+                                "an in-project res:// file path", checked.error);
+    godot::String stream_path(checked.value.c_str());
     if (!godot::FileAccess::file_exists(stream_path))
       return util::error_detail("file does not exist", sp->GetString(),
                                 "an existing file path",

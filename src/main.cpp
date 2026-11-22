@@ -13,6 +13,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
@@ -20,6 +21,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
+#include "util/project_path.hpp"
 #include "core/transport/ipc_transport.hpp"
 #include "core/editor_readiness.hpp"
 #include "core/export_guard.hpp"
@@ -203,6 +205,13 @@ void GodotAutopilotPlugin::_enter_tree() {
       return std::string();
     }
     return std::string(os->get_data_dir().utf8().get_data());
+  });
+  godot_autopilot::util::set_scheme_globalize_provider([](const std::string &p) {
+    auto *settings = godot::ProjectSettings::get_singleton();
+    if (!settings) {
+      return std::string();
+    }
+    return std::string(settings->globalize_path(godot::String(p.c_str())).utf8().get_data());
   });
   try {
     auto *engine = godot::Engine::get_singleton();

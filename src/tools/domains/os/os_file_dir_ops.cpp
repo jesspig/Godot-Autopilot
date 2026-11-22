@@ -1,4 +1,5 @@
 #include "tools/domains/os/os_file_dir_ops.hpp"
+#include "tools/domains/os/trash_confirm.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/path_util.hpp"
 #include "tools/domains/os/os_ops.hpp"
@@ -289,6 +290,15 @@ JV handle_os_file_write(const JV &args) {
     return handle_ensure_directory(strip_file_action(args));
   }
   if (action == "trash") {
+    const JV *confirm = args.Find("confirm");
+    const bool confirmed = confirm != nullptr && confirm->IsBool() && confirm->GetBool();
+    if (os_ops_detail::trash_needs_confirm(action, confirmed)) {
+      JV e(JV::object_tag);
+      e["error"] = JV("trash removes a file from its original location; retry with confirm=true");
+      e["code"] = JV("confirmation_required");
+      e["confirm_required"] = JV(true);
+      return e;
+    }
     return os_ops::handle_os_move_to_trash(strip_file_action(args));
   }
   return file_action_error(
