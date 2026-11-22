@@ -418,6 +418,28 @@ JV handle_os_execute(const JV &args) {
   return marker;
 }
 
+int64_t start_csharp_build(const godot::String &path,
+                           const godot::PackedStringArray &build_args) {
+  auto *os = godot::OS::get_singleton();
+  if (os == nullptr) return -1;
+  godot::Dictionary pipes = os->execute_with_pipe(path, build_args, false);
+  if (!pipes.has("pid")) return -1;
+  auto state = std::make_shared<OsProcessState>();
+  state->pid = static_cast<int64_t>(pipes["pid"]);
+  state->capture_output = true;
+  state->started_ms = steady_now_ms();
+  if (pipes.has("stdio"))
+    state->stdout_pipe = godot::Ref<godot::FileAccess>(pipes["stdio"]);
+  if (pipes.has("stderr"))
+    state->stderr_pipe = godot::Ref<godot::FileAccess>(pipes["stderr"]);
+  const int64_t op_id = g_process_seq.fetch_add(1);
+  {
+    std::lock_guard<std::mutex> lock(g_process_mutex);
+    g_process_states[op_id] = state;
+  }
+  return op_id;
+}
+
 JV wait_os_process(int64_t op_id, int64_t timeout_ms) {
   if (!runtime_ops::has_editor_queue()) {
     return util::error_json(

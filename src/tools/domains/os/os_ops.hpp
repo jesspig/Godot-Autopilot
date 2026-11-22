@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <mcp/JsonValue.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
+#include <godot_cpp/variant/string.hpp>
 
 namespace godot_autopilot {
 namespace os_ops {
@@ -35,6 +37,8 @@ mcp::JsonValue handle_os_move_to_trash(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_set_environment(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_shell_open(const mcp::JsonValue &args);
 mcp::JsonValue wait_os_process(int64_t wait_id, int64_t timeout_ms);
+int64_t start_csharp_build(const godot::String &path,
+                           const godot::PackedStringArray &build_args);
 
 } // namespace os_ops
 } // namespace godot_autopilot
