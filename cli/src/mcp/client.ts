@@ -1,5 +1,5 @@
 import { CLI_VERSION } from "../version";
-import { CliError, ExitCode } from "../errors";
+import { CliError, ExitCode, isIpcRequestSent, markIpcAuthRejected } from "../errors";
 import { IpcSession, type IpcEndpoint } from "../ipc/client";
 
 export interface JsonRpcResponse {
@@ -424,14 +424,17 @@ export async function request(
     }
     if (ipcResponse !== undefined) {
       if (ipcResponse.error !== undefined && IPC_TOKEN_ERROR_CODES.has(ipcResponse.error.code)) {
-        throw new CliError(
+        throw markIpcAuthRejected(new CliError(
           ExitCode.Transport,
           `IPC authentication failed: ${ipcResponse.error.message ?? "token rejected"} (code ${ipcResponse.error.code}).`,
           "Refusing to fall back to unauthenticated HTTP; check the IPC token from the instance registry.",
-        );
+        ));
       }
       opts.transportSink?.("ipc");
       return ipcResponse;
+    }
+    if (isIpcRequestSent(ipcError)) {
+      throw ipcError;
     }
     if (transportMode === "ipc" || opts.noFallback === true) {
       throw ipcError;

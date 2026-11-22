@@ -277,9 +277,11 @@ uint64_t perf(const std::string &name, const std::string &attrs, int64_t bytes) 
 RequestRecord begin_request(const std::string &request_id,
                             const std::string &method,
                             const std::string &params_digest,
-                            const std::string &traceparent) {
+                            const std::string &traceparent,
+                            const std::string &client_request_id) {
   RequestRecord record;
   record.request_id = request_id;
+  record.client_request_id = client_request_id;
   record.method = method;
   record.correlation_id = traceparent;
   const std::string parent_trace = parse_traceparent_trace_id(traceparent);

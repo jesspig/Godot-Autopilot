@@ -23,6 +23,7 @@ std::string request_id_text(const mcp::RequestId &id);
 
 struct RequestRecord {
   std::string request_id;
+  std::string client_request_id;
   std::string trace_id;
   std::string span_id;
   std::string correlation_id;
@@ -65,7 +66,8 @@ uint64_t perf(const std::string &name, const std::string &attrs, int64_t bytes =
 
 RequestRecord begin_request(const std::string &request_id, const std::string &method,
                             const std::string &params_digest,
-                            const std::string &traceparent);
+                            const std::string &traceparent,
+                            const std::string &client_request_id = std::string());
 void end_request(const std::string &request_id, bool ok,
                  const std::string &error_code, int64_t result_size);
 void note_protocol_error(const std::string &request_id, int64_t code,

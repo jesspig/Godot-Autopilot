@@ -483,7 +483,7 @@ void IpcTransport::service_connections() {
     }
     const ipc_framing::ExtractedFrames frames =
         ipc_framing::extract_length_prefixed(connection.buffer,
-                                             kMaxIpcConnectionBuffer);
+                                             ipc_framing::kMaxFrameBytes);
     connection.buffer = frames.remainder;
     if (frames.overflow) {
       close_connection(connection);

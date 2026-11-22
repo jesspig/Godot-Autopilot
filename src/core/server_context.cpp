@@ -460,10 +460,10 @@ bool ServerContext::start() {
           }
         }
       }
+      const std::string internal_request_key = mcp_wire::request_id_key(req.id);
       monitor::begin_request(
-          godot_transport_instance()->client_request_id_text(
-              mcp_wire::request_id_key(req.id)),
-          std::string(method), digest, traceparent);
+          internal_request_key, std::string(method), digest, traceparent,
+          godot_transport_instance()->client_request_id_text(internal_request_key));
     };
     opts.outgoing_filters = std::make_shared<mcp::FilterPipeline>();
     opts.outgoing_filters->AddFilter(
@@ -472,16 +472,17 @@ bool ServerContext::start() {
               if (const auto *response =
                       std::get_if<mcp::JsonRpcResponse>(&message)) {
                 monitor::end_request(
-                    godot_transport_instance()->client_request_id_text(
-                        mcp_wire::request_id_key(response->id)),
-                    true, "",
+                    mcp_wire::request_id_key(response->id), true, "",
                     static_cast<int64_t>(response->result.Dump().size()));
               } else if (const auto *error =
                              std::get_if<mcp::JsonRpcErrorResponse>(&message)) {
+                const std::string error_request_key =
+                    error->id ? mcp_wire::request_id_key(*error->id)
+                              : std::string();
                 const std::string error_request_id =
                     error->id
                         ? godot_transport_instance()->client_request_id_text(
-                              mcp_wire::request_id_key(*error->id))
+                              error_request_key)
                         : std::string();
                 ErrorPathEvent path_event;
                 path_event.request_id = error_request_id;
@@ -497,7 +498,7 @@ bool ServerContext::start() {
                 }
                 log_error_path(path_event);
                 monitor::note_protocol_error(
-                    error_request_id,
+                    error_request_key,
                     static_cast<int64_t>(error->error.code),
                     error->error.message, 0);
               }
