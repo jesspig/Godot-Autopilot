@@ -1,4 +1,5 @@
 #include "tools/domains/os/os_ops.hpp"
+#include "tools/domains/os/os_process_timeout.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/base/dispatch.hpp"
@@ -201,17 +202,17 @@ JV kill_os_process(int64_t op_id) {
   return r;
 }
 
-JV os_process_timeout_result(int64_t pid, int64_t timeout_ms) {
+JV os_process_timeout_result(int64_t pid, int64_t timeout_ms, bool termination_confirmed) {
   JV e(JV::object_tag);
+  const std::string detail = os_ops_detail::termination_detail(termination_confirmed);
   e["error"] = JV("the external process did not finish within " +
-                  std::to_string(timeout_ms) +
-                  " ms — it was terminated and the call is cancelled (not "
-                  "retryable)");
+                  std::to_string(timeout_ms) + " ms — " + detail);
   e["code"] = JV("main_thread_timeout");
   e["retryable"] = JV(false);
   e["cancelled"] = JV(true);
   e["timeout_ms"] = JV(timeout_ms);
   e["process_id"] = JV(pid);
+  e["termination_confirmed"] = JV(termination_confirmed);
   return e;
 }
 
@@ -456,15 +457,21 @@ JV wait_os_process(int64_t op_id, int64_t timeout_ms) {
     if (state)
       pid = state->pid;
   }
-  dispatch::run_main_thread_slice(
+  bool termination_confirmed = false;
+  const JV kill_result = dispatch::run_main_thread_slice(
       queue, "execute_os_process kill",
       [op_id]() { return kill_os_process(op_id); }, kProcessKillBudgetMs);
+  const JV *killed_p = kill_result.Find("killed");
+  if (killed_p != nullptr && killed_p->IsBool()) {
+    termination_confirmed = killed_p->GetBool();
+  }
   LogSystem::instance().log_detailed(
       LogLevel::Warning, LogCategory::Tools,
-      "execute_os_process timed out and terminated the external process",
+      "execute_os_process timed out; termination_confirmed=" +
+          std::string(termination_confirmed ? "true" : "false"),
       "wait_id=" + std::to_string(op_id) + " timeout_ms=" +
           std::to_string(timeout_ms));
-  return os_process_timeout_result(pid, timeout_ms);
+  return os_process_timeout_result(pid, timeout_ms, termination_confirmed);
 }
 
 JV handle_os_get_datetime(const JV &args) {
