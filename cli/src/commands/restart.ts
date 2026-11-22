@@ -15,6 +15,11 @@ import {
   waitUntilDead,
 } from "./stop";
 
+export function restartPortNote(previousPort: number, newPort: number): string | null {
+  if (previousPort === newPort) return null;
+  return `restarted on port ${newPort}; the MCP port is owned by the plugin, so it may differ from the previous port ${previousPort}`;
+}
+
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
   try {
     return await restart(positional, opts);
@@ -74,12 +79,14 @@ async function restart(positional: string[], opts: GlobalOptions): Promise<numbe
     );
   }
 
+  const portNote = restartPortNote(entry.port, started.port);
   writeJson(
     {
       ok: true,
       restarted: true,
       previous: { id: entry.id, pid: entry.pid, port: entry.port },
       ...instanceView(started),
+      ...(portNote !== null ? { note: portNote } : {}),
     },
     opts,
   );
