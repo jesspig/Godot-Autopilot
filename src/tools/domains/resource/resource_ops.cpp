@@ -1,5 +1,6 @@
 #include "tools/domains/resource/resource_ops.hpp"
 #include "tools/domains/resource/sidecar_transaction.hpp"
+#include "tools/domains/resource/uid_validation.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
@@ -1593,18 +1594,30 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
     return e;
   }
 
-  int64_t uid;
   auto *it_uid = args.Find("uid");
-  if (it_uid && it_uid->IsNumber()) {
-    uid = it_uid->GetInt();
-  } else {
-    uid = uid_svc->create_id();
+  const bool explicit_uid = it_uid != nullptr && it_uid->IsNumber();
+  int64_t uid = explicit_uid ? it_uid->GetInt() : uid_svc->create_id();
+  const auto *it_overwrite = args.Find("overwrite");
+  const bool overwrite = it_overwrite != nullptr && it_overwrite->IsBool() &&
+                         it_overwrite->GetBool();
+  const bool already_registered = uid_svc->has_id(uid);
+  const resource_ops_detail::UidVerdict verdict =
+      resource_ops_detail::validate_uid_assignment(explicit_uid, uid,
+                                                   already_registered, overwrite);
+  if (verdict == resource_ops_detail::UidVerdict::kReject) {
+    return util::error_json(uid <= 0
+        ? "uid must be a positive integer"
+        : "uid already registered; pass overwrite=true to reassign it");
   }
   const godot::String path_gs = godot::String::utf8(path.c_str());
-  if (uid_needs_add(uid_svc->has_id(uid))) {
+  const bool added = verdict == resource_ops_detail::UidVerdict::kAcceptAdd;
+  if (added) {
     uid_svc->add_id(uid, path_gs);
   } else {
     uid_svc->set_id(uid, path_gs);
+  }
+  if (!uid_svc->has_id(uid)) {
+    return util::error_json("failed to assign uid " + std::to_string(uid));
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
