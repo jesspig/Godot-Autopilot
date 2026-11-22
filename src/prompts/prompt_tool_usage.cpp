@@ -219,15 +219,16 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 7. create_resource — 创建资源
+## 7. resource_create — 创建资源
 
 **功能：** 在内存中创建指定类型的资源实例。
 
 **输入：**
 ```json
 {
-  "name": "create_resource",
+  "name": "resource_create",
   "arguments": {
+    "action": "create",
     "type": "Environment",
     "name": "MyEnvironment"
   }
@@ -247,22 +248,23 @@ std::string prompt_tool_usage() {
 ```
 
 **注意：**
-- 资源在内存中创建，需通过 `save_resource` 持久化到文件
+- 资源在内存中创建，需通过 `resource_save` 持久化到文件
 - `name` 可选，用于设置内存路径标识
-- 返回的 `object_id` 可用于 `save_resource` 的 `object_id` 参数
+- 返回的 `object_id` 可用于 `resource_save` 的 `object_id` 参数
 - 类型必须是 Resource 子类
 
 ---
 
-## 8. save_resource — 保存资源
+## 8. resource_save — 保存资源
 
 **功能：** 将资源保存到文件。支持保存内存中创建的资源（使用 object_id 或 class_type+name 变通方案）。
 
 **输入（使用 class_type + name 创建新资源并保存）：**
 ```json
 {
-  "name": "save_resource",
+  "name": "resource_save",
   "arguments": {
+    "action": "save",
     "path": "res://environment.tres",
     "class_type": "Environment",
     "name": "MyEnvironment"
@@ -273,8 +275,9 @@ std::string prompt_tool_usage() {
 **输入（保存对象 ID 指定的资源）：**
 ```json
 {
-  "name": "save_resource",
+  "name": "resource_save",
   "arguments": {
+    "action": "save",
     "path": "res://environment.tres",
     "object_id": 1234567890
   }
@@ -293,20 +296,21 @@ std::string prompt_tool_usage() {
 - `path` 是源路径（用于加载已有资源）或目标路径
 - `dest_path` 可选，用于保存到不同路径
 - 当资源无法加载时，如果提供了 `class_type` + `name` 会自动创建新资源
-- `object_id` 来自 `create_resource` 的返回结果
+- `object_id` 来自 `resource_create` 的返回结果
 - 自动创建中间目录
 
 ---
 
-## 9. create_editor_scene — 创建新场景
+## 9. editor_scene_control — 创建新场景
 
 **功能：** 创建新场景并设置根节点。
 
 **输入：**
 ```json
 {
-  "name": "create_editor_scene",
+  "name": "editor_scene_control",
   "arguments": {
+    "action": "create",
     "type": "Node2D",
     "name": "Game"
   }
@@ -330,15 +334,16 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 10. open_editor_scene — 打开场景
+## 10. editor_scene_control — 打开场景
 
 **功能：** 从文件系统打开一个 .tscn 场景文件。
 
 **输入：**
 ```json
 {
-  "name": "open_editor_scene",
+  "name": "editor_scene_control",
   "arguments": {
+    "action": "open",
     "path": "res://game.tscn"
   }
 }
@@ -357,15 +362,16 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 11. save_editor_scene_as — 保存场景
+## 11. save_editor_scene — 保存场景
 
 **功能：** 将当前场景保存到指定路径。
 
 **输入：**
 ```json
 {
-  "name": "save_editor_scene_as",
+  "name": "save_editor_scene",
   "arguments": {
+    "action": "save_as",
     "path": "res://game.tscn"
   }
 }
@@ -384,33 +390,38 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 12. add_input_map_action + add_input_map_action_event — 输入映射
+## 12. set_input_map_action — 输入映射
 
 **功能：** 创建输入动作并绑定按键事件。
 
 **步骤 1：创建动作**
 ```json
 {
-  "name": "add_input_map_action",
+  "name": "set_input_map_action",
   "arguments": {
-    "action": "move_left",
+    "action": "set",
+    "name": "move_left",
     "deadzone": 0.5
   }
 }
 ```
 
-**步骤 2：绑定按键事件**
+**步骤 2：为动作绑定按键事件**
 ```json
 {
-  "name": "add_input_map_action_event",
+  "name": "set_input_map_action",
   "arguments": {
-    "action": "move_left",
-    "event": {
-      "class": "InputEventKey",
-      "keycode": 65,
-      "ctrl_pressed": false,
-      "shift_pressed": false
-    }
+    "action": "set",
+    "name": "move_left",
+    "events": [
+      {
+        "class": "InputEventKey",
+        "keycode": 65,
+        "ctrl_pressed": false,
+        "shift_pressed": false
+      }
+    ],
+    "persist": true
   }
 }
 ```
@@ -423,10 +434,10 @@ std::string prompt_tool_usage() {
 ```
 
 **注意：**
-- 参数名是 `action`（不是 `name`）
-- `event` 参数必须包含 `"class"` 字段指定具体 InputEvent 子类
+- `action` 固定为 `set`；动作名用 `name` 参数
+- `events` 数组元素必须包含 `"class"` 字段指定具体 InputEvent 子类
 - 常用 event 类：`InputEventKey`、`InputEventMouseButton`、`InputEventJoypadButton`
-- 必须先用 `add_input_map_action` 创建动作，再绑定事件
+- 可先创建动作，再单独调用一次 `set_input_map_action` 绑定事件；也可在一次调用中同时传 `events`
 
 ---
 
@@ -571,19 +582,20 @@ std::string prompt_tool_usage() {
 - 操作顺序执行，不是并行
 - 成功的操作把工具返回包在 `data` 下（`await_async` 等到的异步 op 结果放在 `result` 下）；失败的操作 `status` 为 `"error"`，错误文本放在 `error` 字段
 - 计数口径：`total` = 已执行数 = `succeeded` + `failed` + `pending`；`skipped` = 遇错即停后未执行的操作数；`total` + `skipped` = `operations` 长度
-- 异步 game 工具（`execute_game_script`、`queue_game_input` 等）在 batch 中默认被明确报错拒绝（该操作 `status` 为 `"error"`，pending 记录被释放，不会悬挂等待），`total` 只计已执行数（含 `pending`）；传 `await_async: true` 后 batch 经传输线程等待异步 op 的真实结果（受该 op 的 `timeout_ms` 约束）。注意：经 `call_tool` 间接调用 batch 且 `await_async: true` 会命中主线程兜底错误，需直接调用 `batch_execute`；长耗时游戏脚本也可用 `start_game_job` 异步提交（立即返回 `job_id`），再以 `get_game_job` 轮询结果
+- 异步 game 工具（`game_script`、`game_input` 等）在 batch 中默认被明确报错拒绝（该操作 `status` 为 `"error"`，pending 记录被释放，不会悬挂等待），`total` 只计已执行数（含 `pending`）；传 `await_async: true` 后 batch 经传输线程等待异步 op 的真实结果（受该 op 的 `timeout_ms` 约束）。注意：经 `call_tool` 间接调用 batch 且 `await_async: true` 会命中主线程兜底错误，需直接调用 `batch_execute`；长耗时游戏脚本也可用 `game_script`（action=start_job）异步提交（立即返回 `job_id`），再以 `get_game_state`（action=job）轮询结果
 
 ---
 
-## 16. add_group_node — 组管理
+## 16. node_group — 组管理
 
 **功能：** 将节点添加到指定组，便于批量操作和查找。
 
 **输入：**
 ```json
 {
-  "name": "add_group_node",
+  "name": "node_group",
   "arguments": {
+    "action": "add",
     "node_path": "Player",
     "group_name": "players"
   }
@@ -656,10 +668,10 @@ std::string prompt_tool_usage() {
 }
 ```
 
-**矩形区域 — fill_tilemap_rect 一次铺满：**
+**矩形区域 — set_tilemap_cells 的 from/to 一次铺满：**
 ```json
 {
-  "name": "fill_tilemap_rect",
+  "name": "set_tilemap_cells",
   "arguments": {
     "node_path": "TileMap",
     "from": {"x": 0, "y": 5},
@@ -681,9 +693,9 @@ std::string prompt_tool_usage() {
 ```
 
 **注意：**
-- 矩形区域优先用 `fill_tilemap_rect`：`from`/`to` 为两个对角格（含端点，先后顺序不限），整块记为一次 undo；单次上限 100000 格，传 `erase: true` 则清除区域内所有格子
+- 矩形区域优先用 `set_tilemap_cells` 的 `from`/`to`：`from`/`to` 为两个对角格（含端点，先后顺序不限），整块记为一次 undo；单次上限 100000 格，传 `erase: true` 则清除区域内所有格子
 - `cells` 数组每请求建议保持 ~64 项以下——客户端侧参数构造可能截断更大载荷，导致 JSON 解析失败（报 parse error）
-- 大批量铺 TileMap（如整行、整面）改用 `code_execute`（或 `execute_game_script`）程序化循环生成，避免手工构造大型 JSON 出错
+- 大批量铺 TileMap（如整行、整面）改用 `code_execute`（或 `game_script`，action=execute）程序化循环生成，避免手工构造大型 JSON 出错
 - `code_execute` 单函数模式下代码内联在 `_run()` 中执行，循环结束后用 `return` 返回结果
 
 ---

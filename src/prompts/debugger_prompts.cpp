@@ -23,14 +23,14 @@ void register_debugger_prompts(mcp::McpServer &server) {
   server.RegisterPrompt(
       "debug-analyze-error",
       PromptOptions{}.Description(
-          "Analyze a runtime error with full context. Use get_debugger_log and "
-          "get_debugger_errors first to gather data."),
+          "Analyze a runtime error with full context. Use get_debugger_stream "
+          "(action=log) and get_debugger_stream (action=errors) first to gather data."),
       [](const std::string &name, const std::optional<mcp::JsonValue> &args) {
         std::string text =
             R"TEMPLATE(You have encountered a runtime error in the Godot game. Follow these steps to diagnose:
 
-1. **Read error data**: Use `get_debugger_errors` to retrieve structured errors from the running game, or
-   use `get_debugger_log` to check editor output for compilation/script errors.
+1. **Read error data**: Use `get_debugger_stream` (action=errors, source=game) to retrieve structured errors from the running game, or
+   use `get_debugger_stream` (action=log, source=editor) to check editor output for compilation/script errors.
 
 2. **Identify the error type**:
    - GDScript runtime error (division by zero, null instance, etc.)
@@ -71,14 +71,14 @@ void register_debugger_prompts(mcp::McpServer &server) {
         std::string text =
             R"TEMPLATE(The debugger has paused at a breakpoint. Follow these steps:
 
-1. **Read the stack**: Script-level stack capture at a breakpoint is not exposed to extensions; use `execute_game_script` (action='script') inside the running game or `get_game_log_entries` to inspect where execution stopped.
+1. **Read the stack**: Script-level stack capture at a breakpoint is not exposed to extensions; use `game_script` (action=execute, script_action=script) inside the running game or `get_game_log_entries` to inspect where execution stopped.
 2. **Read the scene**: Use `get_debugger_scene_tree` to see the remote scene tree.
 3. **Understand the context**:
    - Which function is the execution paused in?
    - What's the call path leading here?
    - Which nodes are currently active in the scene?
 
-4. **Check session state**: Use `get_debugger_session_info` to confirm debugging state.
+4. **Check session state**: Use `get_debugger_stream` (action=session) to confirm debugging state.
 
 5. **Determine the next action**:
    - If investigating a bug: compare expected vs actual values
@@ -97,8 +97,8 @@ void register_debugger_prompts(mcp::McpServer &server) {
             R"TEMPLATE(Review the game output to understand the current state:
 
 1. **Read outputs**:
-   - Use `get_debugger_log` for editor-side output (script compilation results, tool scripts)
-   - Use `get_debugger_output` for runtime print() output from the running game
+   - Use `get_debugger_stream` (action=log, source=editor) for editor-side output (script compilation results, tool scripts)
+   - Use `get_debugger_stream` (action=output, source=game) for runtime print() output from the running game
 
 2. **Look for patterns**:
    - Error messages: RED/RED with stack traces
@@ -133,7 +133,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
          const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
         std::string text = R"TEMPLATE(Review game performance:
 
-1. **Read monitor data**: Use `get_debug_monitors` for live editor-side values and `get_game_status` for the running game's fps and frame counters.
+1. **Read monitor data**: Use `get_debug_info` (action=monitors) for live editor-side values and `get_game_state` (action=status) for the running game's fps and frame counters.
 
 2. **Key metrics to check**:
    - FPS: target 60 (or your project's target)
@@ -164,9 +164,9 @@ void register_debugger_prompts(mcp::McpServer &server) {
          const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
         std::string text = R"TEMPLATE(Check the current debug session:
 
-1. Use `get_debugger_session_info` to see if a game is running and if the debugger is paused.
-2. If active and not breaked: the game is running normally. Check `get_debugger_errors` for any runtime errors.
-3. If breaked: the debugger is paused at a breakpoint. Use `execute_game_script` or `get_game_log_entries` to inspect where execution stopped.
+1. Use `get_debugger_stream` (action=session) to see if a game is running and if the debugger is paused.
+2. If active and not breaked: the game is running normally. Check `get_debugger_stream` (action=errors) for any runtime errors.
+3. If breaked: the debugger is paused at a breakpoint. Use `game_script` (action=execute, script_action=script) or `get_game_log_entries` to inspect where execution stopped.
 4. If inactive: no game is currently running in the editor.
 
 Based on the state, I will:

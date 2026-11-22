@@ -115,7 +115,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
   server.RegisterPrompt(
       "tool-usage",
       mcp::PromptOptions{}.Description(
-          "Usage examples for the 17 most commonly used MCP tools with JSON "
+          "Usage examples for the 19 most commonly used MCP tools with JSON "
           "input/output and gotchas"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {

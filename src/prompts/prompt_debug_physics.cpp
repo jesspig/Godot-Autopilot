@@ -20,8 +20,10 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "intersect_physics_3d_ray",
+    "name": "physics_query",
     "arguments": {
+      "dimension": 3,
+      "mode": "intersect_ray",
       "space_rid": 0,
       "from": {"x": 0, "y": 1, "z": 0},
       "to": {"x": 0, "y": 1, "z": -10},
@@ -38,8 +40,10 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "intersect_physics_3d_shape",
+    "name": "physics_query",
     "arguments": {
+      "dimension": 3,
+      "mode": "intersect_shape",
       "space_rid": 0,
       "shape_type": "CapsuleShape3D",
       "shape_params": {"radius": 0.5, "height": 2.0},
@@ -57,8 +61,10 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "intersect_physics_3d_point",
+    "name": "physics_query",
     "arguments": {
+      "dimension": 3,
+      "mode": "intersect_point",
       "space_rid": 0,
       "position": {"x": 0, "y": 1, "z": 0},
       "collision_mask": 1
@@ -73,9 +79,10 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "intersect_physics_2d_ray",
+    "name": "physics_query",
     "arguments": {
-      "space_rid": 0,
+      "dimension": 2,
+      "mode": "intersect_ray",
       "from": {"x": 0, "y": 0},
       "to": {"x": 100, "y": 0},
       "collision_mask": 1
@@ -90,8 +97,9 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "set_debug_collision_visual",
+    "name": "set_debug_visuals",
     "arguments": {
+      "action": "collision",
       "enabled": true
     }
   }
@@ -101,8 +109,9 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "set_debug_navigation_visual",
+    "name": "set_debug_visuals",
     "arguments": {
+      "action": "navigation",
       "enabled": true
     }
   }
@@ -115,8 +124,9 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "get_debug_monitors",
+    "name": "get_debug_info",
     "arguments": {
+      "action": "monitors",
       "ids": [20]
     }
   }
@@ -128,7 +138,7 @@ std::string prompt_debug_physics() {
 - 射线投射的 `from` 和 `to` 是世界坐标
 - 碰撞掩码（collision_mask）基于层的 2^N 位运算
 - 调试可视化在编辑器场景运行时才生效
-- 使用 `get_debug_monitors` 的 `catalog: true` 查看所有可用的性能监控项)gda";
+- 使用 `get_debug_info` 的 `action: "catalog"` 查看所有可用的性能监控项)gda";
 }
 
 } // namespace godot_autopilot
