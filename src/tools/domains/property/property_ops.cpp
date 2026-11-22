@@ -1,4 +1,5 @@
 #include "tools/domains/property/property_ops.hpp"
+#include "tools/domains/property/property_rollback.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -2378,6 +2379,36 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   };
   std::vector<BatchApplied> applied;
   applied.reserve(work.size());
+  auto verified_rollback = [&]() -> property_ops_detail::RollbackOutcome {
+    std::vector<std::string> names;
+    std::vector<bool> restored;
+    names.reserve(applied.size());
+    restored.reserve(applied.size());
+    for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
+      bool ok = false;
+      if (rit->is_meta) {
+        if (rit->had_old) {
+          rit->owner->set_meta(rit->leaf, rit->old_value);
+          ok = rit->owner->has_meta(rit->leaf) &&
+               rit->owner->get_meta(rit->leaf) == rit->old_value;
+        } else {
+          rit->owner->remove_meta(rit->leaf);
+          ok = !rit->owner->has_meta(rit->leaf);
+        }
+      } else {
+        rit->owner->set(rit->leaf, rit->old_value);
+        ok = rit->owner->get(rit->leaf) == rit->old_value;
+      }
+      names.push_back(rit->name);
+      restored.push_back(ok);
+    }
+    property_ops_detail::RollbackOutcome outcome =
+        property_ops_detail::partition_rollback(names, restored);
+    if (!outcome.unrestored.empty()) {
+      scene_dirty_tracker::mark_scene_modified();
+    }
+    return outcome;
+  };
   std::vector<mcp::JsonValue> warnings;
   std::vector<mcp::JsonValue> inlines;
   mcp::JsonValue converted(mcp::JsonValue::object_tag);
@@ -2427,20 +2458,10 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
           std::string sub_msg = error_text_of(
               metadata_key_error(prop_str, path_str, meta_reason));
           if (atomic) {
-            for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
-              if (rit->is_meta) {
-                if (rit->had_old) {
-                  rit->owner->set_meta(rit->leaf, rit->old_value);
-                } else {
-                  rit->owner->remove_meta(rit->leaf);
-                }
-              } else {
-                rit->owner->set(rit->leaf, rit->old_value);
-              }
-            }
+            const property_ops_detail::RollbackOutcome rollback = verified_rollback();
             mcp::JsonValue rolled(mcp::JsonValue::array_tag);
-            for (const BatchApplied &done : applied) {
-              rolled.PushBack(mcp::JsonValue(done.name));
+            for (const std::string &name : rollback.rolled_back) {
+              rolled.PushBack(mcp::JsonValue(name));
             }
             mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
             mcp::JsonValue fitem(mcp::JsonValue::object_tag);
@@ -2458,6 +2479,13 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
             mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
             e["applied_properties"] = std::move(empty_applied);
             e["rolled_back"] = std::move(rolled);
+            if (!rollback.unrestored.empty()) {
+              mcp::JsonValue unrestored(mcp::JsonValue::array_tag);
+              for (const std::string &name : rollback.unrestored) {
+                unrestored.PushBack(mcp::JsonValue(name));
+              }
+              e["unrestored"] = std::move(unrestored);
+            }
             return e;
           }
           mcp::JsonValue fitem(mcp::JsonValue::object_tag);
@@ -2490,20 +2518,10 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       if (!target.ok) {
         std::string sub_msg = error_text_of(target.error);
         if (atomic) {
-          for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
-            if (rit->is_meta) {
-              if (rit->had_old) {
-                rit->owner->set_meta(rit->leaf, rit->old_value);
-              } else {
-                rit->owner->remove_meta(rit->leaf);
-              }
-            } else {
-              rit->owner->set(rit->leaf, rit->old_value);
-            }
-          }
+          const property_ops_detail::RollbackOutcome rollback = verified_rollback();
           mcp::JsonValue rolled(mcp::JsonValue::array_tag);
-          for (const BatchApplied &done : applied) {
-            rolled.PushBack(mcp::JsonValue(done.name));
+          for (const std::string &name : rollback.rolled_back) {
+            rolled.PushBack(mcp::JsonValue(name));
           }
           mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
           mcp::JsonValue fitem(mcp::JsonValue::object_tag);
@@ -2514,13 +2532,20 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
           e["error"] = mcp::JsonValue("failed to apply property '" + prop_str +
                                       "' on " + path_str + ": " + sub_msg +
                                       " (atomic rollback: " +
-                                      std::to_string(applied.size()) +
+                                      std::to_string(rollback.rolled_back.size()) +
                                       " reverted)");
           e["failed_property"] = mcp::JsonValue(prop_str);
           e["failed"] = std::move(one_failed);
           mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
           e["applied_properties"] = std::move(empty_applied);
           e["rolled_back"] = std::move(rolled);
+          if (!rollback.unrestored.empty()) {
+            mcp::JsonValue unrestored(mcp::JsonValue::array_tag);
+            for (const std::string &name : rollback.unrestored) {
+              unrestored.PushBack(mcp::JsonValue(name));
+            }
+            e["unrestored"] = std::move(unrestored);
+          }
           return e;
         }
         mcp::JsonValue fitem(mcp::JsonValue::object_tag);
@@ -2612,7 +2637,12 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
             inline_attached = true;
             inline_type = inline_build.type;
           } else {
-            value = VariantJson::deserialize_strict(raw_value, type_hint);
+            try {
+              value = VariantJson::deserialize_strict(raw_value, type_hint);
+            } catch (const std::exception &ex) {
+              item_failed = true;
+              item_error = "invalid value for '" + prop_str + "': " + ex.what();
+            }
           }
         }
       }
@@ -2647,20 +2677,10 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       }
       if (item_failed) {
         if (atomic) {
-          for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
-            if (rit->is_meta) {
-              if (rit->had_old) {
-                rit->owner->set_meta(rit->leaf, rit->old_value);
-              } else {
-                rit->owner->remove_meta(rit->leaf);
-              }
-            } else {
-              rit->owner->set(rit->leaf, rit->old_value);
-            }
-          }
+          const property_ops_detail::RollbackOutcome rollback = verified_rollback();
           mcp::JsonValue rolled(mcp::JsonValue::array_tag);
-          for (const BatchApplied &done : applied) {
-            rolled.PushBack(mcp::JsonValue(done.name));
+          for (const std::string &name : rollback.rolled_back) {
+            rolled.PushBack(mcp::JsonValue(name));
           }
           mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
           mcp::JsonValue fitem(mcp::JsonValue::object_tag);
@@ -2671,13 +2691,20 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
           e["error"] = mcp::JsonValue("failed to apply property '" + prop_str +
                                       "' on " + path_str + ": " + item_error +
                                       " (atomic rollback: " +
-                                      std::to_string(applied.size()) +
+                                      std::to_string(rollback.rolled_back.size()) +
                                       " reverted)");
           e["failed_property"] = mcp::JsonValue(prop_str);
           e["failed"] = std::move(one_failed);
           mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
           e["applied_properties"] = std::move(empty_applied);
           e["rolled_back"] = std::move(rolled);
+          if (!rollback.unrestored.empty()) {
+            mcp::JsonValue unrestored(mcp::JsonValue::array_tag);
+            for (const std::string &name : rollback.unrestored) {
+              unrestored.PushBack(mcp::JsonValue(name));
+            }
+            e["unrestored"] = std::move(unrestored);
+          }
           return e;
         }
         mcp::JsonValue fitem(mcp::JsonValue::object_tag);
