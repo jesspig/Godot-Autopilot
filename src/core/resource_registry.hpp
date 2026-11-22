@@ -20,6 +20,7 @@ void register_resource(const godot::Ref<godot::Resource> &res,
                        const std::string &name);
 godot::Ref<godot::Resource> lookup_memory(const std::string &name);
 void erase_oid(int64_t object_id);
+std::vector<std::string> erase_oid_and_extract_names(int64_t object_id);
 
 } // namespace resource_registry
 } // namespace godot_autopilot

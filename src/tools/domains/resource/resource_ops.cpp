@@ -1,4 +1,6 @@
 #include "tools/domains/resource/resource_ops.hpp"
+#include "tools/domains/resource/sidecar_transaction.hpp"
+#include "tools/domains/resource/uid_validation.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
@@ -1015,8 +1017,14 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
     }
   }
   if (err == godot::OK && has_oid) {
-    resource_registry::erase_oid(obj_id);
+    const std::vector<std::string> preserved_names =
+        resource_registry::erase_oid_and_extract_names(obj_id);
     resource_registry::register_resource(res, name);
+    for (const std::string &alias : preserved_names) {
+      if (alias.rfind("name:", 0) == 0 && alias.substr(5) != name) {
+        resource_registry::register_resource(res, alias.substr(5));
+      }
+    }
   }
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -1586,18 +1594,30 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
     return e;
   }
 
-  int64_t uid;
   auto *it_uid = args.Find("uid");
-  if (it_uid && it_uid->IsNumber()) {
-    uid = it_uid->GetInt();
-  } else {
-    uid = uid_svc->create_id();
+  const bool explicit_uid = it_uid != nullptr && it_uid->IsNumber();
+  int64_t uid = explicit_uid ? it_uid->GetInt() : uid_svc->create_id();
+  const auto *it_overwrite = args.Find("overwrite");
+  const bool overwrite = it_overwrite != nullptr && it_overwrite->IsBool() &&
+                         it_overwrite->GetBool();
+  const bool already_registered = uid_svc->has_id(uid);
+  const resource_ops_detail::UidVerdict verdict =
+      resource_ops_detail::validate_uid_assignment(explicit_uid, uid,
+                                                   already_registered, overwrite);
+  if (verdict == resource_ops_detail::UidVerdict::kReject) {
+    return util::error_json(uid <= 0
+        ? "uid must be a positive integer"
+        : "uid already registered; pass overwrite=true to reassign it");
   }
   const godot::String path_gs = godot::String::utf8(path.c_str());
-  if (uid_needs_add(uid_svc->has_id(uid))) {
+  const bool added = verdict == resource_ops_detail::UidVerdict::kAcceptAdd;
+  if (added) {
     uid_svc->add_id(uid, path_gs);
   } else {
     uid_svc->set_id(uid, path_gs);
+  }
+  if (!uid_svc->has_id(uid)) {
+    return util::error_json("failed to assign uid " + std::to_string(uid));
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
@@ -1822,6 +1842,12 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
         godot::String(to_import_path.c_str()));
   }
 
+  std::vector<resource_ops_detail::SidecarMove> sidecar_moves;
+  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kUid,
+                           !uid_sidecar_absent && uid_err == godot::OK});
+  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kImport,
+                           import_sidecar_present && import_err == godot::OK});
+
   ResourceScanBudget scan_budget;
   bool scan_truncated = false;
   std::vector<std::string> text_files;
@@ -1897,8 +1923,18 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   godot::Error err = godot::DirAccess::rename_absolute(
       godot::String(from.c_str()), godot::String(to.c_str()));
   if (err != godot::OK) {
+    for (resource_ops_detail::SidecarKind kind :
+         resource_ops_detail::rollback_order(sidecar_moves)) {
+      const std::string &moved_from =
+          kind == resource_ops_detail::SidecarKind::kUid ? from_uid_path : from_import_path;
+      const std::string &moved_to =
+          kind == resource_ops_detail::SidecarKind::kUid ? to_uid_path : to_import_path;
+      godot::DirAccess::rename_absolute(godot::String(moved_to.c_str()),
+                                        godot::String(moved_from.c_str()));
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    r["error"] = mcp::JsonValue("rename failed; sidecars were restored");
     return r;
   }
 

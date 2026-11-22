@@ -69,7 +69,7 @@ std::vector<std::string> stale_name_keys(
   return result;
 }
 
-void erase_oid(int64_t object_id) {
+std::vector<std::string> erase_oid_and_extract_names(int64_t object_id) {
   std::lock_guard<std::mutex> lock(g_cache_mutex);
   std::vector<std::pair<std::string, int64_t>> entries;
   entries.reserve(g_cache.size());
@@ -80,10 +80,16 @@ void erase_oid(int64_t object_id) {
     entries.emplace_back(entry.first,
                          static_cast<int64_t>(entry.second->get_instance_id()));
   }
-  for (const std::string &key : stale_name_keys(entries, object_id)) {
+  std::vector<std::string> names = stale_name_keys(entries, object_id);
+  for (const std::string &key : names) {
     g_cache.erase(key);
   }
   g_cache.erase(oid_key(object_id));
+  return names;
+}
+
+void erase_oid(int64_t object_id) {
+  erase_oid_and_extract_names(object_id);
 }
 
 } // namespace resource_registry
