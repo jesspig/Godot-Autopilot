@@ -615,6 +615,8 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
       result = os_ops::wait_os_process(id, timeout);
     } else if (kind == "editor_scene_switch") {
       result = editor_ops::wait_scene_switch(id, timeout);
+    } else if (kind == "csharp_build") {
+      result = editor_ops::wait_csharp_build(*wait_p, timeout);
     } else {
       mcp::JsonValue error(mcp::JsonValue::object_tag);
       error["error"] = mcp::JsonValue("unknown deferred wait kind: " + kind);

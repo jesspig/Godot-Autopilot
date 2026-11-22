@@ -6,8 +6,13 @@ using Godot.Collections;
 public partial class GdaCSharpBridge : RefCounted
 {
 
-    private ulong _nextToken = 1;
+    private static ulong _nextGlobalToken = 1;
     private readonly System.Collections.Generic.Dictionary<ulong, Subscription> _subscriptions = new System.Collections.Generic.Dictionary<ulong, Subscription>();
+
+    private static ulong AllocateToken()
+    {
+        return System.Threading.Interlocked.Increment(ref _nextGlobalToken) - 1;
+    }
 
     private sealed class Subscription
     {
@@ -135,8 +140,7 @@ public partial class GdaCSharpBridge : RefCounted
                 return Fail("cannot bind event '" + eventName + "' (" + ev.EventHandlerType.FullName + "): " + e.Message);
             }
             ev.AddEventHandler(source, handler);
-            ulong token = _nextToken;
-            _nextToken = _nextToken + 1;
+            ulong token = AllocateToken();
             Subscription sub = new Subscription();
             sub.Source = source;
             sub.Event = ev;
@@ -171,5 +175,26 @@ public partial class GdaCSharpBridge : RefCounted
         {
             return Fail(e.Message);
         }
+    }
+
+    public int unsubscribeAll()
+    {
+        int removed = 0;
+        var tokens = new System.Collections.Generic.List<ulong>(_subscriptions.Keys);
+        foreach (ulong token in tokens)
+        {
+            Subscription sub;
+            if (!_subscriptions.TryGetValue(token, out sub)) continue;
+            try
+            {
+                sub.Event.RemoveEventHandler(sub.Source, sub.Handler);
+                removed++;
+            }
+            catch (Exception)
+            {
+            }
+            _subscriptions.Remove(token);
+        }
+        return removed;
     }
 }

@@ -45,6 +45,8 @@ mcp::JsonValue handle_editor_files_panel(const mcp::JsonValue &args);
 mcp::JsonValue handle_editor_info(const mcp::JsonValue &args);
 mcp::JsonValue handle_editor_config(const mcp::JsonValue &args);
 mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms);
+mcp::JsonValue wait_csharp_build(const mcp::JsonValue &wait_ctx,
+                                 int64_t timeout_ms);
 bool save_receipt_flag(const mcp::JsonValue &args, const char *name);
 std::string hash_hex(uint64_t value);
 

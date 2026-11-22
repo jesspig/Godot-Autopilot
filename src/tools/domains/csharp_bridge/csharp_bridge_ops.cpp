@@ -1,4 +1,5 @@
 #include "tools/domains/csharp_bridge/csharp_bridge_ops.hpp"
+#include "tools/domains/csharp_bridge/bridge_locator.hpp"
 
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
@@ -485,9 +486,12 @@ std::string bridge_repair_source() {
        "run build_csharp_assembly and restart the game\"}\n";
   s += "__gda_bridge_node.name = \"GdaCSharpRuntime\"\n";
   s += "get_tree().root.add_child(__gda_bridge_node)\n";
+  s += "var __gda_holder = get_tree().root.find_child(\"" +
+       std::string(kBridgeHolderNode) + "\", true, false)\n";
+  s += "var __gda_bridge_ready = " +
+       csharp_bridge_detail::bridge_ready_expression("__gda_holder") + "\n";
   s += "return {\"ok\": true, \"bridge_created\": true, \"bridge_ready\": "
-       "get_tree().root.find_child(\"" +
-       std::string(kBridgeHolderNode) + "\", true, false) != null}\n";
+       "__gda_bridge_ready}\n";
   return s;
 }
 
@@ -508,14 +512,10 @@ std::string emit_bridge_header() {
   std::string s;
   s += "var __gda_holder = get_tree().root.find_child(\"" +
        std::string(kBridgeHolderNode) + "\", true, false)\n";
-  s += "if __gda_holder == null:\n";
+  s += "if not (" + csharp_bridge_detail::bridge_ready_expression("__gda_holder") + "):\n";
   s += "    " + emit_bridge_missing_return(
-      "no __gda_runtime node (add GdaCSharpRuntime to the game scene and run a "
-      ".NET game build)");
-  s += "if not __gda_holder.has_meta(\"bridge\"):\n";
-  s += "    " + emit_bridge_missing_return(
-      "__gda_runtime node has no bridge meta (GdaCSharpRuntime._Ready did not "
-      "run)");
+      "no ready C# bridge node (add GdaCSharpRuntime to the game scene, build "
+      "the .NET assembly and restart the game)");
   s += "var __gda_bridge = __gda_holder.get_meta(\"bridge\")\n";
   return s;
 }
