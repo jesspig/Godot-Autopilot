@@ -1,4 +1,5 @@
 #include "tools/base/code_exec_ops.hpp"
+#include "tools/base/batch_verdict.hpp"
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
@@ -872,7 +873,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                                                            handler_result);
       }
       const bool awaited_error =
-          awaited.IsObject() && awaited.Find("error") != nullptr;
+          awaited.IsObject() && !batch_detail::op_succeeded(awaited);
       result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
       if (awaited_error) {
         if (auto *awaited_err = awaited.Find("error");
@@ -896,11 +897,18 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       continue;
     }
 
-    if (auto *err = handler_result.Find("error")) {
+    const bool handler_failed = !batch_detail::op_succeeded(handler_result);
+    if (handler_failed) {
+      const mcp::JsonValue *err = handler_result.Find("error");
+      const mcp::JsonValue fallback_error(mcp::JsonValue(
+          err != nullptr && err->IsString()
+              ? err->GetString()
+              : std::string("tool returned a structured or runtime error")));
+      const mcp::JsonValue &error_value = (err != nullptr && err->IsString()) ? *err : fallback_error;
       result_item["status"] = mcp::JsonValue("error");
-      result_item["error"] = *err;
+      result_item["error"] = error_value;
       mcp::JsonValue error_body(mcp::JsonValue::object_tag);
-      error_body["error"] = *err;
+      error_body["error"] = error_value;
       result_item["result"] = std::move(error_body);
       push_payload(result_item);
       results.PushBack(std::move(result_item));
