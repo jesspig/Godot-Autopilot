@@ -1,8 +1,10 @@
 #ifndef GODOT_AUTOPILOT_PATH_UTIL_HPP
 #define GODOT_AUTOPILOT_PATH_UTIL_HPP
 
+#include <atomic>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <string>
@@ -105,12 +107,18 @@ inline std::string sibling_temp_path(const std::string &path,
   return path + suffix;
 }
 
+inline std::string atomic_temp_path(const std::string &path, uint64_t serial) {
+  static std::atomic<uint64_t> counter{0};
+  const uint64_t n = serial != 0 ? serial : counter.fetch_add(1) + 1;
+  return path + ".tmp-" + std::to_string(n);
+}
+
 inline bool write_file_atomically(const std::string &path,
                                   const std::string &content) {
   if (path.empty()) {
     return false;
   }
-  const std::string temp_path = sibling_temp_path(path, ".tmp");
+  const std::string temp_path = atomic_temp_path(path, 0);
   const std::filesystem::path fs_target = to_fs_path(path);
   const std::filesystem::path fs_temp = to_fs_path(temp_path);
   {
@@ -133,14 +141,9 @@ inline bool write_file_atomically(const std::string &path,
   if (!ec) {
     return true;
   }
-  std::filesystem::remove(fs_target, ec);
-  std::filesystem::rename(fs_temp, fs_target, ec);
-  if (ec) {
-    std::error_code cleanup_ec;
-    std::filesystem::remove(fs_temp, cleanup_ec);
-    return false;
-  }
-  return true;
+  std::error_code cleanup_ec;
+  std::filesystem::remove(fs_temp, cleanup_ec);
+  return false;
 }
 
 } // namespace godot_autopilot
