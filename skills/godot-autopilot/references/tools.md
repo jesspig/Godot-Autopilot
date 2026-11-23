@@ -50,7 +50,7 @@ never report a fabricated result after it.
 
 ## Tool surface and deprecated aliases
 
-- The live catalog carries 252 canonical tools; `gda tools list` and
+- The live catalog carries 253 canonical tools; `gda tools list` and
   `search_tools` expose only those. `get_tool_detail` also resolves an alias, but
   returns the canonical tool detail plus the replacement fields.
 - Another 325 deprecated aliases resolve to a canonical tool through

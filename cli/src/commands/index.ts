@@ -23,6 +23,7 @@ import { run as cache } from "./cache";
 import { run as install } from "./install";
 import { run as update } from "./update";
 import { run as trace } from "./trace";
+import { run as monitor } from "./monitor";
 
 export interface Command {
   run(positional: string[], opts: GlobalOptions): Promise<number>;
@@ -53,4 +54,5 @@ export const COMMANDS: Record<string, Command> = {
   install: { run: install },
   update: { run: update },
   trace: { run: trace },
+  monitor: { run: monitor },
 };

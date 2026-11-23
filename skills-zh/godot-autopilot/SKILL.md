@@ -30,7 +30,7 @@ Godot Autopilot（GDA）是进程内 GDExtension，通过本地 `gda` CLI 与 MC
 
 工具名是 snake_case，通常动词在前，但段数会变，名字也会随工具集增长而变化。发现是强制步骤。
 
-live catalog 有 252 个 canonical 工具。另有 325 个弃用别名仍可经 `call_tool` 与 `batch_execute` 解析，但不进 `search_tools`，也不出现在 `gda tools list`。别名自 0.4.x 起弃用，将在 0.6.x 移除：始终调用 canonical 工具并传它的 action。常见旧名到新调用的映射见 `references/tools.md` 的别名说明。
+live catalog 有 253 个 canonical 工具。另有 325 个弃用别名仍可经 `call_tool` 与 `batch_execute` 解析，但不进 `search_tools`，也不出现在 `gda tools list`。别名自 0.4.x 起弃用，将在 0.6.x 移除：始终调用 canonical 工具并传它的 action。常见旧名到新调用的映射见 `references/tools.md` 的别名说明。
 
 ```bash
 gda search "tilemap cell"

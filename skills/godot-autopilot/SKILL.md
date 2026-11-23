@@ -50,7 +50,7 @@ recalled signature is a common source of silent failures.
 Tool names are snake_case and usually verb-first, but segment counts vary and
 names change as the toolset grows. Discovery is mandatory.
 
-The live catalog carries 252 canonical tools. Another 325 deprecated aliases
+The live catalog carries 253 canonical tools. Another 325 deprecated aliases
 still resolve through `call_tool` and `batch_execute`, but they stay out of
 `search_tools` and `gda tools list`. The aliases are deprecated from the 0.4.x
 line and are removed in the 0.6.x line: always call the canonical tool with its

@@ -45,6 +45,7 @@
 #include "tools/domains/theme/theme_tools.hpp"
 #include "tools/domains/test/test_tools.hpp"
 #include "tools/domains/analyze/analyze_tools.hpp"
+#include "tools/domains/monitor/monitor_tools.hpp"
 #include "tools/domains/gridmap/gridmap_tools.hpp"
 #include "tools/domains/tween/tween_tools.hpp"
 #include "tools/base/runtime_ops.hpp"
@@ -513,6 +514,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(theme_tools::make_tools);
     add_domain_tools(test_tools::make_tools);
     add_domain_tools(analyze_tools::make_tools);
+    add_domain_tools(monitor_tools::make_tools);
     add_domain_tools(gridmap_tools::make_tools);
     add_domain_tools(tween_tools::make_tools);
 

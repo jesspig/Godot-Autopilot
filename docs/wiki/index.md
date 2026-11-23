@@ -18,6 +18,7 @@
 | [tool_surface_conventions.md](tool_surface_conventions.md) | 工具面别名与 action 约定：隐藏别名、参数适配、结果投影、弃用字段、冲突与搜索排除 | `tool_spec.hpp`、`tool_registry.hpp`、`dispatch.cpp`、`tool_catalog.cpp` |
 | [tool_surface_report.md](tool_surface_report.md) | T-24 工具面压缩审计：前后对比、按域与副作用分布、未验证项 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、埋点门面、日志与本地持久化、配置常量、存储布局、遗留兼容 | `src/core/` |
+| [modules/game_monitor.md](modules/game_monitor.md) | 游戏运行时监视器：逐帧 JSONL、内置 59 项与自定义监控发现、会话调取与分析 | `src/core/observability/`、`cli/src/monitor.ts` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口、运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
 | [modules/ports.md](modules/ports.md) | 端口与实例登记：端点复用、解析优先级、实例登记与发现、控制面与实例端口分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |
 | [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、meta/full 工具面、别名解析、元工具与动态工具、Tasks/Progress/MRTR/Skills、schema 统计、dispatch 预算 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline/confirmation） |

@@ -2,6 +2,7 @@
 
 #include "core/config.hpp"
 #include "core/editor_coords.hpp"
+#include "core/observability/game_monitor.hpp"
 #include "core/observability/log_system.hpp"
 #include "gda_protocol.hpp"
 #include "runtime/error_cursor.hpp"
@@ -1937,6 +1938,7 @@ public:
   bool scene_ready_sent_ = false;
 
   void on_process_frame() {
+    godot_autopilot::game_monitor::ensure_connected();
     if (scene_ready_sent_ || g_ready_tree == nullptr) {
       return;
     }
@@ -1954,6 +1956,7 @@ public:
   bool on_gda_message(const godot::String &p_message,
                       const godot::Array &p_data) {
     (void)p_message;
+    godot_autopilot::game_monitor::ensure_connected();
     g_last_activity_ms = godot::Time::get_singleton()
                              ? godot::Time::get_singleton()->get_ticks_msec()
                              : 0;
@@ -2486,6 +2489,7 @@ void register_listener() {
       os->add_logger(g_logger);
     }
     g_registered = true;
+    godot_autopilot::game_monitor::ensure_connected();
 
     bool scene_ready_now = false;
     godot::SceneTree *tree = nullptr;
@@ -2522,6 +2526,7 @@ void register_listener() {
 void unregister_listener() {
   if (!g_registered)
     return;
+  godot_autopilot::game_monitor::stop();
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
     dbg->unregister_message_capture(godot::StringName(gda_string(GDA_PREFIX)));
   }

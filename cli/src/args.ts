@@ -230,6 +230,10 @@ Commands:
   trace slow          List calls slower than --slow <ms> (default 1000)
   trace failures      List failed tool calls
   trace export        Export traces as jsonl or otlp (--format)
+  monitor status      Show game monitor scope and recording directory
+  monitor sessions    List recorded game monitor sessions
+  monitor report <id> Analyze one session (or --file <path> for offline JSONL)
+  monitor export <id> Copy one session JSONL into GDA home
   install skills      Install skill books to ~/.agents/skills (--prune removes retired books)
   install plugin      Install the Godot addon into a project
   update <target>     Update cli, skills, plugin, or all (--check for status)

@@ -7,7 +7,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具数](https://img.shields.io/badge/tools-252-brightgreen)
+![工具数](https://img.shields.io/badge/tools-253-brightgreen)
 
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
@@ -17,7 +17,7 @@ Godot Autopilot（GDA）是住在 **Godot 编辑器内部**的插件型 [MCP](ht
 
 ![Demo 001](assets/demo-001.gif)
 
-**252 个工具**覆盖从编辑器到游戏的完整闭环：246 个域工具 + 5 个元工具 + `system_status`（数量随版本增长，以代理通过 `search_tools` 查到的为准）。325 条旧工具名别名在 0.6.0 前经 `call_tool` 可调用（与实名工具重名的条目按实名工具优先）。技能书为 **1 张入口卡 + 9 篇 references**，教代理按调用协议执行；MCP 失效时改用 GDA CLI。参考：[工具面](docs/wiki/tool_surface_baseline.md)、[技能](docs/wiki/modules/skills.md)、[CLI](docs/wiki/modules/cli.md)。
+**253 个工具**覆盖从编辑器到游戏的完整闭环：247 个域工具 + 5 个元工具 + `system_status`（数量随版本增长，以代理通过 `search_tools` 查到的为准）。325 条旧工具名别名在 0.6.0 前经 `call_tool` 可调用（与实名工具重名的条目按实名工具优先）。技能书为 **1 张入口卡 + 9 篇 references**，教代理按调用协议执行；MCP 失效时改用 GDA CLI。参考：[工具面](docs/wiki/tool_surface_baseline.md)、[技能](docs/wiki/modules/skills.md)、[CLI](docs/wiki/modules/cli.md)。
 
 ## 快速开始
 

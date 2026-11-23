@@ -37,7 +37,7 @@ stdout 是 JSON，诊断进 stderr。退出 2 表示通道不可用；禁止在�
 
 ## 工具面与弃用别名
 
-- live catalog 有 252 个 canonical 工具；`gda tools list` 与 `search_tools` 只暴露这些。`get_tool_detail` 也能解析别名，但返回 canonical 工具详情并附替换字段。
+- live catalog 有 253 个 canonical 工具；`gda tools list` 与 `search_tools` 只暴露这些。`get_tool_detail` 也能解析别名，但返回 canonical 工具详情并附替换字段。
 - 另有 325 个弃用别名，经 `call_tool`、`batch_execute` 与 CLI 的 `gda call` 解析到 canonical 工具。别名不进搜索索引，也不进 catalog，因此按名称搜索每个能力只返回一个条目。
 - 每个别名的响应顶层带替换信息：deprecated_alias、canonical_name、deprecated_since、alias_removal_version。这些字段只作提示；分支必须基于 canonical 工具，而不是别名。
 - 别名自 0.4.x 起标记弃用，将在 0.6.x 移除。迁移就是改用下面的 canonical 工具加 action，不要等到移除。`gda tools list` 找不到某工具时，按对象搜索并调用 canonical 名称。

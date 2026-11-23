@@ -98,11 +98,11 @@ function traceLine(
 }
 
 describe("IF-04 canonical catalog", () => {
-  test("exports the 252 canonical names without aliases", () => {
+  test("exports the 253 canonical names without aliases", () => {
     const catalog = getCanonicalCatalog();
     expect(auditCatalog()).toEqual(catalog);
-    expect(catalog.length).toBe(252);
-    expect(new Set(catalog).size).toBe(252);
+    expect(catalog.length).toBe(253);
+    expect(new Set(catalog).size).toBe(253);
     expect(catalog).toContain("property_get");
     expect(catalog).toContain("get_scene_tree");
     expect(catalog).not.toContain("ping");
@@ -222,14 +222,14 @@ describe("coverage parsing and computation", () => {
     expect(result.suspected_gaming).toBe(false);
   });
 
-  test("uses the real 252 catalog and flags coverage with no evidence", () => {
+  test("uses the real 253 catalog and flags coverage with no evidence", () => {
     const records = parseTraceJsonl(
       Array.from({ length: 12 }, (_, index) => traceLine("property_get", { wall_end_ms: index })).join(
         "\n",
       ),
     );
     const result = computeCoverage(records, getCanonicalCatalog(), 0);
-    expect(result.catalog_total).toBe(252);
+    expect(result.catalog_total).toBe(253);
     expect(result.coverage_used).toBe(1);
     expect(result.suspected_gaming).toBe(true);
     const many = computeCoverage(
@@ -298,7 +298,7 @@ describe("coverage parsing and computation", () => {
 });
 
 describe("IF-02 coverage command", () => {
-  test("writes coverage.json and snapshot and prints catalog_total=252", () => {
+  test("writes coverage.json and snapshot and prints catalog_total=253", () => {
     const round = path.join(tmp, "round");
     fs.mkdirSync(round, { recursive: true });
     fs.writeFileSync(
@@ -316,7 +316,7 @@ describe("IF-02 coverage command", () => {
     } finally {
       capture.restore();
     }
-    expect(capture.read()).toContain("catalog_total=252");
+    expect(capture.read()).toContain("catalog_total=253");
     const coverage = JSON.parse(fs.readFileSync(path.join(round, "coverage.json"), "utf8")) as {
       catalog_total: number;
       used: string[];
@@ -330,9 +330,9 @@ describe("IF-02 coverage command", () => {
       evidence_rows: number;
       suspected_gaming: boolean;
     };
-    expect(coverage.catalog_total).toBe(252);
+    expect(coverage.catalog_total).toBe(253);
     expect(coverage.used).toEqual(["property_get"]);
-    expect(coverage.unused).toHaveLength(251);
+    expect(coverage.unused).toHaveLength(252);
     expect(coverage.by_domain).toBeTruthy();
     expect(coverage.alias_excluded).toEqual([]);
     expect(coverage.round_start_ms).toBe(10);
@@ -397,7 +397,7 @@ describe("IF-02 coverage command", () => {
       used: string[];
     };
     expect(coverage.used).toEqual(["property_set"]);
-    expect(capture.read()).toContain('"catalog_total": 252');
+    expect(capture.read()).toContain('"catalog_total": 253');
   });
 
   test("writes coverage scoped to the round start for a named round directory", () => {
@@ -478,7 +478,7 @@ const EVIDENCE = [
 ].join("\n");
 
 const COVERAGE = JSON.stringify({
-  catalog_total: 252,
+  catalog_total: 253,
   used: ["property_get", "get_scene_tree"],
   unused: ["set_theme_color"],
   coverage_used: 2,
