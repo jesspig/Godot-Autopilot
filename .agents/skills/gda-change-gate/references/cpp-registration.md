@@ -1,8 +1,3 @@
----
-name: cpp-registration
-description: "同步 C++ 编译单元的新增、删除与移动，保证 CMake 双登记一致并通过双守卫。何时用：新增、删除或移动 .cpp、双登记漏项、GDA_UNIT_BUSINESS_SOURCES 不匹配、migration_guard 或 comment_guard 报错、编译链接失败；不适用于仅 .hpp 变更。"
----
-
 # 编译单元登记
 
 新增、删除或移动 `.cpp` 时保证两处登记一致，并通过 ctest 双守卫。

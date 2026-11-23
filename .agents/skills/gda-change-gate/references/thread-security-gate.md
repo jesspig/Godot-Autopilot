@@ -1,8 +1,3 @@
----
-name: thread-security-gate
-description: "改动 Godot API 调用、监听、高风险确认、脱敏、导出、路径或截断时，守住主线程路由与默认安全姿态。何时用：主线程、CommandQueue、submit、submit_tracked、execute_sync、非环回、confirm、ExportGuard、desensitize、normalize_project_path、报错 main_thread_timeout。"
----
-
 # 主线程与安全门
 
 所有 Godot API 经主线程执行，默认安全姿态不静默放宽。

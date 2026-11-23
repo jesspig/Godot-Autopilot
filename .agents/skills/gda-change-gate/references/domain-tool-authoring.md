@@ -1,8 +1,3 @@
----
-name: domain-tool-authoring
-description: "按 ToolSpec 数据化管线新增、改名、改参或改副作用领域工具，并保证注册、取参、副作用声明一致。何时用：新增工具、编写 make_spec_tool 或 ParamSpec、声明 side_effect 或 kMutating、取参用 args.Find、报错 missing required parameter；不适用于仅调用已有工具。"
----
-
 # 领域工具编写
 
 按数据化管线新增工具，保证注册、取参、副作用声明一致。
