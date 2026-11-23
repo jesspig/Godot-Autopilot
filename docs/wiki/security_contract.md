@@ -7,7 +7,7 @@ tags:
   - 并发
   - 契约
   - 认证
-timestamp: "2026-11-23T17:28:29+08:00"
+timestamp: "2026-11-24T00:11:55+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -26,14 +26,14 @@ resource:
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约，也是实现、评审与测试的验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-11-23（本轮增量同步：路径符号链接 containment、call_tool elicitation 与 trash confirm、IPC 认证不降级/不重发、导出期提示词拦截；高风险工具仍由 `confirm=true` 控制）
+> 审计日期：2026-11-24（本轮增量同步：路径符号链接 containment、call_tool elicitation 与 trash confirm、IPC 认证不降级/不重发、导出期提示词拦截；高风险工具仍由 `confirm=true` 控制）
 
 ## 0. 当前安全姿态
 
 - 只有 `/mcp` 与 IPC 两个协议面；REST `/api`、Bearer 认证、allow-list / `GODOT_AUTOPILOT_ALLOW` / `GODOT_AUTOPILOT_AUTH_MODE` 与 `McpConfigDock` 已移除，CLI 为纯客户端。`api_token` 模块现仅提供 `generate_token()`（32 字节随机值的十六进制）与 `constant_time_equals()`；IPC 令牌只经实例登记 `endpoints.ipc.token` 分发，不再有令牌文件与 REST Bearer 路径。
 - 保留 `side_effect` 元数据；MCP 工具声明 `read_only_hint`、`destructive_hint`、`open_world_hint`。高风险工具（`destructive` / `process` / `code_execute` / `game_runtime`）每次调用都必须带 `arguments.confirm=true`，否则返回 `confirmation_required`。经 `call_tool` 代理时按**目标工具**的 `side_effect` 判定（`elicitation_detail::effective_side_effect`）：兼容 elicitation 的客户端在缺 confirm 时收到 `elicitation/create`，拒绝则不执行；工具层始终以 `confirmation::error()` 兜底。另 `os_file_write` 的 `action=trash` 也要求 `confirm=true`（`src/tools/domains/os/trash_confirm.hpp`）。
 - `confirm` 不是安全边界；它只阻止误触，调用方仍需自行审查目标与参数。审计仍记录工具、`side_effect`、结果与错误。
-- `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 的暴露面（252 个顶层工具），不改变安全姿态：导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定、主线程派发全部继续生效。full 下每个域工具走与 `call_tool` 相同的注册回调与 dispatch 预算，不新增线程、不绕过 `ExportGuard`。
+- `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 的暴露面（253 个顶层工具），不改变安全姿态：导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定、主线程派发全部继续生效。full 下每个域工具走与 `call_tool` 相同的注册回调与 dispatch 预算，不新增线程、不绕过 `ExportGuard`。
 - 上下文风险由宿主承担：不支持 tool search / defer loading 的客户端不要开 full；服务端不提供按客户端自动降级。
 
 ## 1. 可信客户端模型
@@ -180,7 +180,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - [ ] 每个高风险工具都能通过 `get_tool_detail.side_effect` 或本页补充规则识别；**任何**工具的 `side_effect` 都非空（无副作用者为字面量 `"none"`）；破坏性工具声明 `destructive`。
 - [ ] 高风险工具（`destructive` / `process` / `code_execute` / `game_runtime`）缺 `arguments.confirm=true` 时返回 `confirmation_required`，带 `confirm=true` 时进入 handler；元工具 `code_execute` / `batch_execute` 同样受控。
 - [ ] 破坏类落档符合 §3.1：销毁宿主内既有对象的工具声明 `destructive`；删除磁盘文件 / 目录归写类；防漂移守卫对「带销毁语义却未声明 `destructive`」的工具失败并列出工具名，白名单 3 条豁免显式登记且写明理由。
-- [ ] `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 暴露面（252 个顶层工具），导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定与主线程派发继续生效。
+- [ ] `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 暴露面（253 个顶层工具），导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定与主线程派发继续生效。
 - [ ] `call_tool` 代理高风险目标时按目标 `side_effect` 触发 elicitation；`os_file_write` 的 `action=trash` 缺 confirm 返回 `confirmation_required`；调试器提示词在导出期被拒绝。
 - [ ] `res://` 经 globalize + 符号链接解析后的越界路径被拒；实例登记与插件配置为原子写入，失败保留旧目标；IPC 认证失败不降级、请求发出后不重发。
 

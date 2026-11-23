@@ -7,7 +7,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![Protocol](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![Tools](https://img.shields.io/badge/tools-252-brightgreen)
+![Tools](https://img.shields.io/badge/tools-253-brightgreen)
 
 > **Let an AI agent build, playtest, and debug your Godot game — from inside the editor.**
 
@@ -17,7 +17,7 @@ Godot Autopilot (GDA) is an [MCP](https://modelcontextprotocol.io/) server that 
 
 ![Demo 001](assets/demo-001.gif)
 
-**252 tools** cover the editor-to-game loop: 246 domain tools, 5 meta tools, and `system_status` (the exact count grows with each version; ask the agent to check via `search_tools`). 325 deprecated tool-name aliases stay callable through `call_tool` until 0.6.0 (names still exposed as real tools win). Skill books (**1 entry card + 9 references**) teach the calling protocol; the CLI is the fallback when MCP is down. References: [tool surface](docs/wiki/tool_surface_baseline.md), [skills](docs/wiki/modules/skills.md), [CLI](docs/wiki/modules/cli.md).
+**253 tools** cover the editor-to-game loop: 247 domain tools, 5 meta tools, and `system_status` (the exact count grows with each version; ask the agent to check via `search_tools`). 325 deprecated tool-name aliases stay callable through `call_tool` until 0.6.0 (names still exposed as real tools win). Skill books (**1 entry card + 9 references**) teach the calling protocol; the CLI is the fallback when MCP is down. References: [tool surface](docs/wiki/tool_surface_baseline.md), [skills](docs/wiki/modules/skills.md), [CLI](docs/wiki/modules/cli.md).
 
 ## Quick start
 

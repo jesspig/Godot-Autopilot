@@ -1,8 +1,12 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-23；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-24；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
 >
 > changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
+
+## 2026-11-24
+
+- **游戏运行时监视器**：编辑器启动的游戏运行逐帧记录 59 项引擎监视器与自动发现的标准 API 自定义监控，JSONL 落盘；新增 `game_monitor` MCP 工具与 `gda monitor` CLI，支持按会话调取与离线分析。工具面 252→253、ctest 1101 全绿。详见 [changelog/2026-11-24-log.md](changelog/2026-11-24-log.md) 与 [modules/game_monitor.md](modules/game_monitor.md)。
 
 ## 2026-11-23
 

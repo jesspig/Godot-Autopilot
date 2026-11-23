@@ -9,7 +9,7 @@
 - 收到用户指定工程时直接使用该工程，不重新抽题；若路径就是 `examples/e2e`，仍按新轮次先重置（续跑除外）。
 - 创建/重置后用 `bun run gda-dev-tools harness setup --project <project-dir>` 完成环境准备（它按序执行 build、deploy、`gda start`、list、status、ping、tools list）；必要时可单独 `build` / `deploy`。读取命令输出，不读实现源码。
 - 已知缺陷：若 setup 因末尾 `gda ping` 缺 `--project` 失败并终止刚启动的编辑器，先记录上下文（见下），再用 `gda start --project <project-dir>` 恢复并确认 `gda status` ok=true、`gda list` live=true；不反复重试 setup。
-- 可接收本轮聚焦工具域（如「重点验证脚本工具」），它调整验证侧重，但不降低覆盖全部 252 工具的硬门槛。
+- 可接收本轮聚焦工具域（如「重点验证脚本工具」），它调整验证侧重，但不降低覆盖全部 253 工具的硬门槛。
 
 ## 先记录上下文再自重启
 

@@ -8,8 +8,8 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `objective` | 按固定任务书交付可玩内容充分的小样，并**覆盖全部 252 个 canonical 工具**，完成组合测试与连锁反应验证 |
-| `acceptance` | 全部满足才算 complete：功能单元 ≥3 且可玩闭环成立；组合链 C1–C6 全部执行并记录；分域必覆盖达标；**覆盖 252/252**（或逐项客观理由充分）；证据来自同一次连续 run；Q 条目证据齐全；冷启动无错；阶段 2 analysis 完成且独立审查一致；阶段 3 采纳项已授权验证或明确待授权；阶段 4 复测通过 |
+| `objective` | 按固定任务书交付可玩内容充分的小样，并**覆盖全部 253 个 canonical 工具**，完成组合测试与连锁反应验证 |
+| `acceptance` | 全部满足才算 complete：功能单元 ≥3 且可玩闭环成立；组合链 C1–C6 全部执行并记录；分域必覆盖达标；**覆盖 253/253**（或逐项客观理由充分）；证据来自同一次连续 run；Q 条目证据齐全；冷启动无错；阶段 2 analysis 完成且独立审查一致；阶段 3 采纳项已授权验证或明确待授权；阶段 4 复测通过 |
 | `limits` | 边界：只改授权工程、报告目录与授权后的源码/技能；不改 GDA 版本；不提交 git；cap（最大环数与时长上限）记在此处 |
 | `state` | `active` / `paused` / `budgetLimited` / `usageLimited` / `complete` / `unmet` |
 | `completionEvidence` | 指向满足各 acceptance 项的具体证据，逐项对应 |
@@ -30,7 +30,7 @@
 
 ## 混合 verifier（不自评）
 
-- **硬指标**（功能单元数、总时长、组合链执行、覆盖 252/252 与三要素、`suspected_gaming`、跨 run 一致性、崩溃恢复次数、证据文件存在性、无引擎错误日志）：由 `bun run gda-dev-tools harness digest --round <轮目录>` 读取 `digest.json` 判定，以 digest 输出为准，不手工改写。digest 不解析的硬指标（分域覆盖、净可玩内容、跨 run 一致性、组合链证据）在报告中显式写出并由独立子代理复核。
+- **硬指标**（功能单元数、总时长、组合链执行、覆盖 253/253 与三要素、`suspected_gaming`、跨 run 一致性、崩溃恢复次数、证据文件存在性、无引擎错误日志）：由 `bun run gda-dev-tools harness digest --round <轮目录>` 读取 `digest.json` 判定，以 digest 输出为准，不手工改写。digest 不解析的硬指标（分域覆盖、净可玩内容、跨 run 一致性、组合链证据）在报告中显式写出并由独立子代理复核。
 - **硬指标消费点**：`q_items`/`s_items` 核对编号齐全无遗漏；`levels`/`playtime_minutes` 判「功能单元 ≥3 且完整通关 ≥5 分钟」；`causal_triples` 核对动作→条件→后果结构；`coverage_gaps` 作离线回放候选来源；`coverage_used`/`coverage_invalid_touches`/`evidence_rows`/`suspected_gaming` 判覆盖与反作弊；`round`/`schema` 溯源。`digest.json` 只读。
 - **软指标**（玩法手感、主题诠释、画面表现、单元可玩性）：由**独立子代理**判定；开发者只提供证据与复现步骤，不代替下结论。
 - 两类都通过本环/本候选才算 verifier 通过；任一不通过按「同一条件下 probe，失败则回退基线并补齐后复验」处理。

@@ -1,19 +1,19 @@
 ---
 type: 审计报告
 title: 工具面压缩审计报告
-description: 工具面审计：catalog 459→252、生产别名 325、能力矩阵 561 行缺失 0、副作用分布（CodeExecute 5→6）、安全机制与未验证项
+description: 工具面审计：catalog 459→253、生产别名 325、能力矩阵 561 行缺失 0、副作用分布（CodeExecute 5→6）、安全机制与未验证项
 tags:
   - 工具面
   - 审计
   - 压缩
   - 别名
-timestamp: "2026-11-23T21:09:40+08:00"
+timestamp: "2026-11-24T00:11:55+08:00"
 resource: devtools/commands/tool-audit.ts
 ---
 
 # 工具面压缩审计报告
 
-> 审计日期：2026-11-23（增量同步）。本轮不重跑 audit：catalog、别名、schema、能力矩阵计数取自当前源码 catalog 基线与能力矩阵逐项统计，副作用按逐工具声明重算；复现命令仍为 `bun run gda-dev-tools audit-tools --json`（摘要 `audit-tools --report`）。压缩前数字取自 T-01 的 `audit-baseline.json`（catalog 459）。
+> 审计日期：2026-11-24（增量同步）。本轮不重跑 audit：catalog、别名、schema、能力矩阵计数取自当前源码 catalog 基线与能力矩阵逐项统计，副作用按逐工具声明重算；复现命令仍为 `bun run gda-dev-tools audit-tools --json`（摘要 `audit-tools --report`）。压缩前数字取自 T-01 的 `audit-baseline.json`（catalog 459）。
 
 ## 数据来源与命令
 
@@ -26,8 +26,8 @@ resource: devtools/commands/tool-audit.ts
 
 | 指标 | 压缩前 | 压缩后 | 变化 |
 | --- | ---: | ---: | ---: |
-| catalog 总数 | 459 | 252 | -207（-45.1%） |
-| 域工具 | 451 | 246 | -205（-45.5%） |
+| catalog 总数 | 459 | 253 | -207（-45.1%） |
+| 域工具 | 451 | 247 | -205（-45.5%） |
 | 元工具 | 7 | 5 | -2 |
 | `system_status` | 1 | 1 | 0 |
 | 域文件数 | 33 | 35 | +2（新增 Image、Mesh） |
@@ -39,7 +39,7 @@ resource: devtools/commands/tool-audit.ts
 | 能力矩阵缺失 | 0 | 0 | 0 |
 
 - catalog 净减 207：域工具净减 205，元工具净减 2；域工具计数已包含压缩期间净新增的 6 个工具（`pack_scene`、`animation_runtime`、`bake_navigation_mesh`、`astar_path`、`image_ops`、`mesh_ops`），域文件数 +2 为新增 Image、Mesh 两域（各 4 个工具）。
-- 252 落在验收区间 250–300 内。
+- 253 落在验收区间 250–300 内。
 - schema 空从 66 降到 17，非空占比由 85.6% 升到 93.3%；空 schema 指未声明参数且无 action schema 的工具。
 
 ## Top 合并组
@@ -96,7 +96,7 @@ resource: devtools/commands/tool-audit.ts
 | Log | 1 | 1 | 0 |
 | Image | 0 | 4 | +4 |
 | Mesh | 0 | 4 | +4 |
-| **合计** | **451** | **246** | **-205** |
+| **合计** | **451** | **247** | **-205** |
 
 ## 能力矩阵摘要
 
@@ -105,7 +105,7 @@ resource: devtools/commands/tool-audit.ts
 | 矩阵域行 `row_count` | 561 | `capability_matrix.rows` |
 | 含系统/元的 catalog 行 | 567 | `catalog_row_count` |
 | `mapped` | 315 | 旧工具名 → canonical |
-| `kept` | 252 | 246 域行 + 6 系统/元行 |
+| `kept` | 253 | 247 域行 + 6 系统/元行 |
 | `missing` | 0 | `catalog_row_count - mapped - kept` |
 
 - 561 行 = T-01 的 451 个旧工具 + 压缩期间新增的 110 行；旧工具中 315 行 `mapped`、136 行 `kept`，全部为 `kept|mapped`，缺失 0。
@@ -151,7 +151,7 @@ catalog 口径（含元工具与 `system_status`）：
 
 ## 搜索与测试结论
 
-- 搜索索引由 `registry->all_any()` 构建 BM25，别名不入索引、不占 catalog；搜索候选来自 252 个真实工具的 catalog，而不是 252 + 325 个别名条目。
+- 搜索索引由 `registry->all_any()` 构建 BM25，别名不入索引、不占 catalog；搜索候选来自 253 个真实工具的 catalog，而不是 253 + 325 个别名条目。
 - 查询集 [search_queries.json](../../tests/data/search_queries.json) 共 50 条，每条带 `expect_any`；T-03 证据 `search-queries-test.txt` 只验证查询集格式（1 个 Bun 用例、268 个 `expect()` 通过），不能作为压缩后排序质量不下降的证据。
 - T-24 计划的 `SearchQuality`、`AliasCoverage`、`CapabilityMatrix` 三项回归测试由同阶段测试任务新增在 `tests/unit/`；本报告未执行这些测试，结果标记为未验证。
 - 最近一次全量 ctest 为 T-23 轮次证据：880/880 通过（unit 584、boundary 190、integration 88、guard 16、cli 2），不含 T-24 新增测试。

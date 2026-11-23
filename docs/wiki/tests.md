@@ -7,31 +7,31 @@ tags:
   - 单元测试
   - 集成
   - 守卫
-timestamp: "2026-11-23T17:28:29+08:00"
+timestamp: "2026-11-24T00:11:55+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-11-23（程序化测试不依赖抽题；本轮 gtest 数值为源码静态核算、未运行 ctest，CLI 单测为主代理实测 `bun test cli/tests`，以本页「数值核算总表」为准）
+> 审计日期：2026-11-24（程序化测试不依赖抽题；本轮 ctest 与 CLI 单测均为主代理实测通过，工具面与源码计数静态复算，以本页「数值核算总表」为准）
 
 ## 架构总览
 
 测试由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入（`CMakeLists.txt:100`）。该开关固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（cacheVariables 默认 `ON`），经 `inherits` 下发给全部 4 个可执行 configure 预设（`debug`/`debug-portable`/`release`/`release-portable`）：重建 `build/` 后重新配置（`bun run gda-dev-tools build` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参；裸 `cmake`（不带 preset）配置仍默认 OFF。
 
-**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-23 源码静态核算 **1097 = 734 + 257 + 88 + 16 + 2**，未实测）：
+**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-23 源码静态核算 **1101 = 738 + 257 + 88 + 16 + 2**，本轮 ctest 实测全绿）：
 
 | 层 | ctest 载体 | 数量 | 标签 | 判定方式 | 验证对象 |
 |---|---|---|---|---|---|
-| 单元 | `gda_unit_tests`（gtest，`gtest_discover_tests` 逐条注册） | 734（76 文件） | `unit` | gtest 断言 | 合法输入下的模块行为：纯逻辑、编解码、注册与查询 |
+| 单元 | `gda_unit_tests`（gtest，`gtest_discover_tests` 逐条注册） | 739（77 文件） | `unit` | gtest 断言 | 合法输入下的模块行为：纯逻辑、编解码、注册与查询 |
 | 边界 | `gda_boundary_tests`（gtest，同上） | 257（35 文件） | `boundary` | gtest 断言 | 非法 / 极端输入与拒绝路径：参数校验、错误映射、预算超时、门控守卫 |
 | 集成 | `gda_integration_tests`（gtest，同上） | 88（10 文件） | `integration` | gtest 断言 | 进程内 inline 派发的 handler 契约（参数校验 / 错误串 / 注册面 / 运行期通道前置路径），零引擎零项目绑定 |
 | 守卫与脚本项 | `tests/CMakeLists.txt` 的 `add_test`（含 `no_python_guard`、源码守卫、守卫自测、`cli_contract` / `cli_unit`） | 18（guard 16 + cli 2，静态计数 `add_test` 注册点） | `guard` / `cli` | 脚本退出码 | 源码纪律、无 Python 回退与 CLI wire 形状 |
-| 合计 | `ctest -N` | 1097（静态核算，未实测） | — | — | — |
+| 合计 | `ctest -N` | 1101（主代理实测 `ctest --preset debug`，全绿） | — | — | — |
 
 **回归属性**不是独立 ctest 目标，而是分布在单元 / 集成 / 脚本项内的基线断言组，钉住注册面、错误面、wire 形状与技能面，防工具集与协议漂移；清单与更新 SOP 见「回归属性清单」。
 
-**Agent e2e**：依赖真实编辑器 / Godot 进程的行为验证（GDScript 编译执行、游戏进程通道、端到端 HTTP 往返、编辑器态错误文案）已无仓库内引擎轨，移交 `gda-e2e-loop` 闭环执行（测试→分析→授权修复，根 `.agents/skills/`）；固定沙盒 `examples/e2e` + 固定覆盖任务书，不抽题，以覆盖全部 252 个 canonical 工具为硬验收。程序化测试（单元/集成/守卫）不依赖 `jam` 抽题或 `examples/` 生成物，生成器单测在临时目录自覆盖；仓库测试基建（configure + build + ctest）无 Godot 进程路径。
+**Agent e2e**：依赖真实编辑器 / Godot 进程的行为验证（GDScript 编译执行、游戏进程通道、端到端 HTTP 往返、编辑器态错误文案）已无仓库内引擎轨，移交 `gda-e2e-loop` 闭环执行（测试→分析→授权修复，根 `.agents/skills/`）；固定沙盒 `examples/e2e` + 固定覆盖任务书，不抽题，以覆盖全部 253 个 canonical 工具为硬验收。程序化测试（单元/集成/守卫）不依赖 `jam` 抽题或 `examples/` 生成物，生成器单测在临时目录自覆盖；仓库测试基建（configure + build + ctest）无 Godot 进程路径。
 
 ## 构建与运行
 
@@ -42,7 +42,7 @@ cmake --preset debug
 # 构建
 cmake --build --preset debug --target gda_unit_tests gda_integration_tests
 
-# 全量运行（默认门：1097 条注册点全跑，无过滤、无引擎前置）
+# 全量运行（默认门：1101 条注册点全跑，无过滤、无引擎前置）
 ctest --preset debug
 
 # 集成层单跑（ctest 正则匹配「套件.用例」名）
@@ -59,7 +59,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 上列 `debug` / `release` 预设**固定 Ninja 生成器**，PATH 无 ninja 时改用 `debug-portable` / `release-portable`（回退路径见 [build.md](./build.md)「预设」）。`bun run gda-dev-tools test` 由 `resolvePreset()`（`devtools/lib/config.ts`）自动选路，`--preset` 仍只有 `debug` / `release`。四个 preset 共用同一 `binaryDir`，测试目标与可执行文件位置均为 `build/debug/` 或 `build/release/`，不受生成器选择影响。
 
 - **依赖**：googletest 为 `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出（`git clone --recurse-submodules` 或 `git submodule update --init --recursive`），由 `tests/CMakeLists.txt:9-15` 经 `gda_require_submodule` + `add_subdirectory` 引入，缺失即 configure 报错、不做网络回退；godot-cpp 与 mcp-cpp-sdk 同为子模块，单元与集成目标均链接（集成另链接 `mcp-http`，`tests/CMakeLists.txt:107-108`）。**不需要 Godot 可执行文件、`.env` / `GODOT_PATH` 或插件部署**——测试链路无引擎拉起路径。
-- **测试侧构建目标**：`gda_unit_tests` / `gda_boundary_tests` / `gda_integration_tests`（ctest 常驻，分别打 `unit` / `boundary` / `integration` 标签）与 `gda_mcp_transport_probe`（`tests/probe/mcp_transport_probe.cpp`，传输自检程序，**不注册为 ctest 用例**、不计入 1097，由主代理验收阶段按需执行）。
+- **测试侧构建目标**：`gda_unit_tests` / `gda_boundary_tests` / `gda_integration_tests`（ctest 常驻，分别打 `unit` / `boundary` / `integration` 标签）与 `gda_mcp_transport_probe`（`tests/probe/mcp_transport_probe.cpp`，传输自检程序，**不注册为 ctest 用例**、不计入 1101，由主代理验收阶段按需执行）。
 
 ### tests/ 目录布局
 
@@ -88,7 +88,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 ## 单元测试层
 
-**76 个测试文件，734 个用例**（2026-11-23 源码静态统计 `TEST`/`TEST_F` 宏：687 `TEST` + 47 `TEST_F`，未实测；核算方式见数值总表；历史计数演变见本页 git 历史与 [changelog/](changelog/) 各日记录）：
+**77 个测试文件，739 个用例**（2026-11-24 源码静态统计 `TEST`/`TEST_F` 宏：692 `TEST` + 47 `TEST_F`，ctest 单元标签实测 738；核算方式见数值总表；历史计数演变见本页 git 历史与 [changelog/](changelog/) 各日记录）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
@@ -322,7 +322,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 - `skills_guard_self_test`（同一脚本 `--self-test`）：注入未知册、旧关键词、未知命令、未知 status 字段、多文件与缺册反例，验证护栏本身能报错；Bun 可用时与 `skills_guard` 一起注册。
 - 守卫自测项：`migration_guard_self_test` / `comment_guard_self_test` / `no_python_guard_self_test` / `main_thread_guard_self_test` / `tool_domain_guard_self_test` / `skills_guard_self_test`——以注入违规样本的方式验证源码/技能守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
 - `cli_contract`（`cli/tests/contract.test.ts`）：CLI 契约 mock conformance，详见「回归属性清单」的 CLI wire 形状行；仓库内不写盘（图片落临时目录）。
-- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 47 文件 418 项（2026-11-23 主代理实测 `bun test cli/tests`：395 pass / 23 skip / 0 fail / 1798 `expect()` calls，耗时约 89.73 s；文件清单与核算方式见「数值核算总表」CLI 行；静态 `test()` 声明数为 417，实测 418 含运行期展开项）。
+- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 48 文件 420 项（2026-11-24 主代理实测 `bun test cli/tests`：397 pass / 23 skip / 0 fail / 1810 `expect()` calls，耗时约 60.48 s；文件清单与核算方式见「数值核算总表」CLI 行；静态 `test()` 声明数为 419，实测 420 含运行期展开项）。
 - 上述守卫与脚本项与两层 gtest 目标合为默认门：`ctest --preset debug`（或 `bun run gda-dev-tools test`）**无过滤全跑**——引擎轨删除后不再需要 `-E "^gda_runner_|^pool_"` 之类的排除模式。
 
 ## 数值核算总表
@@ -331,26 +331,26 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 | 条目 | 权威口径（2026-11-23 重核） | 命令与证据位置 | 结论 |
 |---|---|---|---|
-| 域工具 | 246（35 个域） | 静态：逐文件统计 `src/tools/domains/*/*_tools.hpp` 的 `make_spec_tool(` ——35 个域头合计 246 处（`property_tools.hpp` 的 `make_set_node_transform_spec()` 特例已包在其 `make_spec_tool` 调用内） | 一致 |
-| 工具类别 | 28 | 246 条 `ToolSpec` 的 category 去重后 28 个取值（含 `Meta` 2 与 `System` 5 的归并口径，见 [overview.md](overview.md)「MCP 工具面」） | 一致 |
-| catalog 条目 | 252（= 246 域 + 5 元 + `system_status`） | `tests/data/tool_catalog_baseline.json` 的 `catalog_total=252`；命令：`bun run gda-dev-tools audit-tools --json`；源码：`register_all.cpp` 单独注册 `system_status`，catalog 由 `registry->all_any()` 派生；单元测试读取同一 JSON 断言 | 一致 |
-| MCP 可达工具 | 顶层 5 元工具；域工具 246 经 `call_tool` 代理可达；`system_status` 只计 catalog | baseline JSON 的 `meta_total=5` / `domain_total=246`；单元测试断言 `ListTools` 数量与 `kMetaToolNames` 一致 | 一致 |
+| 域工具 | 247（35 个域） | 静态：逐文件统计 `src/tools/domains/*/*_tools.hpp` 的 `make_spec_tool(` ——35 个域头合计 247 处（`property_tools.hpp` 的 `make_set_node_transform_spec()` 特例已包在其 `make_spec_tool` 调用内） | 一致 |
+| 工具类别 | 29 | 247 条 `ToolSpec` 的 category 去重后 29 个取值（含 `Meta` 2 与 `System` 5 的归并口径，见 [overview.md](overview.md)「MCP 工具面」） | 一致 |
+| catalog 条目 | 253（= 247 域 + 5 元 + `system_status`） | `tests/data/tool_catalog_baseline.json` 的 `catalog_total=253`；命令：`bun run gda-dev-tools audit-tools --json`；源码：`register_all.cpp` 单独注册 `system_status`，catalog 由 `registry->all_any()` 派生；单元测试读取同一 JSON 断言 | 一致 |
+| MCP 可达工具 | 顶层 5 元工具；域工具 247 经 `call_tool` 代理可达；`system_status` 只计 catalog | baseline JSON 的 `meta_total=5` / `domain_total=247`；单元测试断言 `ListTools` 数量与 `kMetaToolNames` 一致 | 一致 |
 | 生产别名 | 325（不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析） | baseline JSON 的 `alias_count=325` 与 `alias_names` / `alias_mappings` 数组逐项；统一 `deprecated_since="0.4.0"` / `removal_version="0.6.0"` | 一致 |
-| schema 基线 | 235 非空 + 17 空 | baseline JSON 的 `schema_non_empty=235` / `schema_empty=17`；单元测试 `SchemaStatisticsBaseline` 读取 `tests/support/tool_catalog_baseline.cpp` | 一致 |
-| 能力矩阵 | 561 域行 / 567 catalog 行；mapped 315 / kept 252 / missing 0 | `tests/data/capability_matrix.json` 的 `row_count` / `catalog_row_count` / `mapped_count` / `kept_count` / `domain_missing_count` | 一致 |
+| schema 基线 | 236 非空 + 17 空 | baseline JSON 的 `schema_non_empty=236` / `schema_empty=17`；单元测试 `SchemaStatisticsBaseline` 读取 `tests/support/tool_catalog_baseline.cpp` | 一致 |
+| 能力矩阵 | 562 域行 / 567 catalog 行；mapped 315 / kept 253 / missing 0 | `tests/data/capability_matrix.json` 的 `row_count` / `catalog_row_count` / `mapped_count` / `kept_count` / `domain_missing_count` | 一致 |
 | 域 flags | `kMutating` 79 / `kNone` 159 / `kCaptureImage` 7（`kLongBlocking` 3 / `kObserve` 4 / `kSceneTarget` 27 / `kUndoable` 17） | 逐项统计 baseline JSON `tools[]` 的 `flags` 字段（与领域工具页代理重算交叉核对；旧值 78 / 160 / 9 已过期） | 一致 |
 | 副作用逐项分布 | catalog：None 150 / CodeExecute 6 / Destructive 7 / Process 7 / GameRuntime 7 / WritesScene 29 / ModifiesWindow 20 / WritesFile 14 / WritesConfig 8 / ShowsAlert 4；域：None 146 / CodeExecute 4，其余同 | 逐项统计 baseline JSON 的 `tools[]` / `meta_tools[]` / `system_tools[]` 的 `side_effect`；`run_gdscript_tests` 本轮由 None 改判 CodeExecute（flags 由 `kNone` 改 `kMutating`），故 catalog None 151→150 / CodeExecute 5→6、域 147→146 / 3→4；高风险四类（Destructive + Process + CodeExecute + GameRuntime）合计 27 | 一致 |
 | 顶层汇总字段口径差异 | baseline JSON 顶部 `by_side_effect`（None 151 / CodeExecute 5）、`domain_by_side_effect`（None 147 / CodeExecute 3）、`side_effect_review`（该工具仍标 None）**仍是旧值** | 该 JSON 本轮仅改 `tools[]` 中 `run_gdscript_tests` 一条的 `side_effect` / `flags`，三处顶层汇总字段未同步；**以逐项数组为准，勿照抄旧汇总字段** | 差异已标注 |
-| 单元 | 734（76 个 unit 文件：687 `TEST` + 47 `TEST_F`） | 静态：PowerShell 正则 `^TEST(_F)?\(` 逐文件统计 `tests/unit/*_test.cpp`（本轮源码静态核算，未实测）；旧值 589 / 57 文件已过期 | 一致 |
+| 单元 | 739（77 个 unit 文件：692 `TEST` + 47 `TEST_F`） | 静态：PowerShell 正则 `^TEST(_F)?\(` 逐文件统计 `tests/unit/*_test.cpp`（本轮源码静态核算，未实测）；旧值 589 / 57 文件已过期 | 一致 |
 | 边界 | 257（35 个 boundary 文件：254 `TEST` + 3 `TEST_F`） | 静态：同上统计 `tests/boundary/*_test.cpp`（本轮源码静态核算，未实测）；旧值 190 / 19 文件已过期 | 一致 |
 | 集成 | 88（10 个 `*_test.cpp`，全部 `TEST_F`） | 静态：`^TEST(_F)?\(` 统计 `tests/integration/*_test.cpp`（本轮源码静态核算，未实测）；本轮未改 | 一致 |
 | 守卫与脚本项 | 18（guard 16 + cli 2） | 静态：统计 `tests/CMakeLists.txt` 的 `add_test(NAME ...)` 去重后 18 个注册点（`cli_unit` 的 if/else 两处算 1 个）；guard 标签 16（含 `skills_guard` / `skills_guard_self_test`）、cli 标签 2（`cli_contract` / `cli_unit`） | 一致 |
-| ctest 注册总数 | 1097 = 734 + 257 + 88 + 16 + 2（单元 + 边界 + 集成 + guard + cli） | 由上述四行相加；本轮未运行 `ctest -N`（静态核算）；旧值 885 已过期 | 一致 |
-| CLI TS 单测 | 47 文件 / 418 项（395 pass + 23 skip + 0 fail；2026-11-23 主代理实测 `bun test cli/tests`，1798 `expect()` calls，约 89.73 s） | 命令：`bun test cli/tests`（主代理实测）；静态：`cli/tests/*.test.ts` 45 个 + `*_test.ts` 2 个（`instance_identity_test.ts` / `registry_atomic_test.ts`）共 47 文件；静态 `test()` 声明 417，实测 418 含运行期展开项；2 处 `describe.skip` + 3 处 `skipIf` 块级跳过；旧值 37 文件 / 348 项 / 325 pass 已过期 | 一致 |
+| ctest 注册总数 | 1101 = 738 + 257 + 88 + 16 + 2（单元 + 边界 + 集成 + guard + cli） | 主代理实测 `ctest --preset debug`：100% tests passed out of 1101；静态宏计数 739 与 gtest discover 的 738 差 1 为条件编译项 | 一致 |
+| CLI TS 单测 | 48 文件 / 420 项（397 pass + 23 skip + 0 fail；2026-11-24 主代理实测 `bun test cli/tests`，1810 `expect()` calls，约 60.48 s） | 命令：`bun test cli/tests`（主代理实测）；静态：`cli/tests/*.test.ts` 45 个 + `*_test.ts` 2 个（`instance_identity_test.ts` / `registry_atomic_test.ts`）共 47 文件；静态 `test()` 声明 419，实测 418 含运行期展开项；2 处 `describe.skip` + 3 处 `skipIf` 块级跳过；旧值 37 文件 / 348 项 / 325 pass 已过期 | 一致 |
 | 技能卡 | EN 10 文件；EN+ZH 源共 20 文件（各 1 张入口卡 SKILL.md + 9 篇 references） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 1 个技能目录 | 一致 |
 | MCP skills 资源 | 12（1 目录 + 1 技能 + 10 文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
-| add_library 源文件 | 117 个 `.cpp`（main 1 / core 31 / tools 61 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 静态：`Get-ChildItem src -Recurse -Filter *.cpp`（本轮 117，与基线一致）；`cmake/sources/*.cmake` 清单登记 115 + 根 `CMakeLists.txt` 的 `add_library()` 直列 2（`image_ops.cpp` / `mesh_ops.cpp`） | 一致 |
-| 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 1097 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
+| add_library 源文件 | 120 个 `.cpp`（main 1 / core 33 / tools 62 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 静态：`Get-ChildItem src -Recurse -Filter *.cpp` 实测 120；`source_manifest_guard` 实测 plugin sources 120 == src/ *.cpp 120；根 `CMakeLists.txt` 另直列 `image_ops.cpp` / `mesh_ops.cpp` | 一致 |
+| 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 1101 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
 | 客户端配置 | 0（0.3.2 已移除） | `client_config_gen` 已删除；MCP 客户端由 Agent 按 `mcp_url` 生成配置 | 已移除 |
 | 端口 | 无默认端口；首次在 20000–29999 随机分配并持久化，探测上限 256 | `src/core/config.hpp`：`GDA_PORT_CANDIDATE_BASE/LIMIT = 20000/29999`、`GDA_PORT_PROBE_LIMIT = 256`、`GDA_CONTROL_PORT_BASE/LIMIT = 19900/19999`、`GDA_PRIVATE_PORT_BASE = 32768`（四条 `static_assert` 约束）；候选序列为 `[20000, 29999]` 随机排列（`src/core/transport/port_resolver.cpp`）；显式指定绑定失败不自动更换 | 一致 |
 | REST 端点数 | 0（0.3.2 已移除） | `api_surface` / `api_endpoints` / `api_server` / `api_server_routes` / `api_auth` / `api_envelope` 编译单元已删除，全仓无调用点 | 已移除 |
