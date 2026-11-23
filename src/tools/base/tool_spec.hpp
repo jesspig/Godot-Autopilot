@@ -328,6 +328,10 @@ inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
   try {
     Args declared(args, params);
     declared.validate_declared();
+    std::vector<ParamSpec> strict_params = params;
+    strict_params.push_back(ParamSpec{"confirm", "boolean", "", false});
+    Args strict(args, strict_params);
+    strict.reject_unknown();
   } catch (const ToolArgError &ex) {
     mcp::JsonValue error(mcp::JsonValue::object_tag);
     error["error"] = mcp::JsonValue(ex.what());
