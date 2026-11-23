@@ -170,6 +170,29 @@ TEST(CodeQualityC4Test, DynamicToolRuntimeMatchesSchemaDeclaration) {
             "<no error>");
 }
 
+TEST(CodeQualityC4Test, DynamicToolRejectsUndeclaredParameter) {
+  const std::vector<godot_autopilot::ParamSpec> params = {
+      {"path", "string", "", true},
+  };
+  EXPECT_EQ(dynamic_validation_error(
+                parse(R"({"path":"res://x","bogus":1})"), params),
+            "unknown parameter: bogus");
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"path":"res://x"})"), params),
+            "<no error>");
+}
+
+TEST(CodeQualityC4Test, DynamicToolAllowsConfirmMetaField) {
+  const std::vector<godot_autopilot::ParamSpec> params = {
+      {"path", "string", "", true},
+  };
+  EXPECT_EQ(dynamic_validation_error(
+                parse(R"({"path":"res://x","confirm":true})"), params),
+            "<no error>");
+  EXPECT_EQ(dynamic_validation_error(
+                parse(R"({"path":"res://x","confirm":true,"bogus":1})"), params),
+            "unknown parameter: bogus");
+}
+
 TEST(CodeQualityC4Test, DynamicToolWithoutParamsIsUnchanged) {
   EXPECT_EQ(dynamic_validation_error(parse(R"({"arbitrary":{"nested":1}})"), {}),
             "<no error>");
