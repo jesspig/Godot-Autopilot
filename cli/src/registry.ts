@@ -91,8 +91,33 @@ function sleepMs(ms: number): void {
 
 export function loadRegistry(): RegistryData {
   return withLock(() => {
-    const data = loadRegistryDataUnlocked();
-    writeRegistryAtomic(data);
+    removeOrphanTmpFiles();
+    const p = registryPath();
+    let raw: string;
+    try {
+      raw = fs.readFileSync(p, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return { version: 1, instances: [] };
+      }
+      throw error;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new CliError(ExitCode.Transport, `cannot parse instances.json at ${p}`);
+    }
+    if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { instances?: unknown }).instances)) {
+      throw new CliError(ExitCode.Transport, `cannot parse instances.json at ${p}`);
+    }
+    const data = parsed as RegistryData;
+    data.instances = data.instances.map(normalizeEntry);
+    const alive = data.instances.filter((e) => isAlive(e.pid));
+    if (alive.length !== data.instances.length) {
+      data.instances = alive;
+      writeRegistryAtomic(data);
+    }
     return data;
   });
 }
