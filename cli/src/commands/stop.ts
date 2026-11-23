@@ -1,7 +1,7 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
-import { isAlive, shouldStopByPid, stopForce, stopGraceful } from "../process";
+import { isAlive, stopDecision, stopForce, stopGraceful } from "../process";
 import { cachedEndpointAlive } from "../probe";
 import { findLiveByProject, withRegistryLock, type InstanceEntry } from "../registry";
 import { assertSingleSelector, parseTargetPort } from "../target";
@@ -40,7 +40,11 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
   const endpointAlive = typeof endpointPort === "number" && endpointPort > 0
     ? cachedEndpointAlive(endpointPort)
     : null;
-  if (shouldStopByPid(isAlive(entry.pid), endpointPort, endpointAlive)) {
+  const decision = stopDecision(isAlive(entry.pid), endpointPort, endpointAlive);
+  if (decision.identityWarning) {
+    err(`instance ${entry.id} (pid ${entry.pid}) endpoint on port ${endpointPort} did not confirm identity; falling back to pid-based stop`);
+  }
+  if (decision.stop) {
     if (method === "force") {
       stopForce(entry.pid);
     } else {
