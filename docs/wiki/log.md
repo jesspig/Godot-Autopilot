@@ -8,6 +8,8 @@
 
 - **知识库增量维护（代码质量治理与安全加固批次）**：上次同步点 `b349cb5`（2026-11-21），以 `git diff b349cb5` 定界，覆盖 11-21 尾至 11-23 的提交与工作树改动；本轮不升版，`VERSION` / `CLI_VERSION` 保持 `0.3.4-dev`。按真实源码同步受影响页面段落，逐页 `timestamp` 统一为 `2026-11-23T17:28:29+08:00`，页头审计日期同步 `2026-11-23`。要点：ST-01～ST-05 代码质量治理（受保护配置键、trash confirm、反序列化边界、IPC token 契约、公共 util 与按键统一、提示词漂移修正）、多分支安全加固（路径 containment、资源事务、可信回滚、元工具 elicitation/递归守卫、部署/安装/存储可靠性）、CLI 命令面 22→23 与单测口径重算、技能合并 `gda-change-gate`。程序化测试未统一运行，数值以静态源码核算为准，实测口径见 [tests.md](tests.md)「数值核算总表」。详见 [changelog/2026-11-23-log.md](changelog/2026-11-23-log.md)。
 
+- **0.3.4 正式发布收口**：根 `VERSION` / `CLI_VERSION` 去 `-dev` 后缀为 `0.3.4`，`cli/assets/skills.json` 由官方脚本从新 `VERSION` 重新生成；wiki 中五处「当前开发版 0.3.4-dev」陈述改为正式版并同步页头日期与 `timestamp`；新增发布说明 [release-notes/0.3.4.md](../release-notes/0.3.4.md)，汇总工具面压缩（459→252）、技能与 e2e 重组、mcp-cpp-sdk 0.3.12 升级与 ST-01～ST-05 质量治理。仅改本地文件，未打 tag / 推送 / 触发发布流程。详见 [changelog/2026-11-23-log.md](changelog/2026-11-23-log.md)。
+
 ## 2026-11-21
 
 - **e2e 技能合并为多子代理四阶段闭环**：删除 `gda-e2e-testing` 与 `gda-e2e-analysis`，新建 [`gda-e2e-loop`](../../.agents/skills/gda-e2e-loop/SKILL.md)，全程由四个独立子代理分工（主代理只做总控）：阶段1 盲测不读源码 → 阶段2 分析定案 + 独立审查复核（真伪三分类）→ 阶段3 修复子代理在独立 feature 分支逐步修复（需授权）→ 阶段4 盲测复测回归。新增固定覆盖任务书 `assets/fixed-task-brief.md`（12 功能单元 + 6 组合场景），不抽题、以覆盖全部 252 canonical 工具为硬验收，新增组合链连锁反应表；共享改进库 HARNESS_LIBRARY 随新技能迁移。「同上下文自审偏差」前提已联网核实（属实、证据强），并据文献把「独立 + 外部 grounding + 盲测」写成硬机制；报告产物统一改到 `.handoff/report/<轮目录>/`（不再放项目根目录）。同步更新 tests.md / gamejam.md / tests/README.md 及历史 changelog 引用。详见 [changelog/2026-11-21-log.md](changelog/2026-11-21-log.md)。
