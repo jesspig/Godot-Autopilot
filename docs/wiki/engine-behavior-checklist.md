@@ -7,13 +7,15 @@ tags:
   - 验收
   - e2e
   - L2蒸馏
-timestamp: "2026-11-18T12:25:50+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/
 ---
 
 # 引擎行为验收清单
 
 > **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供端到端验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。
+>
+> 审计日期：2026-11-23。本轮补记路径 containment（`weakly_canonical` 解析）、`call_tool` elicitation 与 `trash` confirm、导出期拦截、C# 桥 token 与生命周期；A 类迁移对照表规模与当前集成层口径统一为 88 项 / 10 文件。
 
 ## 用途与边界
 
@@ -58,12 +60,14 @@ resource: src/tools/
 - **回归点（遍历豁免与改判，changelog/2026-10-19 至 10-22-log.md）**：`create_scene_node` 由 `None` 改判 `writes_scene` 退出遍历（空参不再意外建根，连带 `intersect_physics_2d_ray` 的 `could not resolve 2D physics space: …` 文案进入预期错误豁免表）——工具声明变更必须同步核对遍历候选与豁免表。
 - json 参数类型接受任意 JSON：property_set 直写标量/布尔/对象/数组不再被类型校验拒绝（`42_tool_contract.json`）。
 - e2e 抽查建议：跑一轮工程时顺带用 search_tools/describe 核对新增工具的 `side_effect` 与 schema 是否如实声明；发现"空参不报错"或"未声明副作用"即登记。
+- **回归点（2026-11-23 副作用改判与导出期拦截）**：`run_gdscript_tests` 的 `side_effect` 由 `None` 改为 `CodeExecute`（flags 由 `kNone` 改 `kMutating`），高风险四类（Destructive / Process / CodeExecute / GameRuntime）合计由 26 增至 27。导出期拦截现经 `prompts_detail::reject_if_exporting()` 覆盖提示词入口，动态工具 `AutopilotTools.call_tool` 在导出期返回 `export_blocked_error_text()`。e2e 抽查：导出中分别调用领域工具、MCP 资源、提示词与动态工具 `call_tool`，均须被拒。
 
 ## 域 2：确认门（原授权门，0.3.2 已移除）
 
 - 历史语义（`47_authorization_gate.json` 蒸馏）：授权门 `deny_if_unauthorized` 先于 handler 参数校验，默认拒绝写档工具，拒绝形状为 `error` 全串 + `code=authorization_required` + `authorization_required=<capability>`。0.3.2 起授权门、`GODOT_AUTOPILOT_ALLOW` 与三档能力整体移除，对应集成层断言 `authorization_gate_test.cpp` 一并删除；现行等价门面为高风险 `side_effect`（`destructive`/`process`/`code_execute`/`game_runtime`）缺 `confirm=true` 时返回 `confirmation_required`。
 - 授权态与通道态可区分的验收语义仍适用：同一工具在「缺 `confirm` 被拒」与「`confirm` 通过但无游戏」两种态下错误文案不同，验收时须分辨（`35_scene_tree_gate.json` 两态口径）。
 - e2e 抽查建议：遇到 `confirmation_required` 时先核对本轮调用是否显式带 `confirm=true` 再判缺陷；高风险工具的 confirm 门不得被别名或批量编排绕过。
+- **回归点（2026-11-23 确认 / elicitation 收紧）**：`call_tool` 代理高风险工具时取**目标工具**的 side_effect 判定是否发起 elicitation（直调取表面副作用，`elicitation_detail::effective_side_effect` / `should_elicit`）；仅在缺 `confirm` 且客户端声明支持 elicitation 时发起。`os_file_write(action=trash)` 另需显式 `confirm=true`（`os_ops_detail::trash_needs_confirm`）。e2e 抽查：不带 confirm 调用 trash 应被拒；带 confirm 后进入真实删除路径。
 
 ## 域 3：场景节点与属性
 
@@ -108,9 +112,10 @@ resource: src/tools/
 - capture 参数校验（集成层 `capture_params_validation_test.cpp` 已钉住错误串）：`after_frames` 负数/非整数、`when` 仅限 target=game、`scale` 越界、`save`/`save_dir` 类型错误、`res://../` 逃逸与 `user://` 拒绝（`12_capture_params.json`）。
 - **退化视口错误迁移（11-18 收紧）**：编辑器目标 2D 视口渲染图像任一边 ≤8px 或可见矩形为零判退化，触发 3D 回退；两者均不可用返回结构化错误 `no_scene_open`（无场景打开）/ `viewport_degenerate`（附 `captured_viewport`/`size` 诊断）——旧行为静默 ok + 占位图（e2e Q1 的 2×2 图）；e2e 抽查：空工程捕获应报 error 或产出正常尺寸图像。
 - 工程外绝对路径拒绝（`path rejected: absolute path is outside the project root` 语义）：进程内不可复现（ProjectSettings 单例边界），错误串等价性由源码背书，验收在真实编辑器中发生（`12_capture_params.json` 的 editor_save_dir_outside_project 步，T-04 R-04-01）。
+- **回归点（2026-11-23 路径 containment）**：`normalize_project_path` 现以 `std::filesystem::weakly_canonical` 解析绝对路径与 `res://`（后者经可注入的 scheme globalize provider），新增错误 `absolute path resolves outside the project root` / `path resolves outside the project root`——符号链接逃逸不再仅靠词法前缀判断（纯逻辑由单元测试 `scheme_path_containment_test` 钉住）。e2e 抽查：真实编辑器中构造指向工程外的符号链接路径，捕获 / 资源写入须被拒。
 - 视觉辅助参数（集成层 `vision_assist_validation_test.cpp` 已钉住）：`annotate_nodes`/`annotate_nodes_max`/`diff_image`/`review_scene_visually` 全参数负例（`17_vision_assist.json`）。
 - `diff_image requires diff_against_last` 前置校验：进程内不可复现（EditorInterface 单例边界），真实编辑器中验收（`17_vision_assist.json` 的 diff_image_requires_diff 步，T-04 R-04-02）。
-- 帧相位与落盘（`48_capture_frame_phase.json`）：`when` 表达式命中抓拍返回 `when_satisfied_frame`/`captured_frame` 两帧号字段且 `captured_frame > when_satisfied_frame`；`after_frames` 延迟抓拍；连续 10 次 save 落盘互不相同的 `saved_path` 并经 list_directory 清单核对；`capture_editor_viewport(target=game)` 的 save 落盘（修复 target=game 静默忽略 save 的回归）。
+- 帧相位与落盘（`48_capture_frame_phase.json`）：`when` 表达式命中抓拍返回 `when_satisfied_frame`/`captured_frame` 两帧号字段且 `captured_frame > when_satisfied_frame`；`after_frames` 延迟抓拍；连续 10 次 save 落盘互不相同的 `saved_path` 并经 list_directory 清单核对；`capture_editor_viewport(target=game)` 的 save 落盘（修复 target=game 静默忽略 save 的回归）。2026-11-23 起 `dispatch::resolve_deferred_wait` 对 `capture_editor_viewport` 与 `capture_game_viewport` 同样经 `finalize_capture_response` 定型。
 - **前置：`48` 号帧相位与落盘语义必须 GUI 游戏渲染**（headless 游戏进程无渲染输出，无法取图；该用例曾因此临时改写测试床 `main_run_args` 并列入 isolated 名单）。`12`/`17` 的参数校验 headless 即可。
 - e2e 抽查建议：GUI 会话中做一次 when/after_frames 抓拍与 save 落盘清单核对，顺带核对 capture 目录无越权路径写入。
 
@@ -163,6 +168,7 @@ resource: src/tools/
 - csharp_* 六域工具编辑器侧参数校验（集成层无此套件，历史 JSON 声明 30 步）：定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态（非数组/超上限）、token 类型与正数（`38_csharp_bridge.json`）。
 - locator 缺失覆盖：memory 不存在名返回四段式 memory-not-found 定位错误（定位先于桥单例获取，mono/非 mono 双稳）（`38_csharp_bridge.json`）。
 - 反射真调口径（.NET 下验收）：私有成员门（`allow_non_public` 默认拒绝读/写 `_secret`、显式开启后取值）、固定元数方法调用、params 打包、泛型风格名 no-overload 全串、subscribe/unsubscribe token 链（`38_csharp_bridge.json` 真调骨架段）。
+- **回归点（2026-11-23 C# 桥 token 与生命周期）**：subscribe token 由实例级 `_nextToken=1` 改为静态 `_nextGlobalToken` + `Interlocked.Increment`（`BridgeEvents.AllocateToken`，首 token 为 0、跨桥实例唯一）；`GdaCSharpRuntime._ExitTree()` 调 `unsubscribeAll()` 并对 holder `RemoveMeta("bridge")`；桥就绪判定 `csharp_bridge_detail::bridge_ready_expression` 要求 holder 上 `has_meta("bridge")` 且 `get_meta("bridge") != null`（非仅节点存在，边界由单元测试 `bridge_locator_test` 钉住）。e2e 抽查：移除运行时桥节点后无残留订阅与失效 bridge meta，重建后 `bridge_ready=true`。
 - list_members 过滤分页（纯编辑器侧、不依赖桥）：默认分页、`name_contains`、`limit/offset` 切片与越界、`kind` 过滤、truncated 语义；counts 计数来自引擎 ClassDB（`38_csharp_bridge.json` T-24/T-25 增补）。
 - **回归点（res:// 交给 dotnet 构建不发生）**：`build_csharp_assembly` 原把 `res://` 工程文件路径原样交给 dotnet（MSB1009、构建不发生），修复为经 `ProjectSettings.globalize_path` 换算系统绝对路径；断言 result.project_file/command 契约与 `probe_script` 校验（非法 probe_script 在参数校验阶段拒绝）、`next_action`/`restart_required`/`editor_assembly_probe` 可读（`38_csharp_bridge.json`、`44_csharp_tooling.json`，changelog/2026-10-21-log.md）。
 - 缺桥错误载荷与可执行片段：runtime=game 缺桥时返回含 `suggested_action` 与 `execute_game_script.source_code` 的可执行片段（load GdaCSharpRuntime.cs → new → add_child），用 execute_game_script 执行同源片段断言 bridge_created/bridge_ready（`38_csharp_bridge.json` game_bridge_missing 段）。
@@ -220,7 +226,7 @@ resource: src/tools/
 
 ## A 类迁移对照表
 
-> 48 份 L2 用例的「集成层迁移 + 划回 e2e」合并定稿。等价口径：错误串逐字一致（C-06，含 em dash 与引号转义）；结构键与值一致；`not_empty` 声明以非空断言对应；env 注入等价复刻旧 runner `requires` 语义。集成层规模 **109 项 / 12 文件**（引用 [tests.md](tests.md)「数值核算总表」集成行，不自造口径）。原始四份来源：`.handoff/evidence/T-02/mapping.md`（00/10/47 试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`（03 工具面契约）；R-01 台账（引擎触达剔除记录）在各来源文件内。
+> 48 份 L2 用例的「集成层迁移 + 划回 e2e」合并定稿。等价口径：错误串逐字一致（C-06，含 em dash 与引号转义）；结构键与值一致；`not_empty` 声明以非空断言对应；env 注入等价复刻旧 runner `requires` 语义。集成层规模 **88 项 / 10 文件**（引用 [tests.md](tests.md)「数值核算总表」集成行，不自造口径）。原始四份来源：`.handoff/evidence/T-02/mapping.md`（00/10/47 试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`（03 工具面契约）；R-01 台账（引擎触达剔除记录）在各来源文件内。
 
 ### 已迁用例对照
 
@@ -263,6 +269,6 @@ resource: src/tools/
 
 ## 相关页面
 
-- [测试体系（tests.md）](tests.md)——集成层 109 项的套件覆盖清单、回归属性清单与数值核算总表
+- [测试体系（tests.md）](tests.md)——集成层 88 项的套件覆盖清单、回归属性清单与数值核算总表
 - [工具注册表（modules/tools_registry.md）](modules/tools_registry.md)——注册管线、工具面与排除划分判定
 - [领域工具 A 组（modules/tools_ops_a.md）](modules/tools_ops_a.md) / [B 组（modules/tools_ops_b.md）](modules/tools_ops_b.md)——各域工具实现细节

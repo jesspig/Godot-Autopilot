@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-10-21T20:08:37+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -21,13 +21,13 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-11-16（技能资源收敛为 1 张入口卡 + 9 篇 references，MCP skills 资源 12；技能权威口径见 [skills.md](skills.md)）
+> 审计日期：2026-11-23（提示词按权威代码修正工具名漂移，调试器提示词纳入导出期拦截；技能资源 1 张入口卡 + 9 篇 references / 12 资源口径见 [skills.md](skills.md)）
 
 ## 模块简介
 
 这四组文件不直接产生领域工具，而是为 MCP 服务器与编辑器体验提供支撑：
 
-- **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），均经 `server.RegisterPrompt` 注册。
+- **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），均经 `server.RegisterPrompt` 注册；回调入口统一经 `prompts_detail::reject_if_exporting()` 做导出期拦截。
 - **Resources**：暴露 15 个引擎/调试侧 MCP resource URI（8 引擎侧 + 7 调试捕获侧）+ **12 个 skills 资源**，均为 `godot://` 前缀。skills 组含 `godot://skills` 目录、`godot://skills/<name>` 与 `godot://skills/<name>/<file>`，按 1 张入口卡 + 9 篇 references 动态注册为 1 目录 + 1 技能 + 10 文件 = 12 个资源，经协议层可发现可读；单文件 MIME 按扩展名（`.md` 为 `text/markdown`），目录清单为 `application/json`。
 - **UI**：底部日志面板（`McpLogDock`）；右侧 `McpConfigDock` 已于 0.3.2 移除。
 - **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、MCP 图像内容交付、客户端 MCP 配置生成、Agent Skills 文档生成。
@@ -39,31 +39,31 @@ resource:
 | 注册函数 | 文件 | 数量 | 内容生成方式 |
 |---|---|---|---|
 | `register_all_prompts(server, queue)` | `prompt_handlers.cpp` + 7 个 `prompt_*.cpp/hpp` | 7 | 内容函数经 `queue.submit()` 在主线程执行（`prompt_handlers.cpp:28-113`） |
-| `register_debugger_prompts(server)` | `debugger_prompts.cpp/hpp` | 5 | 纯文本模板直接同步构造（不触碰 Godot API，不经 queue） |
+| `register_debugger_prompts(server)` | `debugger_prompts.cpp/hpp` + `prompt_export_guard.hpp` | 5 | 纯文本模板直接同步构造（不触碰 Godot API，不经 queue）；各回调先经 `reject_if_exporting()` 拦截导出期调用 |
 
-所有 prompt 返回单条 `role=assistant` 的 `TextContent` 消息（两处 `make_result` 实现相同）。注册后各写一条 `Prompts` 类别日志："7 prompt templates registered" / "Registered debugger prompts: 5 templates"。
+所有 prompt 返回单条 `role=assistant` 的 `TextContent` 消息（两处 `make_result` 实现相同）。通用组经 `run_prompt_task()`、调试组在各回调入口调用 `prompts_detail::reject_if_exporting()`——导出期（`ExportGuard::is_exporting()`）抛 `mcp::McpError(HandlerError, dispatch::export_blocked_error_text())`。注册后各写一条 `Prompts` 类别日志："7 prompt templates registered" / "Registered debugger prompts: 5 templates"。
 
 ### 通用 prompt 名单（register_all_prompts）
 
 | 注册名 | 描述（注册时） | 内容来源函数 | 正文要点 |
 |---|---|---|---|
-| `create-3d-scene` | Guide to create a basic 3D scene with camera, lighting, and a test object | `prompt_create_3d_scene()`（130 行） | 分步：Node3D 根 → Camera3D → DirectionalLight3D → 环境/测试对象，各步附 `create_scene_node`/`property_set` JSON 示例 |
-| `setup-character` | Guide to set up a 3D character controller with CharacterBody3D, collision, and movement script | `prompt_setup_character()`（86 行） | CharacterBody3D + CollisionShape3D + CapsuleShape3D + `create_script`/`attach_script_to_node`，附完整 player.gd 模板 |
-| `debug-physics` | Guide to use physics debugging tools including ray casts, shape casts, and performance monitors | `prompt_debug_physics()`（134 行） | `intersect_physics_3d_ray`/点查询/监视器示例（shape_cast 工具已随重命名删除） |
-| `setup-input-map` | Guide to configure input actions in Project Settings and test them | `prompt_setup_input_map()`（144 行） | 经 `call_tool` 调 `set_project_settings`/`save_project_settings` 配置 `input/move_*` 等动作与按键事件 |
-| `setup-gui` | Guide to create a simple GUI with CanvasLayer, containers, buttons, and labels | `prompt_setup_gui()`（202 行） | CanvasLayer → VBoxContainer → 标签/按钮 + 信号连接示例 |
-| `tool-usage` | Usage examples for the 17 most commonly used MCP tools with JSON input/output and gotchas | `prompt_tool_usage()`（685 行） | 实际含 **19 个**工具章节（见"不一致点"） |
-| `keycode-reference` | Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations | `prompt_keycode_reference()`（213 行） | ASCII 键码表、Godot 特殊键码（`KEY_SPECIAL=4194304` 基值）、`add_input_map_action_event` 的 event JSON、Variant→JSON 映射表 |
+| `create-3d-scene` | Guide to create a basic 3D scene with camera, lighting, and a test object | `prompt_create_3d_scene()` | 分步：Node3D 根 → Camera3D → DirectionalLight3D → 环境/测试对象，各步附 `create_scene_node`/`property_set` JSON 示例 |
+| `setup-character` | Guide to set up a 3D character controller with CharacterBody3D, collision, and movement script | `prompt_setup_character()` | CharacterBody3D + CollisionShape3D + CapsuleShape3D + `create_script`/`attach_script_to_node`（参数为 `node_path`），附完整 player.gd 模板 |
+| `debug-physics` | Guide to use physics debugging tools including ray casts, shape casts, and performance monitors | `prompt_debug_physics()` | 统一走 `physics_query`（`dimension`=2/3、`mode`=intersect_ray/shape/point）、`set_debug_visuals`（`action`=collision/navigation）、`get_debug_info`（`action`=monitors） |
+| `setup-input-map` | Guide to configure input actions in Project Settings and test them | `prompt_setup_input_map()` | 经 `call_tool` 调 `update_project_settings`（`action`=set/save）、`set_input_map_action`（`action`=set，events 带 `class`）、`get_input_state`、`input_action`、`game_input` |
+| `setup-gui` | Guide to create a simple GUI with CanvasLayer, containers, buttons, and labels | `prompt_setup_gui()` | CanvasLayer → VBoxContainer → 标签/按钮 + 信号连接示例 |
+| `tool-usage` | Usage examples for the 19 most commonly used MCP tools with JSON input/output and gotchas | `prompt_tool_usage()` | 实际含 **19 个**工具章节，注册描述已对齐为 19；示例统一走合并入口（`resource_create`/`resource_save`/`editor_scene_control`/`set_input_map_action`/`node_group`/`set_tilemap_cells` 等） |
+| `keycode-reference` | Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations | `prompt_keycode_reference()` | ASCII 键码表、按 Godot 权威 `Key` 枚举重写的特殊键表（`KEY_SPECIAL=4194304` 基值，如 `KEY_ENTER=4194309`、`KEY_SHIFT=4194325`、`KEY_META=4194327`，含小键盘段）、`set_input_map_action`（action=set）的 events JSON、Variant→JSON 映射表 |
 
-### 调试 prompt 名单（register_debugger_prompts，可带可选参数）
+### 调试 prompt 名单（register_debugger_prompts，可带可选参数，均做导出期拦截）
 
 | 注册名 | 描述 | 支持参数 | 正文引导使用的工具 |
 |---|---|---|---|
-| `debug-analyze-error` | Analyze a runtime error with full context | `error_text`（追加到文末） | `get_debugger_errors`、`get_debugger_log` |
-| `debug-analyze-breakpoint` | Analyze the current breakpoint context: stack trace, scene tree, and variable state | 无 | `execute_game_script`、`get_game_log_entries`、`get_debugger_scene_tree`、`get_debugger_session_info` |
-| `debug-review-output` | Review the game's output log for issues | `since`（追加到文末） | `get_debugger_log`、`get_debugger_output` |
-| `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `get_debug_monitors`、`get_game_status` |
-| `debug-session-status` | Quick summary of the current debug session state | 无 | `get_debugger_session_info` 等 |
+| `debug-analyze-error` | Analyze a runtime error with full context | `error_text`（追加到文末） | `get_debugger_stream`（`action`=errors/log，`source`=game/editor） |
+| `debug-analyze-breakpoint` | Analyze the current breakpoint context: stack trace, scene tree, and variable state | 无 | `game_script`（`action`=execute、`script_action`=script）、`get_game_log_entries`、`get_debugger_scene_tree`、`get_debugger_stream`（`action`=session） |
+| `debug-review-output` | Review the game's output log for issues | `since`（追加到文末） | `get_debugger_stream`（`action`=log/output，`source`=editor/game） |
+| `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `get_debug_info`（`action`=monitors）、`get_game_state`（`action`=status） |
+| `debug-session-status` | Quick summary of the current debug session state | 无 | `get_debugger_stream`（`action`=session/errors）、`game_script`、`get_game_log_entries` |
 
 ## Resources（15 个引擎/调试侧 URI + skills 资源组，均经 RegisterResource/RegisterResourceTemplate 注册）
 
@@ -71,7 +71,7 @@ resource:
 
 | 组件 | 文件 | 数量 | 注册方式 | MIME | 执行方式 |
 |---|---|---|---|---|---|
-| `register_all_resources(server, queue)` | `resource_handlers.cpp/hpp` | 8（5 静态 + 3 模板：`scene-node`/`filesystem-path`/`editor-setting`） | `godot://` URI，`application/json` | 每个 handler 经 `dispatch::run_bounded_on_main_thread`（预算 `GDA_DISPATCH_WAIT_DEFAULT_MS`）在主线程执行 |
+| `register_all_resources(server, queue)` | `resource_handlers.cpp/hpp` | 8（5 静态 + 3 模板：`scene-node`/`filesystem-path`/`editor-setting`） | `godot://` URI，`application/json` | 每个 handler 经 `dispatch::run_bounded_on_main_thread`（预算 `GDA_DISPATCH_WAIT_DEFAULT_MS`）在主线程执行；3 个模板经 `util::resource_template_value` 校验必需的 path/key 变量，`filesystem-path` 另经 `util::normalize_resource_uri_path` 规范化 |
 | `register_debugger_resources(server, queue)` | `debugger_resources.cpp/hpp` | 7（全静态） | `godot://` URI，`text/plain` | 每个 handler 经 `dispatch::run_bounded_on_main_thread` 在主线程执行，`debugger-session` 的 Godot debugger 查询也在主线程执行 |
 | `register_skill_resources(server)` | `resource_handlers.cpp` + `skill_resources.hpp`（URI 解析，header-only） | 12（1 目录 + 1 技能 + 10 文件） | `godot://skills…` URI，目录为 `application/json`、单文件按扩展名 | 读构建期内嵌的技能内容（`embedded_skills()`），不触碰 Godot API |
 
@@ -87,12 +87,12 @@ resource:
 | `scene-tree` | `godot://scene/tree` | 编辑场景树：`name`/`class`/`path`（相对根前缀）/`children` 递归 |
 | `scene-node`（模板） | `godot://scene/{path}` | 节点详情：属性（跳过 INTERNAL/GROUP/CATEGORY/SUBGROUP usage）、`groups`、`script`（class+path）、子节点摘要 |
 | `filesystem-tree` | `godot://filesystem/tree` | `EditorFileSystemDirectory` 树：`subdirs`/`files`（name/path/type） |
-| `filesystem-path`（模板） | `godot://filesystem/{path}` | 目录列出或单文件信息；路径无 `res://` 前缀时自动补全 |
+| `filesystem-path`（模板） | `godot://filesystem/{path}` | 目录列出或单文件信息；`normalize_resource_uri_path` 归一反斜杠、剥 `res://` 前缀、消解 `.`/`..`，越界或空路径报 `InvalidParams`；内部直接用规范化后的 `res://` 路径查 `EditorFileSystem` |
 | `editor-selection` | `godot://editor/selection` | 选中节点数组（name/class/相对 path）；无选择则 `[]` |
 | `editor-setting`（模板） | `godot://editor/settings/{key}` | 单键编辑器设置值 |
 | `log-recent` | `godot://log/recent` | `LogSystem` 最近 50 条：`level`/`category`/`message`/`timestamp`（ISO8601） |
 
-错误统一为 JSON 对象 `{"error": "消息"}`（本文件内 `set_error`，与 `error_util::error_json` 同构）。
+错误统一为 JSON 对象 `{"error": "消息"}`（本文件内 `set_error`，与 `error_util::error_json` 同构）；3 个模板的 path/key 变量缺失或路径非法则直接抛 `mcp::McpError(InvalidParams, "missing/invalid template variable: path|key")`。
 
 ### debugger_resources 名单（text/plain）
 
@@ -112,7 +112,7 @@ resource:
 
 `EditorDock` 子类，标题 "GDA Log"，默认停靠底部槽（`DOCK_SLOT_BOTTOM`），可关闭，最小高度 `DEFAULT_DOCK_HEIGHT = 200`：
 
-- **布局**：VBoxContainer = `RichTextLabel`（threaded、BBCode、scroll_follow、可选择、段落上限 `LINE_LIMIT = 5000` 超限删首段）+ 底部 `HFlowContainer`（Clear 按钮、Collapse 切换按钮、Detail 切换按钮、Open Logs 按钮、Open Traces 按钮、Trace 切换按钮、搜索 `LineEdit`、类别 `OptionButton`、4 个级别过滤按钮）
+- **布局**：VBoxContainer = `RichTextLabel`（threaded、BBCode、scroll_follow、可选择、段落上限 `LINE_LIMIT = 5000` 超限删首段）+ 底部 `HFlowContainer`（Clear 按钮、Collapse 切换按钮、Detail 切换按钮、Open Logs 按钮、Open Traces 按钮、Trace 切换按钮、搜索 `LineEdit`、类别 `OptionButton`、4 个级别过滤按钮）；日志行/detail/轨迹文本均先经 `util::escape_bbcode`（`[`/`]` 转义为 `[lb]`/`[rb]`）再用 `append_text` 写入，避免内容被当作 BBCode 渲染
 - **Detail 切换**：toggle 按钮（默认关）控制每条消息下是否缩进显示 `LogEntry.detail` 诊断行；`show_detail_` 变更触发 `_rebuild_log()` 全量重建
 - **Open Logs / Open Traces**：`_on_open_logs()` 与 `_on_open_traces()` 分别把 `LogPersist::log_dir()`（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/logs`）与 `LogPersist::trace_dir()`（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/traces`）经 `ProjectSettings::globalize_path` 转绝对路径后 `OS::shell_open`；失败记 System 错误日志
 - **Trace 视图**：toggle 按钮（默认关）切换「按 trace 查看」视图——人类日志行在 `entry.trace_id` 非空时追加可点击 `[trace]` 标记（`push_meta` + `meta_clicked`），点击后按该 trace_id 调用 `TraceRecorder::query_by_trace` 渲染结构化事件列表
@@ -386,10 +386,9 @@ MCP 截图交付的纯逻辑件（仅依赖 `mcp::JsonValue`/`mcp::ContentVarian
 
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
-| `prompt_handlers.cpp:93`（tool-usage 描述） | "Usage examples for the **17** most commonly used MCP tools" | `prompt_tool_usage.cpp` 正文自称 **19 个**工具，实际含 19 个章节 | 文档间冲突 |
-| `prompt_setup_input_map.cpp:69` | `Enter=4194310（KEY_ENTER）` | `prompt_keycode_reference.cpp:61` 表 `KEY_ENTER=4194312`、`KEY_META=4194310`（87 行） | 文档间冲突 |
+| prompt_handlers.cpp 的 tool-usage 注册描述 | "Usage examples for the **19** most commonly used MCP tools" | `prompt_tool_usage.cpp` 正文含 19 个工具章节，注册描述已同步为 19 | 已修复 ✓ |
+| prompt_setup_input_map.cpp / prompt_keycode_reference.cpp 的 Enter 键码 | 两处均为 `KEY_ENTER=4194309` | 特殊键表按 Godot 权威 `Key` 枚举重写（如 `KEY_SHIFT=4194325`、`KEY_META=4194327`、`KEY_F1=4194332`），原 4194310/4194312 冲突值已消除 | 已修复 ✓ |
 | `prompt_keycode_reference.cpp` 映射表 | （原）`Rid → number`、`PackedByteArray → string (base64)` | 09-13 已修复：RID → `{"id": number}` 对象（行 159）、PackedByteArray → 数字数组（行 162），与 `variant_json.cpp` 实现一致 | 已修复 ✓ |
-| `prompt_keycode_reference.cpp:57/85` | KEY_SHIFT 表格出现两行 | 分别位于特殊键表（Shift）与修饰键表（左/右 Shift），语境不同，非重复缺陷 | 已澄清 ✓ |
 | AGENTS.md（架构） | "所有 Godot API 调用必须通过队列执行" | `debugger_resources` 与 `resource_handlers` 已统一经 `dispatch::run_bounded_on_main_thread`（带预算的队列等待）执行，`debugger-session` 的 Godot debugger 查询也在主线程 | 已与代码一致 |
 | AGENTS.md（日志类别） | 仅 System/Transport/Tools/Resources/Prompts 五类 | `resource_handlers.cpp` 的 `category_to_string` 同五类 + `unknown` 兜底；UI 类别下拉一致 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | `error_util::error_json` 与资源侧 `set_error` 同构 | 一致 ✓ |

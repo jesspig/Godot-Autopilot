@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-11-19T05:31:53+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource:
   - README.md
   - README.zh-CN.md
@@ -16,7 +16,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-11-19（就绪门控消费 scene-ready；数值口径见 [tests.md](./tests.md)）
+> 审计日期：2026-11-23（公共 helper 与领域工具内部守卫增补；数值口径见 [tests.md](./tests.md)）
 
 ## 项目定位
 
@@ -89,7 +89,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 - 自定义底部日志面板 `McpLogDock`（"GDA Log"）：按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同时匹配 message 与 detail）、折叠重复、Detail 显示诊断 detail、Open Logs 打开工程级日志目录（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/logs`）、Open Traces 打开同工程 `traces` 目录与 Trace 视图（日志行带可点击 `[trace]` 标记，按 trace_id 渲染结构化事件列表，默认关闭）。"Show timestamps" 开关控制每条日志的 `[HH:MM:SS]` 本地时间前缀，经 `<集中根>/config.json`（默认 `~/.godot-autopilot/config.json`）的 `show_time` 键持久化；新路径缺该键时回退旧 `user://godot_autopilot/config.json`。折叠重复日志时，除条数外始终显示最新一条的时间，不受总开关控制。
 - 右侧配置面板 `McpConfigDock`（"MCP Config"）已于 0.3.2 移除：端口由插件持有并持久化，MCP 配置从 `gda status --json` 的 `mcp_url` 生成，授权门改为高风险工具的 `confirm`，技能通过 `gda install skills` 安装。当前仅保留 `McpLogDock`。
-- `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; retry after export completes"}`）；导出期拒绝现覆盖**工具调用 / MCP 资源 / MCP 提示词**三类入口。导出标志为**实例级**——每个 `ExportGuard` 实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表，任一实例处于导出期即返回 true。
+- `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; retry after export completes"}`）；导出期拒绝现覆盖**工具调用 / MCP 资源 / MCP 提示词**三类入口，本轮补齐提示词的 `prompts_detail::reject_if_exporting()` 与动态工具 `AutopilotTools.call_tool` 的拦截。导出标志为**实例级**——每个 `ExportGuard` 实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表，任一实例处于导出期即返回 true。
 
 ### Computer Use grounding（09-15）
 
@@ -132,14 +132,15 @@ godot-self-driving/
 │   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext、PluginConfig、EditorReadiness、ErrorWatermark、EditorCoords、LogPersist、TraceRecorder、SanitizePolicy、Monitor、MonitorEnv、PerfSampler
 │   ├── tools/                  # 领域工具：61 个 .cpp（domains/*/*_ops + base/register_all、dispatch、tool_args、tool_pipeline 等）、
 │   │                           #   35 个域 _tools.hpp（246 条 ToolSpec，325 个别名）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
-│   │                           #   ready_policy.hpp（游戏通道就绪决策，header-only）/ autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）
+│   │                           #   ready_policy.hpp（游戏通道就绪决策，header-only）/ autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）；本轮新增 header-only helper：batch_verdict（批量结果判定）、call_depth_guard（调用深度）、call_tool_elicitation（高风险 elicitation 判定）
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources + skill_resources（skills 资源组，12 个资源）
 │   ├── prompts/                # 提示词模板：12 个（prompt_handlers 7 通用 + debugger_prompts 5 调试）
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval/verify) + gda_protocol.hpp
+│   ├── csharp_bridge/          # C# 反射桥源码（6 个 .cs）：GdaCSharpBridge / GdaCSharpRuntime / BridgeCall / BridgeGetSet / BridgeConvert / BridgeEvents；静态 Interlocked token 分配、unsubscribeAll() 与 _ExitTree() 解绑
 │   ├── ui/                     # 编辑器 UI：mcp_log_dock（0.3.2 删除 mcp_config_dock）
 │   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、scene_verify、
-│   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 27 个文件（7 cpp + 20 hpp）
-│   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
+│   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 30 个文件（7 cpp + 23 hpp）
+│   │                           #   本轮新增 header-only helper：hash_util（摘要/哈希）、input_guards（取参与输入校验公共守卫）、string_util（大小写与字符串公共函数）；另有 core/path_util 提供原子写与路径工具
 ├── skills/                     # 插件技能卡源（1 张入口卡 + 9 篇 references；共 10 个 .md）
 ├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 37 个 .test.ts
 ├── tests/                      # 单元/边界/集成 gtest 目标 + support/ 夹具 + guard/ 源码守卫（含 no_python_guard）+ probe/ 传输探针（数值见 tests.md 数值核算总表）

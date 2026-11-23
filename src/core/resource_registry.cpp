@@ -11,19 +11,25 @@ namespace {
 std::unordered_map<std::string, godot::Ref<godot::Resource>> g_cache;
 std::mutex g_cache_mutex;
 
+} // namespace
+
 std::string oid_key(int64_t object_id) { return std::to_string(object_id); }
 
-bool is_pure_digits(const std::string &s) {
+bool is_object_id_key(const std::string &s) {
   if (s.empty())
     return false;
-  for (char c : s) {
-    if (c < '0' || c > '9')
+  std::size_t index = 0;
+  if (s[0] == '-') {
+    index = 1;
+    if (s.size() == 1)
+      return false;
+  }
+  for (; index < s.size(); ++index) {
+    if (s[index] < '0' || s[index] > '9')
       return false;
   }
   return true;
 }
-
-} // namespace
 
 void register_resource(const godot::Ref<godot::Resource> &res,
                        const std::string &name) {
@@ -41,7 +47,7 @@ godot::Ref<godot::Resource> lookup_memory(const std::string &name) {
   if (it != g_cache.end()) {
     return it->second;
   }
-  if (is_pure_digits(name)) {
+  if (is_object_id_key(name)) {
     auto it_oid = g_cache.find(name);
     if (it_oid != g_cache.end()) {
       return it_oid->second;

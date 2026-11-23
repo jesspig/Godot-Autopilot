@@ -3333,7 +3333,7 @@ resolve_resource(const mcp::JsonValue &args, bool &out_has_oid,
   bool has_oid = false;
   auto *it_oid_str = args.Find("object_id_str");
   if (it_oid_str && it_oid_str->IsString()) {
-    if (!util::parse_decimal_int64(it_oid_str->GetString(), obj_id)) {
+    if (!util::parse_signed_decimal_int64(it_oid_str->GetString(), obj_id)) {
       out_error = "invalid object_id_str: not a valid 64-bit integer";
       return godot::Ref<godot::Resource>();
     }

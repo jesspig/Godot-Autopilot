@@ -625,6 +625,62 @@ mcp::JsonValue with_capture_save_options(mcp::JsonValue pending,
   return pending;
 }
 
+bool is_pending_subcall_response(const mcp::JsonValue &response,
+                                 int64_t *out_request_id,
+                                 int64_t *out_timeout_ms) {
+  if (!response.IsObject())
+    return false;
+  const mcp::JsonValue *pending = response.Find("__gda_pending");
+  if (pending == nullptr || !pending->IsInt())
+    return false;
+  if (out_request_id != nullptr)
+    *out_request_id = pending->GetInt();
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  if (const mcp::JsonValue *timeout = response.Find("timeout_ms");
+      timeout != nullptr && timeout->IsInt() && timeout->GetInt() > 0)
+    timeout_ms = timeout->GetInt();
+  if (out_timeout_ms != nullptr)
+    *out_timeout_ms = timeout_ms;
+  return true;
+}
+
+mcp::JsonValue unwrap_subcall_section(const mcp::JsonValue &response,
+                                      bool await_pending) {
+  mcp::JsonValue section(mcp::JsonValue::object_tag);
+  if (const mcp::JsonValue *r = response.Find("result"))
+    return *r;
+  if (const mcp::JsonValue *e = response.Find("error")) {
+    section["error"] = *e;
+    return section;
+  }
+  int64_t request_id = 0;
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  if (await_pending &&
+      is_pending_subcall_response(response, &request_id, &timeout_ms)) {
+    mcp::JsonValue awaited =
+        runtime_ops::wait_pending_response(request_id, timeout_ms);
+    if (awaited.IsObject() && !awaited.Contains("error")) {
+      awaited = runtime_ops::finalize_capture_response(awaited, response);
+    }
+    if (awaited.IsObject()) {
+      if (const mcp::JsonValue *r = awaited.Find("result"))
+        return *r;
+      if (const mcp::JsonValue *e = awaited.Find("error")) {
+        section["error"] = *e;
+        return section;
+      }
+    }
+    return awaited;
+  }
+  std::string diagnostic = response.Dump();
+  constexpr size_t kMaxDiagnosticChars = 256;
+  if (diagnostic.size() > kMaxDiagnosticChars)
+    diagnostic.resize(kMaxDiagnosticChars);
+  section["error"] =
+      mcp::JsonValue("unexpected sub-call response shape: " + diagnostic);
+  return section;
+}
+
 mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_editor_viewport called");
@@ -1618,19 +1674,6 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     if (const mcp::JsonValue *v = from.Find(key))
       to[key] = *v;
   };
-  auto unwrap_section = [](const mcp::JsonValue &response) {
-    mcp::JsonValue section(mcp::JsonValue::object_tag);
-    if (const mcp::JsonValue *r = response.Find("result")) {
-      section = *r;
-      return section;
-    }
-    if (const mcp::JsonValue *e = response.Find("error")) {
-      section["error"] = *e;
-      return section;
-    }
-    section["error"] = mcp::JsonValue("unexpected sub-call response shape");
-    return section;
-  };
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   if (!include_editor) {
     mcp::JsonValue skipped(mcp::JsonValue::object_tag);
@@ -1646,7 +1689,7 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     copy_optional(args, editor_args, "annotate");
     copy_optional(args, editor_args, "annotate_nodes");
     copy_optional(args, editor_args, "annotate_nodes_max");
-    inner["editor_capture"] = unwrap_section(handle_capture_viewport(editor_args));
+    inner["editor_capture"] = unwrap_subcall_section(handle_capture_viewport(editor_args), false);
   }
   if (!include_game) {
     mcp::JsonValue skipped(mcp::JsonValue::object_tag);
@@ -1661,7 +1704,7 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     copy_optional(args, game_args, "annotate_nodes");
     copy_optional(args, game_args, "annotate_nodes_max");
     copy_optional(args, game_args, "timeout_ms");
-    inner["game_capture"] = unwrap_section(runtime_ops::handle_game_capture(game_args));
+    inner["game_capture"] = unwrap_subcall_section(runtime_ops::handle_game_capture(game_args), true);
   }
   if (!nodes_param) {
     mcp::JsonValue skipped(mcp::JsonValue::object_tag);
@@ -1672,13 +1715,13 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     mcp::JsonValue node_args(mcp::JsonValue::object_tag);
     node_args["paths"] = *nodes_param;
     node_args["viewport"] = mcp::JsonValue(node_viewport);
-    inner["nodes"] = unwrap_section(scene_ops::handle_get_node_screen_rect(node_args));
+    inner["nodes"] = unwrap_subcall_section(scene_ops::handle_get_node_screen_rect(node_args), false);
   }
   {
     mcp::JsonValue geom_args(mcp::JsonValue::object_tag);
     geom_args["viewport"] = mcp::JsonValue(viewport);
     geom_args["index"] = mcp::JsonValue(index);
-    inner["mapping"] = unwrap_section(editor_ui_ops::handle_get_editor_viewport_geometry(geom_args));
+    inner["mapping"] = unwrap_subcall_section(editor_ui_ops::handle_get_editor_viewport_geometry(geom_args), false);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);

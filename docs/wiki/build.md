@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-11-19T05:31:53+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -17,7 +17,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-11-19（Game Jam v2；构建、部署、打包命令与产物以本页「命令速查表」为准）
+> 审计日期：2026-11-23（部署新增产物预检且不再预清理目标工程；构建、部署、打包命令与产物以本页「命令速查表」为准）
 
 ## 命令速查表
 
@@ -25,8 +25,8 @@ resource:
 |---|---|
 | `bun run gda-dev-tools build` | Debug：配置 + 构建（不部署） |
 | `bun run gda-dev-tools build --release` | Release 配置 + 构建（不部署、不清理） |
-| `bun run gda-dev-tools deploy` | 部署 Debug 产物到 `--project <dir>` 指定的 Godot 工程（可重复）；不传 `--project` 时递归发现 `examples/` 下的比赛最终项目，跳过 intake 与 e2e 沙盒，未发现则报错退出 |
-| `bun run gda-dev-tools deploy --release` | 先清理目标工程，再部署 Release 产物 |
+| `bun run gda-dev-tools deploy` | 部署前先用 `missingDeployArtifacts()` 预检当前平台库（Windows 另含 PDB）与 6 个 C# 桥源，缺任一即报错退出且保留现有 addon；通过后部署 Debug 产物到 `--project <dir>` 指定的 Godot 工程（可重复）；不传 `--project` 时递归发现 `examples/` 下的比赛最终项目，跳过 intake 与 e2e 沙盒，未发现则报错退出 |
+| `bun run gda-dev-tools deploy --release` | 直接部署 Release 产物，**不再预清理目标工程**（产物预检同 `--debug`，缺项时保留现有 addon） |
 | `bun run gda-dev-tools package` | 仅打包本地 Debug 构建产物（默认 `build/debug`，不触发构建，产物缺失则报错退出） |
 | `bun run gda-dev-tools package --preset release` | 打包本地 Release 构建产物（`build/release`） |
 | `bun run gda-dev-tools package --libs-dir <dir>` | 从 `<dir>` 递归收集三平台库合并后打包（CI Release 用该路径；缺失任一平台库即报错退出） |
@@ -103,14 +103,17 @@ resource:
 
 `cmake --build --preset <解析后的预设名>`（`resolvePreset` 的返回值），输出 tee 到 `build/<preset>/build.log`（口径同 §2）。实际生成器由该预设决定：有 ninja 为 Ninja，否则为平台默认生成器（并行度计算对两者一致生效）。`-portable` 预设带 `configuration` 字段（见「预设」），CMake 自动翻译为 `--config Debug|Release`，多配置生成器（Visual Studio / Xcode / Ninja Multi-Config）据此把产物落进配置名子目录。
 
-### 4. 部署 `deployArtifacts(preset, projects)`（`devtools/commands/deploy.ts`）
+### 4. 部署 `runDeploy()` / `deployArtifacts()`（`devtools/commands/deploy.ts`）
 
-逐个工程循环；`--project` 未指定时递归发现 `examples/` 下含 `project.godot` 的最终项目并跳过 intake。库源目录取 [`devtools/lib/config.ts:artifactDir(preset)`](../../devtools/lib/config.ts) 而非 `BUILD_DIR / preset`，因多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」）：
+`runDeploy()` 先解析目标工程与 preset，库源目录取 [`devtools/lib/config.ts:artifactDir(preset)`](../../devtools/lib/config.ts) 而非 `BUILD_DIR / preset`，因多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」）：
 
+0. **部署前预检**（`missingDeployArtifacts(binaryDir, hostPlatform())`）：检查当前平台库、Windows 的 `godot-autopilot.pdb`、`BRIDGE_DIR` 下 6 个 C# 桥源（`BRIDGE_SOURCES`）；缺任一即打印 `[ERROR] Deployment aborted; missing artifacts: ...` 与 `Existing addons were left untouched.`，退出码 1，不触碰任何现有 addon。`--release` 也不再预先 `cleanTargets()` 清理目标工程。单测见 `devtools/commands/deploy.test.ts`（3 用例：空目录缺项、不支持平台不触碰文件系统、产物齐全返回空）。
 1. 创建部署目录，删除 Godot 热重载遗留的备份库（glob `~*`）；
 2. 生成 `godot-autopilot.gdextension`（见下节）；
-3. 复制平台库（缺失仅 WARN 不失败）；Windows 额外复制 `godot-autopilot.pdb`（存在时，仅 Debug 产出外部 PDB，Release 保持 `Embedded` 无外部符号，详见「产物清单」）；
-4. `validateAddonIntegrity()`（`devtools/commands/deploy.ts`）：解析 gdextension 中当前平台（`windows`/`linux`/`macos` 前缀）的 `[libraries]` 条目，逐个校验 `res://` 对应磁盘文件存在；缺失即报错并以退出码 1 结束（防止宿主工程导出失败）。
+3. 复制平台库（预检已保证存在）；Windows 额外复制 `godot-autopilot.pdb`（存在时，仅 Debug 产出外部 PDB，Release 保持 `Embedded` 无外部符号，详见「产物清单」）；
+4. `validateAddonIntegrity()`（`devtools/commands/deploy.ts:74`）：解析 gdextension 中当前平台（`windows`/`linux`/`macos` 前缀）的 `[libraries]` 条目，逐个校验 `res://` 对应磁盘文件存在；缺失即报错并以退出码 1 结束（防止宿主工程导出失败）。
+
+逐个工程循环发生在 `deployArtifacts()`；`--project` 未指定时递归发现 `examples/` 下含 `project.godot` 的最终项目并跳过 intake。
 
 ### 5. 打包 `packageAddon(libsDir, preset)`（`devtools/commands/package.ts`）
 
@@ -141,7 +144,7 @@ resource:
 | cli | 5 个目标的 `bun build --compile` 独立二进制（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），macOS 产物 ad-hoc 签名（`codesign --force --sign -`），各自打 zip/tar.gz 后上传 artifact；二进制名带根 `VERSION` |
 | package | 下载全部 artifact → `bun run gda-dev-tools package --libs-dir dist` 合并 → **跑 `bun run gda-dev-tools package-check dist/godot-autopilot-*.zip` 自检（失败即中止发布）** → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和）。校验和覆盖 `addons.zip` 与全部 CLI 二进制 |
 
-Release 资产下载对 tag 的 `v` 前缀与无前缀两种形式依次尝试，校验文件固定为 `sha256sums.txt`；`gda install plugin` 与 `scripts/install.*` 共用该口径。
+Release 资产下载对 tag 的 `v` 前缀与无前缀两种形式依次尝试，校验文件固定为 `sha256sums.txt`；`gda install plugin` 与 `scripts/install.*` 共用该口径。安装侧三点行为：① `cli/src/commands/install.ts` 的 `shouldStopRunningForInstall(archiveReady)`——仅在归档校验通过、确认含 `.gdextension` 后才 `stopForce` 运行中的插件实例（不再安装开始即强停）；② `scripts/install.ps1` / `install.sh` 在校验通过后写自更新 manifest 到 `~/.godot-autopilot/cache/manifests/cli-<version>.json`（含 sha256/size/platform/fetched_at 等字段，跳过校验时不写）；③ 二进制替换失败时恢复旧版本到原路径并报错退出。安装与缓存的详细口径见 [modules/cli.md](./modules/cli.md)。
 
 macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编译 universal 双架构（仅 Apple 平台生效），gdextension 对应条目为 `macos.{debug,release}.universal`。
 
@@ -284,7 +287,7 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 | [`harness.ts`](../../devtools/commands/harness.ts) | 自改进 harness 三命令：`runHarnessSetup` 按序跑 build/deploy/start/list/status/ping/tools list 并逐步报退出码（失败即以该码退出）；`runHarnessCoverage` 经 `gda trace export --format jsonl` 读轨迹，仅按 `getCanonicalCatalog()` 的 252 canonical 名统计（别名计入 `alias_excluded` 不计入 `used`），写 `coverage.json` 与 `trace-snapshot.jsonl`；`runHarnessDigest` 只读解析 `report.md`/`evidence.md`/`coverage.json` 产出 `digest.json`（Q、S、关卡、因果三元组、覆盖缺口与四字段口径）。单测见 `cli/tests/harness.test.ts` |
 | [`tool-audit.ts`](../../devtools/commands/tool-audit.ts) | 工具面审计（`runToolAudit`）；另导出 `getCanonicalCatalog(): string[]`——复用 `buildAudit().tool_names` 返回 252 项 canonical 名（不含别名），供 harness coverage 的 252 口径使用，不新增其他职责 |
 | [`jam.ts`](../../devtools/commands/jam.ts) | Game Jam 抽题与项目创建：读 schema v2 题库并校验；按比赛最终项目判定已用主题；每次抽题独立采样 3–5 条关键词与灵感；生成/刷新 `examples/<theme_id>/project/` intake；`jam create` 复制 intake、按 `<slug>-<hash8>` 命名、写入 `jam.json`；`jam e2e` 创建/刷新/重置 `examples/e2e`（`kind=e2e`，拒绝非 e2e 目录）；作品说明文档按 `GAMEJAM.md` 提交要求处理；支持 `list`/`projects`/`index`/`--json`；单测见 `cli/tests/jam.test.ts` |
-| [`deploy.ts`](../../devtools/commands/deploy.ts) | 把 `artifactDir(preset)` 指向的产物（**不是** `BUILD_DIR / preset`，多配置生成器下多一层配置名子目录）复制到 `resolveProjects()` 解析出的目标工程，生成 `.gdextension`，`validateAddonIntegrity()` 逐条校验 res:// 路径存在（库缺失时报错并以退出码 1 结束） |
+| [`deploy.ts`](../../devtools/commands/deploy.ts) | `runDeploy()` 先经 `missingDeployArtifacts()` 预检平台库/PDB/6 个 C# 桥源（缺项退出 1 且不碰现有 addon，`--release` 亦不再预清理目标工程），再由 `deployArtifacts()` 把 `artifactDir(preset)` 指向的产物（**不是** `BUILD_DIR / preset`，多配置生成器下多一层配置名子目录）复制到 `resolveProjects()` 解析出的目标工程，生成 `.gdextension`，`validateAddonIntegrity()` 逐条校验 res:// 路径存在（库缺失时报错并以退出码 1 结束）；单测见 `deploy.test.ts` |
 | [`package.ts`](../../devtools/commands/package.ts) | 打包本地构建产物（默认 `build/debug`，`--preset release` 用 `build/release`，`--libs-dir` 用外部目录）；`collectPlatformLibs()` 递归收集三平台库、`collectCSharpBridge()` 收集 6 个 C# 桥 `.cs`、`collectPackageFiles()` 汇总「平台库 + C# 桥 + gdextension」到**临时暂存目录**（不含 `.pdb`），再由 `writeZip()` 出 `dist/godot-autopilot-<version>.zip` |
 | [`package-check.ts`](../../devtools/commands/package-check.ts) | 打包完整性自检：解压 zip 后核对三平台库齐全、`BRIDGE_SOURCES` 6 个 C# 桥源文件齐全、`.gdextension` 的 `[libraries]` 条目逐一有对应文件、包内不含 `.pdb`；通过退出 0，缺项退出 1，参数错误退出 2 |
 | [`clean.ts`](../../devtools/commands/clean.ts) | 按 `resolveProjects()` 解析出的目标工程清 `.godot/` 与 `addons/godot-autopilot/`，**不碰 `build/`** |
@@ -309,7 +312,7 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 
 CLI 载体（`cli/`）为 Bun + TypeScript 源码直跑，**不参与 `gda-dev-tools build`/`deploy`/`package` 构建流水线**。本地开发只需 Bun：
 
-- 跑测试：`bun test cli/tests`（37 文件 348 项：325 pass / 23 skip，秒级）
+- 跑测试：`bun test cli/tests`（2026-11-23 实测 47 文件 418 项：395 pass / 23 skip / 0 fail，约 90 秒；权威口径见 [tests.md](./tests.md)「数值核算总表」）
 - 类型检查：`bun x tsc -p cli/tsconfig.json --noEmit`
 - 手动调用：`bun cli/bin/gda.ts --help`
 

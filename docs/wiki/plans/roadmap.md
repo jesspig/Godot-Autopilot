@@ -6,13 +6,15 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
 > 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径**：以 [测试体系](../tests.md)「数值核算总表」为唯一权威；本页各批次记录中的计数均为交付当时值，不代表当前值。
+>
+> 审计日期：2026-11-23。本轮为测试扩容与硬化（公共 helper、路径 containment、elicitation、C# 桥生命周期），未新增域工具、未改变工具面（catalog 252 / 35 域）与 P0–P3 交付状态；行为验收点补记见 [引擎行为验收清单](../engine-behavior-checklist.md)。
 
 ## 竞品全景（一行定位速记）
 

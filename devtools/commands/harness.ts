@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { numberField, readTraceRecords, stringField, type TraceRecord } from "../../cli/src/trace";
 import { PROJECT_ROOT } from "../lib/config";
 import { getCanonicalCatalog } from "./tool-audit";
 
@@ -87,21 +88,6 @@ function defaultStepRunner(command: string[]): number {
   }
 }
 
-function defaultCaptureRunner(command: string[]): { exitCode: number; stdout: string } {
-  try {
-    const result = Bun.spawnSync(command, {
-      cwd: PROJECT_ROOT,
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    return { exitCode: result.exitCode ?? 1, stdout: result.stdout.toString() };
-  } catch (error) {
-    console.error(`[ERROR] failed to start ${command[0]}: ${message(error)}`);
-    return { exitCode: 1, stdout: "" };
-  }
-}
-
 export function setupCommandSequence(project: string, headless: boolean): string[][] {
   const start = ["gda", "start", "--project", project];
   if (headless) start.push("--headless");
@@ -109,10 +95,10 @@ export function setupCommandSequence(project: string, headless: boolean): string
     ["bun", "run", "gda-dev-tools", "build"],
     ["bun", "run", "gda-dev-tools", "deploy", "--project", project],
     start,
-    ["gda", "list"],
+    ["gda", "list", "--project", project],
     ["gda", "status", "--project", project, "--json"],
     ["gda", "ping", "--project", project],
-    ["gda", "tools", "list"],
+    ["gda", "tools", "list", "--project", project],
   ];
 }
 
@@ -163,6 +149,26 @@ export function parseTraceJsonl(text: string): CoverageTraceRecord[] {
     });
   }
   return records;
+}
+
+export function readCliCoverageRecords(
+  records: TraceRecord[],
+  startedAtMs?: number,
+): CoverageTraceRecord[] {
+  const scoped: CoverageTraceRecord[] = [];
+  for (const record of records) {
+    if (stringField(record, "source") !== "cli") continue;
+    if (stringField(record, "kind") !== "tool_call") continue;
+    const started = numberField(record, "wall_start_ms");
+    if (startedAtMs !== undefined && started > 0 && started < startedAtMs) continue;
+    scoped.push({
+      tool: stringField(record, "tool") || stringField(record, "name"),
+      kind: "tool_call",
+      ok: record.ok === true,
+      wallEndMs: numberField(record, "wall_end_ms"),
+    });
+  }
+  return scoped;
 }
 
 export function parseRoundStartMs(roundName: string): number | undefined {
@@ -255,6 +261,7 @@ export function computeCoverage(
 export type CoverageDeps = {
   runner?: CaptureRunner;
   catalog?: string[];
+  cliRecords?: TraceRecord[];
 };
 
 export function runHarnessCoverage(
@@ -262,7 +269,9 @@ export function runHarnessCoverage(
   deps: CoverageDeps = {},
 ): number {
   const catalog = deps.catalog ?? getCanonicalCatalog();
-  const runner = deps.runner ?? defaultCaptureRunner;
+  const roundDir = path.resolve(options.round);
+  const roundStartMs = parseRoundStartMs(path.basename(roundDir));
+  let records: CoverageTraceRecord[];
   let traceText: string;
   if (options.trace !== null) {
     try {
@@ -271,21 +280,33 @@ export function runHarnessCoverage(
       console.error(`[ERROR] cannot read trace file ${options.trace}: ${message(error)}`);
       return 1;
     }
-  } else {
-    const result = runner(["gda", "trace", "export", "--format", "jsonl"]);
+    records = parseTraceJsonl(traceText);
+  } else if (deps.runner !== undefined) {
+    const result = deps.runner(["gda", "trace", "export", "--format", "jsonl"]);
     if (result.exitCode !== 0) {
       console.error(`[ERROR] gda trace export failed (exit ${result.exitCode})`);
       return result.exitCode;
     }
     traceText = result.stdout;
+    records = parseTraceJsonl(traceText);
+  } else {
+    records = readCliCoverageRecords(deps.cliRecords ?? readTraceRecords(), roundStartMs);
+    traceText = `${records
+      .map((record) =>
+        JSON.stringify({
+          tool: record.tool,
+          kind: record.kind,
+          ok: record.ok,
+          wall_end_ms: record.wallEndMs,
+        }),
+      )
+      .join("\n")}\n`;
   }
-  const roundDir = path.resolve(options.round);
   const evidencePath = path.join(roundDir, "evidence.md");
   const evidenceRows = fs.existsSync(evidencePath)
     ? countEvidenceRows(fs.readFileSync(evidencePath, "utf8"))
     : 0;
-  const roundStartMs = parseRoundStartMs(path.basename(roundDir));
-  const result = computeCoverage(parseTraceJsonl(traceText), catalog, evidenceRows, roundStartMs);
+  const result = computeCoverage(records, catalog, evidenceRows, roundStartMs);
   fs.mkdirSync(roundDir, { recursive: true });
   fs.writeFileSync(path.join(roundDir, result.trace_snapshot), traceText, "utf8");
   fs.writeFileSync(path.join(roundDir, "coverage.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
@@ -304,7 +325,7 @@ export function extractIds(text: string, prefix: "Q" | "S"): string[] {
 }
 
 export function extractLevels(text: string): string[] {
-  const countMatch = text.match(/(?:关卡数|关数|levels)\s*[:：]?\s*(\d+)/i);
+  const countMatch = text.match(/(?:关卡数|关数|功能单元数|levels)\s*[:：=]?\s*(\d+)/i);
   if (countMatch) {
     const count = Number(countMatch[1]);
     if (Number.isFinite(count) && count > 0) {
@@ -341,6 +362,7 @@ export function extractPlaytimeMinutes(text: string): number {
     /playtime_minutes\s*[:：]?\s*(\d+(?:\.\d+)?)/i,
     /单关[^\n]*?(\d+(?:\.\d+)?)\s*分钟/,
     /通关时长\s*[:：]?\s*(\d+(?:\.\d+)?)\s*分钟/,
+    /完整通关[^\n]*?(\d+(?:\.\d+)?)\s*分钟/,
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -449,6 +471,20 @@ export function runHarnessDigest(options: HarnessDigestOptions): number {
     return 1;
   }
   fs.writeFileSync(path.join(roundDir, "digest.json"), `${JSON.stringify(digest, null, 2)}\n`, "utf8");
+  let coverageOut: Record<string, unknown>;
+  try {
+    coverageOut = JSON.parse(fs.readFileSync(coveragePath, "utf8")) as Record<string, unknown>;
+  } catch {
+    coverageOut = {};
+  }
+  if (
+    coverageOut.evidence_rows !== digest.evidence_rows ||
+    coverageOut.suspected_gaming !== digest.suspected_gaming
+  ) {
+    coverageOut.evidence_rows = digest.evidence_rows;
+    coverageOut.suspected_gaming = digest.suspected_gaming;
+    fs.writeFileSync(coveragePath, `${JSON.stringify(coverageOut, null, 2)}\n`, "utf8");
+  }
   process.stdout.write(
     `[DIGEST] ${digest.round} q=${digest.q_items.length} s=${digest.s_items.length} levels=${digest.levels.length} gaps=${digest.coverage_gaps.length}\n`,
   );

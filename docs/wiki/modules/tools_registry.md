@@ -7,13 +7,13 @@ tags:
   - 工具注册
   - ToolSpec
   - 别名
-timestamp: "2026-11-18T12:25:50+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-11-18（工具面 252 = 246 域 + 5 元 + `system_status`；35 个域文件、28 个 category、325 个生产别名；schema 235 非空 / 17 空；Tasks 存储路径修正见正文）
+> 审计日期：2026-11-23（工具面 252 = 246 域 + 5 元 + `system_status`；35 个域文件、28 个 category、325 个生产别名；schema 235 非空 / 17 空；Tasks 存储路径修正见正文）
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`tool_spec.hpp`、`tool_args.cpp/hpp`、`tool_pipeline.cpp/hpp`、`tool_base.hpp`、`tool_registry.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.cpp/hpp`、`side_effect_policy.hpp`、`confirmation.hpp`、35 个域 `*_tools.hpp`，对照 `tests/unit/register_all_test.cpp`、`tests/unit/tool_registry_test.cpp`、`tests/unit/confirmation_test.cpp`、`tests/unit/tool_verdict_test.cpp`、`tests/guard/` 与仓库根 `AGENTS.md`。
 > 相关页面：[ToolSpec 数据层与执行管线](../tool_base_design.md) · [别名约定](../tool_surface_conventions.md) · [测试体系](../tests.md) · [端口与实例登记](ports.md) · [工具实现 A 组](tools_ops_a.md) · [工具实现 B 组](tools_ops_b.md) · [入口与运行时](entry_runtime.md) · [架构总览](../overview.md)
 
@@ -21,7 +21,7 @@ resource: src/tools/
 
 工具注册发生在 `register_all_tools()`（`src/tools/base/register_all.cpp`），唯一来源是 `ToolRegistry`：**246 个域工具 + `system_status` + 5 个元工具 = catalog 252 条**，全部为 `ToolSpec` 数据记录（`make_spec_tool` → `SpecTool`，见 [ToolSpec 数据层与执行管线](../tool_base_design.md)）。域工具定义在 `src/tools/domains/<域>/<域>_tools.hpp`（35 个域文件，共 246 条 `ToolSpec`），每域 `make_tools()` 返回 `vector<unique_ptr<ToolBase>>`；每个工具 = `const std::vector<ParamSpec>` 参数表 + 一行 `make_spec_tool(ToolSpec{...})`。
 
-`build_registry()` 的注册顺序固定：先 add `system_status`（`kHealthProbe`），再逐域注册 35 个 `make_tools()`，再 add 5 个元工具（`flags = kMeta` 自动归入 meta 表），最后追加 `dynamic_specs::store()` 中的用户脚本工具（`kDynamic`）。`refresh_derived()` 从 registry 派生 catalog、BM25 索引与 dispatch handlers。
+`build_registry()` 的注册顺序固定：先 add `system_status`（`kHealthProbe`），再逐域注册 35 个 `make_tools()`，再 add 5 个元工具（`flags = kMeta` 自动归入 meta 表），最后追加 `dynamic_specs::store()` 中的用户脚本工具（`kDynamic`）。注册末尾调 `audit_destructive_declarations(*registry)`（`src/tools/base/register_all.cpp`）：用 `side_effect_policy::destructive_suspects()` 扫描 `all_any()`，对「名字/描述像破坏性但未声明 `Destructive`」的工具写一条 Tools Warning 并记 `destructive_declaration_audit` lifecycle 事件（带 `suspects` 计数），命中即说明声明与实际语义可能不符；现有 3 条豁免见 `side_effect_policy.hpp` 的 `kDestructiveExemptions`。`refresh_derived()` 从 registry 派生 catalog、BM25 索引与 dispatch handlers。
 
 ```mermaid
 flowchart TD
@@ -42,9 +42,9 @@ flowchart TD
 ```
 
 - **数据记录**：`ToolSpec{name, description, category, tags, side_effect, flags, params, handler, raw_schema, aliases, examples}`；`flags` 为 `tool_flags` 位标志（`kMeta` / `kDynamic` / `kMutating` / `kObserve` / `kCaptureImage` / `kSceneTarget` / `kUndoable` / `kHealthProbe` / `kLongBlocking`，共 9 位）。`ToolRegistry::add()` 按 `flags & kMeta` 自动路由，不依赖 `dynamic_cast` 分类。
-- **`side_effect`（10 值）**：`none` / `writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` / `process` / `code_execute` / `game_runtime` / `destructive`；只读工具回显 `"none"`。当前分布（252 条）：`none` 151、`writes_scene` 29、`modifies_window` 20、`writes_file` 14、`writes_config` 8、`destructive` 7、`process` 7、`game_runtime` 7、`code_execute` 5、`shows_alert` 4。高风险四类（`destructive` / `process` / `code_execute` / `game_runtime`）要求 `arguments.confirm=true`；`confirm` 只防误触，不是安全边界。
+- **`side_effect`（10 值）**：`none` / `writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` / `process` / `code_execute` / `game_runtime` / `destructive`；只读工具回显 `"none"`。当前分布（252 条，按当前 `tools` 数组重算）：`none` 150、`writes_scene` 29、`modifies_window` 20、`writes_file` 14、`writes_config` 8、`destructive` 7、`process` 7、`game_runtime` 7、`code_execute` 6、`shows_alert` 4。2026-11-23 起 `run_gdscript_tests` 由 `none` 改为 `code_execute`（同时置 `kMutating`）；高风险四类（`destructive` / `process` / `code_execute` / `game_runtime`）合计 27 个，要求 `arguments.confirm=true`；`confirm` 只防误触，不是安全边界。
 - **schema 单一源**：`SpecTool` 构造时 `schema_ = raw_schema.IsObject() ? raw_schema : schema::build_schema(params)`；域工具与 `system_status` 均从参数表派生，5 个元工具中 `search_tools` / `batch_execute` / `code_execute` 因嵌套结构手写 JSON 存入 `raw_schema`，`get_tool_detail` / `call_tool` 经 `build_schema`。
-- **取参**：`Args`（`tool_args.hpp/cpp`）提供 `opt_*` / `require_*` / `get_*` 与 `reject_unknown()`；`null` 视为缺失，`integer` 接受整数值 double、拒绝小数与越界，`boolean` 严格。错误消息 `missing required parameter: X` / `invalid parameter: X must be a ...` 由 handler 抛出后经 dispatch 统一包装。该工具已实现并有测试覆盖，但域 handler 仍以 `args.Find(...)` 为主；新增工具跟随所在域的既有写法。
+- **取参**：`Args`（`tool_args.hpp/cpp`）提供 `opt_*` / `require_*` / `get_*` 与 `reject_unknown()`，新增 `validate_declared()`（按参数表逐项校验必填与类型）；`null` 视为缺失，`integer` 接受整数值 double、拒绝小数与越界，`boolean` 严格。错误消息 `missing required parameter: X` / `invalid parameter: X must be a ...` 由 handler 抛出后经 dispatch 统一包装。域 handler 仍以 `args.Find(...)` 为主；但 `kDynamic` 工具已在 `SpecTool::execute()` 入口经 `spec_detail::validate_dynamic_args()` 用 `Args` 校验（必填/类型 + 拒绝未声明参数，`confirm` 例外），详见 [ToolSpec 数据层与执行管线](../tool_base_design.md)。新增域工具跟随所在域的既有写法。
 - **生命周期**：`g_active_registry` 为 mutex 保护的 `shared_ptr<ToolRegistry>`；`register_all_tools` / `refresh_dynamic_tools` 每次先构建局部 registry，再经 `refresh_derived` 批量替换 catalog/index/dispatch。dispatch handler 捕获 registry 并在调用时 `find` 取工具，旧请求持有的 registry 由共享所有权延长生命周期。
 - **动态工具**：`AutopilotTools`（`autopilot_tools.cpp`）把用户工具 spec 存入 `dynamic_spec_store.hpp` 的 store()（互斥保护），注册/注销后调 `refresh_dynamic_tools()` 全量重建；工具带 `kDynamic`，重名或与内置工具碰撞拒绝。目录批量注册入口 `rescan(directory)`（默认 `res://addons/godot-autopilot-tools`；前缀校验、256 文件、深度 8、逐文件错误隔离，返回 `scanned` / `registered` / `failed` / `errors`）。
 
@@ -82,20 +82,21 @@ flowchart TD
 |---|---|
 | `search_tools` | BM25 检索真实工具；`limit` 默认 20、`0` 全量、负值报 `invalid parameter`；`categories=true` 返回分类计数。`list_categories` 是其别名 |
 | `get_tool_detail` | 获取单个 canonical 工具的完整 schema；传别名返回 canonical 详情并附弃用字段 |
-| `call_tool` | 按名称代理调用领域工具或 `system_status`；解析别名、等待异步结果、附加截图 image content，并检查 `error` 置 `is_error` |
-| `batch_execute` | 顺序批量执行多工具；`stop_on_error`、`rollback_on_error`、`await_async`；逐条返回结果 |
+| `call_tool` | 按名称代理调用领域工具或 `system_status`；解析别名、等待异步结果、附加截图 image content，并检查 `error` 置 `is_error`；递归深度守卫（≥8 拒绝）与按目标工具副作用触发的 elicitation 见下方 |
+| `batch_execute` | 顺序批量执行多工具；`stop_on_error`、`rollback_on_error`、`await_async`；逐条返回结果。成功/失败判定统一走 `batch_verdict.hpp` 的 `op_succeeded()` → `spec_detail::verdict_of()`（顶层 `error`、`structured_error`、`runtime_error` 三条失败轨一视同仁），不再只看顶层 `error`；`$steps[N]` 序号解析与回滚 `rollback_partial` 计算见 [ToolSpec 数据层与执行管线](../tool_base_design.md) |
 | `code_execute` | 执行任意 GDScript；支持 `function_name`、`timeout_ms`、`auto_owner`、`confirm` |
 
 - `system_status` 是 `SpecTool`、非元工具，经 `call_tool` 调用；返回 `version` / `port` / `uptime_seconds` / `running` / `tool_count`（252）/ `queue_depth` 与 `main_thread` 对象（`last_drain_age_ms` / `queue_depth` / `queue_cancelled` / `queue_rejected_full` / `oldest_pending_ms`）。`ping` 是其别名。
 - 元工具处理器用 `RequestContext::GetRequest().id` 建立 `monitor::RequestScope` 并经 `tools::RequestSpanGuard` 压入请求 span，使「协议请求 → call_tool → 域工具」trace 端到端关联。
-- `call_tool` 对带 `__gda_pending` 的异步结果做等待与 `capture_game_viewport` 结果定型（`runtime_ops::wait_pending_response`）；`call_tool` 与 `batch_execute(await_async=true)` 的编排回调在 MCP 线程执行，领域工具 handler 仍由 dispatch 路由回主线程。
+- `call_tool` 对带 `__gda_pending` 的异步结果做等待（`runtime_ops::wait_pending_response`）；截图结果定型改为按工具名判定，仅 `capture_game_viewport` / `capture_editor_viewport` 走 `finalize_capture_response`，不再以结果含 `path` 推断。直连工具回调也会在 `dispatch::has_deferred_marker()` 命中时统一 `resolve_deferred_wait()`（新增 `csharp_build` → `editor_ops::wait_csharp_build` 分支）。`call_tool` 与 `batch_execute(await_async=true)` 的编排回调在 MCP 线程执行，领域工具 handler 仍由 dispatch 路由回主线程。
+- `call_tool` 入口有线程局部递归深度守卫（`kMaxCallToolDepth = 8`，`call_depth_guard.hpp` 的 `call_depth_exceeds(current, max)` 判定 `current >= max`），超限返回 `call_tool recursion depth exceeded`；防止 `call_tool` 代理链自递归打穿调用栈。
 - 图片附件按 `kCaptureImage` flag 判定：registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content，仅未知工具名才走旧白名单 `is_image_capture_tool` 兜底；单元测试 `tool_pipeline_traits_test.cpp` 覆盖附件判定纯逻辑。
 
 ## Tasks、Progress、MRTR 与 Skills
 
 - **Tasks**：`ServerContext` 固定启用 `enable_tasks_extension`，任务存储为 `<gda_home>/.godot-autopilot/tasks/tasks-<stamp>.jsonl` 的 `FileTaskStore`（11-18 修正：此前漏 `.godot-autopilot` 段落到 profile 根 `tasks/`；路径变更仅影响新会话，旧文件保留），装配时发 `tasks_enabled` lifecycle 事件、`path` 属性与存储路径同值；`call_tool` 以 `Task/Optional` 注册，支持 `tasks/get|update|cancel`，不支持任务的客户端同步退化。
 - **Progress**：`batch_execute` 在请求带 progress token 时发送开始/结束两条 `notifications/progress`（当前不逐 operation 上报）。
-- **MRTR**：full 面直接工具在客户端声明 elicitation 且未带 `confirm` 时返回 `input_required`；`accept` 注入 `confirm=true`，`decline/cancel` 不执行。`call_tool` 仍走目标工具的 `confirmation_required`。
+- **MRTR**：full 面直接工具在客户端声明 elicitation 且未带 `confirm` 时返回 `input_required`；`accept` 注入 `confirm=true`，`decline/cancel` 不执行。2026-11-23 起 `call_tool` 也纳入同一 elicitation 判定（`call_tool_elicitation.hpp`）：代理时按 `args.name` 查目标工具（含别名解析）取其 `side_effect` 作为有效副作用，`should_elicit = required_for(effect) && !confirm_provided && client_supports_elicitation`；目标为高风险且未带 confirm 时同样返回 `input_required`，不再由 `call_tool` 自身的 `None` 副作用绕过。注入 confirm 后仍走目标工具的 `confirmation_required`。
 - **Skills**：`enable_skills_extension=true`，1 张入口卡 + 9 篇 references 以 `godot://skills/<name>/SKILL.md` 注册为 `mcp::Skill`（resources=dynamic）；旧 `godot://skills/...` 资源保留。Skills 是 2026 协议能力：客户端必须先发 `server/discover`（不要用 `initialize`）再把 `MCP-Protocol-Version: 2026-07-28` 与 `params._meta` 带到 `skills/list|get`；`initialize` 仍按 2025-11-25 协商，供旧客户端使用。
 - `gda status --json` 的 `mcp` 块暴露协议版本、capabilities 与 serverInfo，脚本可先判断扩展再选命令。
 

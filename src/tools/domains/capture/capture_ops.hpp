@@ -44,5 +44,12 @@ mcp::JsonValue save_capture_bytes(const godot::PackedByteArray &bytes,
 mcp::JsonValue with_capture_save_options(mcp::JsonValue pending,
                                          const CaptureSaveOptions &options);
 
+bool is_pending_subcall_response(const mcp::JsonValue &response,
+                                 int64_t *out_request_id,
+                                 int64_t *out_timeout_ms);
+
+mcp::JsonValue unwrap_subcall_section(const mcp::JsonValue &response,
+                                      bool await_pending);
+
 } // namespace capture_ops
 } // namespace godot_autopilot

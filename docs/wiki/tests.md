@@ -7,27 +7,27 @@ tags:
   - 单元测试
   - 集成
   - 守卫
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-11-17（Game Jam v2 与 `jam e2e`；程序化测试不依赖抽题；数值以本页「数值核算总表」为准）
+> 审计日期：2026-11-23（程序化测试不依赖抽题；本轮 gtest 数值为源码静态核算、未运行 ctest，CLI 单测为主代理实测 `bun test cli/tests`，以本页「数值核算总表」为准）
 
 ## 架构总览
 
 测试由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入（`CMakeLists.txt:100`）。该开关固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（cacheVariables 默认 `ON`），经 `inherits` 下发给全部 4 个可执行 configure 预设（`debug`/`debug-portable`/`release`/`release-portable`）：重建 `build/` 后重新配置（`bun run gda-dev-tools build` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参；裸 `cmake`（不带 preset）配置仍默认 OFF。
 
-**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-17 实测 **885 = 589 + 190 + 88 + 16 + 2**）：
+**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-23 源码静态核算 **1097 = 734 + 257 + 88 + 16 + 2**，未实测）：
 
 | 层 | ctest 载体 | 数量 | 标签 | 判定方式 | 验证对象 |
 |---|---|---|---|---|---|
-| 单元 | `gda_unit_tests`（gtest，`gtest_discover_tests` 逐条注册） | 589（57 文件） | `unit` | gtest 断言 | 合法输入下的模块行为：纯逻辑、编解码、注册与查询 |
-| 边界 | `gda_boundary_tests`（gtest，同上） | 190（19 文件） | `boundary` | gtest 断言 | 非法 / 极端输入与拒绝路径：参数校验、错误映射、预算超时、门控守卫 |
+| 单元 | `gda_unit_tests`（gtest，`gtest_discover_tests` 逐条注册） | 734（76 文件） | `unit` | gtest 断言 | 合法输入下的模块行为：纯逻辑、编解码、注册与查询 |
+| 边界 | `gda_boundary_tests`（gtest，同上） | 257（35 文件） | `boundary` | gtest 断言 | 非法 / 极端输入与拒绝路径：参数校验、错误映射、预算超时、门控守卫 |
 | 集成 | `gda_integration_tests`（gtest，同上） | 88（10 文件） | `integration` | gtest 断言 | 进程内 inline 派发的 handler 契约（参数校验 / 错误串 / 注册面 / 运行期通道前置路径），零引擎零项目绑定 |
-| 守卫与脚本项 | `tests/CMakeLists.txt` 的 `add_test`（含 `no_python_guard`、源码守卫、守卫自测、`cli_contract` / `cli_unit`） | 以 `ctest -N` 为准 | `guard` / `cli` | 脚本退出码 | 源码纪律、无 Python 回退与 CLI wire 形状 |
-| 合计 | `ctest -N` | 以实测为准 | — | — | — |
+| 守卫与脚本项 | `tests/CMakeLists.txt` 的 `add_test`（含 `no_python_guard`、源码守卫、守卫自测、`cli_contract` / `cli_unit`） | 18（guard 16 + cli 2，静态计数 `add_test` 注册点） | `guard` / `cli` | 脚本退出码 | 源码纪律、无 Python 回退与 CLI wire 形状 |
+| 合计 | `ctest -N` | 1097（静态核算，未实测） | — | — | — |
 
 **回归属性**不是独立 ctest 目标，而是分布在单元 / 集成 / 脚本项内的基线断言组，钉住注册面、错误面、wire 形状与技能面，防工具集与协议漂移；清单与更新 SOP 见「回归属性清单」。
 
@@ -42,7 +42,7 @@ cmake --preset debug
 # 构建
 cmake --build --preset debug --target gda_unit_tests gda_integration_tests
 
-# 全量运行（默认门：885 条注册点全跑，无过滤、无引擎前置）
+# 全量运行（默认门：1097 条注册点全跑，无过滤、无引擎前置）
 ctest --preset debug
 
 # 集成层单跑（ctest 正则匹配「套件.用例」名）
@@ -59,14 +59,14 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 上列 `debug` / `release` 预设**固定 Ninja 生成器**，PATH 无 ninja 时改用 `debug-portable` / `release-portable`（回退路径见 [build.md](./build.md)「预设」）。`bun run gda-dev-tools test` 由 `resolvePreset()`（`devtools/lib/config.ts`）自动选路，`--preset` 仍只有 `debug` / `release`。四个 preset 共用同一 `binaryDir`，测试目标与可执行文件位置均为 `build/debug/` 或 `build/release/`，不受生成器选择影响。
 
 - **依赖**：googletest 为 `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出（`git clone --recurse-submodules` 或 `git submodule update --init --recursive`），由 `tests/CMakeLists.txt:9-15` 经 `gda_require_submodule` + `add_subdirectory` 引入，缺失即 configure 报错、不做网络回退；godot-cpp 与 mcp-cpp-sdk 同为子模块，单元与集成目标均链接（集成另链接 `mcp-http`，`tests/CMakeLists.txt:107-108`）。**不需要 Godot 可执行文件、`.env` / `GODOT_PATH` 或插件部署**——测试链路无引擎拉起路径。
-- **测试侧构建目标**：`gda_unit_tests` / `gda_boundary_tests` / `gda_integration_tests`（ctest 常驻，分别打 `unit` / `boundary` / `integration` 标签）与 `gda_mcp_transport_probe`（`tests/probe/mcp_transport_probe.cpp`，传输自检程序，**不注册为 ctest 用例**、不计入 885，由主代理验收阶段按需执行）。
+- **测试侧构建目标**：`gda_unit_tests` / `gda_boundary_tests` / `gda_integration_tests`（ctest 常驻，分别打 `unit` / `boundary` / `integration` 标签）与 `gda_mcp_transport_probe`（`tests/probe/mcp_transport_probe.cpp`，传输自检程序，**不注册为 ctest 用例**、不计入 1097，由主代理验收阶段按需执行）。
 
 ### tests/ 目录布局
 
 | 目录 | 内容 |
 |---|---|
-| `tests/unit/` | 单元测试层（57 个 `*_test.cpp`，glob 自动收集，标签 `unit`） |
-| `tests/boundary/` | 边界测试层（19 个 `*_test.cpp`，参数校验 / 拒绝路径 / 预算超时 / 错误映射，标签 `boundary`） |
+| `tests/unit/` | 单元测试层（76 个 `*_test.cpp`，glob 自动收集，标签 `unit`） |
+| `tests/boundary/` | 边界测试层（35 个 `*_test.cpp`，参数校验 / 拒绝路径 / 预算超时 / 错误映射，标签 `boundary`） |
 | `tests/integration/` | 集成测试层（`harness.hpp` 夹具 + 10 个 `*_test.cpp`，标签 `integration`） |
 | `tests/support/` | `config_loader.{cpp,hpp}`（单元与边界共用的测试支撑源；原 `tests/runner/` 目录其余文件已随引擎轨删除） |
 | `tests/guard/` | 源码守卫（`migration_guard.cmake` + Bun/TS 守卫）与 `migrated_domains.txt` |
@@ -88,68 +88,88 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 ## 单元测试层
 
-**57 个测试文件，589 个用例**（2026-11-17 `ctest -L unit -N` 实测；源码 `TEST`/`TEST_F` 宏口径见数值总表；历史计数演变见本页 git 历史与 [changelog/](changelog/) 各日记录）：
+**76 个测试文件，734 个用例**（2026-11-23 源码静态统计 `TEST`/`TEST_F` 宏：687 `TEST` + 47 `TEST_F`，未实测；核算方式见数值总表；历史计数演变见本页 git 历史与 [changelog/](changelog/) 各日记录）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
 | `alias_coverage_test.cpp` | 1 | 能力矩阵旧工具行均可解析为 kept/mapped/alias/merged、别名解析无冲突 |
 | `alias_projection_test.cpp` | 8 | 各域别名参数/结果投影：legacy 输入映射到统一 canonical 工具 |
 | `alias_resolution_test.cpp` | 8 | 别名解析：改名、参数改名、标量包数组、结果恢复旧形状、破坏类别名需 confirm、冲突拒绝、catalog 只列真实工具、detail 带别名元数据 |
+| `api_token_test.cpp` | 5 | API 令牌：生成长度/失败兜底/可注入随机源、常量时间比较对空值与不匹配拒绝与相同接受 |
+| `array_script_branch_test.cpp` | 10 | 类型化数组元素的分支判定纯逻辑：空类不判型、原生类走原生分支、全局脚本类走脚本分支、未知类报不可解析、原生/脚本不匹配的双类名报错；`parse_hint_class` 裸名保持、去类型前缀、逗号截断与空白裁剪、空串产出空 |
+| `atomic_write_path_test.cpp` | 3 | 原子写路径：临时路径带序列号且唯一、自动序列号互异、写入替换内容且不留临时文件 |
+| `batch_refs_test.cpp` | 7 | `batch_execute` 最小变量串联纯逻辑：`$prev` 链、`$steps[N].result` 嵌套替换与字面量保持原样、前向引用/首操作 `$prev`/状态错配报错前缀、stop_on_error 截断 |
+| `batch_rollback_test.cpp` | 4 | `batch_execute` 回滚：使用被编辑场景的对象历史、历史版本不增长标记首步、快照匹配时完整回滚、无可撤销步骤时不回滚 |
+| `batch_verdict_test.cpp` | 4 | 批量结果判定：顶层 ok 成功、顶层 error / 结构化 error / `runtime_error` 失败 |
 | `bm25_index_test.cpp` | 20 | BM25 检索：命中排序、分类/标签过滤、空查询、上限截断 |
+| `call_depth_guard_test.cpp` | 2 | 工具间调用深度守卫：低于上限放行、达到或超过上限拒绝 |
+| `call_tool_elicitation_test.cpp` | 5 | elicitation 判定：`call_tool` 代理取目标工具副作用、直调取表面副作用、高风险缺 confirm 且客户端支持时发起、confirm 或缺能力时跳过、低风险不发起 |
 | `capability_matrix_test.cpp` | 2 | 历史工具映射矩阵：旧工具须 kept 或 mapped、唯一旧工具数与行数一致 |
-| `register_all_test.cpp` | 31 | 注册管线：5 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、同 server 重注册拒绝（SDK 0.3.11）、双服务器一致性；full 面分页与 `list_changed`、Tasks 能力广告、`tool.side_effect` 可读性、UI 布局描述契约、`json` 参数不写 `type`；`ToolResultIsError` 五项判定 |
-| `command_queue_test.cpp` | 16 | 跨线程 submit/drain、异常经 future 传播、主线程记录；`submit_tracked`/`cancel`（命中/已执行/未知 id）与 drain 心跳 `last_drain_age_ms`；带预算 submit 预算内完成、超时取消待执行任务、取消计数递增、owner 线程内联执行、预算非正仍等完成 |
-| `tool_catalog_test.cpp` | 6 | ToolCatalog：add/get、重复覆盖、并发安全 |
-| `log_system_test.cpp` | 9 | 单例、级别/分类/文本过滤、环形缓冲覆盖、值拷贝快照与 recent 上限；`trace_id`/`span_id` 关联字段、`filter_text` 匹配 detail/`trace_id`/`span_id` |
-| `tool_registry_test.cpp` | 6 | `SpecTool`/ToolRegistry：add/find/categories、execute echo、`side_effect_of`、`kMeta` flags 归类与路由、`make_tool_info` 的 dynamic/mutating |
-| `tool_verdict_test.cpp` | 15 | 工具结果判定（`src/tools/base/tool_spec.hpp`）：顶层/结构化 `code` 优先级、`runtime_error` 与成功判定、`deferred` 标记、trace stash/take 往返 |
+| `capture_subcall_test.cpp` | 6 | 工具子调用 pending 识别：形状与整数 id 要求、默认超时、解包保留既有 result/error、未 await 的 pending 保留诊断而非静默丢弃、await 后不再报形状不符 |
+| `code_quality_framework_test.cpp` | 11 | 动态工具框架：LRU 逐出与恢复键不重复、deferred trace、重名/与元工具冲突拒绝、声明校验、运行期匹配 schema、拒绝未声明参数、confirm 元字段放行、无参工具、null 视为缺失 |
+| `code_quality_transport_test.cpp` | 13 | 传输侧错误计数与脱敏：上限、各形态错误（顶层/结构化/结果内对象）、按请求归因与回退桶、敏感数值/布尔/null/对象数组剥离、raw 模式保留 |
+| `command_queue_test.cpp` | 17 | 跨线程 submit/drain、异常经 future 传播、主线程记录；`submit_tracked`/`cancel`（命中/已执行/未知 id）与 drain 心跳 `last_drain_age_ms`；带预算 submit 预算内完成、超时取消待执行任务、取消计数递增、owner 线程内联执行、非正/负预算立即拒绝 |
+| `config_setting_guard_test.cpp` | 2 | 配置写键守卫：受保护前缀拒绝、普通键放行 |
 | `confirmation_test.cpp` | 3 | 高风险工具确认（`src/tools/base/confirmation.hpp`）：高风险副作用缺 `confirm` 拒绝、`confirm:true` 放行、拒绝携带结构化码与档位 |
-| `schema_builder_test.cpp` | 5 | schema 构造形状、required 位置、未知类型不崩溃 |
-| `runtime_ops_test.cpp` | 12 | 编辑器队列注入往返、`payload_is_pending` 识别（非对象/非整数拒绝）、`discard_pending` 未命中返回 false |
-| `search_quality_test.cpp` | 1 | 标准查询集命中前 10（search_quality 基线） |
-| `security_parallel_hardening_test.cpp` | 13 | 安全与并行硬化：队列关闭/满/线程校验/零容量/打开态拒绝、工程路径 scheme 与穿越拒绝、配置常量、Variant 字符串与数组截断、日志并发查询稳定性 |
-| `skill_gen_test.cpp` | 10 | 技能生成器：入口卡清单、name/description 规范、SKILL.md + references 布局、frontmatter 渲染、CLI-first 发现契约（`SkillBooksDescribeDiscovery` / `CliChannelContract`）、脚本桥防复活守卫（`SkillBooksCarryNoScriptBridge`）、反引号词回验（详见下节） |
-| `mcp_image_content_test.cpp` | 11 | 截图 MCP image content（header-only `src/util/mcp_image_content.hpp`）：3 个 capture_* 白名单、顶层/嵌套 data 提取与优先级、data 替换为 `<attached-as-image-content>`、非白名单/非对象/缺 data/非 png 不注入 |
-| `log_ops_test.cpp` | 4 | 游戏日志过滤（`log_ops::filter_log_lines`）：空 filter 返回全部、子串命中、保留末尾 limit 条、limit ≤0 返回全部命中 |
+| `coords_inverse_test.cpp` | 6 | 坐标反解往返纯逻辑：恒等与拉伸往返还原视口点、letterbox 边距先减后反缩、矩形中心往返、singular 与近 singular 变换回退输入点 |
+| `deserialization_guard_test.cpp` | 2 | 反序列化守卫：NodeRef 路径穿越拒绝、普通路径接受 |
+| `dotnet_env_test.cpp` | 6 | .NET 环境判定纯逻辑（`src/util/dotnet_env.hpp`）：特性名版本切换（4.4 起 `dotnet` / 4.4 之前 `mono`）、`CSharpScript` 类注册即 .NET 构建（不受特性名影响）、4.4+ 只认 `dotnet` 特性名、4.4 之前只认 `mono` 特性名、版本未知取二者或、普通编辑器判否 |
+| `dup_helpers_test.cpp` | 9 | 公共 helper 去重口径：十进制数字、有符号解析、字符串取参、非空校验、`res://` URI、`received_keys` 后缀、FNV-1a、对象定位字段、JSON 转义 |
 | `editor_coords_test.cpp` | 15 | 编辑器坐标纯逻辑（`src/core/editor_coords.hpp/cpp`）：`fit_within` 缩放、`scale_size` 缩放链、截图 `diff_sample` 采样比较与 bbox |
 | `editor_output_decode_test.cpp` | 8 | 控制台输出解码纯逻辑（`decode_console_output`）：UTF-8 中文与 ASCII/空串原样通过、GBK 字节转为可读 UTF-8、Windows 下 ACP 预解码乱码回环还原（CP936「姝ｅ湪」→「正在」）、纯 CJK 文本不被 ACP 回环改写、非法与截断字节替换 `?` 不崩溃、严格 UTF-8 拒绝超长/代理/越界编码（非 Windows 或 ACP 非 CP936 时 `GTEST_SKIP`） |
 | `editor_ui_tree_test.cpp` | 6 | 编辑器场景树行纯逻辑（`editor_ui_ops` 侧）：filter 匹配（空过滤/大小写不敏感跨 path 与 name/selected_only）、`max_items` 钳制上限 1000、ASCII 折叠仅限 ASCII 字母、相对路径分段拼接 |
-| `inline_resource_json_test.cpp` | 12 | 资源属性内联描述解析：`{"type": ..., "properties": {...}}` 一步创建 `[sub_resource]` 的解析/校验与错误路径 |
-| `skill_resources_test.cpp` | 13 | `godot://skills` MCP 资源解析：目录/单册/单文件 URI 解析与未知 URI 错误；`ScriptMimeType`（`.md`→`text/markdown`；实现侧 `skill_resources.hpp` 仍保留 `.mjs`→`text/javascript` 映射，当前无技能使用该扩展名） |
-| `tilemap_ops_test.cpp` | 13 | `fill_tilemap_rect` 矩形铺砖纯逻辑：角点归一/格数上限（>100000 报错）/擦除分支与 set_count 统计 |
-| `vision_assist_test.cpp` | 7 | 视觉辅助截图参数纯逻辑：`scale`/`max_dimension` 组合封顶与小图不放大、`scale` 越界拒绝、`region` 左上交集裁剪、`diff_image` bbox 与阈值噪声忽略、`annotate_nodes_max` 先于绘制强制 |
-| `game_response_envelope_test.cpp` | 6 | 游戏回包信封纯逻辑（`runtime/game_response_envelope.hpp`）：标量负载顶层抬升 `wrapped`、数组负载留在 `result` 下并顶层带 `next_seq`、对象负载合并传输字段不改写、负载自有值优先于传输字段、缺传输字段不改形状、非对象游戏回包原样返回 |
+| `game_response_envelope_test.cpp` | 17 | 游戏回包信封纯逻辑（`runtime/game_response_envelope.hpp`）：标量负载顶层抬升 `wrapped`、数组负载留在 `result` 下并顶层带 `next_seq`、对象负载合并传输字段不改写、负载自有值优先于传输字段、缺传输字段不改形状、非对象游戏回包原样返回；cancel 请求 id 契约、静默通道超时/`script_error` 证据、每请求计数与 queued-ready 结构化重试 |
 | `game_ui_coords_test.cpp` | 6 | `click_game_ui_element` 注入坐标换算纯逻辑（`core/editor_coords.hpp`）：4x 拉伸、letterbox 边距、画布平移复合、rect 中心映射 |
-| `input_key_parse_test.cpp` | 7 | 键名解析（`input_key_parse`）：标点映射 ASCII 键码、空格/波浪号原样、字母数字与命名键、F1–F12 解析与越界拒绝、Ctrl-主键组合、未知命名键返回 None |
-| `keycode_alias_test.cpp` | 6 | 键名→键码统一判定纯逻辑（`input_map_ops::resolve_key_name_code`）：裸名/`KEY_` 前缀/大小写不敏感/数字码等价、未知名判无效 |
-| `script_freshness_test.cpp` | 7 | 脚本取用口径纯逻辑（`script_ops.cpp`）：`script_load_cache_mode` 缓存模式选择、`wants_fresh_load` 只认字面 true |
+| `gda_home_test.cpp` | 18 | 家目录集中根解析纯逻辑（`src/core/storage/gda_home.cpp`）：四级来源的候选顺序、形状校验与存在性校验的差异、覆写值的直返语义、平台分支（Windows / POSIX）、父目录上溯与各类覆写回退 |
 | `gdscript_autoload_hint_test.cpp` | 6 | GDScript 编译错误的 autoload 名提示：命中已注册 autoload、非 autoload/其他错误不提示、重复名去重、裸标识符匹配、空输入不提示 |
 | `gdscript_wrap_test.cpp` | 29 | GDScript 包装层纯逻辑（`src/util/gdscript_wrap.hpp`）：裸语句包装（多行/注释与 `extends` 剥离/tab 缩进保持/混用缩进拒绝/顶层函数定义拒绝）、单表达式自动 return 与入口名、`wrap_whole_script` 入口校验、`map_error_line_numbers` 偏移映射与多命中、`strip_extends_lines` 行数保持 |
-| `tool_pipeline_traits_test.cpp` | 4 | traits 图片附件判定纯逻辑：顶层 data 附加 image content、非 png/缺 data 拒绝、无 flag 透传（有 flag 的场景补全需编辑器，单元测试未覆盖） |
-| `tool_invoke_test.cpp` | 4 | 工具间组合调用纯逻辑（`tools::invoke_tool`）：未知/成功透传、异步 pending 嵌套拦截、深度守卫（导出分支无 setter，单元测试未覆盖，注释已声明） |
-| `batch_refs_test.cpp` | 7 | `batch_execute` 最小变量串联纯逻辑：`$prev` 链、`$steps[N].result` 嵌套替换与字面量保持原样、前向引用/首操作 `$prev`/状态错配报错前缀、stop_on_error 截断 |
-| `trace_recorder_test.cpp` | 19 | `TraceRecorder` 纯逻辑：id 前缀/唯一性、seq 严格递增、`query_recent` 尾取与 0/超量边界、`query_by_trace` 过滤、`query_since` 边界与 `next_seq`、`clear_for_test` 重置、脱敏剥离敏感键值保留其他键、脱敏/原始两种截断口径、FNV-1a 稳定值与区分、base64 解码、`to_json_line` 核心键与转义；`TraceKind`/`trace_kind_name`、schema v2 新字段与敏感键通用集合、`query_by_request` |
-| `log_persist_test.cpp` | 10 | `LogPersist` 纯函数：`format_human_line` 三态、`session_stamp_from_ticks` UTC 转换、`should_prune` 边界（>20 文件或 >50MB）、`level_name`/`category_name` 全枚举与未知值；健康计数访问器与 `health_summary`、`trace_dir`；`health_summary` 可观测键与非主线程 trace 图片缓冲落盘、脱敏时返回空 |
-| `monitor_test.cpp` | 9 | 统一埋点门面 `monitor` 纯逻辑：`trace_kind_name` 全枚举、`RequestRegistry` 的 put/get/take/size/clear 与 `expire` 边界、`emit` 严格递增 seq 与默认填充（`thread_id`/`monotonic_ns`）、`tool_call` 失败态与人类日志按 trace_id 可检索、`begin_request`/`end_request` 经 traceparent 关联、`push_request`/`pop_request`/`RequestScope`、`build_attrs`/`json_escape` 转义、`sanitize_field` 截断与大小写不敏感剥离 |
-| `perf_sampler_test.cpp` | 6 | 性能采样纯函数（仅 header 内联部分）：`accumulate_frame`（负 delta 归零与峰值跟踪）、`average_frame_ms`（空样本为 0）、`compute_rates`（`seconds<=0` 全 0 与手算窗口的吞吐/错误率/平均延迟）、零响应/零样本时比率归 0、`milliseconds_to_nanoseconds` 换算；`tick`/`set_queue`/超时看门狗依赖引擎与 `perf_sampler.cpp`，单元测试未覆盖 |
-| `array_script_branch_test.cpp` | 10 | 类型化数组元素的分支判定纯逻辑：空类不判型、原生类走原生分支、全局脚本类走脚本分支、未知类报不可解析、原生/脚本不匹配的双类名报错；`parse_hint_class` 裸名保持、去类型前缀、逗号截断与空白裁剪、空串产出空 |
-| `coords_inverse_test.cpp` | 6 | 坐标反解往返纯逻辑：恒等与拉伸往返还原视口点、letterbox 边距先减后反缩、矩形中心往返、singular 与近 singular 变换回退输入点 |
-| `metadata_key_test.cpp` | 8 | 元数据键路由与校验纯逻辑：前缀名路由 metadata、裸名保持 property、键合法性校验（空键/`..`/禁用字符拒绝）、detail 四要素文案与契约字面量 |
-| `text_ops_csharp_test.cpp` | 13 | C# 类声明解析纯逻辑（`text_ops.hpp` 导出的 `parse_csharp_classes`）：空格与紧贴冒号基类、泛型列表前空格与泛型后基类、tab/换行空白、缺基类留空、限定名取尾段、注释与字符串噪声、多类返回、partial 检测 |
-| `http_transport_test.cpp` | 46 | 自建 HTTP 传输纯逻辑（`src/core/http_transport.{hpp,cpp}` + `http_parse.hpp`）：请求行/头块解析上限、查询串解析、`Content-Length` 与请求体上限（4 MiB → 413）、路由表匹配、百分号解码；传输轮转公平性与流式收口用例 |
-| `mcp_http_shim_test.cpp` | 36 | MCP HTTP 适配层纯逻辑（`src/core/mcp_http_shim.{hpp,cpp}`）：请求/响应与 MCP 消息的映射、SSE 与 JSON 双通道、错误帧转换 |
-| `mcp_http_shim_dispatch_test.cpp` | 8 | MCP 适配层与派发的接线纯逻辑：请求分类与派发入口的对应关系、初始化通知转发 |
-| `storage_layout_test.cpp` | 7 | 存储布局路径纯逻辑（`src/core/storage/storage_paths.cpp` + `project_store.cpp`）：全局配置路径、工程目录名（名称替换 + 截断 + 路径哈希）、工程级配置路径、日志/轨迹/截图目录路径 |
-| `legacy_compat_test.cpp` | 15 | 遗留数据兼容纯逻辑（`src/core/storage/legacy_store.cpp`）：旧目录定位、配置项回退选取（新路径优先、缺键回退、解析失败回退）、相对路径分类（全局配置/日志/轨迹/截图/不支持）、复制式导入规划与执行（不覆盖、不删源、跳过计数）、导入摘要文本 |
-| `gda_home_test.cpp` | 13 | 家目录集中根解析纯逻辑（`src/core/storage/gda_home.cpp`）：四级来源的候选顺序、形状校验与存在性校验的差异、覆写值的直返语义、平台分支（Windows / POSIX） |
-| `project_store_test.cpp` | 8 | 存储根解析纯逻辑（`src/core/storage/project_store.cpp`）：集中根目录名、工程目录名生成、路径哈希稳定性与截断、全局/工程配置与实例索引路径 |
-| `instance_registry_test.cpp` | 10 | 实例登记纯逻辑（`src/core/storage/instance_registry.cpp`）：单实例记录读写、记录结构（端口/进程号/端点/令牌/版本）、全局索引重建与条目跳过 |
-| `ipc_endpoint_test.cpp` | 4 | IPC 端点路径派生（`src/core/transport/ipc_endpoint.cpp`）：run dir + 工程名哈希的 socket 路径、超长 run dir 回退纯哈希、工程名清洗与空名、残留端点仅在不可达时重建 |
-| `ipc_framing_test.cpp` | 11 | IPC 分帧纯逻辑（`src/core/transport/ipc_framing.cpp`）：换行分帧的单行/粘包/残片/超限/CRLF 裁剪，长度前缀分帧的往返/粘包/残片/超限/4 MiB 帧 |
-| `dotnet_env_test.cpp` | 6 | .NET 环境判定纯逻辑（`src/util/dotnet_env.hpp`）：特性名版本切换（4.4 起 `dotnet` / 4.4 之前 `mono`）、`CSharpScript` 类注册即 .NET 构建（不受特性名影响）、4.4+ 只认 `dotnet` 特性名、4.4 之前只认 `mono` 特性名、版本未知取二者或、普通编辑器判否 |
+| `godot_transport_pending_test.cpp` | 13 | Godot 传输 pending 键纯逻辑（`src/core/godot_transport.{hpp,cpp}`）：复合键区分连接与请求 id、同输入键稳定（幂等）、int 与 string 请求 id 前后缀区分不串扰 |
 | `http_stream_registry_test.cpp` | 3 | HTTP 流式注册表纯逻辑（`src/core/http_stream_registry.{hpp,cpp}`）：Sink 帧数超上限拒绝写入、close 后不再接收帧、多连接广播的拒绝计数 |
-| `godot_transport_pending_test.cpp` | 3 | Godot 传输 pending 键纯逻辑（`src/core/godot_transport.{hpp,cpp}`）：复合键区分连接与请求 id、同输入键稳定（幂等）、int 与 string 请求 id 前后缀区分不串扰 |
-| **合计** | **589** | |
+| `http_transport_test.cpp` | 46 | 自建 HTTP 传输纯逻辑（`src/core/http_transport.{hpp,cpp}` + `http_parse.hpp`）：请求行/头块解析上限、查询串解析、`Content-Length` 与请求体上限（4 MiB → 413）、路由表匹配、百分号解码；传输轮转公平性与流式收口用例 |
+| `inline_resource_json_test.cpp` | 12 | 资源属性内联描述解析：`{"type": ..., "properties": {...}}` 一步创建 `[sub_resource]` 的解析/校验与错误路径 |
+| `input_key_parse_test.cpp` | 7 | 键名解析（`input_key_parse`）：标点映射 ASCII 键码、空格/波浪号原样、字母数字与命名键、F1–F12 解析与越界拒绝、Ctrl-主键组合、未知命名键返回 None |
+| `input_key_unification_test.cpp` | 4 | 键名口径统一：解析器共用同一权威表、函数键用权威裸名表、裸函数名不进通用解析器、未知与畸形名解析为 None |
+| `input_validation_hardening_test.cpp` | 15 | 输入加固：物理 FPS / 最大 FPS / time_scale 范围、游戏桥畸形 JSON 不抛、十进制对象 id 溢出拒绝、ASCII 小写安全、BBCode 转义、资源模板缺变量、资源 URI 归一化、测试目录与主题读路径经工程路径归一化、符号链接 containment、BM25 空文本按标签/分类、候选平均长度 |
+| `instance_registry_test.cpp` | 14 | 实例登记纯逻辑（`src/core/storage/instance_registry.cpp`）：单实例记录读写、记录结构（端口/进程号/端点/令牌/版本）、IPC 端点（TCP/Unix）往返与校验、文件 owner-only 与原子写不留临时文件、全局索引重建与条目跳过 |
+| `ipc_endpoint_test.cpp` | 4 | IPC 端点路径派生（`src/core/transport/ipc_endpoint.cpp`）：run dir + 工程名哈希的 socket 路径、超长 run dir 回退纯哈希、工程名清洗与空名、残留端点仅在不可达时重建 |
+| `ipc_framing_test.cpp` | 12 | IPC 分帧纯逻辑（`src/core/transport/ipc_framing.cpp`）：换行分帧的单行/粘包/残片/超限/CRLF 裁剪与残片超限，长度前缀分帧的往返/粘包/残片/超限/4 MiB 帧与 wire buffer 上界 |
+| `keycode_alias_test.cpp` | 6 | 键名→键码统一判定纯逻辑（`input_map_ops::resolve_key_name_code`）：裸名/`KEY_` 前缀/大小写不敏感/数字码等价、未知名判无效 |
+| `legacy_compat_test.cpp` | 15 | 遗留数据兼容纯逻辑（`src/core/storage/legacy_store.cpp`）：旧目录定位、配置项回退选取（新路径优先、缺键回退、解析失败回退）、相对路径分类（全局配置/日志/轨迹/截图/不支持）、复制式导入规划与执行（不覆盖、不删源、跳过计数）、导入摘要文本 |
+| `log_ops_test.cpp` | 4 | 游戏日志过滤（`log_ops::filter_log_lines`）：空 filter 返回全部、子串命中、保留末尾 limit 条、limit ≤0 返回全部命中 |
+| `log_persist_test.cpp` | 10 | `LogPersist` 纯函数：`format_human_line` 三态、`session_stamp_from_ticks` UTC 转换、`should_prune` 边界（>20 文件或 >50MB）、`level_name`/`category_name` 全枚举与未知值；健康计数访问器与 `health_summary`、`trace_dir`；`health_summary` 可观测键与非主线程 trace 图片缓冲落盘、脱敏时返回空 |
+| `log_system_test.cpp` | 12 | 单例、级别/分类/文本过滤、环形缓冲覆盖、值拷贝快照与 recent 上限；`trace_id`/`span_id` 关联字段、`filter_text` 匹配 detail/`trace_id`/`span_id`；SDK 日志桥接的失败原因落点、级别抬升与 Transport 分类映射 |
+| `mcp_http_shim_dispatch_test.cpp` | 8 | MCP 适配层与派发的接线纯逻辑：请求分类与派发入口的对应关系、初始化通知转发 |
+| `mcp_http_shim_test.cpp` | 36 | MCP HTTP 适配层纯逻辑（`src/core/mcp_http_shim.{hpp,cpp}`）：请求/响应与 MCP 消息的映射、SSE 与 JSON 双通道、错误帧转换 |
+| `mcp_image_content_test.cpp` | 11 | 截图 MCP image content（header-only `src/util/mcp_image_content.hpp`）：3 个 capture_* 白名单、顶层/嵌套 data 提取与优先级、data 替换为 `<attached-as-image-content>`、非白名单/非对象/缺 data/非 png 不注入 |
+| `metadata_key_test.cpp` | 8 | 元数据键路由与校验纯逻辑：前缀名路由 metadata、裸名保持 property、键合法性校验（空键/`..`/禁用字符拒绝）、detail 四要素文案与契约字面量 |
+| `monitor_test.cpp` | 10 | 统一埋点门面 `monitor` 纯逻辑：`trace_kind_name` 全枚举、`RequestRegistry` 的 put/get/take/size/clear 与 `expire` 边界、同客户端 id 不同内部键相互独立、`emit` 严格递增 seq 与默认填充（`thread_id`/`monotonic_ns`）、`tool_call` 失败态与人类日志按 trace_id 可检索、`begin_request`/`end_request` 经 traceparent 关联、`push_request`/`pop_request`/`RequestScope`、`build_attrs`/`json_escape` 转义、`sanitize_field` 截断与大小写不敏感剥离 |
+| `object_id_reference_test.cpp` | 3 | 对象 id 引用：负 id 字符串在赋值查找链中保留、旧十进制解析器仍拒绝负数、有符号解析器拒绝畸形输入 |
+| `perf_sampler_test.cpp` | 6 | 性能采样纯函数（仅 header 内联部分）：`accumulate_frame`（负 delta 归零与峰值跟踪）、`average_frame_ms`（空样本为 0）、`compute_rates`（`seconds<=0` 全 0 与手算窗口的吞吐/错误率/平均延迟）、零响应/零样本时比率归 0、`milliseconds_to_nanoseconds` 换算；`tick`/`set_queue`/超时看门狗依赖引擎与 `perf_sampler.cpp`，单元测试未覆盖 |
+| `plugin_config_write_test.cpp` | 8 | 插件配置原子写：解析失败拒绝合并、缺配置合并为空文档、成功读取保留其他键、替换既有值、不留临时文件、新建目标、空路径拒绝、含 NUL 二进制写入 |
+| `project_store_test.cpp` | 8 | 存储根解析纯逻辑（`src/core/storage/project_store.cpp`）：集中根目录名、工程目录名生成、路径哈希稳定性与截断、全局/工程配置与实例索引路径 |
+| `register_all_test.cpp` | 32 | 注册管线：5 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、同 server 重注册拒绝（SDK 0.3.11）、双服务器一致性；full 面分页与 `list_changed`、Tasks 能力广告、`tool.side_effect` 可读性、UI 布局/点击命中/游戏 UI 诊断描述契约、`json` 参数不写 `type`；`ToolResultIsError` 五项判定、登记表为工具单一来源 |
+| `resource_registry_test.cpp` | 5 | 资源登记表：对象 id 键接受负整数、拒绝名称与畸形数字、名称键只匹配同名实例、陈旧名称键选中同名条目、无匹配时为空 |
+| `runtime_ops_test.cpp` | 12 | 编辑器队列注入往返、`payload_is_pending` 识别（非对象/非整数拒绝）、`discard_pending` 未命中返回 false |
+| `schema_builder_test.cpp` | 6 | schema 构造形状、required 位置、未知类型不崩溃 |
+| `scheme_path_containment_test.cpp` | 3 | 路径 containment：仅 Inside 放行、无 provider 沿用旧词法行为、词法逃逸仍拒绝 |
+| `script_freshness_test.cpp` | 7 | 脚本取用口径纯逻辑（`script_ops.cpp`）：`script_load_cache_mode` 缓存模式选择、`wants_fresh_load` 只认字面 true |
+| `search_quality_test.cpp` | 1 | 标准查询集命中前 10（search_quality 基线） |
+| `security_parallel_hardening_test.cpp` | 13 | 安全与并行硬化：队列关闭/满/线程校验/零容量/打开态拒绝、工程路径 scheme 与穿越拒绝、配置常量、Variant 字符串与数组截断、日志并发查询稳定性 |
+| `side_effect_parse_test.cpp` | 3 | 副作用解析：接受 `destructive`/`writes_scene`、接受所有旧名、拒绝未知 |
+| `skill_gen_test.cpp` | 10 | 技能生成器：入口卡清单、name/description 规范、SKILL.md + references 布局、frontmatter 渲染、CLI-first 发现契约（`SkillBooksDescribeDiscovery` / `CliChannelContract`）、脚本桥防复活守卫（`SkillBooksCarryNoScriptBridge`）、反引号词回验（详见下节） |
+| `skill_resources_test.cpp` | 13 | `godot://skills` MCP 资源解析：目录/单册/单文件 URI 解析与未知 URI 错误；`ScriptMimeType`（`.md`→`text/markdown`；实现侧 `skill_resources.hpp` 仍保留 `.mjs`→`text/javascript` 映射，当前无技能使用该扩展名） |
+| `storage_layout_test.cpp` | 8 | 存储布局路径纯逻辑（`src/core/storage/storage_paths.cpp` + `project_store.cpp`）：全局配置路径、工程目录名（名称替换 + 截断 + 路径哈希）、工程级配置路径、日志/轨迹/截图目录路径 |
+| `text_ops_csharp_test.cpp` | 13 | C# 类声明解析纯逻辑（`text_ops.hpp` 导出的 `parse_csharp_classes`）：空格与紧贴冒号基类、泛型列表前空格与泛型后基类、tab/换行空白、缺基类留空、限定名取尾段、注释与字符串噪声、多类返回、partial 检测 |
+| `tilemap_ops_test.cpp` | 13 | `fill_tilemap_rect` 矩形铺砖纯逻辑：角点归一/格数上限（>100000 报错）/擦除分支与 set_count 统计 |
+| `tool_catalog_test.cpp` | 6 | ToolCatalog：add/get、重复覆盖、并发安全 |
+| `tool_invoke_test.cpp` | 4 | 工具间组合调用纯逻辑（`tools::invoke_tool`）：未知/成功透传、异步 pending 嵌套拦截、深度守卫（导出分支无 setter，单元测试未覆盖，注释已声明） |
+| `tool_pipeline_traits_test.cpp` | 4 | traits 图片附件判定纯逻辑：顶层 data 附加 image content、非 png/缺 data 拒绝、无 flag 透传（有 flag 的场景补全需编辑器，单元测试未覆盖） |
+| `tool_registry_test.cpp` | 6 | `SpecTool`/ToolRegistry：add/find/categories、execute echo、`side_effect_of`、`kMeta` flags 归类与路由、`make_tool_info` 的 dynamic/mutating |
+| `tool_verdict_test.cpp` | 15 | 工具结果判定（`src/tools/base/tool_spec.hpp`）：顶层/结构化 `code` 优先级、`runtime_error` 与成功判定、`deferred` 标记、trace stash/take 往返 |
+| `trace_recorder_test.cpp` | 19 | `TraceRecorder` 纯逻辑：id 前缀/唯一性、seq 严格递增、`query_recent` 尾取与 0/超量边界、`query_by_trace` 过滤、`query_since` 边界与 `next_seq`、`clear_for_test` 重置、脱敏剥离敏感键值保留其他键、脱敏/原始两种截断口径、FNV-1a 稳定值与区分、base64 解码、`to_json_line` 核心键与转义；`TraceKind`/`trace_kind_name`、schema v2 新字段与敏感键通用集合、`query_by_request` |
+| `vision_assist_test.cpp` | 7 | 视觉辅助截图参数纯逻辑：`scale`/`max_dimension` 组合封顶与小图不放大、`scale` 越界拒绝、`region` 左上交集裁剪、`diff_image` bbox 与阈值噪声忽略、`annotate_nodes_max` 先于绘制强制 |
+| **合计** | **734** | |
+
 
 **链接来源**（`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`，由 `cmake/sources/` 清单聚合：`gda_unit_sources.cmake` 30 业务源（含 `tests/support/config_loader.cpp` 与 `tests/support/tool_catalog_baseline.cpp`）+ 4 个测试本体 + 1 组 `GDA_TOOLS_OPS_SOURCES` glob；`api_unit_transport.cmake` 10 业务源 + 5 测试本体；`api_unit_contract.cmake` 2 测试本体；`api_unit_storage.cmake` 2 业务源 + 2 测试本体；`api_unit_instance_guard.cmake` 1 业务源 + 1 测试本体；`api_unit_cli.cmake` / `api_unit_docs.cmake` 无登记项。合计显式业务源 43 + 1 组 glob、测试本体 14）：`src/core/`：`log_system`、`log_persist`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`、`editor_coords`、`trace_recorder`、`monitor`、`gda_home`、`project_store`、`instance_registry`、`storage_paths`、`legacy_store`、`instance_guard`；`src/util/`：`bm25_index`、`error_util`、`readback_util`、`scene_verify`、`variant_json`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/`：`tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`、`editor_ui_actions`、`tool_args`、`tool_pipeline`、`tool_invoke`；传输面 `src/core/port_resolver`、`http_route_table`、`http_stream_registry`、`godot_transport`、`mcp_http_shim`、`api_token`、`ipc_endpoint`、`ipc_transport`、`ipc_framing`；`src/resources/resource_error_mapping`；`src/tools/domains/*/*_ops.cpp`（glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。`gdscript_wrap`/`ready_policy` 等 header-only 头由对应测试直接 include，无需源登记。
 
@@ -175,33 +195,49 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 ## 边界测试层
 
-**19 个测试文件，190 个用例**（2026-11-14 `ctest -L boundary -N` 实测）。判据见「三层划分」：断言主体是非法 / 极端输入下的确定性行为。
+**35 个测试文件，257 个用例**（2026-11-23 源码静态统计：254 `TEST` + 3 `TEST_F`，未实测；核算方式见数值总表）。判据见「三层划分」：断言主体是非法 / 极端输入下的确定性行为。
 
 | 文件 | 主题 |
 |---|---|
+| `bridge_locator_test.cpp` | C# 桥就绪定位：就绪表达式要求 holder 上存在非空 `bridge` meta |
+| `capture_viewport_degenerate_test.cpp` | 退化视口阈值 8px：尺寸矩阵、8px 拒绝 / 9px 接受、零尺寸视口、正常捕获放行 |
+| `collision_validation_test.cpp` | 瓦片碰撞层校验：合法层接受、越界拒绝 |
 | `config_loader_strict_test.cpp` | 严格配置加载：缺键、非法值、类型错误的拒绝 |
-| `destructive_tier_guard_test.cpp` | 破坏类档位判定标准的防漂移扫描 |
+| `csharp_build_result_test.cpp` | C# 构建结果：digest 截断标记、错误行大小写不敏感扫描与截断标记 |
+| `destructive_tier_guard_test.cpp` | 破坏类档位判定防漂移扫描（逐档判据覆盖、豁免白名单与注册审计） |
 | `dispatch_budget_test.cpp` | 主线程等待预算与队列不可用返回 |
 | `dispatch_queue_unavailable_test.cpp` | 无编辑器队列时的兜底错误 |
 | `dispatch_semantics_test.cpp` | 派发语义：导出拦截、工具存在性、参数校验的失败序 |
+| `editor_startup_gate_test.cpp` | 编辑器启动窗门控：无根 / 窗口边界判定、启动错误契约与文案保留 / 替换 |
 | `error_cursor_test.cpp` | 调试器错误游标的排他与越界行为 |
 | `error_path_log_test.cpp` | 错误路径日志的字段与分类 |
 | `error_util_test.cpp` | 错误 JSON 形状与结果包装 |
 | `exec_budget_test.cpp` | 执行预算与超时上限的钳制 |
 | `export_guard_test.cpp` | 导出期拒绝三类入口 |
+| `grid_budget_test.cpp` | 网格预算：正常网格放行、乘积超限与非正数拒绝 |
 | `instance_guard_test.cpp` | 同工程实例冲突判定 |
-| `ipc_transport_test.cpp` | IPC 传输生命周期：空/超长路径拒绝、监听-泵-停止、二次监听拒绝、未监听停止安全、TCP 随机端口、非环回主机拒绝、令牌校验 |
+| `ipc_transport_test.cpp` | IPC 传输生命周期：空 / 超长路径拒绝、监听-泵-停止、二次监听拒绝、未监听停止安全、TCP 随机端口、非环回主机拒绝、令牌校验（含空令牌与 `initialize` 缺令牌） |
+| `os_process_timeout_test.cpp` | OS 进程超时：已确认终止才声称 terminated、未确认不声称 |
+| `prompt_export_guard_test.cpp` | 提示词导出期拦截：仅导出中拦截 |
+| `property_rollback_test.cpp` | 属性回滚：已确认项进 rolled back、未确认项分离、恢复列表短于名称按未恢复处理 |
+| `protected_key_test.cpp` | 受保护键：autoload 小写及大小写变体保护、无关键放行 |
 | `ready_policy_test.cpp` | 就绪门控与未就绪失败路径 |
+| `reimport_validation_test.cpp` | 重导入校验：`files` 非空字符串数组、非数组 / 超上限拒绝、路径回退需字符串 |
+| `reparent_undo_order_test.cpp` | reparent 撤销顺序：先脱旧父再挂新父、变换恢复、非托管无变换步 |
 | `resource_error_mapping_test.cpp` | 资源错误到错误码的映射 |
 | `resource_gate_test.cpp` | 资源门控与拒绝条件 |
-| `tool_args_test.cpp` | 取参器：缺失/类型错误/null 语义/未知键拒绝 |
+| `save_write_receipt_test.cpp` | 保存写回执：目标缺失后创建视为已核验、既存无变化不可核验、时间戳更新视为已核验、保存后缺失不可核验 |
+| `sidecar_transaction_test.cpp` | sidecar 事务：回滚为移动逆操作、未移动跳过、空移动无回滚 |
+| `tool_args_test.cpp` | 取参器：缺失 / 类型错误 / null 语义 / 未知键拒绝 |
 | `transport_lifecycle_test.cpp` | 线程退出的阶段判定与预算比较 |
+| `trash_confirm_test.cpp` | 回收站确认：`trash` 动作需 `confirm`、其他动作不受影响 |
 | `uid_guard_test.cpp` | UID 写选择守卫的表成员判定 |
+| `uid_validation_test.cpp` | UID 校验：非正数拒绝、新 uid 用 add、已存在需 overwrite |
 | `variant_json_strict_test.cpp` | 严格 JSON 形状回读：别名冲突、缺字段、越界的拒绝 |
 
 ## 集成层（进程内契约测试）
 
-**`gda_integration_tests`，10 个 `*_test.cpp`，88 个 TEST**（2026-11-14 实测）。由旧 L2 引擎轨的 48 份 config JSON 蒸馏：错误串逐字等价、结构键与值一致、env 注入等价复刻旧 runner `requires` 语义；不可进程内复现的引擎触达断言划回 Agent e2e（逐条台账见各对照表的 R-01 条目）。
+**`gda_integration_tests`，10 个 `*_test.cpp`，88 个 TEST**（2026-11-23 源码静态统计，未实测）。由旧 L2 引擎轨的 48 份 config JSON 蒸馏：错误串逐字等价、结构键与值一致、env 注入等价复刻旧 runner `requires` 语义；不可进程内复现的引擎触达断言划回 Agent e2e（逐条台账见各对照表的 R-01 条目）。
 
 ### 目标与边界
 
@@ -286,40 +322,45 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 - `skills_guard_self_test`（同一脚本 `--self-test`）：注入未知册、旧关键词、未知命令、未知 status 字段、多文件与缺册反例，验证护栏本身能报错；Bun 可用时与 `skills_guard` 一起注册。
 - 守卫自测项：`migration_guard_self_test` / `comment_guard_self_test` / `no_python_guard_self_test` / `main_thread_guard_self_test` / `tool_domain_guard_self_test` / `skills_guard_self_test`——以注入违规样本的方式验证源码/技能守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
 - `cli_contract`（`cli/tests/contract.test.ts`）：CLI 契约 mock conformance，详见「回归属性清单」的 CLI wire 形状行；仓库内不写盘（图片落临时目录）。
-- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 37 文件 348 项（2026-11-17 实测 325 pass / 23 skip / 0 fail；文件清单见「数值核算总表」CLI 行；参数化循环在运行期展开，运行期项数以 `bun test cli/tests` 实测为准）。
+- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 47 文件 418 项（2026-11-23 主代理实测 `bun test cli/tests`：395 pass / 23 skip / 0 fail / 1798 `expect()` calls，耗时约 89.73 s；文件清单与核算方式见「数值核算总表」CLI 行；静态 `test()` 声明数为 417，实测 418 含运行期展开项）。
 - 上述守卫与脚本项与两层 gtest 目标合为默认门：`ctest --preset debug`（或 `bun run gda-dev-tools test`）**无过滤全跑**——引擎轨删除后不再需要 `-E "^gda_runner_|^pool_"` 之类的排除模式。
 
 ## 数值核算总表
 
-本页是全仓数值的**唯一权威落点**。表中「命令与证据位置」给出可复核的复算命令或证据文件；`AGENTS.md`、技能层、其它 wiki 页与 `tests/README.md` 只引用本页，不复制数值。基线日 2026-11-17（2026-11-09 首立后随批次重核）。
+本页是全仓数值的**唯一权威落点**。表中「命令与证据位置」给出可复核的复算命令或证据文件；`AGENTS.md`、技能层、其它 wiki 页与 `tests/README.md` 只引用本页，不复制数值。本轮 2026-11-23 重核：gtest 三层与守卫注册点为**源码静态核算（未运行 ctest）**，CLI 单测为**主代理实测 `bun test cli/tests`**，工具面数值为源码静态核算并与领域工具页交叉核对。
 
-| 条目 | 权威口径（2026-11-17 重基线） | 命令与证据位置 | 结论 |
+| 条目 | 权威口径（2026-11-23 重核） | 命令与证据位置 | 结论 |
 |---|---|---|---|
-| 域工具 | 246（35 个域） | 命令：统计 `src/tools/domains/*/*_tools.hpp` 的 `make_spec_tool(`——35 个域头合计 246 处（2026-11-17 静态实测；`property_tools.hpp` 的 `make_set_node_transform_spec()` 特例已包在其 `make_spec_tool` 调用内） | 一致 |
+| 域工具 | 246（35 个域） | 静态：逐文件统计 `src/tools/domains/*/*_tools.hpp` 的 `make_spec_tool(` ——35 个域头合计 246 处（`property_tools.hpp` 的 `make_set_node_transform_spec()` 特例已包在其 `make_spec_tool` 调用内） | 一致 |
 | 工具类别 | 28 | 246 条 `ToolSpec` 的 category 去重后 28 个取值（含 `Meta` 2 与 `System` 5 的归并口径，见 [overview.md](overview.md)「MCP 工具面」） | 一致 |
-| catalog 条目 | 以 `tests/data/tool_catalog_baseline.json` 的 `catalog_total` 为准 | 命令：`bun run gda-dev-tools audit-tools --json`；源码：`register_all.cpp` 单独注册 `system_status`，catalog 由 `registry->all_any()` 派生；单元测试读取同一 JSON 并断言 | 一致 |
-| MCP 可达工具 | 以 baseline JSON 的 `meta_total` + `domain_total` 为准 | MCP 顶层只注册元工具（单元测试断言 `ListTools` 数量与 `kMetaToolNames` 一致），域工具只能经 `call_tool` 元工具代理调用；`system_status` 只计入 catalog | 一致 |
-| schema 基线 | 以 baseline JSON 的 `schema_non_empty` + `schema_empty` 为准 | 单元测试 `SchemaStatisticsBaseline` 读取 `tests/support/tool_catalog_baseline.cpp`；命令：构建后 `ctest -R SchemaStatisticsBaseline` | 一致 |
-| 单元 | 589（57 个 unit 文件） | 命令：`ctest --preset debug -N -L unit`（2026-11-17 实测 589）；源码口径 `grep -cE "^TEST(_F)?\(" tests/unit/*.cpp` | 一致 |
-| 边界 | 190（19 个 boundary 文件） | 命令：`ctest --preset debug -N -L boundary`（实测 190）；源码口径 `grep -cE "^TEST(_F)?\(" tests/boundary/*.cpp` | 一致 |
-| 集成 | 88（10 个 `*_test.cpp`） | 命令：`grep -cE "^TEST(_F)?\(" tests/integration/*_test.cpp`（2026-11-14 实测 88） | 一致 |
-| 守卫与脚本项 | 16（含 `install_docs_guard` / `zip_layout_guard`、`cli_contract` / `cli_unit`） | 命令：`ctest --preset debug -N -L guard` 与 `ctest --preset debug -N -L cli`；证据：`tests/CMakeLists.txt` 的 `add_test` 注册 | 一致 |
-| ctest 注册总数 | 885 = 589 + 190 + 88 + 16 + 2（单元 + 边界 + 集成 + 守卫 + CLI） | 命令：`ctest --preset debug -N`（`Total Tests: 885`）；全量 ctest 通过 | 一致 |
-| CLI TS 单测 | 37 个测试文件 / 348 项（325 pass + 23 skip + 0 fail，2026-11-17 实测口径；含 `jam.test.ts`、`jam_projects.test.ts`） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts`；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
+| catalog 条目 | 252（= 246 域 + 5 元 + `system_status`） | `tests/data/tool_catalog_baseline.json` 的 `catalog_total=252`；命令：`bun run gda-dev-tools audit-tools --json`；源码：`register_all.cpp` 单独注册 `system_status`，catalog 由 `registry->all_any()` 派生；单元测试读取同一 JSON 断言 | 一致 |
+| MCP 可达工具 | 顶层 5 元工具；域工具 246 经 `call_tool` 代理可达；`system_status` 只计 catalog | baseline JSON 的 `meta_total=5` / `domain_total=246`；单元测试断言 `ListTools` 数量与 `kMetaToolNames` 一致 | 一致 |
+| 生产别名 | 325（不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析） | baseline JSON 的 `alias_count=325` 与 `alias_names` / `alias_mappings` 数组逐项；统一 `deprecated_since="0.4.0"` / `removal_version="0.6.0"` | 一致 |
+| schema 基线 | 235 非空 + 17 空 | baseline JSON 的 `schema_non_empty=235` / `schema_empty=17`；单元测试 `SchemaStatisticsBaseline` 读取 `tests/support/tool_catalog_baseline.cpp` | 一致 |
+| 能力矩阵 | 561 域行 / 567 catalog 行；mapped 315 / kept 252 / missing 0 | `tests/data/capability_matrix.json` 的 `row_count` / `catalog_row_count` / `mapped_count` / `kept_count` / `domain_missing_count` | 一致 |
+| 域 flags | `kMutating` 79 / `kNone` 159 / `kCaptureImage` 7（`kLongBlocking` 3 / `kObserve` 4 / `kSceneTarget` 27 / `kUndoable` 17） | 逐项统计 baseline JSON `tools[]` 的 `flags` 字段（与领域工具页代理重算交叉核对；旧值 78 / 160 / 9 已过期） | 一致 |
+| 副作用逐项分布 | catalog：None 150 / CodeExecute 6 / Destructive 7 / Process 7 / GameRuntime 7 / WritesScene 29 / ModifiesWindow 20 / WritesFile 14 / WritesConfig 8 / ShowsAlert 4；域：None 146 / CodeExecute 4，其余同 | 逐项统计 baseline JSON 的 `tools[]` / `meta_tools[]` / `system_tools[]` 的 `side_effect`；`run_gdscript_tests` 本轮由 None 改判 CodeExecute（flags 由 `kNone` 改 `kMutating`），故 catalog None 151→150 / CodeExecute 5→6、域 147→146 / 3→4；高风险四类（Destructive + Process + CodeExecute + GameRuntime）合计 27 | 一致 |
+| 顶层汇总字段口径差异 | baseline JSON 顶部 `by_side_effect`（None 151 / CodeExecute 5）、`domain_by_side_effect`（None 147 / CodeExecute 3）、`side_effect_review`（该工具仍标 None）**仍是旧值** | 该 JSON 本轮仅改 `tools[]` 中 `run_gdscript_tests` 一条的 `side_effect` / `flags`，三处顶层汇总字段未同步；**以逐项数组为准，勿照抄旧汇总字段** | 差异已标注 |
+| 单元 | 734（76 个 unit 文件：687 `TEST` + 47 `TEST_F`） | 静态：PowerShell 正则 `^TEST(_F)?\(` 逐文件统计 `tests/unit/*_test.cpp`（本轮源码静态核算，未实测）；旧值 589 / 57 文件已过期 | 一致 |
+| 边界 | 257（35 个 boundary 文件：254 `TEST` + 3 `TEST_F`） | 静态：同上统计 `tests/boundary/*_test.cpp`（本轮源码静态核算，未实测）；旧值 190 / 19 文件已过期 | 一致 |
+| 集成 | 88（10 个 `*_test.cpp`，全部 `TEST_F`） | 静态：`^TEST(_F)?\(` 统计 `tests/integration/*_test.cpp`（本轮源码静态核算，未实测）；本轮未改 | 一致 |
+| 守卫与脚本项 | 18（guard 16 + cli 2） | 静态：统计 `tests/CMakeLists.txt` 的 `add_test(NAME ...)` 去重后 18 个注册点（`cli_unit` 的 if/else 两处算 1 个）；guard 标签 16（含 `skills_guard` / `skills_guard_self_test`）、cli 标签 2（`cli_contract` / `cli_unit`） | 一致 |
+| ctest 注册总数 | 1097 = 734 + 257 + 88 + 16 + 2（单元 + 边界 + 集成 + guard + cli） | 由上述四行相加；本轮未运行 `ctest -N`（静态核算）；旧值 885 已过期 | 一致 |
+| CLI TS 单测 | 47 文件 / 418 项（395 pass + 23 skip + 0 fail；2026-11-23 主代理实测 `bun test cli/tests`，1798 `expect()` calls，约 89.73 s） | 命令：`bun test cli/tests`（主代理实测）；静态：`cli/tests/*.test.ts` 45 个 + `*_test.ts` 2 个（`instance_identity_test.ts` / `registry_atomic_test.ts`）共 47 文件；静态 `test()` 声明 417，实测 418 含运行期展开项；2 处 `describe.skip` + 3 处 `skipIf` 块级跳过；旧值 37 文件 / 348 项 / 325 pass 已过期 | 一致 |
 | 技能卡 | EN 10 文件；EN+ZH 源共 20 文件（各 1 张入口卡 SKILL.md + 9 篇 references） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 1 个技能目录 | 一致 |
 | MCP skills 资源 | 12（1 目录 + 1 技能 + 10 文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
-| add_library 源文件 | 117 个 `.cpp`（main 1 / core 31 / tools 61 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 命令：`find src -name "*.cpp" | wc -l`（2026-11-17 实测 117）；`cmake/sources/*.cmake` 清单登记 115 + 根 `CMakeLists.txt` 的 `add_library()` 直列 2（`image_ops.cpp` / `mesh_ops.cpp`） | 一致 |
-| 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 885 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
+| add_library 源文件 | 117 个 `.cpp`（main 1 / core 31 / tools 61 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 静态：`Get-ChildItem src -Recurse -Filter *.cpp`（本轮 117，与基线一致）；`cmake/sources/*.cmake` 清单登记 115 + 根 `CMakeLists.txt` 的 `add_library()` 直列 2（`image_ops.cpp` / `mesh_ops.cpp`） | 一致 |
+| 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 1097 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
 | 客户端配置 | 0（0.3.2 已移除） | `client_config_gen` 已删除；MCP 客户端由 Agent 按 `mcp_url` 生成配置 | 已移除 |
 | 端口 | 无默认端口；首次在 20000–29999 随机分配并持久化，探测上限 256 | `src/core/config.hpp`：`GDA_PORT_CANDIDATE_BASE/LIMIT = 20000/29999`、`GDA_PORT_PROBE_LIMIT = 256`、`GDA_CONTROL_PORT_BASE/LIMIT = 19900/19999`、`GDA_PRIVATE_PORT_BASE = 32768`（四条 `static_assert` 约束）；候选序列为 `[20000, 29999]` 随机排列（`src/core/transport/port_resolver.cpp`）；显式指定绑定失败不自动更换 | 一致 |
 | REST 端点数 | 0（0.3.2 已移除） | `api_surface` / `api_endpoints` / `api_server` / `api_server_routes` / `api_auth` / `api_envelope` 编译单元已删除，全仓无调用点 | 已移除 |
 | 请求体上限 | 4 MiB | `src/core/transport/http_parse.hpp` 的 `kMaxBodyBytes`（超限由传输层直接 413） | 一致 |
 | 授权档位与能力名 | 0（0.3.2 已移除授权门） | `authorization.hpp` 与 `GODOT_AUTOPILOT_ALLOW` 已删除；高风险工具改由 `confirm=true` 控制 | 已移除 |
-| 破坏类档位 | 7 个声明者 + 4 档判据 | `src/tools/base/side_effect_policy.hpp` 的 `kTierCriteria` 四档判据与边界规则、`kDestructiveExemptions` 3 条豁免白名单（每条带理由）；声明 `destructive` 的工具 7 个（`delete_scene_node` / `delete_display_window` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor` / `free_render_rid`）；0.3.2 起判据保留但不再驱动授权门，高风险工具由 `confirm` 控制；单元测试 用例 `destructive_tier_guard_test` 防漂移 | 判据保留 |
+| 破坏类档位 | 7 个声明者 + 4 档判据；高风险四类合计 27（Destructive 7 + Process 7 + CodeExecute 6 + GameRuntime 7） | `src/tools/base/side_effect_policy.hpp` 的 `kTierCriteria` 四档判据与边界规则、`kDestructiveExemptions` 3 条豁免白名单（每条带理由）；声明 `destructive` 的工具 7 个（`delete_scene_node` / `delete_display_window` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor` / `free_render_rid`）；0.3.2 起判据保留但不再驱动授权门，高风险工具由 `confirm` 控制；单元测试 `destructive_tier_guard_test`（15 项）防漂移 | 判据保留 |
 | 授权模式 | 0（0.3.2 已移除） | `AuthMode` / `GODOT_AUTOPILOT_AUTH_MODE` 已删除 | 已移除 |
 | 面板可勾选能力 | 0（0.3.2 已随授权门移除） | `authorization.hpp` / `authorization_switches.hpp` / `authorization_dock_toggle_test` 均已删除；高风险工具改由 `confirm=true` 控制 | 已移除 |
-| 主线程预算 | 默认 27000 ms / 健康探针 5000 ms / 长阻塞 29000 ms | `src/core/config.hpp:16-20`（常量即生效值）；预算选择逻辑 `src/tools/base/dispatch.cpp:288-298`；长阻塞预算经 `env_int_clamped` 钳制在 `[1000, 29000]`，未设 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 时生效 29000 ms | 一致 |
-| `code_execute` 超时上界 | 静态 27000 ms，实际生效 = `min(27000, 生效长阻塞派发预算)` | `src/core/config.hpp:45` `GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000`；唯一实现点 `code_exec_ops.cpp:464-470` 的 `max_timeout_ms()`；派发侧余量 2000 ms、传输侧余量 2000 ms，由 `config.hpp:48-62` 三条 `static_assert` 约束 | 一致 |
+| 主线程预算 | 默认 27000 ms / 健康探针 5000 ms / 长阻塞 29000 ms | `src/core/config.hpp`（常量即生效值）；预算选择逻辑 `src/tools/base/dispatch.cpp`；长阻塞预算经 `env_int_clamped` 钳制在 `[1000, 29000]`，未设 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 时生效 29000 ms | 一致 |
+| `code_execute` 超时上界 | 静态 27000 ms，实际生效 = `min(27000, 生效长阻塞派发预算)` | `src/core/config.hpp` 的 `GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000`；唯一实现点 `code_exec_ops.cpp` 的 `max_timeout_ms()`；派发侧余量 2000 ms、传输侧余量 2000 ms，由 `config.hpp` 三条 `static_assert` 约束 | 一致 |
 
 > 对照说明：本表为逐文件/逐宏统计与实测证据的重基线值；`AGENTS.md` 与技能层只引用本页、不复制数值，`tests/README.md` 若出现旧值（其 L2 内容为 T-10 重基线对象）以本页为准。旧「L1/L2 双层」口径的行（L2 用例数、池化注册、池床、遍历枚举/排除/候选/步数/warnings）已随引擎轨移除，去向见「历史口径迁移」。
 

@@ -12,7 +12,7 @@ Godot Autopilot（GDA）项目指令。项目事实、数值口径与文档维�
 ## 硬约束
 
 - 所有 Godot API 必须经 `CommandQueue` 在主线程执行（`submit()` / 带预算入口）；直接调用必崩，`main_thread_guard` 在 ctest 拦截。`execute_sync()` 是无界等待，禁止新增调用。
-- 新增 `.cpp` 双登记：根侧源表（根 `CMakeLists.txt` 的 `add_library()` 直列或 `cmake/sources/*.cmake` 清单）与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`；`domains/*/*_ops.cpp` 测试侧由 glob 自动纳入。漏根登记只在运行时暴露，漏测试登记会静默失去覆盖。详见 `.agents/skills/cpp-registration/SKILL.md`。
+- 新增 `.cpp` 双登记：根侧源表（根 `CMakeLists.txt` 的 `add_library()` 直列或 `cmake/sources/*.cmake` 清单）与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`；`domains/*/*_ops.cpp` 测试侧由 glob 自动纳入。漏根登记只在运行时暴露，漏测试登记会静默失去覆盖。详见 `.agents/skills/gda-change-gate/SKILL.md`。
 - `third_party/` 依赖是 git submodule，构建前须已检出；缺失即 configure 报错，不做网络回退。
 - 源码禁止注释（仅 `// namespace` 结尾标记）；`comment_guard` 在 ctest 拦截。
 - 默认安全姿态不可静默放宽：仅绑环回、脱敏默认开、高风险工具需 `confirm=true`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。

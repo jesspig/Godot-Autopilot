@@ -7,7 +7,7 @@ tags:
   - 端口
   - 实例登记
   - 发现链
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource:
   - src/core/transport/port_resolver.cpp
   - src/core/transport/port_recovery.hpp
@@ -24,7 +24,7 @@ resource:
 
 > **0.3.2**：REST `/api`、API token 与 `endpoints.api` 已移除；端口仍由插件持有并写入实例登记，CLI `--port` 仅作连接覆写。`McpConfigDock` 状态区已删除，端口/错误改由 `gda status` 与日志面板承担。
 
-> 审计日期：2026-11-13（端口随机化：首次启动在 20000–29999 随机绑定并持久化，失败重随机的语义见正文）
+> 审计日期：2026-11-23（本轮增量同步：IPC 帧长/令牌契约与不回退重发、存储原子写入、端口常量收敛；端口随机化语义见正文）
 
 ## 端口模型：一个端口，MCP 端点
 
@@ -55,7 +55,7 @@ resource:
 2. 候选区间 `[GDA_PORT_CANDIDATE_BASE, GDA_PORT_CANDIDATE_LIMIT]` = `[20000, 29999]`；
 3. 以 `random_device` + 进程号作为种子打乱，首次绑定取序列头部。
 
-- 候选区间上界 29999 **低于**私有动态端口区间起点 32768（`GDA_PRIVATE_PORT_BASE`），由 `static_assert` 约束；保留段 `[19900, 19999]` 与自动分配区间不相交，同样由 `static_assert` 保证。
+- 候选区间上界为 29999；`GDA_PORT_PROBE_LIMIT` 由 `static_assert` 约束在候选总数之内（`src/core/config.hpp`）。
 - 实际探测时**最多探 256 个候选**（`GDA_PORT_PROBE_LIMIT`）；探完仍未绑定成功即启动失败，错误信息带实际探测次数与最后一次失败原因（`no free port candidate bound after N probes: <原因>`）。
 - 随机排列保证多实例不会总是挤在候选序列头部；同一进程两次启动也会得到不同的起点。
 
@@ -99,7 +99,7 @@ resource:
   "project_path": "C:/path/to/project",
   "endpoints": {
     "mcp": {"host": "127.0.0.1", "port": 21437, "path": "/mcp", "protocol": "mcp", "auth": "none"},
-    "ipc": {"present": true, "kind": "unix", "path": "/tmp/gda.sock", "protocol": "mcp-jsonrpc", "framing": "length-prefixed-json", "auth": "token", "version": 1}
+    "ipc": {"present": true, "kind": "unix", "path": "/tmp/gda.sock", "token": "<IPC 令牌>", "protocol": "mcp-jsonrpc", "framing": "length-prefixed-json", "auth": "token", "version": 1}
   },
   "gda_home": "C:/Users/<user>",
   "started_at": 1760000000000,
@@ -175,29 +175,30 @@ CLI 的目标解析是一条**五级优先链**，每一级都记录来源（`so
 | CLI 本地注册表 | `<集中根>/cli/instances.json`（state dir 可由 `GODOT_AUTOPILOT_CLI_HOME` 覆写；同目录下还有 `instances.lock` 与 `logs/`） | `gda start` | CLI 自己拉起的编辑器实例 |
 | 插件全局实例索引 | `<集中根>/instances.json` | 插件（编辑器进程内） | 所有在跑的插件实例，含端口、进程号与 IPC 端点 |
 
-两者在发现链上**分处第 4 级与第 5 级**：CLI 先看插件写的全局索引，再退到自己拉起的实例。0.3.2 起不再有 REST 令牌；插件实例的 IPC 端点自带 `gda_token`。
+两者在发现链上**分处第 4 级与第 5 级**：CLI 先看插件写的全局索引，再退到自己拉起的实例。0.3.2 起不再有 REST 令牌；插件实例的 IPC 端点自带 `gda_token`。CLI 本地注册表的读-改-写纳入单锁 `withRegistryLock()`（`cli/src/registry.ts`，`gda stop` 的移除走该入口），避免并发丢更新；`gda stop` 还先按端点存活二次确认实例身份，身份不符时回退按 pid 停止并告警。
 
 ## 控制面端口（已移除）
 
-0.3.2 起 `gda serve` 控制面已删除（`cli/src/commands/serve.ts` 与 `src/serve/` 不再存在），不再有 CLI 侧本地代理端口。插件保留段 `19900–19999`（`GDA_CONTROL_PORT_BASE` / `GDA_CONTROL_PORT_LIMIT`）仍由 `static_assert` 保证不与自动分配区间相交，但当前无生产引用点。
+0.3.2 起 `gda serve` 控制面已删除（`cli/src/commands/serve.ts` 与 `src/serve/` 不再存在），不再有 CLI 侧本地代理端口；`src/core/config.hpp` 当前也不再定义控制面端口常量与对应静态断言。
 
 ## 本机 IPC 通道（2026-11-13 T-03）
 
-插件在 HTTP 端口之外额外监听一条本机 IPC 通道；绑定失败只记 Warning 并降级为「仅 HTTP」，不影响端口通道。实现见 [`src/core/transport/ipc_transport.cpp`](../../../src/core/transport/ipc_transport.cpp)、[`ipc_framing.cpp`](../../../src/core/transport/ipc_framing.cpp)、[`ipc_endpoint.cpp`](../../../src/core/transport/ipc_endpoint.cpp)。
+插件在 HTTP 端口之外额外监听一条本机 IPC 通道；令牌生成失败（记 Error）或监听失败（记 Warning）时降级为「仅 HTTP」，不影响端口通道。实现见 [`src/core/transport/ipc_transport.cpp`](../../../src/core/transport/ipc_transport.cpp)、[`ipc_framing.cpp`](../../../src/core/transport/ipc_framing.cpp)、[`ipc_endpoint.cpp`](../../../src/core/transport/ipc_endpoint.cpp)。
 
 - **后端**：Windows 使用 loopback TCP（`127.0.0.1` + 随机端口，`kind=tcp`）；POSIX 使用 AF_UNIX（`<集中根>/run/<工程名清洗>-<路径哈希 8 位>.sock`，`kind=unix`）。命名管道作为后续可选后端，当前未进入生产路径。
 - **实例登记**：`endpoints.ipc = {kind, path|name|host+port, token, protocol:"mcp-jsonrpc", framing:"length-prefixed-json", auth:"token", version:1}`，仅在监听成功时写入；旧记录缺该字段按「无 IPC」处理。
-- **帧语义**：4 字节大端长度 + UTF-8 JSON，单帧上限 4 MiB；`pump()` 每帧有 accept/read/写回预算。
-- **令牌**：每个实例启动时生成随机令牌，只写实例索引；首帧必须是 `initialize` 且 `params._meta.gda_token` 匹配，否则返回 `-32001 IPC token rejected` 并关闭。令牌不写日志、不写 trace。
+- **帧语义**：4 字节大端长度 + UTF-8 JSON，单帧上限 `kMaxFrameBytes = 4 MiB`；连接读缓冲上限 `max_wire_buffer_bytes() = kMaxFrameBytes + kLengthPrefixBytes`（4 MiB + 4 字节，`src/core/transport/ipc_framing.hpp`），可容纳满额载荷帧，超限关闭连接；`pump()` 每帧有 accept/read/写回预算。
+- **令牌**：每个实例启动时经 `api_token::generate_token()` 生成 32 字节随机值的十六进制令牌，只写实例索引 `endpoints.ipc.token`；空令牌时 `listen_unix()`/`listen_tcp()` 拒绝监听（消息 `IPC token is empty; refusing to listen`）。首帧必须是 `initialize` 且 `params._meta.gda_token` 经 `constant_time_equals()` 恒定时间比较匹配，否则返回 `-32001 IPC token rejected` 并关闭；令牌不可用时返回 `-32003 IPC token unavailable`。令牌不写日志、不写 trace。
 - **边界**：最大连接 8、在途请求 16、请求超时 60 秒、空闲 10 分钟关闭；超限返回 `-32003 too many in-flight IPC requests`。
-- **回退**：CLI IPC 失败时回退 HTTP；`--no-fallback` 可禁止回退。
+- **回退**：仅当请求**尚未发出**时，IPC 连接不可达才回退 HTTP，`--no-fallback` 可禁止回退；请求已写入 socket 后超时或断连不回退重发（结果未知）；`-32001`/`-32002` 认证失败在 auto 模式下也拒绝降级到无认证 HTTP（见 [T0 安全边界与并发契约](../security_contract.md) §3.4）。
+- **HTTP 写回上限**：每连接 outbox 上限 `max_outbox_bytes_per_connection = 1 MiB`（`src/core/transport/http_transport_ext.hpp`）；追加后超限则置 `close_after_write`/`dead` 并停止后续入列，避免响应无界堆积。
 
 ## 已知限制
 
 - **端口是全局资源，多实例必然分散**：多个编辑器同时开着时，每个实例从 20000–29999 随机取端口，客户端必须先读实例登记再连接，不能假定端口固定。
-- **全局索引是快照**：实例登记的写入失败（目录不可写、磁盘满）会让该实例对 CLI 不可见，但**不影响 MCP 端点本身**——插件照常监听，CLI 只是找不到它。
-- **IPC 令牌只在实例登记里**：没有第二个可读位置（不写环境变量、不写工程文件），因此丢了实例登记就等于丢了令牌，需重启插件实例重新签发。
-- **CLI 的集中根解析比插件简单**：CLI 侧为「`GODOT_AUTOPILOT_HOME` 覆写 → `os.homedir()`」两级，不做插件侧的存在性校验；两者在正常环境下指向同一目录，但覆写或异常 HOME 环境下可能分叉。**这不是校验缺失而是分工不同**——CLI 没有「自行推断家目录」的派生层，插件侧那条存在性校验在 CLI 侧没有适用对象；判定与依据见 [核心模块](core.md)「集中根解析」的两级校验口径结论。
+- **全局索引是快照**：实例登记改走 `write_file_atomically()`（唯一临时路径 + rename，失败保留旧目标，POSIX 下再 chmod 0600）；目录不可写或磁盘满时写入失败会让该实例对 CLI 不可见，但**不影响 MCP 端点本身**——插件照常监听，CLI 只是找不到它。
+- **IPC 令牌随实例登记分发**：插件不写令牌文件、不写日志/trace、不写工程文件；`endpoints.ipc.token` 是 CLI 的取用点，显式 `--socket` 时 CLI 另可从 `GODOT_AUTOPILOT_IPC_TOKEN` 读取。丢了实例登记需重启插件实例重新签发。
+- **CLI 的集中根解析比插件简单**：CLI 侧为「`GODOT_AUTOPILOT_HOME` 覆写 → `os.homedir()`」两级，不做插件侧的存在性校验；两者在正常环境下指向同一目录，但覆写或异常 HOME 环境下可能分叉。**这不是校验缺失而是分工不同**——CLI 没有「自行推断家目录」的派生层，插件侧那条存在性校验在 CLI 侧没有适用对象；判定与依据见 [核心模块](core.md)「集中根解析」的校验口径。
 
 ### 异常退出后的端口与登记残留
 

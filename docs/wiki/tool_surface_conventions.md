@@ -7,7 +7,7 @@ tags:
   - 别名
   - 弃用
   - ToolSpec
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/base/tool_spec.hpp
 ---
 
@@ -51,6 +51,8 @@ resource: src/tools/base/tool_spec.hpp
    - `alias_removal_version`
    - `deprecated_since`（非空时）
 6. 异步结果（`__gda_pending`、`__gda_wait`、`__gda_job`）先带弃用字段返回 pending；`resolve_deferred_wait` 在等待完成后对最终结果再做一次投影与字段追加。
+
+2026-11-23：`dispatch::resolve_alias_canonical(name)`（`dispatch.hpp`）对外暴露别名→canonical 解析；`register_all.cpp` 的 `call_tool` elicitation 也经该链按 `args.name` 取目标工具（含别名）的有效 `side_effect`，故别名指向的高风险工具不会被 `call_tool` 代理绕过 elicitation（见 [工具注册表](modules/tools_registry.md)）。`ToolRegistry::all_aliases()` 已删除，别名计数走 `alias_count()`。
 
 ## 目录与搜索
 

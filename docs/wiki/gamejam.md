@@ -7,7 +7,7 @@ tags:
   - e2e
   - 抽题
   - devtools
-timestamp: "2026-11-17T02:19:35+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource:
   - devtools/commands/jam.ts
   - devtools/data/gamejam/themes.json
@@ -20,6 +20,8 @@ resource:
 服务两类流程：比赛开发用 `gda-game-develop` 抽题、命名、创建并保留项目；端到端测试用 `gda-e2e-loop` 在固定沙盒 `examples/e2e` 中按固定覆盖任务书做真实开发与组合测试，串起测试—分析—授权修复闭环，以覆盖全部 252 个 canonical 工具为硬验收。
 
 程序化测试（ctest、`bun test`、单元/集成/守卫）不依赖抽题或 `examples/` 生成物；只有生成器自身的单测在临时目录覆盖它。
+
+> 审计日期：2026-11-23。本轮同步 `gda-e2e-loop` 技能改动：共享改进库为运行时数据、固定沙盒 setup 序列统一绑定 `--project`。程序化测试数值以 [tests.md](./tests.md)「数值核算总表」为准。
 
 ## 题库
 
@@ -141,9 +143,11 @@ bun run gda-dev-tools jam index [--json]
 
 1. 每个新轮次先重置：`bun run gda-dev-tools jam e2e --reset --json`；只有用户明确要求续跑时才跳过。
 2. 取返回的 `path` 作为 `<project-dir>`，用固定覆盖任务书（技能内 `assets/fixed-task-brief.md`）覆盖 `GAMEJAM.md`；不抽题。
-3. 环境准备全程自主：`bun run gda-dev-tools harness setup --project <project-dir>`（默认完整编辑器，不请用户打开/关闭工程）。
+3. 环境准备全程自主：`bun run gda-dev-tools harness setup --project <project-dir>`（默认完整编辑器，不请用户打开/关闭工程）；setup 序列中的 `gda list` / `gda tools list` 亦带 `--project`，避免 cwd 回退仓库根后定位失败。
 4. 按固定任务书做真实开发操作与组合测试，串起测试—分析—授权修复闭环；覆盖全部 252 个 canonical 工具为硬验收。
 5. 报告写到 `.handoff/report/<YYYY-MM-DD_HH-MM>/`（`report.md` / `evidence.md` / `img/` / `analysis.md`），不再放项目根目录；`harness coverage/digest --round` 指向该目录即可。不执行 `jam index`，`examples/INDEX.md` 只收比赛项目。
+6. 共享改进库为**运行时数据** `.handoff/library/HARNESS_LIBRARY.md`（被 git 忽略，与 `report.md` / `analysis.md` 同生命周期）；技能册中的 `HARNESS_LIBRARY.md` 只保留字段与合并规则模板，分析阶段按 id 增量合并、不重写整库。
+7. 覆盖统计默认从 CLI trace 记录读取 `tool_call`（`cli/src/trace` 的 `readTraceRecords` / `readCliCoverageRecords`），不再依赖 `gda trace export`；`harness digest --round` 会把 `evidence_rows` / `suspected_gaming` 回写 `coverage.json`。
 
 详细流程见 [gda-e2e-loop 技能](../../.agents/skills/gda-e2e-loop/SKILL.md)。
 

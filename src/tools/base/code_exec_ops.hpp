@@ -23,6 +23,18 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args);
 void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
                          std::string &error);
 
+int32_t batch_resolve_history_id(int32_t object_history_id,
+                                 bool has_target_object);
+
+struct BatchRollbackReport {
+  int64_t expected_actions{0};
+  bool partial{false};
+};
+
+BatchRollbackReport batch_rollback_report(int64_t actions_created,
+                                          int64_t undoable_successes,
+                                          int64_t rolled_back);
+
 struct BatchUndoRollback {
   int64_t actions_created{0};
   int64_t rolled_back{0};

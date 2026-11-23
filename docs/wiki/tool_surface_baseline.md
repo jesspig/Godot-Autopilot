@@ -6,13 +6,13 @@ tags:
   - 工具面
   - 基线
   - 审计
-timestamp: "2026-11-16T13:38:53+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: devtools/commands/tool-audit.ts
 ---
 
 # 工具面基线
 
-> 审计日期：2026-11-16。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成，汇总报告见 [tool_surface_report.md](tool_surface_report.md) 与 T-24 的 `audit-report.json`；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json)、[tool_surface_target.json](../../tests/data/tool_surface_target.json) 与 [capability_matrix.json](../../tests/data/capability_matrix.json) 中找到来源。
+> 审计日期：2026-11-23。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成，汇总报告见 [tool_surface_report.md](tool_surface_report.md) 与 T-24 的 `audit-report.json`；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json)、[tool_surface_target.json](../../tests/data/tool_surface_target.json) 与 [capability_matrix.json](../../tests/data/capability_matrix.json) 中找到来源。
 
 ## 数据来源与命令
 
@@ -91,7 +91,7 @@ category 口径为 28 类、求和 252（含元与系统）：域与 category �
 
 | SideEffect | catalog（252） | 域工具（246） |
 | --- | ---: | ---: |
-| None | 151 | 147 |
+| None | 150 | 146 |
 | WritesScene | 29 | 29 |
 | ModifiesWindow | 20 | 20 |
 | WritesFile | 14 | 14 |
@@ -99,11 +99,12 @@ category 口径为 28 类、求和 252（含元与系统）：域与 category �
 | Destructive | 7 | 7 |
 | Process | 7 | 7 |
 | GameRuntime | 7 | 7 |
-| CodeExecute | 5 | 3 |
+| CodeExecute | 6 | 4 |
 | ShowsAlert | 4 | 4 |
 
-- catalog 与域工具口径仅两处不同：None 151/147、CodeExecute 5/3；差异来自 5 个元工具与 `system_status`（catalog 比域工具多 4 个 None、2 个 CodeExecute）。
-- 需 `confirm=true` 的高风险档 Destructive、Process、CodeExecute、GameRuntime 合计 26 个 catalog 工具，默认安全姿态未放宽。
+- catalog 与域工具口径仅两处不同：None 150/146、CodeExecute 6/4；差异来自 5 个元工具与 `system_status`（catalog 比域工具多 4 个 None、2 个 CodeExecute）。
+- 需 `confirm=true` 的高风险档 Destructive、Process、CodeExecute、GameRuntime 合计 27 个 catalog 工具，默认安全姿态未放宽。
+- 2026-11-23 变更：`run_gdscript_tests`（Testing 域，`src/tools/domains/test/test_tools.hpp`）由 `SideEffect::None`/`kNone` 改为 `SideEffect::CodeExecute`/`kMutating`，故 None 与 CodeExecute 各移动 1（catalog 与域工具口径同时）。基线 JSON 的 `tools` 数组已同步，但 `by_side_effect` / `domain_by_side_effect` / `side_effect_review` 三个汇总字段仍是改动前旧值；上表按当前 `tools` 数组与源码重算，权威口径见 [tests.md](tests.md)「数值核算总表」。
 
 ## 历史基线（已被本页取代）
 

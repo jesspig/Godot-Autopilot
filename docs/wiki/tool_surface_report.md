@@ -1,19 +1,19 @@
 ---
 type: 审计报告
 title: 工具面压缩审计报告
-description: T-24 最终审计：catalog 459→252、生产别名 325、能力矩阵 561 行缺失 0、副作用分布与未验证项
+description: 工具面审计：catalog 459→252、生产别名 325、能力矩阵 561 行缺失 0、副作用分布（CodeExecute 5→6）、安全机制与未验证项
 tags:
   - 工具面
   - 审计
   - 压缩
   - 别名
-timestamp: "2026-11-16T13:20:11+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: devtools/commands/tool-audit.ts
 ---
 
 # 工具面压缩审计报告
 
-> 审计日期：2026-11-16。catalog、别名、schema、能力矩阵与副作用计数全部来自当前工作树的 `bun run gda-dev-tools audit-tools --json`，同一组数据由 `audit-tools --report` 输出；压缩前数字取自 T-01 的 `audit-baseline.json`（catalog 459）。
+> 审计日期：2026-11-23（增量同步）。本轮不重跑 audit：catalog、别名、schema、能力矩阵计数取自当前源码 catalog 基线与能力矩阵逐项统计，副作用按逐工具声明重算；复现命令仍为 `bun run gda-dev-tools audit-tools --json`（摘要 `audit-tools --report`）。压缩前数字取自 T-01 的 `audit-baseline.json`（catalog 459）。
 
 ## 数据来源与命令
 
@@ -127,7 +127,7 @@ catalog 口径（含元工具与 `system_status`）：
 
 | SideEffect | 压缩前 | 压缩后 | 变化 |
 | --- | ---: | ---: | ---: |
-| None | 282 | 151 | -131 |
+| None | 282 | 150 | -132 |
 | WritesScene | 43 | 29 | -14 |
 | ModifiesWindow | 42 | 20 | -22 |
 | WritesFile | 27 | 14 | -13 |
@@ -135,11 +135,19 @@ catalog 口径（含元工具与 `system_status`）：
 | Destructive | 6 | 7 | +1 |
 | Process | 10 | 7 | -3 |
 | GameRuntime | 18 | 7 | -11 |
-| CodeExecute | 9 | 5 | -4 |
+| CodeExecute | 9 | 6 | -3 |
 | ShowsAlert | 4 | 4 | 0 |
 
-- 域工具口径与 catalog 口径仅两处不同：None 147（catalog 151）、CodeExecute 3（catalog 5）；差异来自 5 个元工具与 `system_status`（catalog 比域工具多 4 个 None、2 个 CodeExecute）。
-- 需 `confirm` 的高风险档 Destructive、Process、CodeExecute、GameRuntime 合计 26 个 catalog 工具，默认安全姿态未放宽。
+- 域工具口径与 catalog 口径仅两处不同：None 146（catalog 150）、CodeExecute 4（catalog 6）；差异来自 5 个元工具与 `system_status`（catalog 比域工具多 4 个 None、2 个 CodeExecute）。
+- 需 `confirm` 的高风险档 Destructive、Process、CodeExecute、GameRuntime 合计 27 个 catalog 工具，默认安全姿态未放宽。
+- 本轮唯一副作用口径变化来自 `run_gdscript_tests`（Testing）：`None`→`CodeExecute`、`kNone`→`kMutating`（[test_tools.hpp](../../src/tools/domains/test/test_tools.hpp) 的 ToolSpec）。`tests/data/tool_catalog_baseline.json` 顶层 `by_side_effect` / `domain_by_side_effect` 汇总字段仍是旧值（151/5 与 147/3），逐项 `tools[]` 才是当前值，本页按逐项重算。
+
+## 工具面安全机制（增量）
+
+- 注册期新增 `audit_destructive_declarations`（[register_all.cpp](../../src/tools/base/register_all.cpp)）：对名字/描述疑似破坏性却未声明 Destructive 的工具记 Warning 与 `destructive_declaration_audit` 监控，不增删 catalog 条目。
+- `call_tool` 增加线程本地递归深度上限 8（`kMaxCallToolDepth`）；对目标工具按 `effective_side_effect` 计算确认档，避免经 `call_tool` 间接绕过高风险确认。
+- 提示词导出期统一由 `prompts_detail::reject_if_exporting()` 拦截（[prompt_export_guard.hpp](../../src/prompts/prompt_export_guard.hpp)），覆盖 debugger 提示词与通用提示词入口；debugger 模板已改用 `get_debugger_stream`、`game_script`、`get_debug_info`、`get_game_state` 等 canonical 名，`tool-usage` 示例从 17 个工具扩到 19 个。
+- `build_csharp_assembly` 改为有界 deferred：先回 `__gda_wait` marker 再由等待入口解析结果，输出 digest 与错误行按上限截断。
 
 ## 搜索与测试结论
 
@@ -160,6 +168,7 @@ catalog 口径（含元工具与 `system_status`）：
 | `SearchQuality` 搜索质量回归 | 未验证 | 本报告未执行，需以 T-24 测试输出为准 |
 | `AliasCoverage` 别名覆盖回归 | 未验证 | 本报告未执行，需以 T-24 测试输出为准 |
 | `CapabilityMatrix` 能力矩阵回归 | 未验证 | 本报告未执行，需以 T-24 测试输出为准 |
+| 本轮增量新增的边界/回滚单测 | 未验证 | 本页仅基于源码与 catalog 基线逐项统计同步，未运行 ctest / audit-tools |
 
 真实引擎 e2e 留待 T-26 在已连接编辑器上执行；本节列出的 `not_run` 项不得当作通过。
 
