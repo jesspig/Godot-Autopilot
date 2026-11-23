@@ -65,6 +65,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   input: "Input",
   input_map: "InputMap",
   log: "Log",
+  monitor: "Monitor",
   nav: "Nav",
   os: "OS",
   physics: "Physics",
@@ -192,6 +193,7 @@ const DOMAIN_TARGETS: Record<string, DomainTarget> = {
     merge_groups: ["get_input_map_actions", "set_input_map_action_bundle", "erase_input_map", "save_input_map"],
   },
   Log: { target: 1, plan_target: 1, merge_groups: ["get_game_log_entries"] },
+  Monitor: { target: 1, plan_target: 1, merge_groups: ["game_monitor"] },
   Nav: { target: 6, plan_target: 6, merge_groups: ["create_navigation", "nav_query", "nav_control"] },
   OS: {
     target: 11,

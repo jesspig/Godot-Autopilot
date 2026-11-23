@@ -42,7 +42,7 @@ const char *const kMetaToolNames[kMetaToolCount] = {
 const char *const kValidCategories[] = {
     "Analysis",   "Animation",  "Audio",      "Capture",    "Config",     "Debug",
     "Debugger",   "Display",    "Docs",       "Editor",     "Game",
-    "Group",      "Input",      "Navigation", "OS",         "Physics",
+    "Group",      "Input",      "Monitor",    "Navigation", "OS",         "Physics",
     "Properties", "Render",     "Resources",  "Scene",      "Scripts",
     "SpriteFrames", "System",   "Testing",    "Text",       "Theme",
     "TileMap",

@@ -1,16 +1,16 @@
 {
   "schema": 1,
   "source": "src/tools/domains/*/*_tools.hpp",
-  "catalog_current": 252,
+  "catalog_current": 253,
   "catalog_target": 270,
-  "catalog_expected": 277,
+  "catalog_expected": 278,
   "catalog_target_range": [
     250,
     300
   ],
-  "domain_current_total": 246,
-  "domain_target_total": 265,
-  "planned_domain_target_total": 266,
+  "domain_current_total": 247,
+  "domain_target_total": 266,
+  "planned_domain_target_total": 267,
   "net_new_total": 6,
   "strict_prune_count": 32,
   "meta_current": 5,
@@ -260,6 +260,15 @@
         "mesh_inspect",
         "multimesh",
         "multimesh_instance"
+      ]
+    },
+    {
+      "name": "Monitor",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "game_monitor"
       ]
     },
     {

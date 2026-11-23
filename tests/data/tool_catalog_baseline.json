@@ -4,11 +4,11 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 252,
-  "domain_total": 246,
+  "catalog_total": 253,
+  "domain_total": 247,
   "meta_total": 5,
   "system_total": 1,
-  "domain_count": 35,
+  "domain_count": 36,
   "by_domain": {
     "Analysis": 1,
     "Animation": 10,
@@ -29,6 +29,7 @@
     "InputMap": 4,
     "Log": 1,
     "Mesh": 4,
+    "Monitor": 1,
     "Nav": 14,
     "OS": 12,
     "Physics": 46,
@@ -64,6 +65,7 @@
     "Resources": 18,
     "Input": 10,
     "System": 5,
+    "Monitor": 1,
     "Navigation": 14,
     "OS": 11,
     "Physics": 45,
@@ -94,6 +96,7 @@
     "Resources": 18,
     "Input": 10,
     "System": 1,
+    "Monitor": 1,
     "Navigation": 14,
     "OS": 11,
     "Physics": 45,
@@ -112,7 +115,7 @@
     "ModifiesWindow": 20,
     "WritesFile": 14,
     "WritesConfig": 8,
-    "CodeExecute": 5,
+    "CodeExecute": 6,
     "ShowsAlert": 4,
     "Process": 7,
     "GameRuntime": 7
@@ -124,7 +127,7 @@
     "ModifiesWindow": 20,
     "WritesFile": 14,
     "WritesConfig": 8,
-    "CodeExecute": 3,
+    "CodeExecute": 4,
     "ShowsAlert": 4,
     "Process": 7,
     "GameRuntime": 7
@@ -2085,7 +2088,7 @@
       "action": "write"
     }
   ],
-  "schema_non_empty": 235,
+  "schema_non_empty": 236,
   "schema_empty": 17,
   "tool_names": [
     "analyze_project",
@@ -2184,6 +2187,7 @@
     "mesh_inspect",
     "multimesh",
     "multimesh_instance",
+    "game_monitor",
     "create_nav_2d_map",
     "create_nav_2d_region",
     "create_nav_2d_agent",
@@ -3523,7 +3527,7 @@
       "param_count": 4,
       "has_action_schema": true,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 307
+      "line": 308
     },
     {
       "name": "erase_input_map",
@@ -3536,7 +3540,7 @@
       "param_count": 2,
       "has_action_schema": true,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 360
+      "line": 361
     },
     {
       "name": "save_input_map",
@@ -3549,7 +3553,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 390
+      "line": 391
     },
     {
       "name": "get_game_log_entries",
@@ -3615,6 +3619,19 @@
       "has_action_schema": true,
       "source": "src/tools/domains/mesh/mesh_tools.hpp",
       "line": 128
+    },
+    {
+      "name": "game_monitor",
+      "category": "Monitor",
+      "domain": "Monitor",
+      "side_effect": "None",
+      "flags": [
+        "kObserve"
+      ],
+      "param_count": 2,
+      "has_action_schema": true,
+      "source": "src/tools/domains/monitor/monitor_tools.hpp",
+      "line": 32
     },
     {
       "name": "create_nav_2d_map",
@@ -5269,7 +5286,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 78
+      "line": 79
     },
     {
       "name": "create_script",
@@ -5282,7 +5299,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 83
+      "line": 84
     },
     {
       "name": "patch_script",
@@ -5295,7 +5312,7 @@
       "param_count": 6,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 88
+      "line": 89
     },
     {
       "name": "attach_script_to_node",
@@ -5310,7 +5327,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 93
+      "line": 94
     },
     {
       "name": "detach_script_from_node",
@@ -5324,7 +5341,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 98
+      "line": 99
     },
     {
       "name": "get_script_property",
@@ -5337,7 +5354,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 103
+      "line": 104
     },
     {
       "name": "set_script_property",
@@ -5350,7 +5367,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 108
+      "line": 109
     },
     {
       "name": "call_script_node",
@@ -5363,7 +5380,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 113
+      "line": 114
     },
     {
       "name": "reload_script",
@@ -5373,10 +5390,10 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
+      "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 118
+      "line": 119
     },
     {
       "name": "get_script_property_list",
@@ -5389,7 +5406,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 123
+      "line": 124
     },
     {
       "name": "update_spriteframes",
@@ -5602,7 +5619,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 485
+      "line": 522
     },
     {
       "name": "get_tool_detail",
@@ -5614,7 +5631,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 534
+      "line": 571
     },
     {
       "name": "call_tool",
@@ -5626,7 +5643,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 547
+      "line": 584
     },
     {
       "name": "batch_execute",
@@ -5639,7 +5656,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 569
+      "line": 606
     },
     {
       "name": "code_execute",
@@ -5652,7 +5669,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 632
+      "line": 669
     }
   ],
   "system_tools": [
@@ -5666,7 +5683,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 384
+      "line": 420
     }
   ],
   "side_effect_review": [
@@ -5683,13 +5700,6 @@
       "side_effect": "None",
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 494
-    },
-    {
-      "name": "run_gdscript_tests",
-      "domain": "Testing",
-      "side_effect": "None",
-      "source": "src/tools/domains/test/test_tools.hpp",
-      "line": 46
     }
   ]
 }
