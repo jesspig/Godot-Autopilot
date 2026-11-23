@@ -157,11 +157,15 @@ export function applyUpdate(argv: string[]): number {
   }
 }
 
+export function cliUpdateBinaryName(platform: string = process.platform): string {
+  return platform === "win32" ? "gda.exe" : "gda";
+}
+
 function cacheCliBinary(): { binary: string; version: string; source: UpdateItemResult["source"] } | null {
   const manifest = selectLatest("cli");
   if (manifest === undefined || !verifyManifest(manifest)) return null;
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "cli-update-"));
-  const extracted = path.join(temp, "gda");
+  const extracted = path.join(temp, cliUpdateBinaryName());
   try {
     if (manifest.asset.endsWith(".zip")) {
       const dir = path.join(temp, "unpacked");
