@@ -7,13 +7,13 @@ tags:
   - 领域工具
   - A组
   - action
-timestamp: "2026-11-16T13:38:53+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/domains/
 ---
 
 # 领域工具模块（src/tools/domains/，A 组 15 域 133 工具）
 
-> 审计日期：2026-11-16（T-25 文档收口）。数值取自 [tool_surface_report.md](../tool_surface_report.md) 与 T-24 的 `audit-report.json`：catalog 252 = 246 个域工具 + 5 个元工具 + `system_status` 1，35 个域文件；生产别名 325、schema 235 非空 / 17 空、能力矩阵 561 行缺失 0。本页覆盖其中 15 个域、133 个 canonical 工具。
+> 审计日期：2026-11-23（增量同步）。数值取自 [tool_surface_report.md](../tool_surface_report.md) 与当前源码 catalog 基线逐项统计：catalog 252 = 246 个域工具 + 5 个元工具 + `system_status` 1，35 个域文件；生产别名 325、schema 235 非空 / 17 空、能力矩阵 561 行缺失 0。本轮工具名、域数与 action 表未变，改动集中在 handler 校验与事务增强；副作用口径变化见报告页。本页覆盖其中 15 个域、133 个 canonical 工具。
 
 ## 口径与别名窗口
 
@@ -28,7 +28,7 @@ resource: src/tools/domains/
 | 工具 | action / mode | 说明 | 副作用 | 旧名（别名，0.4.0 弃用 → 0.6.0 移除） |
 |---|---|---|---|---|
 | `create_scene_node` | mode: node / scene / spec / bundle / path | 一次完成建节点、实例化场景、声明式建树、节点+属性+脚本+分组+信号原子捆绑、建路径节点 | WritesScene | `instantiate_scene`（scene）、`build_nodes_from_spec`（spec）、`spawn_node_bundle`（bundle）、`create_path_node`（path） |
-| `edit_scene_node` | rename / reparent / advance_path / duplicate / reorder / replace | 改名、改父级、推进 PathFollow、复制子树、替换节点、调整同级顺序（单 undo 步） | WritesScene | `rename_scene_node`、`reparent_node`、`advance_path_follow` |
+| `edit_scene_node` | rename / reparent / advance_path / duplicate / reorder / replace | 改名、改父级、推进 PathFollow、复制子树、替换节点、调整同级顺序（单 undo 步）；reparent 撤销按固定顺序登记（脱离新父 → 挂回旧父 → 复位索引 → 按需还原变换 → 还原 owner） | WritesScene | `rename_scene_node`、`reparent_node`、`advance_path_follow` |
 | `delete_scene_node` | — | 删除节点；拒删场景根，写入编辑器 undo 历史 | Destructive | — |
 | `pack_scene` | — | 把子树打包为 res:// 下的 PackedScene 文件，落盘后重载校验 | WritesFile | — |
 | `get_scene_tree` | — | 遍历编辑场景树；`pattern`/`type`/`group` 切换为过滤模式，`verify`/`paths`/`observe` 附核验、屏坐标与截图 | None | `get_scene_snapshot`、`get_scene_node_screen_rect`、`verify_scene_saved`、`has_group_node` |
@@ -46,7 +46,7 @@ resource: src/tools/domains/
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
 | `property_get` | — | 读单节点属性（支持批量 `properties` 与 `metadata/` 通道） | None | — |
-| `property_set` | — | 写节点属性：严格形状转换、对象引用、属性族展开、写后 readback 与 undo | WritesScene | `set_properties_batch` |
+| `property_set` | — | 写节点属性：严格形状转换、对象引用、属性族展开、写后 readback 与 undo；批量失败逐项校验回滚，附 `rolled_back` / `unrestored` 收据 | WritesScene | `set_properties_batch` |
 | `property_get_list` | — | 列出节点属性及元数据（`only_script_variables`、`property_filter`） | None | — |
 | `signal_connect` | — | 连接信号到目标方法，默认持久化 | WritesScene | — |
 | `signal_disconnect` | — | 断开由 `signal_connect` 建立的连接（幂等） | WritesScene | — |
@@ -74,7 +74,7 @@ resource: src/tools/domains/
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
 | `get_input_map` | list / has | 列动作名或检查动作存在 | None | `get_input_map_actions`、`has_input_map_action` |
-| `set_input_map_action` | set | 确保动作存在并一次应用死区与事件；`persist` 决定是否写 ProjectSettings | WritesConfig | `add_input_map_action`、`add_input_map_action_event`、`set_input_map_action_deadzone`、`set_input_map_action_bundle` |
+| `set_input_map_action` | set | 确保动作存在并一次应用死区与事件；`persist` 决定是否写 ProjectSettings；键名解析安全化（数字键安全转换、F1–F12 识别修复） | WritesConfig | `add_input_map_action`、`add_input_map_action_event`、`set_input_map_action_deadzone`、`set_input_map_action_bundle` |
 | `erase_input_map` | action / event | 删除整个动作或其中一条事件并持久化 | WritesConfig | `erase_input_map_action`、`erase_input_map_action_event` |
 | `save_input_map` | — | 把当前 InputMap 写入 ProjectSettings 并保存 | WritesConfig | — |
 
@@ -134,10 +134,10 @@ resource: src/tools/domains/
 | `resource_create` | create / duplicate / curve / curve_points / primitive / array | 创建内存资源、复制、曲线/控制点、PrimitiveMesh、ArrayMesh | None | `create_resource`、`duplicate_resource`、`create_curve_resource`、`set_curve_points`、`create_primitive_mesh`、`create_array_mesh` |
 | `resource_mesh` | surface_material | 给网格表面指派材质 | None | `set_mesh_surface_material` |
 | `resource_property` | get / set | 读写内存资源属性（写后 readback） | None | `get_resource_property`、`set_resource_property` |
-| `resource_file` | copy / rename / move / remove / create_dir | 资源文件复制、改名、移动、删除、建目录；rename/move 事务化改写引用 | WritesFile | `copy_resource_file`、`rename_resource_file`、`move_resource_file`、`remove_resource_file`、`create_directory` |
-| `resource_save` | save | 保存资源到磁盘（支持 copy-on-write 与落盘校验） | WritesFile | `save_resource` |
-| `resource_uid_set` | set_uid | 写入资源 UID | WritesFile | `set_resource_uid` |
-| `resource_import` | reimport / import_options | 排队重导入、写 `.import` 白名单选项 | WritesFile | `reimport_resource_files`、`set_resource_import_options` |
+| `resource_file` | copy / rename / move / remove / create_dir | 资源文件复制、改名、移动、删除、建目录；rename/move 事务化改写引用，sidecar 逆序回滚、重导入/重载并把引用绑回受影响场景属性 | WritesFile | `copy_resource_file`、`rename_resource_file`、`move_resource_file`、`remove_resource_file`、`create_directory` |
+| `resource_save` | save | 保存资源到磁盘（支持 copy-on-write 与落盘校验）；按 object_id 保存时保留 `memory://` 别名 | WritesFile | `save_resource` |
+| `resource_uid_set` | set_uid | 写入资源 UID：显式非正数拒绝、已占用需 `overwrite=true`，写入后复核注册状态 | WritesFile | `set_resource_uid` |
+| `resource_import` | reimport / import_options | 排队重导入、写 `.import` 白名单选项；reimport 参数畸形（缺 files/path、空数组或非字符串）直接报错不假成功 | WritesFile | `reimport_resource_files`、`set_resource_import_options` |
 | `assign_mesh_to_instance` | — | 把网格挂到 MeshInstance2D/3D 节点 | WritesScene | — |
 
 ## Scripts（10）
@@ -158,11 +158,11 @@ resource: src/tools/domains/
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
 | `get_project_settings` | get / has | 读 project.godot 设置或检查存在 | None | `has_project_settings` |
-| `update_project_settings` | set / save | 改内存设置并保存到 project.godot | WritesConfig | `set_project_settings`、`save_project_settings` |
+| `update_project_settings` | set / save | 改内存设置并保存到 project.godot；`autoload/` 前缀键（大小写不敏感）拒写，改用 `update_autoloads` | WritesConfig | `set_project_settings`、`save_project_settings` |
 | `get_editor_settings` | get / has | 读编辑器偏好（附 hint / enum_options） | None | `has_editor_settings` |
 | `update_editor_settings` | set | 改编辑器偏好并落盘 | WritesConfig | `set_editor_settings` |
 | `get_engine_state` | version / fps / frames_drawn / time_scale | 读引擎版本、FPS、累计帧、时间缩放 | None | `get_engine_version`、`get_engine_fps`、`get_engine_frames_drawn`、`get_engine_time_scale` |
-| `update_engine_state` | time_scale / max_fps | 改时间缩放与帧率上限 | ModifiesWindow | `set_engine_time_scale`、`set_engine_max_fps` |
+| `update_engine_state` | time_scale / max_fps | 改时间缩放与帧率上限；time_scale 限有限数且 0..上限、max_fps 限合法区间 | ModifiesWindow | `set_engine_time_scale`、`set_engine_max_fps` |
 | `get_autoloads` | list | 按加载序列出自启动单例 | None | `get_autoload_list` |
 | `update_autoloads` | add / remove / move | 增删/排序自启动单例并即时保存 | WritesConfig | `add_autoload`、`remove_autoload`、`move_autoload` |
 
@@ -180,7 +180,7 @@ resource: src/tools/domains/
 | `get_editor_ui` | elements / hit / geometry / scene_tree_items | 枚举编辑器控件、命中链、视口几何、Scene 树行 | None | `get_editor_ui_elements`、`hit_test_editor_point`、`get_editor_viewport_geometry`、`scene_tree_items` |
 | `get_editor_files` | tree / status / scan | 编辑器文件系统树、状态与扫描 | None | `get_editor_file_system_tree`、`get_editor_file_system_status`、`scan_editor_file_system` |
 | `editor_scene_control` | create / open / close / reload / play / stop | 场景新建、打开、关闭、重载、播放、停止 | ModifiesWindow | `create_editor_scene`、`open_editor_scene`、`close_editor_scene`、`reload_editor_scene`、`play_editor_current_scene`、`stop_editor_playing` |
-| `save_editor_scene` | save / save_as / save_all | 保存当前/另存/全部保存，附落盘回执 | WritesFile | `save_editor_scene_as`、`save_editor_scenes` |
+| `save_editor_scene` | save / save_as / save_all | 保存当前/另存/全部保存，附落盘回执；另存为文件未变化或不可读时不再报成功 | WritesFile | `save_editor_scene_as`、`save_editor_scenes` |
 | `editor_selection_set` | set / select_tree | 设置选择或按场景树行选中 | ModifiesWindow | `set_editor_selection`、`select_scene_tree_node` |
 | `editor_undo` | create / add_do / add_undo / commit / undo / redo / history / clear | 撤销栈四件套与全局 undo/redo/历史 | ModifiesWindow | `create_editor_undo_redo_action`、`add_editor_undo_redo_do`、`add_editor_undo_redo_undo`、`commit_editor_undo_redo` |
 | `script_editor` | open / goto / list_open / current / unsaved / save_all / reload_open / close | 脚本编辑器打开、跳行、列表、保存、重载、关闭 | ModifiesWindow | — |
@@ -190,7 +190,7 @@ resource: src/tools/domains/
 | `editor_info` | theme / scale / language / paths / multi_window / distraction_free / toast | 读编辑器主题/缩放/语言/路径并推 toast | ShowsAlert | — |
 | `editor_ui_action` | click / type / shortcut | 按元素 path 点击、输入文本、注入快捷键 | ModifiesWindow | `click_editor_element`、`type_editor_element_text`、`run_editor_shortcut` |
 | `editor_config` | main_scene / plugin_enable | 设置主场景、启停插件 | WritesConfig | `set_editor_main_scene`、`set_editor_plugin_enabled` |
-| `build_csharp_assembly` | — | `dotnet build` 构建 C# 工程，返回构建结果与后续动作 | Process | — |
+| `build_csharp_assembly` | — | `dotnet build` 构建 C# 工程，返回构建结果与后续动作；改为有界 deferred，先回 `__gda_wait` 再解析结果，digest 与错误行截断上报 | Process | — |
 | `dotnet_environment` | — | 探测 .NET/C# 环境，不触发构建 | Process | — |
 
 ## Analysis（1）
@@ -204,7 +204,7 @@ resource: src/tools/domains/
 | 工具 | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|
 | `capture_editor_viewport` | 截图（编辑器视口或 `target=game` 游戏视口），支持区域/缩放/标注/差分/落盘 | WritesFile | `capture_game_viewport` |
-| `review_scene_visually` | 一次返回编辑器截图、游戏截图、节点屏坐标表与视口映射 | WritesFile | — |
+| `review_scene_visually` | 一次返回编辑器截图、游戏截图、节点屏坐标表与视口映射；game 子调用返回 pending 时自动等待并回传，异常响应附截断诊断 | WritesFile | — |
 
 ## 调用示例
 

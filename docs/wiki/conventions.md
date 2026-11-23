@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-11-19T05:31:53+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/
 ---
 
@@ -43,17 +43,19 @@ resource: src/
 - **所有 Godot API 调用必须通过 `CommandQueue` 在主线程执行**（HTTP 线程直接调用会崩溃）；`CommandQueue::execute_sync()` **已无调用点**且是无界等待，**不得新增调用**——跨线程进主线程一律走 `submit()` 或带预算的等待入口（`dispatch::run_on_main_thread_with_budget` / `dispatch::run_bounded_on_main_thread`）。例外：`debugger_prompts` 为纯静态模板文本、不触碰 Godot API 亦不经队列；`debugger_resources` 与 `resource_handlers` 读取捕获缓冲经 `dispatch::run_bounded_on_main_thread`（默认预算 `GDA_DISPATCH_WAIT_DEFAULT_MS`）提交到主线程执行；`call_tool` 元工具编排回调在 MCP 线程执行但自身不触碰 Godot API（领域工具经 dispatch 路由回主线程，2026-09-13 起）
 - **主线程契约由静态守卫强制**：`tests/guard/main_thread_guard.ts` 扫描 `src/` 下全部 `*.cpp/*.hpp`，把每个源文件按「线程上下文分类」归入 `main`（主线程）/ `managed`（受管，游戏进程侧经 SceneTreeTimer 与 awaiter 排到游戏主线程）/ `foreign`（外线程）三类；`foreign` 类文件里的 Godot API 直接调用默认违规，只有落在该文件显式登记的主线程作用域（`FOREIGN_MAIN_THREAD_SCOPES`）里才放行。词法层面先剥离字符串字面量（含 raw string）与注释再匹配标识符，避免把字面量/注释里的 API 名误判为真实调用。判定在 ctest 阶段（`ctest --preset debug -R main_thread_guard`），无违规打印 `main-thread-guard OK` 退出 0，有违规退出 1，文件读/解码失败退出 2。
 - `CommandQueue`：header-only，`submit()` 返回 `std::future`（异常经 `set_exception` 传播），主线程 `_process()` 每帧 `drain()`
-- 导出期间（`ExportGuard` **实例级**导出标志——每个实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表、任一实例在导出期即返回 true）`dispatch` 拒绝工具调用
+- 导出期间（`ExportGuard` **实例级**导出标志——每个实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表、任一实例在导出期即返回 true）`dispatch` 拒绝工具调用；`AutopilotTools::call_tool()`（`src/tools/base/autopilot_tools.cpp`）2026-11-23 起入口同查 `is_exporting()`，命中返回 `dispatch::export_blocked_error_text()`
 
 ## 添加工具流程
 
 `ToolRegistry` 单一来源 + 全量 `ToolSpec` 数据记录（无 `tool_defs.def`、无宏/真类；设计见 [tool_base_design.md](tool_base_design.md)）：
 
 1. `src/tools/domains/<域>/<域>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
-2. `src/tools/domains/<域>/<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状：`Args(raw, kXxxParams)` 取参器（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()`）已实现且有单元测试，但 `src/` 下无领域 handler 接入（除 `tool_args.cpp` 自身，全仓 0 处 include）；在架 handler 一律用 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`，35 个域均如此。新增工具跟随所在域邻居的写法，不要在已用 `args.Find` 的文件里混入 `Args`，避免同一文件两种取参风格并存
+2. `src/tools/domains/<域>/<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状（2026-11-23 复核）：`Args(raw, kXxxParams)`（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()` + 新增 `validate_declared()`）已在 `SpecTool::execute()` 入口用于 `kDynamic` 工具的取参校验（`validate_dynamic_args()`），但 35 个领域的在架 handler 仍一律用 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`。新增域工具跟随所在域邻居写法，不要在已用 `args.Find` 的文件里混入 `Args`，避免同一文件两种取参风格并存
 3. 该域 `src/tools/domains/<域>/<域>_tools.hpp`：定义 `const std::vector<ParamSpec> kXxxParams = {...}` 参数表，并在 `make_tools()` 中以 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))` 一行注册——`register_all.cpp` 经各域 `make_tools()` 自动注册，无需手改；schema 从参数表自动派生（仅嵌套结构才用 `raw_schema` 手写 JSON）
 4. `side_effect`（`SideEffect` 枚举选值）与 `flags`（如 `kMutating`）按工具实际影响声明；合成输入类可加 `kObserve` 复用执行管线的截图后处理
 5. 仅新增 `.cpp` 才需动根侧登记（header-only 无需；**所有**新增 `.cpp` 都要登记——根 `CMakeLists.txt` 直列条目或 `cmake/sources/*.cmake` 清单二选一，Unity 构建只编译列出的文件）；迁移守卫 `tests/guard/` 拒绝旧宏（`GDA_TOOL_CLASS` 等）与 `schema_*_ops.cpp` 残留
+
+**公共 helper 优先复用（2026-11-23）**：输入解析/校验统一走 `src/util/input_guards.hpp`（`string_arg_status`、`parse_object_locator`、`parse_signed_decimal_int64`、`received_keys_text`/`received_keys_suffix`、`normalize_resource_uri_path` 等），路径拼接走 `src/core/path_util.hpp` 的 `join_path` 等，工程内路径规范化与逃逸校验走 `src/util/project_path.hpp`，字符串/FNV 哈希分别走 `src/util/string_util.hpp`/`hash_util.hpp`，`side_effect` 字符串解析走 `src/tools/base/tool_base.hpp` 的 `parse_side_effect()`；按键解析与路径拼接已统一，勿在调用方重写重复实现（设计见 [ToolSpec 数据层与执行管线](tool_base_design.md)）。
 
 ## 测试纪律
 

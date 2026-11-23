@@ -7,7 +7,7 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/
 ---
 
@@ -15,7 +15,7 @@ resource: src/tools/
 
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
-> **当前 API 面（2026-11-17 复核：注册共 35 域 246 工具 + 5 元 + `system_status`，catalog 共 252；`SideEffect` 10 值；高风险工具要求 `confirm=true`，`main_thread_timeout` 的 `retryable` 为 false）**
+> **当前 API 面（2026-11-23 复核：注册共 35 域 246 工具 + 5 元 + `system_status`，catalog 共 252；`SideEffect` 10 值；高风险工具要求 `confirm=true`，`main_thread_timeout` 的 `retryable` 为 false）**
 > 管线分层：`tool_spec.hpp`（`ToolSpec`/`ParamSpec`/`tool_flags`/`SpecTool`/`make_spec_tool`）→ `dispatch.hpp/cpp`（主线程路由与预算）→ `tool_args.hpp/cpp`（`Args`/`ToolArgError`）→ `tool_pipeline.hpp/cpp`（`pipeline::run_post`）；注册见 `register_all.hpp/cpp`（`build_registry`/`refresh_derived`/`refresh_dynamic_tools`/`get_active_registry`）；动态工具见 `dynamic_spec_store.hpp` + `autopilot_tools.{hpp,cpp}`；工具间调用与 trace 见 `tool_invoke.hpp/cpp`。下文分节展开。
 
 ## 目录布局
@@ -24,7 +24,7 @@ resource: src/tools/
 
 | 位置 | 内容 |
 |---|---|
-| `src/tools/base/` | 29 个文件：`ToolSpec`/参数/schema/注册/分发/确认/就绪策略等管线实现，外加元工具（`autopilot_tools`、`code_exec_ops`）与跨域共享件（`debugger_access`、`runtime_ops`） |
+| `src/tools/base/` | 32 个文件：`ToolSpec`/参数/schema/注册/分发/确认/就绪策略等管线实现，外加元工具（`autopilot_tools`、`code_exec_ops`）与跨域共享件（`debugger_access`、`runtime_ops`）；2026-11-23 新增三个纯逻辑头 `batch_verdict.hpp` / `call_depth_guard.hpp` / `call_tool_elicitation.hpp`（分别抽离 batch 成功判定、`call_tool` 递归阈值、代理调用 elicitation 决策，便于单测） |
 | `src/tools/domains/<域>/` | 35 个域目录共 125 个文件：每个域一个目录，内含 `<域>_tools.hpp`（ToolSpec 规格）与 `<域>_ops.{hpp,cpp}`（handler 实现，大域可拆 `<域>_*_ops.cpp`） |
 
 增删文件的路径约定：新增域建 `domains/<域名>/`，放 `<域名>_tools.hpp` 与实现；仅跨域共享的管线件放 `base/`。`tests/CMakeLists.txt` 与 `source_manifest_guard.ts` 用递归 glob（`domains/*/*_ops.cpp` + `base/*_ops.cpp`）收集实现，域内 `*_ops.cpp` 无需登记即纳入。
@@ -55,7 +55,7 @@ inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec);
 ```
 
 - `ParamSpec`/`schema::ParamDef` 四字段：`{name, type, description, required}`；`type` 为 JSON schema 类型字符串（`string`/`integer`/`number`/`boolean`/`object`/`array`）。
-- `tool_flags` 位标志（`kNone` + 9 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（`observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）、`kHealthProbe`（健康探针 `ping`/`system_status`，5000ms 短预算）、`kLongBlocking`（`code_execute`/`batch_execute`，长阻塞预算）。收编计数见下节 traits 小节（2026-11-17 逐块统计）。
+- `tool_flags` 位标志（`kNone` + 9 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（`observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）、`kHealthProbe`（健康探针 `ping`/`system_status`，5000ms 短预算）、`kLongBlocking`（`code_execute`/`batch_execute`，长阻塞预算）。收编计数见下节 traits 小节（2026-11-23 逐块统计）。
 - 域侧写法：`const std::vector<ParamSpec> kXxxParams = {...};` 参数表与工具名一一对应，`make_tools()` 中 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))`（`side_effect` 取 `SideEffect` 枚举 10 值，见 [安全边界与并发契约](security_contract.md)）。
 
 ## SpecTool 与执行管线
@@ -69,15 +69,17 @@ class SpecTool : public ToolBase, public ISideEffect {
 `SpecTool` 构造时固化三件事：`schema_`（`raw_schema` 优先，否则 `build_schema(params)`）、`meta_`（name/description/category/tags）、`spec_`。`execute()` 的执行顺序固定：
 
 1. `confirm` 门 `confirmation::required_for(spec_.side_effect)`——高风险 `side_effect`（`destructive`/`process`/`code_execute`/`game_runtime`）且调用未带 `arguments.confirm=true` 时直接返回 `confirmation_required` 结构化错误；带 confirm 时剔除 `confirm` 键后进入 handler；
-2. `handler(args)`；
-3. `pipeline::run_post(spec, args, result)`——`kObserve` 且 `args.observe == true` 时调 `capture_ops::handle_capture_viewport({"target":"editor"})`，把 `data/format/width/height/path` 合并进结果（失败写 `observe_error`）；`kSceneTarget` 且响应无 `error` 时，`result.scene_path` 缺失则幂等补全编辑器场景信息（`util::add_scene_info_fields` + `edited_scene_info()`，不做脏标记）；`kUndoable` 纯标记，post 无动作（各 handler 自管 undo）；其余原样返回。
+2. `kDynamic` 工具取参校验（`src/tools/base/tool_spec.hpp` 的 `spec_detail::validate_dynamic_args()`，2026-11-23 新增）——`Args::validate_declared()` 校验必填/类型，再以 `reject_unknown()` 拒绝未声明参数（`confirm` 作为合法键例外）；任一失败返回 `{"error": <ToolArgError::what()>}`，不进入 handler，消除动态工具「声明 schema 与实际取参」双轨；
+3. `handler(args)`；
+4. `pipeline::run_post(spec, args, result)`——`kObserve` 且 `args.observe == true` 时调 `capture_ops::handle_capture_viewport({"target":"editor"})`，把 `data/format/width/height/path` 合并进结果（失败写 `observe_error`）；`kSceneTarget` 且响应无 `error` 时，`result.scene_path` 缺失则幂等补全编辑器场景信息（`util::add_scene_info_fields` + `edited_scene_info()`，不做脏标记）；`kUndoable` 纯标记，post 无动作（各 handler 自管 undo）；其余原样返回。
 
 `kObserve` 后处理自 2026-09-19 起由管线统一提供；Input 域 4 个合成输入工具（`click_input_mouse`/`scroll_input_mouse`/`drag_input_mouse`/`type_input_text`）与 Editor 域 2 个元素操作工具（`click_editor_element`/`type_editor_element_text`）已收编，`input_click_ops.cpp`/`editor_ui_actions.cpp` 中的重复实现已删除。
 
 ### side_effect 回显与确认门（0.3.2 起现行口径）
 
 - **`side_effect_name` 回显口径**：`SideEffect` 10 值经 `tool_base.hpp` 的 `side_effect_name()` 映射为 `none`/`writes_file`/`writes_config`/`writes_scene`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`。只读工具（`SideEffect::None`）回显 `"none"`，不再回显空串；`get_tool_detail` 的 `side_effect` 字段取自该函数，registry 查不到工具时兜底 `"none"`。
-- **`code_execute`/`batch_execute` 的 `side_effect` 声明为 `SideEffect::CodeExecute`**，回显 `"code_execute"`。
+- **`code_execute`/`batch_execute` 的 `side_effect` 声明为 `SideEffect::CodeExecute`**，回显 `"code_execute"`；2026-11-23 起 `run_gdscript_tests` 也从 `None`/`kNone` 改为 `CodeExecute`/`kMutating`（`src/tools/domains/test/test_tools.hpp`），故 catalog 的 `CodeExecute` 计 6、域工具计 4。
+- **`parse_side_effect(text, out)`**（`src/tools/base/tool_base.hpp`，2026-11-23 从 `autopilot_tools.cpp` 的私有函数上提并扩展）：接受空串→`None` 及全部 9 个非 `None` 值名（含此前不被接受的 `writes_scene` / `destructive`），未知值返回 false；`"none"` 仍不是合法输入。单元测试 `tests/unit/side_effect_parse_test.cpp` 覆盖全部取值与未知拒绝。
 - **高风险确认**：判定只看 `side_effect`（四类见执行顺序第 1 步），不按工具名特判；新增工具声明对应 `side_effect` 即自动纳入，无需改表。0.3.2 之前的授权三档/能力门/`GODOT_AUTOPILOT_ALLOW` 已整体移除，完整口径见 [T0 安全边界与并发契约](security_contract.md) §3。
 
 ## 线程路由与 dispatch 预算（09-29 新增）
@@ -110,10 +112,10 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 ## traits 收编终态（kCaptureImage/kSceneTarget/kUndoable）
 
-- **`kCaptureImage`（9 工具，图片附件单一来源）**：`register_all.cpp` 的 `call_tool` 回调按 flag 判定——registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content；仅未知工具名走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`，`src/util/mcp_image_content.hpp`）。
+- **`kCaptureImage`（7 工具，图片附件单一来源；2026-11-23 按基线 `tools` 数组重算）**：`register_all.cpp` 的 `call_tool` 回调按 flag 判定——registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content；仅未知工具名走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`，`src/util/mcp_image_content.hpp`）。
 - **`kSceneTarget`（42 工具，成功响应幂等补全）**：见上节 `run_post` 第 3 步；仅补缺失的 `scene_path`/`scene_unsaved`，不做脏标记。
 - **`kUndoable`（24 工具，纯标记）**：各 handler 自管 undo，`run_post` 无动作。
-- 计数口径（2026-11-17 重算）：以 `src/tools/domains/*/*_tools.hpp` 中每个 `make_spec_tool(ToolSpec{ ... })` **块**为单位，统计该块 flags 表达式是否出现该 flag——即「多少工具声明了该 flag」，非 grep 文本出现次数。246 个域工具块统计得：`kSceneTarget` 27 / `kUndoable` 17 / `kMutating` 78 / `kNone` 160 / `kCaptureImage` 7 / `kObserve` 4 / `kLongBlocking` 3（`kMeta`/`kDynamic`/`kHealthProbe` 只出现在元工具与动态工具上，不在域工具块内）。运行时以 `get_tool_detail` 回显为准。
+- 计数口径（2026-11-23 重算）：以 `src/tools/domains/*/*_tools.hpp` 中每个 `make_spec_tool(ToolSpec{ ... })` **块**为单位，统计该块 flags 表达式是否出现该 flag——即「多少工具声明了该 flag」，非 grep 文本出现次数。246 个域工具块统计得：`kSceneTarget` 27 / `kUndoable` 17 / `kMutating` 79 / `kNone` 159 / `kCaptureImage` 7 / `kObserve` 4 / `kLongBlocking` 3（`kMutating`+1、`kNone`−1 来自 `run_gdscript_tests` 改为 `kMutating`）（`kMeta`/`kDynamic`/`kHealthProbe` 只出现在元工具与动态工具上，不在域工具块内）。运行时以 `get_tool_detail` 回显为准。
 
 - **线程契约**：handler 经 `dispatch::call_handler` →（非主线程时）`run_on_main_thread_with_budget`（09-29 起，含等待预算与超时取消，见上节）路由到 Godot 主线程；唯一例外是 `call_tool` 元工具的编排回调在 MCP 线程执行（等待游戏响应/截图定型，不触碰 Godot API），领域工具 handler 仍由 dispatch 路由回主线程。类内部不得另起线程触碰 Godot API。
 - 错误直接返回 `{"error": msg}` JSON 对象（构造用 `util::error_json`/`util::ok_result` 助手）。
@@ -125,15 +127,15 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 - `has`/`is_null`；`opt_string`/`opt_int`/`opt_number`/`opt_bool`/`opt_object`/`opt_array`（返回 `std::optional` 或指针）；
 - `require_*` 缺失抛 `ToolArgError("missing required parameter: <name>")`；类型不符抛 `"invalid parameter: <name> must be a <type>"`；
-- `get_*` 带默认值；`reject_unknown()` 按参数表拒绝未知键（`"unknown parameter: <name>"`）。
+- `get_*` 带默认值；`reject_unknown()` 按参数表拒绝未知键（`"unknown parameter: <name>"`）；`validate_declared()`（2026-11-23 新增）遍历参数表逐项校验必填与类型（`string`/`integer`/`number`/`boolean`/`object`/`array`）。
 
 语义要点：`null` 一律视为缺失；`integer` 接受整数值的 JSON double（拒绝小数、拒绝越界）；`boolean` 严格（`1`/`0` 报错）；`reject_unknown` 对非对象输入直接放行。单元测试 `tool_args_test.cpp` 覆盖 11 项。
 
-> **接入状态（2026-10-20 复核）**：`Args` **可用但未接线**——`src/` 下除 `tool_args.cpp` 自身外无文件 include `tool_args.hpp`，35 个领域的 handler 全走 `args.Find(...)` + `util::error_json(...)`。「取参统一 Args」是收敛方向而非现状；写新 handler 前先看所在域邻居文件的风格，避免同文件混用两种风格。真正统一接入需一次性改全部 `*_ops.cpp` 并复跑 `03_tools_contract` 遍历。
+> **接入状态（2026-11-23 复核）**：`Args` 已部分接线——`tool_spec.hpp` 现 include `tool_args.hpp`，在 `SpecTool::execute()` 入口对 `kDynamic` 工具经 `validate_dynamic_args()` 调用 `validate_declared()` + `reject_unknown()`（见执行顺序第 2 步），动态工具的 schema 声明与实际取参不再双轨。**35 个领域的在架 handler 仍全走 `args.Find(...)` + `util::error_json(...)`**，「取参统一 Args」对域工具仍是收敛方向而非现状；写新域 handler 前先看所在域邻居文件的风格，避免同文件混用两种风格。
 
 ## ToolRegistry 与注册派生
 
-`ToolRegistry` 仍是工具单一来源：`add()` 按 `flags & kMeta` 自动归入 meta_（其余进域工具表），`find`/`find_meta`/`find_any`/`all`/`all_meta`/`all_any`/`size`/`meta_size`/`categories` 全量可查；`make_tool_info` 把 `kDynamic`/`kMutating` 映射为 `ToolInfo.dynamic/mutating` 供 catalog 与遍历使用。注册管线细节见 [工具注册表](modules/tools_registry.md)。
+`ToolRegistry` 仍是工具单一来源：`add()` 按 `flags & kMeta` 自动归入 meta_（其余进域工具表），`find`/`find_meta`/`find_any`/`all`/`all_meta`/`all_any`/`size`/`meta_size`/`categories` 全量可查；`make_tool_info` 把 `kDynamic`/`kMutating` 映射为 `ToolInfo.dynamic/mutating` 供 catalog 与遍历使用。2026-11-23 起 `add()` 先用私有 `find_instantiated_locked()` 检查已实例化工具名，重名即抛 `std::invalid_argument("duplicate tool name: " + name)`；`all_aliases()` 已删除，别名查询走 `resolve_alias()` / `alias_count()`（契约见 [工具面别名约定](tool_surface_conventions.md)）。注册管线细节见 [工具注册表](modules/tools_registry.md)。
 
 ## 动态工具（用户脚本 API）
 
@@ -144,10 +146,10 @@ class SpecTool : public ToolBase, public ISideEffect {
 | `register_tool(definition, callable)` | 注册用户工具，返回 handle（失败返回 -1 并 `push_error`） |
 | `unregister_tool(handle)` | 按 handle 移除，成功触发重建 |
 | `has_tool(name)` / `list_tools()` / `get_tool(name)` | 查询已注册工具（get_tool 含 name/description/category/tags/side_effect/params/handle） |
-| `call_tool(name, args)` | 直连 dispatch 调任意工具（自动回主线程） |
+| `call_tool(name, args)` | 直连 dispatch 调任意工具（自动回主线程）；入口先查 `ExportGuard::is_exporting()`，导出期返回 `dispatch::export_blocked_error_text()`（2026-11-23 新增） |
 | `is_enabled()` / `set_enabled(bool)` | `user_tools` 能力门已随 0.3.2 移除：`is_enabled()` 恒返回 true，`set_enabled()` 仅记一条 Tools 日志 |
 
-- **definition 字段**：`name`（必填、非空）、`description`、`category`（默认 `User`）、`tags`、`side_effect`（注册方声明的**输入**字段：空串或省略即 `SideEffect::None`，其余取 `writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`；`"none"` **不是**合法输入值，只读动态工具须留空）、`params`（`[{name, type, description, required}]`）。动态工具 `side_effect` **回显**恒非空——只读工具回显 `"none"`（`autopilot_tools.cpp:613` 经 `side_effect_name`），输入侧空串不出现在回显中。
+- **definition 字段**：`name`（必填、非空）、`description`、`category`（默认 `User`）、`tags`、`side_effect`（注册方声明的**输入**字段，由 `tool_base.hpp` 的 `parse_side_effect()` 解析：空串或省略即 `SideEffect::None`，其余接受全部 9 个非 `None` 值名——`writes_file`/`writes_config`/`writes_scene`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`（后两个 `writes_scene`/`destructive` 为 2026-11-23 新增支持）；`"none"` **不是**合法输入值，只读动态工具须留空）、`params`（`[{name, type, description, required}]`）。动态工具 `side_effect` **回显**恒非空——只读工具回显 `"none"`（`autopilot_tools.cpp` 经 `side_effect_name`），输入侧空串不出现在回显中。动态工具执行前还会按 `params` 做取参校验（`Args::validate_declared()` + `reject_unknown()`，见执行顺序第 2 步），声明之外的参数会被拒绝。
 - **存储与重建**：spec 存入 `dynamic_specs::store()`（`dynamic_spec_store.hpp`，互斥保护），`register_tool`/`unregister_tool` 成功后调 `refresh_dynamic_tools()` 重建 registry（动态 spec 带 `kDynamic` flag）；重名（已注册或与内置工具碰撞）拒绝注册。
 - **执行门**：`user_tools` 能力门已随 0.3.2 移除，注册与调用不再门控。callable 目标对象被释放后调用报"目标已失效，请重新注册"。
 - **生命周期**：`AutopilotTools` 析构清空 spec store；编辑器中单例随插件加载注册。
@@ -241,6 +243,8 @@ trace 扩展（09-20）：`invoke_tool` 正常路径用 `SpanGuard(trace, span)`
 ## batch_execute 最小变量串联
 
 `batch_execute` 在 `src/tools/base/code_exec_ops.cpp` 内支持最小变量串联（无 schema 改动）：整字符串精确替换 `$prev`（上一操作的成功/失败载荷整体）、`$steps[N].result` / `$steps[N].error`（指定序号操作的载荷，可位于嵌套结构；非整字符串混写如 `"prefix $prev suffix"` 保持原样）。不可解析时该步骤记 error，前缀 `unresolvable reference`（首操作用 `$prev`、前向引用、状态错配如对失败操作取 `.result`、序号越界均属此类），走既有 `stop_on_error` 语义；无条件分支、无并行。单元测试 `tests/unit/batch_refs_test.cpp` 覆盖 7 项。
+
+2026-11-23 补充：每步成败改由 `batch_verdict.hpp` 的 `batch_detail::op_succeeded()`（→ `spec_detail::verdict_of()`）统一判定，`structured_error` / `runtime_error` 与顶层 `error` 一视为失败，避免只认顶层 `error` 造成误判；`$steps[N]` 的 `N` 解析收敛到 `util::parse_signed_decimal_int64()`（`src/util/input_guards.hpp`），拒绝小数/空串/越界。回滚快照取编辑场景根对象的 history id（无根或无效回退 `GLOBAL_HISTORY`，`batch_resolve_history_id()`），`rollback_partial` 改由 `batch_rollback_report()` 按 `max(actions_created, undoable_successes)` 与 `rolled_back` 比对计算，并统计成功项中的 `undoable` 布尔字段。单元测试 `tests/unit/batch_verdict_test.cpp` 覆盖三轨判定。
 
 ## 迁移规则与守卫
 

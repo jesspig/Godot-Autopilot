@@ -9,7 +9,7 @@ tags:
   - TypeScript
   - MCP
   - IPC
-timestamp: "2026-11-18T12:25:50+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource:
   - cli/
   - package.json
@@ -18,7 +18,7 @@ resource:
 
 # CLI 载体（`cli/`，命令 `gda`）
 
-> 审计日期：2026-11-18（stop/restart 失败识别任务存储中毒并提示降级；命令与测试数值以命令参考表与 [tests.md](../tests.md) 为准）
+> 审计日期：2026-11-23（batch 单操作失败不中断整批、注册表读改写单锁原子、stop 端点存活二次确认、IPC 已发出不回退重发、安装校验后登记 manifest 与失败回滚；命令与测试数值以命令参考表与 [tests.md](../tests.md) 为准）
 
 ## 定位与分发
 
@@ -34,6 +34,8 @@ resource:
 
 **不进 addon 包**：CLI 独立于 GDExtension 插件（`godot-autopilot.dll` 等），不参与 `gda-dev-tools build`/`deploy`/`package`，不进 `addons.zip`；独立二进制作为**单独的 release 资产**与 `addons.zip` 并列发布（`release.yml` 的 `cli` 作业，5 个目标；`ci.yml` 的 `cli-bins` 作业做三平台冒烟）。发布资产含 `addons.zip`、5 个平台的 `gda-<version>-<platform>` 归档与 `sha256sums.txt`；0.3.3 起 `sha256sums.txt` 同时覆盖 `addons.zip`，`gda install plugin` 下载后校验插件包，0.3.2 及更早的插件包需手动解压。
 
+**独立二进制安装脚本**（`scripts/install.ps1` / `scripts/install.sh`）：下载归档后先对照 `sha256sums.txt` 校验，**校验通过才**写自更新 manifest（`~/.godot-autopilot/cache/manifests/cli-<version>.json`，含 sha256/size/platform/fetched_at；跳过校验时不登记）。替换二进制采用「备份旧版本 → 写入临时文件 → 移动到目标」，新版本落位失败即恢复旧版本并报错退出。`gda install plugin` 同样把停止运行中编辑器实例推迟到归档内容校验通过之后。
+
 **输出语言**：CLI 面向国际用户，全部用户可见文本（帮助、错误消息、suggestion、退出码说明）均为英文；源码内注释不受此约束。
 
 ## 缓存与更新
@@ -48,9 +50,9 @@ resource:
 
 ## 命令参考
 
-`gda --help` 共列 **22** 个顶层命令：调用族 6、生命周期 5、资产与查询族 10、文档族 1（`docs`，6 个子命令）。下表按族分组。
+`gda --help` 共列 **23** 个顶层命令：调用族 7、生命周期 5、资产与查询族 10、文档族 1（`docs`，6 个子命令）。下表按族分组。
 
-### 调用族（6 个，经 MCP 协议）
+### 调用族（7 个，经 MCP 协议）
 
 | 命令 | 映射到 MCP | 说明 |
 |---|---|---|
@@ -60,6 +62,7 @@ resource:
 | `search [query]` | `search_tools`（直连） | 搜索工具；`--category`/`--tags` 过滤 |
 | `describe <tool>` | `get_tool_detail`（直连） | 工具详情 |
 | `call <tool>` | 直连或 `call_tool` 包装 | 调用工具；`--args`/`--args-file` 传参 |
+| `batch --args-file <path>` | 直连或 `call_tool` 包装（共享一次 IPC 会话） | 单进程内顺序执行多操作；单个操作抛异常或工具失败只记入该条结果，不中断整批；退出码为全部成功时 0、否则工具失败 1 |
 
 ### 生命周期（5 个，本地状态管理）
 
@@ -77,12 +80,12 @@ resource:
 |---|---|
 | `skills list|show` | 列出/打印 1 张入口技能卡与 9 篇 references（`--zh` 中文；`show --file <rel>` 读参考文件） |
 | `tools list` | 通过运行实例的 `search_tools {limit:0}` 列出全部直接工具，过滤 5 个 MCP 协议工具，输出 `{tools, total}`；`--category`/`--tags` 可过滤 |
-| `resources list|templates|read|watch` | 通用 MCP `resources/*`：list 可带 `--templates`；read 默认文本直出/JSON pretty/blob 摘要，`--save <dir>` 落盘，`--json` 脱敏 base64，`--raw` 原始信封；watch 轮询 `--interval` 秒 |
-| `prompts list|get` | 通用 MCP `prompts/*`：list 输出 `{prompts}`；get 用 `--args` 传字符串参数，默认按 `[role] text` 渲染，`--json` 保留 messages |
-| `tasks list|get|wait|cancel|clean` | 本地任务索引 `<gda-root>/tasks/`；`call --async` 创建并记录，wait 状态变化写 stderr，终态结果写 stdout |
+| `resources list|templates|read|watch` | 通用 MCP `resources/*`：list 可带 `--templates`；read 默认文本直出/JSON pretty/blob 摘要，`--save <dir>` 落盘，`--json` 脱敏 base64，`--raw` 原始信封；watch 轮询 `--interval` 秒；与 `prompts` 一样走 `--transport`/`--socket` 指定的 IPC 通道 |
+| `prompts list|get` | 通用 MCP `prompts/*`：list 输出 `{prompts}`；get 用 `--args` 传字符串参数，默认按 `[role] text` 渲染，`--json` 保留 messages；支持 IPC 通道 |
+| `tasks list|get|wait|cancel|clean` | 本地任务索引 `<gda-root>/tasks/`；`call --async` 创建并记录，wait 状态变化写 stderr，终态结果写 stdout；`wait` 在终态 `completed` 时检查内层结果，内层工具失败按退出码 1 返回 |
 | `projects` | 列出已知工程（`<集中根>/projects/*`） |
-| `cache list|info|clear` | 缓存清单/大小/清理（`clear` 需 `--force`） |
-| `install skills|plugin` | 安装入口卡与 references 到 `~/.agents/skills`（`--path` 可装项目级目录，`--prune` 清理退役目录），或把插件装进工程 |
+| `cache list|info|clear` | 缓存清单/大小/清理（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills）；`cli` 资产按当前平台键（windows-x64/linux-x64/macos-arm64/macos-x64）筛选 |
+| `install skills|plugin` | 安装入口卡与 references 到 `~/.agents/skills`（`--path` 可装项目级目录，`--prune` 清理退役目录），或把插件装进工程；插件安装校验归档内容通过后才停止运行中的编辑器实例 |
 | `update <cli|skills|plugin|all>` | 更新资产，`--check` 只检查状态 |
 | `trace list|show|summary|slow|failures|export` | Trace v4 查询与导出 |
 
@@ -120,7 +123,7 @@ resource:
 | `--progress` | 布尔 | call | 进度通知写 stderr，stdout 保持 JSON |
 | `--input <json>` | 字符串 | call | MRTR `input_required` 的 inputResponses；非 TTY 无该参数退出 3 |
 | `--godot <path>` | 字符串 | start | 显式指定 Godot 可执行文件 |
-| `--wait <sec>` | 字符串 | start/stop/restart | 就绪/停止等待秒数（0=不等待）；`restart` 的停止阶段固定 10 秒，不受该选项影响 |
+| `--wait <sec>` | 字符串 | start/stop/restart | 就绪/停止等待秒数（0=不等待）；`restart` 停止阶段默认 10 秒，可由该选项覆盖 |
 | `--tail <n>` | 字符串 | logs | 日志末尾行数（默认 50） |
 | `--headless` | 布尔 | start | 无头模式启动编辑器 |
 | `--play` | 布尔 | start | 就绪后播放当前场景 |
@@ -172,9 +175,9 @@ resource:
 
 - 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>] [--zh]` 列出/打印 1 张入口技能卡与 9 篇 references；`gda projects` 按 `<集中根>/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
 - 工具发现（live，2026-11-14 T-04/T-05）：`gda tools list [--category] [--tags]` 输出 `{tools: string[], total}`；`gda search [query]` 无 query 输出 `{categories}`、有 query 输出 `{results: [{name, score}]}`（服务端默认 20 条）。CLI 无离线 catalog，也没有 `gda tools search|describe` 或 `--refresh`。
-- 资产安装、更新与缓存：`gda install skills [--zh] [--offline] [--path <dir>] [--prune]` 安装 1 张入口卡 + 9 篇 references（`--prune` 清理退役目录）；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`；`gda cache list|info|clear`（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills 三类资产）。
+- 资产安装、更新与缓存：`gda install skills [--zh] [--offline] [--path <dir>] [--prune]` 安装 1 张入口卡 + 9 篇 references（`--prune` 清理退役目录）；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`；`gda cache list|info|clear`（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills 三类资产；`cli` 资产按当前平台键筛选）。归档解压后做 zip-slip 防护：逐项以 realpath 校验是否越界，越界即报传输错误。
 - `gda list` 支持 `--all`（含未运行工程）、`--projects`（按工程聚合）、`--stale`（仅非存活）；条目 `live` 保留布尔并新增 `liveDetail {pid, endpoint}` 两级。
-- IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
+- IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。**请求一旦写出即不因丢响应而重发**：超时或连接中断时若请求已发出，按传输错误退出码 2 并提示「the execution result is unknown and the call was not retried」，避免重复副作用；IPC 返回令牌错误（code -32001/-32002）时不回退到无鉴权的 HTTP。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
 
 ## 离线引擎文档（`gda docs`）
 
@@ -248,6 +251,7 @@ resource:
 - 锁文件 `instances.lock`，`wx` 排他创建；50ms 重试间隔、2000ms 总超时。
 - 死锁窃取：mtime 超 10s 且锁内 pid 不存活时删除锁继续。
 - 原子写：tmp 文件（`instances.json.<pid>.tmp`）+ `rename`。
+- 读改写原子化（`withRegistryLock`）：`start` 登记、`stop` 移除等改动把「加载 → 修改 → 原子写」纳入同一把锁内执行，避免并发实例登记互相覆盖。
 - 加载时过滤死 pid 条目（`isAlive` 探测），有清理则写回。`isAlive` 在 Windows 上解析 `tasklist /FI "PID eq N" /NH /FO CSV` 输出的 pid 字段，**与系统语言无关**；POSIX 走 `process.kill(pid, 0)`。
 
 ## 生命周期语义
@@ -264,22 +268,24 @@ resource:
 4. **导入预步**：默认执行 `--headless --import --path`（120s 超时，失败非致命仅告警）；`--no-import` 跳过。
 5. **启动与脱父**：直连 `spawn` 拉起编辑器（stdin 忽略、stdout/stderr 重定向日志，注入 `GODOT_AUTOPILOT_PORT`）。Windows 置 `detached: true` 脱离父进程与控制台（避免 Bun 直系子进程随 CLI 退出被作业对象连带杀掉），再 `unref()`；**pid 由 `spawn` 直接返回**，不做端口反查。非 Windows 不设 `detached`。引擎不可执行时抛 `failed to launch the editor executable: ENOENT: …`，suggestion 为 `check the --godot path points at a runnable Godot binary`；此时编辑器未启动，不进回滚，pending 日志直接删除。
 6. **就绪探测**：TCP + MCP `ping`（`direct: true`，500ms 间隔，默认 60s，`--wait` 覆盖，0=不等待）；提前退出或超时均报传输错误并附日志路径。**失败回滚**（`rollbackFailedStart`）：终止编辑器并删除 pending 日志，不写登记表；终止三态均带 pid——`the editor process (pid N) was terminated` / `the editor process (pid N) had already exited` / `the editor process (pid N) could not be terminated, stop it manually: taskkill /F /T /PID N`（POSIX 为 `kill -9 N`）；日志处置附消息尾（`its pending log was removed` / `its pending log could not be removed (…)`）。
-7. **登记**：就绪后写入 registry（id = `p<pid>`），日志从 `.pending-<port>-<ts>.log` 重命名为 `<id>.log`。
+7. **登记**：就绪后经 `withRegistryLock` 原子写入 registry（id = `p<pid>`），日志从 `.pending-<port>-<ts>.log` 重命名为 `<id>.log`。
 8. **`--play`**：就绪后调 `play_editor_current_scene`（非致命，失败仅告警）。
 
 ### stop（[`src/commands/stop.ts`](../../../cli/src/commands/stop.ts)）
 
 - **停止方法按窗口状态选择**（`stopMethod(force, headless)`）：显式 `--force` **或目标实例 `headless: true`** 时强制停止，否则优雅停止。无窗口实例收不到不带 `/F` 的 `taskkill` 关闭请求，故必须直接强制；此时输出的 `method: "force"` 是**预期值**，不是优雅停止超时后的降级。
+- **停止前端点存活二次确认**：以实例登记端口（优先 `instancePort`）取 `cachedEndpointAlive` 的 TTL 探测结果；端点端口存在且探测为不存活（身份不符）时，仍按 pid 停止但向 stderr 告警 `endpoint on port <port> did not confirm identity; falling back to pid-based stop`。无缓存或已过期（返回 `null`）时静默按 pid 停止。
 - **有窗口实例默认优雅**（Windows `taskkill /PID`，其他 `SIGTERM`，默认等 10s，`--wait` 覆盖）；**失败只报告**：超时未退出输出 `ok: false` + hint（`the process is still running; retry with --force`），退出码 2 并**保留登记**，不会静默升级为强制停止。
-- **`--force` 强杀**：Windows `taskkill /F /T /PID`，其他 `SIGKILL`；仍存活报 `the process survived a force stop`。停止成功后从 registry 移除条目。
+- **`--force` 强杀**：Windows `taskkill /F /T /PID`，其他 `SIGKILL`；仍存活报 `the process survived a force stop`。停止成功后经 `withRegistryLock` 从 registry 移除条目。
 - **失败诊断识别任务存储中毒（11-18 新增）**：优雅停止失败时经 `collectTaskStorePoisoning`（[`src/commands/stop-diagnosis.ts`](../../../cli/src/commands/stop-diagnosis.ts)）读该工程最新 `gda-*.log` 尾部 64 KiB，命中签名 `task store: failed to persist` 即在 hint 输出中毒诊断（SDK FileTaskStore compaction bug on Windows，非瞬时磁盘错误）+ `retry with --force (this discards unsaved scene edits)` 风险提示；未命中保持原 hint。退出码不变，仅增诊断文本。
 
 ### restart（[`src/commands/restart.ts`](../../../cli/src/commands/restart.ts)）
 
 - **定位规则与 `stop` 一致**：位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一（同时给出报用法错误）。只作用于 **CLI 本地注册表**的实例（`source="cli"`）；插件索引中不由 CLI 拉起的编辑器（`source="plugin"`）只用于展示与寻址，不能 `stop`/`restart`。
-- **流程**：定位条目 → 进程存活时按 `stop` 规则停止（**无窗口或显式 `--force` 强制**；有窗口优雅：Windows `taskkill /PID`、其他 `SIGTERM`）→ **固定等待 10 秒**（**不受 `--wait` 影响**）→ 从注册表移除旧条目 → 以**原端口、原 headless、原 godot 路径**调用 `start`（`--wait` 在此阶段生效，默认 60 秒就绪超时；`--no-import` / `--play` / `--probe` 随本次调用传入）→ 输出 `{ok: true, restarted: true, previous: {id, pid, port}, ...新实例视图}`。
-- **失败语义**：有窗口实例优雅停止后 10 秒仍未退出 → **不启动替代实例**，退出码 2，建议改用 `--force` 或手工停止，并保留登记（同一工程同时开两个编辑器可能静默崩溃，见 [端口与实例登记](ports.md)「同一工程的多实例：默认拒绝」）。suggestion 同样经 `gracefulRestartSuggestion(poisoned)` 识别任务存储中毒签名并附 `--force` 风险提示（11-18 新增，诊断源与 stop 相同）。启动阶段失败时，错误消息追加「原实例已被停止」。
-- 目标实例本就已退出时，跳过停止与等待，直接按登记的端口 / headless / godot 路径重新拉起。
+- **流程**：定位条目 → 进程存活时按 `stop` 规则停止（**无窗口或显式 `--force` 强制**；有窗口优雅：Windows `taskkill /PID`、其他 `SIGTERM`）→ 等待 `--wait` 秒（默认 10 秒）→ 从注册表移除旧条目 → 以**原工程、原 headless、原 godot 路径**调用 `start`（不显式传端口，端口由插件分配；`--wait` 在此阶段生效，默认 60 秒就绪超时；`--no-import` / `--play` / `--probe` 随本次调用传入）→ 输出 `{ok: true, restarted: true, previous: {id, pid, port}, ...新实例视图}`。
+- **端口可能变化**：MCP 端口由插件持有，重启不保证复用原端口；新端口与原端口不同时，回包额外附 `note: restarted on port <新端口>; the MCP port is owned by the plugin, so it may differ from the previous port <原端口>`。
+- **失败语义**：优雅停止等待超时仍未退出 → **不启动替代实例**，退出码 2，建议改用 `--force` 或手工停止，并保留登记（同一工程同时开两个编辑器可能静默崩溃，见 [端口与实例登记](ports.md)「同一工程的多实例：默认拒绝」）。suggestion 同样经 `gracefulRestartSuggestion(poisoned)` 识别任务存储中毒签名并附 `--force` 风险提示（11-18 新增，诊断源与 stop 相同）。启动阶段失败时，错误消息追加「原实例已被停止」。
+- 目标实例本就已退出时，跳过停止与等待，直接按登记的工程 / headless / godot 路径重新拉起（端口仍由插件分配）。
 
 ### logs / list
 
@@ -328,7 +334,7 @@ resource:
 
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
-| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 37 文件；`bun test cli/tests` 实测 348 项（325 pass / 23 skip，2026-11-17） | `bun test cli/tests` |
+| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 47 文件；源码 `test()`/`it()` 静态声明 417 项（含 `describe.skip`/`skipIf` 块级跳过；2026-11-23 按源码统计，本轮未运行测试，实测 pass/skip 见 [tests.md](../tests.md)） | `bun test cli/tests` |
 | ctest `cli_unit` | [`tests/CMakeLists.txt`](../../../tests/CMakeLists.txt) | 直接执行 `bun test cli/tests` | bun 缺失时由 CMake 注册 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`cli/tests/contract.test.ts`](../../../cli/tests/contract.test.ts) | CLI 载体 mock conformance | bun 驱动 gda CLI；bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.ts`](../../../tests/guard/version_sync_guard.ts) | 全部版本钉与 `VERSION` 同值 | 扫描 `skills/` 全部文本文件 + 根 `README*.md` 的每一处版本钉，另含 `VERSION` 与 `CLI_VERSION` 两个值源 |

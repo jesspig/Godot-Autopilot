@@ -7,13 +7,13 @@ tags:
   - 领域工具
   - B组
   - action
-timestamp: "2026-11-17T16:54:14+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/domains/
 ---
 
 # 工具实现模块 B（20 域 113 工具）
 
-> 审计日期：2026-11-16（T-25 文档收口）。数值与 A 组同源：catalog 252 = 246 域 + 5 元 + `system_status` 1（35 个域文件），生产别名 325、schema 235/17、能力矩阵 561 行缺失 0，见 [tool_surface_report.md](../tool_surface_report.md)。本页覆盖 20 个域、113 个 canonical 工具；A 组见 [tools_ops_a.md](tools_ops_a.md)（133 个），133 + 113 = 246。
+> 审计日期：2026-11-23（增量同步）。数值与 A 组同源：catalog 252 = 246 域 + 5 元 + `system_status` 1（35 个域文件），生产别名 325、schema 235/17、能力矩阵 561 行缺失 0，见 [tool_surface_report.md](../tool_surface_report.md)。本轮工具名、域数与 action 表未变；`run_gdscript_tests` 副作用由 None 改为 CodeExecute（catalog None 151→150、CodeExecute 5→6，高风险档 26→27）。本页覆盖 20 个域、113 个 canonical 工具；A 组见 [tools_ops_a.md](tools_ops_a.md)（133 个），133 + 113 = 246。
 
 ## 口径与别名窗口
 
@@ -60,14 +60,14 @@ resource: src/tools/domains/
 
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
-| `os_process` | create / execute / kill / status / exit_code / is_running | 外部进程创建、执行、终止与状态 | Process | `create_os_process`、`execute_os_process`、`kill_os_process` |
+| `os_process` | create / execute / kill / status / exit_code / is_running | 外部进程创建、执行、终止与状态；超时未确认终止时回 `termination_confirmed=false` 并提示进程可能仍在运行 | Process | `create_os_process`、`execute_os_process`、`kill_os_process` |
 | `os_environment` | get / set / has | 读/写/检查编辑器进程环境变量（set 仅会话内） | Process | `get_os_environment`、`set_os_environment` |
 | `os_time` | datetime / unix_time | 系统日期时间与 Unix 时间戳 | None | `get_os_datetime`、`get_os_unix_time` |
 | `os_system_info` | info / locale / fonts / memory_info / static_memory / video_adapter / cmdline_args | 宿主系统、语言、字体、内存、显卡与命令行信息 | None | `get_os_system_info`、`get_os_locale`、`get_os_system_fonts` |
 | `get_os_unique_id` | — | 读机器唯一标识 | Process | — |
 | `get_os_user_data_dir` | — | 读用户数据目录 | Process | — |
 | `os_file_text` | read / find | 纯文件 I/O 读文本与递归搜索（>2 MiB 报 `file_too_large`） | None | `read_file`、`find_in_files` |
-| `os_file_write` | write / copy / ensure / trash | 写/追加文本、字节复制、幂等建目录、移入回收站；脚本写入附诊断 | WritesFile | `write_file`、`copy_file`、`ensure_directory`、`move_os_file_to_trash` |
+| `os_file_write` | write / copy / ensure / trash | 写/追加文本、字节复制、幂等建目录、移入回收站；脚本写入附诊断；trash 需 `confirm=true`，否则回 `confirmation_required` | WritesFile | `write_file`、`copy_file`、`ensure_directory`、`move_os_file_to_trash` |
 | `os_file_manager` | list / info | 只读目录列举与文件元信息（大小、mtime、sha256/md5） | None | `list_directory`、`get_file_info` |
 | `create_csharp_script` | — | 预校验后创建 C# 脚本文件 | WritesFile | — |
 | `open_os_path` | — | 用默认应用打开 URL 或路径 | Process | — |
@@ -92,7 +92,7 @@ resource: src/tools/domains/
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
 | `audio_bus` | get_layout / set_layout / get_info / info / set_volume / set_mute / set_solo / set_bypass / add_effect | 总线布局、信息、音量/静音/独奏/旁路与效果添加 | None | `get_audio_bus_layout`、`set_audio_bus_layout`、`get_audio_bus_count`、`get_audio_bus_name`、`set_audio_bus_volume_db`、`set_audio_bus_mute`、`set_audio_bus_solo`、`set_audio_bus_bypass_effects`、`add_audio_bus_effect` |
-| `audio_player` | play / stop / set_volume / set_pitch / seek / get_position | 三种 AudioStreamPlayer 的播放、停止、音量、音高、定位 | None | `play_audio_player`、`stop_audio_player`、`set_audio_player_volume_db`、`set_audio_player_pitch_scale`、`seek_audio_player`、`get_audio_player_playback_position` |
+| `audio_player` | play / stop / set_volume / set_pitch / seek / get_position | 三种 AudioStreamPlayer 的播放、停止、音量、音高、定位；`stream_path` 仅接受项目内 `res://` 文件 | None | `play_audio_player`、`stop_audio_player`、`set_audio_player_volume_db`、`set_audio_player_pitch_scale`、`seek_audio_player`、`get_audio_player_playback_position` |
 | `audio_device` | list_outputs / set_output / list_inputs / set_input / get_input_status | 输出/输入设备列举与切换 | None | `get_audio_device_outputs`、`set_audio_device_output`、`get_audio_device_inputs`、`get_audio_input_devices`、`set_audio_device_input` |
 | `audio_capture` | start / stop / create_wav | 输入捕获启停并落为 `memory://` WAV；或由内联样本建 WAV | None | `start_audio_input_capture`、`stop_audio_input_capture`、`create_audiostream_wav` |
 | `remove_audio_bus_effect` | — | 按总线内效果下标删除效果 | Destructive | — |
@@ -147,7 +147,7 @@ resource: src/tools/domains/
 
 | 工具 | action | 说明 | 旧名（别名） |
 |---|---|---|---|
-| `update_tileset` | add_atlas_source / add_physics_layer / set_tile_collision | 给 `memory://` TileSet 加 atlas 源、物理层与格子碰撞 | `add_tilemap_atlas_source`、`add_tilemap_physics_layer`、`set_tilemap_tile_collision` |
+| `update_tileset` | add_atlas_source / add_physics_layer / set_tile_collision | 给 `memory://` TileSet 加 atlas 源、物理层与格子碰撞；写碰撞前校验物理层存在，atlas 纹理路径 containment 与网格上限 | `add_tilemap_atlas_source`、`add_tilemap_physics_layer`、`set_tilemap_tile_collision` |
 
 ## GridMap（4）
 
@@ -162,7 +162,7 @@ resource: src/tools/domains/
 
 | 工具 | action | 说明 | 旧名（别名） |
 |---|---|---|---|
-| `update_spriteframes` | create / add_animation / add_frame | 建 `memory://` SpriteFrames、加动画、加帧（支持 hframes/vframes 切 AtlasTexture） | `create_spriteframes`、`add_spriteframes_animation`、`add_spriteframes_frame` |
+| `update_spriteframes` | create / add_animation / add_frame | 建 `memory://` SpriteFrames、加动画、加帧（支持 hframes/vframes 切 AtlasTexture）；hframes×vframes 上限 10000（防 int64 溢出），纹理路径 containment | `create_spriteframes`、`add_spriteframes_animation`、`add_spriteframes_frame` |
 
 ## Animation（10）
 
@@ -184,7 +184,7 @@ resource: src/tools/domains/
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
 | `get_theme_info` | — | 汇总 `.tres` 主题的类型与条目名单 | None | — |
-| `update_theme` | create / bundle | 创建或更新磁盘 Theme（写出后 IGNORE 重载校验） | WritesFile | `create_theme_resource`、`set_theme_item_bundle`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat` |
+| `update_theme` | create / bundle | 创建或更新磁盘 Theme（写出后 IGNORE 重载校验）；加载路径 containment 校验 | WritesFile | `create_theme_resource`、`set_theme_item_bundle`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat` |
 | `update_control_layout` | apply / layout | 对 Control 应用主题、锚点预设或组合布局（单 undo 步） | WritesScene | `apply_theme_to_control`、`set_control_anchor_preset`、`set_control_layout` |
 
 ## Tween（3）
@@ -193,7 +193,7 @@ resource: src/tools/domains/
 |---|---|---|---|---|
 | `game_tween` | create / control / callback / method / interval | 游戏内创建/控制补间步骤 | GameRuntime | `create_game_tween`、`control_game_tween` |
 | `get_game_tween_list` | — | 列出游戏内活跃补间（只读） | None | — |
-| `tween_editor_property` | property / callback / method / interval | 在编辑场景预览补间步骤 | WritesScene | — |
+| `tween_editor_property` | property / callback / method / interval | 在编辑场景预览补间步骤；`target_value` 按属性当前类型反序列化 | WritesScene | — |
 
 ## Log（1）
 
@@ -223,13 +223,13 @@ resource: src/tools/domains/
 
 | 工具 | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|
-| `run_gdscript_tests` | 运行内置断言框架的 GDScript 测试并返回结构化报告 | None | `run_gdscript_test_files` |
+| `run_gdscript_tests` | 运行内置断言框架的 GDScript 测试并返回结构化报告；`directory` 仅接受项目内 `res://` 目录 | CodeExecute | `run_gdscript_test_files` |
 
 ## C#（2）
 
 | 工具 | action | 说明 | 副作用 | 旧名（别名） |
 |---|---|---|---|---|
-| `csharp_member` | get / set / call / list | 经冻结的 GdaCSharpBridge ABI 读写/调用/列出 C# 成员 | CodeExecute | `csharp_get_property`、`csharp_set_property`、`csharp_call_method`、`csharp_list_members` |
+| `csharp_member` | get / set / call / list | 经冻结的 GdaCSharpBridge ABI 读写/调用/列出 C# 成员；调用前校验 holder 的 `bridge` meta 存在且非 null | CodeExecute | `csharp_get_property`、`csharp_set_property`、`csharp_call_method`、`csharp_list_members` |
 | `csharp_event` | subscribe / unsubscribe | 订阅/退订 C# 事件 | CodeExecute | `csharp_subscribe_event`、`csharp_unsubscribe_event` |
 
 ## 调用示例
