@@ -11,6 +11,8 @@
 set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/observability/log_system.cpp
     ${CMAKE_SOURCE_DIR}/src/core/observability/log_persist.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/observability/game_monitor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/observability/monitor_analysis.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
     ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
     ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
