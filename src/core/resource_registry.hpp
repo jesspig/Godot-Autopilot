@@ -10,6 +10,9 @@
 namespace godot_autopilot {
 namespace resource_registry {
 
+std::string oid_key(int64_t object_id);
+bool is_object_id_key(const std::string &key);
+
 bool name_key_points_to(const std::string &key, int64_t instance_id,
                         int64_t candidate_instance_id);
 std::vector<std::string> stale_name_keys(

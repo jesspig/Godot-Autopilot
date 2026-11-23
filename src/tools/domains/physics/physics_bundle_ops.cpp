@@ -844,7 +844,7 @@ JV handle_collision_shape_assign(const JV &args) {
       } else if (oids_v && oids_v->IsString() && !res_v && !path_v) {
         oid_handled = true;
         int64_t oid = 0;
-        if (!util::parse_decimal_int64(oids_v->GetString(), oid)) {
+        if (!util::parse_signed_decimal_int64(oids_v->GetString(), oid)) {
           JV r(JV::object_tag);
           r["error"] = JV("invalid object_id_str: not a valid 64-bit integer");
           return r;
