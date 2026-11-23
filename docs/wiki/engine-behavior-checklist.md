@@ -190,7 +190,7 @@ resource: src/tools/
 - 存储布局：trace 与日志落 `工程级目录 <集中根>/projects/<项目名>-<路径哈希前 8 位>/{traces,logs}`（脚本经插件注入的存储路径环境变量定位后断言 layout_ok）（`29_trace_persistence.json`、`30_observability.json`、`41_thread_guard.json`；布局纯逻辑由 单元测试 storage_layout_test 覆盖）。
 - trace jsonl 完整性：最新会话文件含 `session_start` 与 `server_ready` 启动标记（启动期入队、首帧 flush）；**每一非空行都是可解析 JSON**（主线程 flush 通道统一落盘后并发追加不再撕裂行）；含本轮 call_tool 事件行；全部 trace 文件不含 PNG base64 前缀（图片只记 `image_ref`/`image_hash`，脱敏默认开启时 store_trace_image 返回空）（`29_trace_persistence.json`、`41_thread_guard.json`）。
 - trace schema v2：`kind=lifecycle`（启动期）/`kind=snapshot`（environment_snapshot）/`kind=protocol_request` 与 `request_id`/`correlation_id`/`thread_id`/`monotonic_ns` 可观测键（`30_observability.json`）。
-- 人类日志：gda-*.log 含启动日志行（"Godot Self-Driving plugin starting"）与 `trace=` 关联 detail 行（`29_trace_persistence.json`、`30_observability.json`、`41_thread_guard.json`）。
+- 人类日志：gda-*.log 含启动日志行（"Godot Autopilot plugin starting (version ...)"）与 `trace=` 关联 detail 行（`29_trace_persistence.json`、`30_observability.json`、`41_thread_guard.json`）。
 - **回归点（B1 第二层，通道停摆免疫）**：编辑器 SceneTree 被暂停（`get_tree().paused=true`，模拟暂停/模态/停摆态）期间，ping（kHealthProbe 走 5000ms 短预算路径）与 system_status 仍可应答（插件 `_enter_tree` 设 `PROCESS_MODE_ALWAYS` 继续 drain，changelog/2026-09-29-log.md）；健康探针停摆时于预算内返回结构化 main_thread_timeout 而非挂死；恢复后 ping 正常（`36_stall_immunity.json`）。
 - **已知边界（不判缺陷）**：编辑器进程的引擎错误不可经 MCP 观测（`user://logs/godot.log` 只由游戏进程写；`get_debugger_log` 读编辑器缓冲但无过滤计数能力）——22 号曾用 get_game_log_entries 做引擎错误守卫，因 headless 床无游戏进程属真空覆盖已移除（changelog/2026-09-26-log.md，旧 tests.md「已知遗留」）。
 - e2e 抽查建议：每轮 e2e 收尾时扫一次 trace jsonl（行可解析、无 PNG base64）与日志启动行，属于零成本的持续回归哨兵。
