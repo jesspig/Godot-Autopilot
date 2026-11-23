@@ -2,6 +2,7 @@
 #define GODOT_AUTOPILOT_RESOURCE_OPS_HPP
 
 #include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <cstdint>
 #include <mcp/JsonValue.hpp>
@@ -16,11 +17,12 @@ inline constexpr const char kLoadFailSuffix[] =
 bool normalize_resource_path(const std::string &raw, std::string &out,
                              std::string &error, bool allow_root = false);
 std::string describe_target(const mcp::JsonValue &args);
-bool load_resource_or_error(const std::string &path,
-                            godot::Ref<godot::Resource> &out_res,
-                            std::string &out_error,
-                            const std::string &type_hint = {},
-                            const char *load_fail_suffix = kLoadFailSuffix);
+bool load_resource_or_error(
+    const std::string &path, godot::Ref<godot::Resource> &out_res,
+    std::string &out_error, const std::string &type_hint = {},
+    const char *load_fail_suffix = kLoadFailSuffix,
+    godot::ResourceLoader::CacheMode cache_mode =
+        godot::ResourceLoader::CACHE_MODE_REUSE);
 godot::Ref<godot::Resource>
 resolve_resource(const mcp::JsonValue &args, bool &out_has_oid,
                  int64_t &out_obj_id, std::string &out_error,
@@ -69,6 +71,16 @@ mcp::JsonValue handle_create_primitive_mesh(const mcp::JsonValue &args);
 mcp::JsonValue handle_create_array_mesh(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_mesh_surface_material(const mcp::JsonValue &args);
 mcp::JsonValue handle_assign_mesh_to_instance(const mcp::JsonValue &args);
+
+mcp::JsonValue handle_load_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_query_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_mesh_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_property_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_file_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_save_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_uid_set_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_import_action(const mcp::JsonValue &args);
 
 } // namespace resource_ops
 } // namespace godot_autopilot

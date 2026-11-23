@@ -3,24 +3,23 @@ import path from "node:path";
 
 import {
   BRIDGE_DIR,
-  DEMO_DIRS,
+  BRIDGE_SOURCES,
   PLATFORM_LIBS,
   PLATFORM_PDB,
   addonDir,
   artifactDir,
   hostPlatform,
-  resolveDemos,
+  resolveProjects,
 } from "../lib/config";
 import { errorMessage } from "../lib/cmake";
 import { GDEXTENSION_NAME, generateGdextension, libraries } from "../lib/gdextension";
-import { cleanTargets } from "./clean";
 
 const RES_PREFIX = "res://";
 
 export type DeployOptions = {
   release: boolean;
   debug: boolean;
-  demos: string[] | null;
+  projects: string[];
 };
 
 function copyFile(source: string, destination: string): void {
@@ -95,7 +94,7 @@ function validateAddonIntegrity(targetAddonDir: string, projectDir: string): boo
   return false;
 }
 
-export function deployArtifacts(preset: string, demos: readonly string[] | null = null): number {
+export function deployArtifacts(preset: string, projects: readonly string[]): number {
   const binaryDir = artifactDir(preset);
   const platform = hostPlatform();
   const libName = PLATFORM_LIBS[platform];
@@ -103,7 +102,7 @@ export function deployArtifacts(preset: string, demos: readonly string[] | null 
     console.log(`[ERROR] Unsupported platform: ${platform}`);
     return 1;
   }
-  for (const projectDir of demos === null ? DEMO_DIRS : demos) {
+  for (const projectDir of projects) {
     console.log(`[DEPLOY] ${projectDir}`);
     const targetAddonDir = addonDir(projectDir);
     fs.mkdirSync(targetAddonDir, { recursive: true });
@@ -130,22 +129,42 @@ export function deployArtifacts(preset: string, demos: readonly string[] | null 
   return 0;
 }
 
+export function missingDeployArtifacts(binaryDir: string, platform: string): string[] {
+  const libName = PLATFORM_LIBS[platform];
+  if (libName === undefined) return ["unsupported platform: " + platform];
+  const missing: string[] = [];
+  if (!fs.existsSync(path.join(binaryDir, libName))) missing.push(libName);
+  if (platform === "windows" && !fs.existsSync(path.join(binaryDir, PLATFORM_PDB))) {
+    missing.push(PLATFORM_PDB);
+  }
+  for (const name of BRIDGE_SOURCES) {
+    if (!fs.existsSync(path.join(BRIDGE_DIR, name))) missing.push(name);
+  }
+  return missing;
+}
+
 export async function runDeploy(options: DeployOptions): Promise<number> {
   if (options.release && options.debug) {
     console.log("[ERROR] Cannot specify both --release and --debug");
     return 1;
   }
-  let demos: string[];
+  let projects: string[];
   try {
-    demos = resolveDemos(options.demos);
+    projects = resolveProjects(options.projects);
   } catch (error) {
     console.log(`[ERROR] ${errorMessage(error)}`);
     return 1;
   }
   const preset = options.release ? "release" : "debug";
-  if (options.release) cleanTargets();
-  console.log(`\n[DEPLOY] Copying ${preset} artifacts to examples/*/addons/...`);
-  const code = deployArtifacts(preset, demos);
+  const binaryDir = artifactDir(preset);
+  const missing = missingDeployArtifacts(binaryDir, hostPlatform());
+  if (missing.length > 0) {
+    console.log(`[ERROR] Deployment aborted; missing artifacts: ${missing.join(", ")}`);
+    console.log("[ERROR] Existing addons were left untouched.");
+    return 1;
+  }
+  console.log(`\n[DEPLOY] Copying ${preset} artifacts to ${projects.length} project(s)...`);
+  const code = deployArtifacts(preset, projects);
   if (code !== 0) return code;
   console.log("\n[DONE] Deploy complete.");
   return 0;

@@ -6,10 +6,15 @@
 namespace godot_autopilot {
 namespace audio_ops {
 
+mcp::JsonValue handle_audio_bus(const mcp::JsonValue &args);
+mcp::JsonValue handle_audio_player(const mcp::JsonValue &args);
+mcp::JsonValue handle_audio_device(const mcp::JsonValue &args);
+mcp::JsonValue handle_audio_capture(const mcp::JsonValue &args);
+mcp::JsonValue handle_bus_info(const mcp::JsonValue &args);
+mcp::JsonValue handle_bus_metrics(const mcp::JsonValue &args);
+mcp::JsonValue handle_input_status(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args);
-mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args);
-mcp::JsonValue handle_bus_get_name(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args);
@@ -24,7 +29,6 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args);
 mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args);
 mcp::JsonValue handle_start_input_capture(const mcp::JsonValue &args);
 mcp::JsonValue handle_stop_input_capture(const mcp::JsonValue &args);

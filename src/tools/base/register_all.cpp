@@ -1,9 +1,13 @@
 #include "tools/base/register_all.hpp"
+#include "tools/base/call_depth_guard.hpp"
+#include "tools/base/call_tool_elicitation.hpp"
 #include "core/command_queue.hpp"
 #include "core/error_watermark.hpp"
 #include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "util/input_guards.hpp"
 #include <version.hpp>
 #include "tools/base/code_exec_ops.hpp"
 #include "tools/base/dispatch.hpp"
@@ -19,6 +23,8 @@
 #include "tools/domains/display/display_tools.hpp"
 #include "tools/domains/editor/editor_tools.hpp"
 #include "tools/domains/input/input_tools.hpp"
+#include "tools/domains/image/image_tools.hpp"
+#include "tools/domains/mesh/mesh_tools.hpp"
 #include "tools/domains/os/os_tools.hpp"
 #include "tools/domains/physics/physics_tools.hpp"
 #include "tools/domains/scene/scene_tools.hpp"
@@ -46,6 +52,7 @@
 #include "tools/base/tool_base.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "tools/base/tool_registry.hpp"
+#include "tools/base/side_effect_policy.hpp"
 #include "tools/base/tool_spec.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
@@ -73,10 +80,35 @@ static int g_port = 0;
 static mcp::McpServer *g_surface_server = nullptr;
 static ToolSurface g_tool_surface = ToolSurface::Meta;
 
-static mcp::JsonValue meta_ping_impl() {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("pong");
-    return r;
+static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog);
+
+static void audit_destructive_declarations(const ToolRegistry &registry) {
+  std::vector<side_effect_policy::ToolDeclaration> declarations;
+  for (const auto &tool : registry.all_any()) {
+    side_effect_policy::ToolDeclaration entry;
+    entry.name = tool->meta().name;
+    entry.description = tool->meta().description;
+    entry.destructive = side_effect_of(*tool) == SideEffect::Destructive;
+    declarations.push_back(std::move(entry));
+  }
+  const std::vector<std::string> suspects =
+      side_effect_policy::destructive_suspects(declarations);
+  if (suspects.empty()) {
+    return;
+  }
+  std::string names;
+  for (const std::string &name : suspects) {
+    if (!names.empty())
+      names += ", ";
+    names += name;
+  }
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Tools,
+      "tools with destruction-shaped names or descriptions are not declared "
+      "destructive: " + names);
+  monitor::lifecycle(
+      "destructive_declaration_audit",
+      monitor::build_attrs({{"suspects", std::to_string(suspects.size())}}));
 }
 
 static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
@@ -97,6 +129,19 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
             return error;
         }
         limit = limit_p->GetInt();
+    }
+
+    bool categories = false;
+    if (auto* categories_p = args.Find("categories"); categories_p && !categories_p->IsNull()) {
+        if (!categories_p->IsBool()) {
+            mcp::JsonValue error(mcp::JsonValue::object_tag);
+            error["error"] = mcp::JsonValue("invalid parameter: categories must be a boolean");
+            return error;
+        }
+        categories = categories_p->GetBool();
+    }
+    if (categories) {
+        return meta_categories_impl(catalog);
     }
 
     Bm25Index::SearchQuery query;
@@ -161,8 +206,7 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
     return j;
 }
 
-static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories called");
+static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog) {
     auto cats = catalog.get_categories();
     mcp::JsonValue j(mcp::JsonValue::object_tag);
     mcp::JsonValue arr(mcp::JsonValue::array_tag);
@@ -180,25 +224,25 @@ static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
         arr.PushBack(std::move(item));
     }
     j["categories"] = std::move(arr);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories completed");
     return j;
 }
 
-static mcp::JsonValue meta_get_tool_detail_impl(
-    const mcp::JsonValue& args, ToolCatalog& catalog,
-    const std::shared_ptr<ToolRegistry>& registry) {
-    auto *name_p = args.Find("name");
-    if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
-        mcp::JsonValue err(mcp::JsonValue::object_tag);
+mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
+                               const std::shared_ptr<ToolRegistry> &registry) {
+    mcp::JsonValue err(mcp::JsonValue::object_tag);
+    if (name.empty()) {
         err["error"] = mcp::JsonValue("missing required parameter: name");
         return err;
     }
 
-    std::string name = name_p->GetString();
-    auto info = catalog.get_tool(name);
+    std::optional<ToolAlias> alias;
+    if (registry) {
+        alias = registry->resolve_alias(name);
+    }
+    const std::string canonical = alias ? alias->canonical : name;
+    auto info = catalog.get_tool(canonical);
     if (!info) {
-        mcp::JsonValue err(mcp::JsonValue::object_tag);
-        err["error"] = mcp::JsonValue("tool not found: " + name);
+        err["error"] = mcp::JsonValue("tool not found: " + canonical);
         return err;
     }
 
@@ -213,44 +257,77 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
+    mcp::JsonValue examples(mcp::JsonValue::array_tag);
+    for (const auto &example : info->examples) {
+        examples.PushBack(mcp::JsonValue(example));
+    }
+    t["examples"] = std::move(examples);
     const char* se = "none";
     uint32_t flags = 0;
-    if (auto tool = registry->find_any(name)) {
-        se = ::godot_autopilot::side_effect_name(
-            ::godot_autopilot::side_effect_of(*tool));
-        flags = tool->tool_flags();
+    if (registry) {
+        if (auto tool = registry->find_any(canonical)) {
+            se = ::godot_autopilot::side_effect_name(
+                ::godot_autopilot::side_effect_of(*tool));
+            flags = tool->tool_flags();
+        }
     }
     t["side_effect"] = mcp::JsonValue(se);
     t["dynamic"] = mcp::JsonValue((flags & tool_flags::kDynamic) != 0);
     t["mutating"] = mcp::JsonValue((flags & tool_flags::kMutating) != 0);
+    if (alias) {
+        j["deprecated_alias"] = mcp::JsonValue(name);
+        j["canonical_name"] = mcp::JsonValue(canonical);
+        j["alias_removal_version"] = mcp::JsonValue(alias->removal_version);
+        if (!alias->deprecated_since.empty()) {
+            j["deprecated_since"] = mcp::JsonValue(alias->deprecated_since);
+        }
+        t["canonical_name"] = mcp::JsonValue(canonical);
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Tools,
+            "tool alias '" + name + "' resolved to '" + canonical + "'");
+    }
     j["tool"] = std::move(t);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "get_tool_detail completed");
     return j;
 }
 
-static std::string received_keys_text(const mcp::JsonValue& args) {
-    if (!args.IsObject() || args.GetObject().empty()) {
-        return "(received no parameters)";
+static mcp::JsonValue meta_get_tool_detail_impl(
+    const mcp::JsonValue& args, ToolCatalog& catalog,
+    const std::shared_ptr<ToolRegistry>& registry) {
+    const auto *name_p = args.Find("name");
+    const std::string name =
+        name_p != nullptr && name_p->IsString() ? name_p->GetString() : std::string();
+    mcp::JsonValue result = tool_detail_for(name, catalog, registry);
+    if (result.Find("error") == nullptr) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                                  "get_tool_detail completed");
     }
-    std::string text = "(received keys: ";
-    bool first = true;
-    for (const auto& entry : args.GetObject()) {
-        if (!first) {
-            text += ", ";
-        }
-        first = false;
-        text += entry.first;
-    }
-    text += ")";
-    return text;
+    return result;
 }
 
+namespace {
+int64_t &call_tool_thread_depth() {
+    static thread_local int64_t depth = 0;
+    return depth;
+}
+struct CallToolDepthGuard {
+    CallToolDepthGuard() { ++call_tool_thread_depth(); }
+    ~CallToolDepthGuard() { --call_tool_thread_depth(); }
+};
+constexpr int64_t kMaxCallToolDepth = 8;
+} // namespace
+
 static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
+    if (meta_detail::call_depth_exceeds(call_tool_thread_depth(), kMaxCallToolDepth)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("call_tool recursion depth exceeded");
+        return e;
+    }
+    CallToolDepthGuard depth_guard;
     auto *name_p = args.Find("name");
     if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: name " + received_keys_text(args));
+        e["error"] = mcp::JsonValue("missing required parameter: name " + util::received_keys_text(args, false));
         return e;
     }
 
@@ -262,14 +339,14 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
 
     if (auto *a = args.Find("arguments"); a && !a->IsObject()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + received_keys_text(args));
+        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + util::received_keys_text(args, false));
         return e;
     }
     for (const auto &entry : args.GetObject()) {
         if (entry.first != "name" && entry.first != "arguments" &&
             entry.first != "confirm") {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + received_keys_text(args));
+            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + util::received_keys_text(args, false));
             return e;
         }
     }
@@ -298,6 +375,7 @@ void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
                                  t->meta().category, t->meta().tags});
     }
     catalog.replace_tools(std::move(catalog_tools));
+    catalog.replace_aliases(registry->alias_map());
     index.replace_entries(index_entries);
 
     dispatch::HandlerMap handlers;
@@ -385,7 +463,15 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             return r;
         };
         spec.raw_schema = schema::build_schema({});
-        registry->add(make_spec_tool(std::move(spec)));
+        registry->add(make_spec_tool(with_aliases(
+            std::move(spec),
+            {ToolAlias{"ping", "system_status", {},
+                       [](const mcp::JsonValue &) {
+                         mcp::JsonValue out(mcp::JsonValue::object_tag);
+                         out["result"] = mcp::JsonValue("pong");
+                         return out;
+                       },
+                       "0.4.0", "0.6.0"}})));
     }
 
     auto add_domain_tools = [&registry](auto& make_fn) {
@@ -405,6 +491,8 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(display_tools::make_tools);
     add_domain_tools(editor_tools::make_tools);
     add_domain_tools(input_tools::make_tools);
+    add_domain_tools(image_tools::make_tools);
+    add_domain_tools(mesh_tools::make_tools);
     add_domain_tools(os_tools::make_tools);
     add_domain_tools(physics_tools::make_tools);
     add_domain_tools(scene_tools::make_tools);
@@ -429,16 +517,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(tween_tools::make_tools);
 
     {
-        ToolSpec spec{"ping", "Health check ping", "Meta", {"health", "ping"}};
-        spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta | tool_flags::kHealthProbe;
-        spec.handler = [](const mcp::JsonValue&) { return meta_ping_impl(); };
-        spec.raw_schema = schema::build_schema({});
-        registry->add(make_spec_tool(std::move(spec)));
-    }
-
-    {
-        ToolSpec spec{"search_tools", "Search available tools by query", "Meta", {"search", "discovery"}};
+        ToolSpec spec{"search_tools", "Search available tools by query, category or tags; categories=true lists categories with tool counts", "Meta", {"search", "discovery"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;
         spec.handler = [&index, &catalog](const mcp::JsonValue& args) { return meta_search_tools_impl(args, index, catalog); };
@@ -466,19 +545,24 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         t_prop["items"] = std::move(ti);
         t_prop["description"] = mcp::JsonValue("Filter by tags");
         props["tags"] = std::move(t_prop);
+        mcp::JsonValue cat_prop(mcp::JsonValue::object_tag);
+        cat_prop["type"] = mcp::JsonValue("boolean");
+        cat_prop["description"] = mcp::JsonValue(
+            "When true return the category list with per-category tool counts instead of tool results");
+        props["categories"] = std::move(cat_prop);
         s["properties"] = std::move(props);
         s["required"] = mcp::JsonValue(mcp::JsonValue::array_tag);
         spec.raw_schema = std::move(s);
-        registry->add(make_spec_tool(std::move(spec)));
-    }
-
-    {
-        ToolSpec spec{"list_categories", "List all tool categories", "Meta", {"categories", "discovery"}};
-        spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta;
-        spec.handler = [&catalog](const mcp::JsonValue&) { return meta_list_categories_impl(catalog); };
-        spec.raw_schema = schema::build_schema({});
-        registry->add(make_spec_tool(std::move(spec)));
+        registry->add(make_spec_tool(with_aliases(
+            std::move(spec),
+            {ToolAlias{"list_categories", "search_tools",
+                       [](const mcp::JsonValue &) {
+                         mcp::JsonValue out(mcp::JsonValue::object_tag);
+                         out["categories"] = mcp::JsonValue(true);
+                         out["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
+                         return out;
+                       },
+                       {}, "0.4.0", "0.6.0"}})));
     }
 
     {
@@ -489,14 +573,14 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             return meta_get_tool_detail_impl(args, catalog, get_active_registry());
         };
         spec.raw_schema = schema::build_schema({
-            {"name", "string", "Tool name (e.g. ping, search_tools)", true},
+            {"name", "string", "Tool name (e.g. get_scene_tree, search_tools)", true},
         });
         registry->add(make_spec_tool(std::move(spec)));
     }
 
     {
         ToolSpec spec{"call_tool",
-                      "Execute any tool by name. Use this to call all 452 non-meta tools (451 domain tools plus system_status).",
+                      "Execute any tool by name. Use this to call all 251 non-meta tools (246 domain tools plus system_status).",
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;
@@ -643,6 +727,8 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         }
     }
 
+    audit_destructive_declarations(*registry);
+
     const int64_t registry_duration_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - registry_start)
@@ -736,14 +822,16 @@ static void register_surface_tool(
         [tool_name, registry, &queue, surface_tool](
             const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
             -> mcp::CallToolResult {
+            const std::string gda_request_key =
+                mcp_wire::request_id_key(ctx.GetRequest().id);
             const std::string gda_request_id =
-                monitor::request_id_text(ctx.GetRequest().id);
-            monitor::RequestScope gda_request_scope(gda_request_id);
+                godot_transport_instance()->client_request_id_text(gda_request_key);
+            monitor::RequestScope gda_request_scope(gda_request_key);
             monitor::RequestRecord gda_request_record;
             std::string gda_request_trace;
             std::string gda_request_span;
-            if (!gda_request_id.empty() &&
-                monitor::registry().get(gda_request_id, &gda_request_record)) {
+            if (!gda_request_key.empty() &&
+                monitor::registry().get(gda_request_key, &gda_request_record)) {
                 gda_request_trace = gda_request_record.trace_id;
                 gda_request_span = gda_request_record.span_id;
             }
@@ -755,73 +843,89 @@ static void register_surface_tool(
             mcp::JsonValue args = ctx.Params().arguments
                 ? *ctx.Params().arguments
                 : mcp::JsonValue(mcp::JsonValue::object_tag);
-            if (tool_name != "call_tool") {
-                const SideEffect effect = side_effect_of(*surface_tool);
-                if (confirmation::required_for(effect) &&
-                    !confirmation::provided(args)) {
-                    bool elicitation = false;
-                    if (auto capabilities =
-                            ctx.Server().GetClientCapabilities()) {
-                        elicitation = capabilities->elicitation.has_value();
-                    }
-                    if (elicitation) {
-                        auto* responses = ctx.Params().input_responses
-                            ? &*ctx.Params().input_responses
-                            : nullptr;
-                        if (responses != nullptr && responses->IsObject()) {
-                            auto* confirm = responses->Find("confirm");
-                            if (confirm != nullptr && confirm->IsObject()) {
-                                auto* action = confirm->Find("action");
-                                if (action != nullptr && action->IsString() &&
-                                    action->GetString() == "accept") {
-                                    args["confirm"] = mcp::JsonValue(true);
-                                } else {
-                                    mcp::CallToolResult declined;
-                                    declined.is_error = true;
-                                    declined.content.push_back(mcp::TextContent{
-                                        "text",
-                                        "confirmation declined: the tool was not executed"});
-                                    return declined;
+            {
+                SideEffect effect = side_effect_of(*surface_tool);
+                if (tool_name == "call_tool") {
+                    const mcp::JsonValue *target_p = args.Find("name");
+                    if (target_p != nullptr && target_p->IsString()) {
+                        const std::string target_name = target_p->GetString();
+                        if (auto registry = get_active_registry()) {
+                            auto target = registry->find_any(target_name);
+                            if (target == nullptr) {
+                                if (auto alias = registry->resolve_alias(target_name)) {
+                                    target = registry->find_any(alias->canonical);
                                 }
                             }
-                        } else {
-                            mcp::CallToolResult required;
-                            required.input_required = mcp::InputRequiredResult{};
-                            mcp::InputRequest request;
-                            request.method = "elicitation/create";
-                            mcp::JsonValue params(
-                                mcp::JsonValue::object_tag);
-                            params["mode"] = mcp::JsonValue("form");
-                            params["message"] = mcp::JsonValue(
-                                "This tool has a " +
-                                std::string(side_effect_name(effect)) +
-                                " side effect. Confirm to continue.");
-                            mcp::JsonValue schema(
-                                mcp::JsonValue::object_tag);
-                            schema["type"] = mcp::JsonValue("object");
-                            mcp::JsonValue properties(
-                                mcp::JsonValue::object_tag);
-                            mcp::JsonValue confirm_property(
-                                mcp::JsonValue::object_tag);
-                            confirm_property["type"] =
-                                mcp::JsonValue("boolean");
-                            confirm_property["description"] = mcp::JsonValue(
-                                "Confirm the high-risk tool call");
-                            properties["confirm"] =
-                                std::move(confirm_property);
-                            schema["properties"] = std::move(properties);
-                            mcp::JsonValue required_fields(
-                                mcp::JsonValue::array_tag);
-                            required_fields.PushBack(
-                                mcp::JsonValue("confirm"));
-                            schema["required"] =
-                                std::move(required_fields);
-                            params["requestedSchema"] = std::move(schema);
-                            request.params = std::move(params);
-                            required.input_required->input_requests["confirm"] =
-                                std::move(request);
-                            return required;
+                            if (target != nullptr) {
+                                effect = elicitation_detail::effective_side_effect(
+                                    true, side_effect_of(*surface_tool),
+                                    side_effect_of(*target));
+                            }
                         }
+                    }
+                }
+                bool client_elicitation = false;
+                if (auto capabilities = ctx.Server().GetClientCapabilities()) {
+                    client_elicitation = capabilities->elicitation.has_value();
+                }
+                if (elicitation_detail::should_elicit(
+                        effect, confirmation::provided(args), client_elicitation)) {
+                    auto* responses = ctx.Params().input_responses
+                        ? &*ctx.Params().input_responses
+                        : nullptr;
+                    if (responses != nullptr && responses->IsObject()) {
+                        auto* confirm = responses->Find("confirm");
+                        if (confirm != nullptr && confirm->IsObject()) {
+                            auto* action = confirm->Find("action");
+                            if (action != nullptr && action->IsString() &&
+                                action->GetString() == "accept") {
+                                args["confirm"] = mcp::JsonValue(true);
+                            } else {
+                                mcp::CallToolResult declined;
+                                declined.is_error = true;
+                                declined.content.push_back(mcp::TextContent{
+                                    "text",
+                                    "confirmation declined: the tool was not executed"});
+                                return declined;
+                            }
+                        }
+                    } else {
+                        mcp::CallToolResult required;
+                        required.input_required = mcp::InputRequiredResult{};
+                        mcp::InputRequest request;
+                        request.method = "elicitation/create";
+                        mcp::JsonValue params(
+                            mcp::JsonValue::object_tag);
+                        params["mode"] = mcp::JsonValue("form");
+                        params["message"] = mcp::JsonValue(
+                            "This tool has a " +
+                            std::string(side_effect_name(effect)) +
+                            " side effect. Confirm to continue.");
+                        mcp::JsonValue schema(
+                            mcp::JsonValue::object_tag);
+                        schema["type"] = mcp::JsonValue("object");
+                        mcp::JsonValue properties(
+                            mcp::JsonValue::object_tag);
+                        mcp::JsonValue confirm_property(
+                            mcp::JsonValue::object_tag);
+                        confirm_property["type"] =
+                            mcp::JsonValue("boolean");
+                        confirm_property["description"] = mcp::JsonValue(
+                            "Confirm the high-risk tool call");
+                        properties["confirm"] =
+                            std::move(confirm_property);
+                        schema["properties"] = std::move(properties);
+                        mcp::JsonValue required_fields(
+                            mcp::JsonValue::array_tag);
+                        required_fields.PushBack(
+                            mcp::JsonValue("confirm"));
+                        schema["required"] =
+                            std::move(required_fields);
+                        params["requestedSchema"] = std::move(schema);
+                        request.params = std::move(params);
+                        required.input_required->input_requests["confirm"] =
+                            std::move(request);
+                        return required;
                     }
                 }
             }
@@ -869,9 +973,14 @@ static void register_surface_tool(
                         return surface_tool->execute(args);
                     });
             }
+            if (!run_on_transport_thread &&
+                dispatch::has_deferred_marker(res)) {
+                res = dispatch::resolve_deferred_wait(tool_name,
+                                                      std::move(res));
+            }
             int64_t new_errors = error_watermark::count_response_errors(res);
             if (new_errors > 0) {
-                error_watermark::record_error(new_errors);
+                error_watermark::record_error(new_errors, gda_request_id);
             }
             if (progress_token.has_value()) {
                 send_progress(static_cast<double>(progress_total),
@@ -882,8 +991,8 @@ static void register_surface_tool(
                 mcp_result.is_error = true;
             }
             if (res.IsObject()) {
-                res["new_errors_since_last_call"] =
-                    mcp::JsonValue(error_watermark::consume_new_errors());
+                res["new_errors_since_last_call"] = mcp::JsonValue(
+                    error_watermark::consume_new_errors(gda_request_id));
             }
             std::vector<mcp::ContentVariant> image_content;
             if (tool_name == "call_tool") {

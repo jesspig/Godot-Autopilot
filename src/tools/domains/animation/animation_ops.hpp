@@ -14,9 +14,8 @@ mcp::JsonValue handle_create_track(const mcp::JsonValue &args);
 mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args);
 mcp::JsonValue handle_remove_track(const mcp::JsonValue &args);
-mcp::JsonValue handle_create_tree(const mcp::JsonValue &args);
-mcp::JsonValue handle_add_state(const mcp::JsonValue &args);
-mcp::JsonValue handle_connect_states(const mcp::JsonValue &args);
+mcp::JsonValue handle_runtime(const mcp::JsonValue &args);
+mcp::JsonValue handle_tree(const mcp::JsonValue &args);
 
 } // namespace animation_ops
 } // namespace godot_autopilot

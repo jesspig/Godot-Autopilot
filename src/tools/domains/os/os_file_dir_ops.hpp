@@ -6,6 +6,9 @@
 namespace godot_autopilot {
 namespace file_dir_ops {
 
+mcp::JsonValue handle_os_file_text(const mcp::JsonValue &args);
+mcp::JsonValue handle_os_file_write(const mcp::JsonValue &args);
+mcp::JsonValue handle_os_file_manager(const mcp::JsonValue &args);
 mcp::JsonValue handle_list_directory(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_file_info(const mcp::JsonValue &args);
 mcp::JsonValue handle_copy_file_generic(const mcp::JsonValue &args);

@@ -2,9 +2,10 @@
 #include "core/observability/log_system.hpp"
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/domains/input/input_click_ops.hpp"
+#include "tools/domains/input_map/input_map_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include <cctype>
-#include <cstdlib>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event_from_window.hpp>
@@ -43,16 +44,16 @@ std::string trim_ascii(const std::string &text) {
 
 bool read_required_string_arg(const mcp::JsonValue &args, const char *name,
                               std::string *out, std::string *error) {
-  const mcp::JsonValue *value = args.Find(name);
-  if (!value) {
+  const util::StringArgStatus status =
+      util::string_arg_status(args, name, *out, false);
+  if (status == util::StringArgStatus::Missing) {
     *error = std::string("missing required parameter: ") + name;
     return false;
   }
-  if (!value->IsString()) {
+  if (status != util::StringArgStatus::Ok) {
     *error = std::string("invalid parameter: ") + name + " must be a string";
     return false;
   }
-  *out = value->GetString();
   return true;
 }
 
@@ -117,16 +118,7 @@ bool inject_key_ex(godot::Key key, bool pressed, bool ctrl, bool shift,
 } // namespace
 
 godot::Key parse_function_key(const std::string &key_lower) {
-  if (key_lower.size() < 2 || key_lower.size() > 3 || key_lower[0] != 'f')
-    return godot::KEY_NONE;
-  for (size_t i = 1; i < key_lower.size(); ++i) {
-    if (key_lower[i] < '0' || key_lower[i] > '9')
-      return godot::KEY_NONE;
-  }
-  const int index = std::atoi(key_lower.c_str() + 1);
-  if (index < 1 || index > 12)
-    return godot::KEY_NONE;
-  return static_cast<godot::Key>(godot::KEY_F1 + (index - 1));
+  return input_map_ops::resolve_function_key(key_lower);
 }
 
 mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
@@ -331,6 +323,33 @@ mcp::JsonValue handle_run_editor_shortcut(const mcp::JsonValue &args) {
   inner["alt"] = mcp::JsonValue(alt);
   inner["meta"] = mcp::JsonValue(meta);
   return util::ok_result(std::move(inner));
+}
+
+mcp::JsonValue handle_editor_ui_action(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "editor_ui_action called");
+  auto *action_p = args.Find("action");
+  const std::string action =
+      (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
+  if (action.empty()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] =
+        mcp::JsonValue("missing required parameter: action (click|type|shortcut)");
+    return error;
+  }
+  if (action == "click") {
+    return handle_click_editor_element(args);
+  }
+  if (action == "type") {
+    return handle_type_editor_element_text(args);
+  }
+  if (action == "shortcut") {
+    return handle_run_editor_shortcut(args);
+  }
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] =
+      mcp::JsonValue("invalid action: expected click|type|shortcut");
+  return error;
 }
 
 } // namespace editor_ui_actions

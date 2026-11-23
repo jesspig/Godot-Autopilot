@@ -14,84 +14,88 @@ namespace scene_tree_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kCallSceneTreeGroupParams = {
-    {"group_name", "string", "Name of the group whose nodes receive the call (string, e.g. 'enemies')", true},
-    {"method", "string", "Method name to call on every group node (string, e.g. 'take_damage')", true},
-    {"arguments", "array", "Optional arguments array passed to the method (array, e.g. [10, 'fire'])", false},
+const std::vector<std::string> kGameSceneTreeActions = {
+    "call_group", "create_timer", "get_nodes_in_group", "is_paused",
+    "notify_group", "reload_current_scene", "set_debug_collisions_hint",
+    "set_pause"};
+
+const std::vector<ParamSpec> kGameSceneTreeParams = {
+    {"group_name", "string", "call_group/notify_group/get_nodes_in_group: name of the group in the running game (string, e.g. 'enemies')", false},
+    {"method", "string", "call_group: method name to call on every group node (string, e.g. 'take_damage')", false},
+    {"arguments", "array", "call_group: optional arguments array passed to the method (array, e.g. [10, 'fire'])", false},
+    {"delay_sec", "number", "create_timer: timer delay in seconds (number, e.g. 1.5)", false},
+    {"process_always", "boolean", "create_timer: process even while the scene tree is paused (boolean, default: true)", false},
+    {"process_in_physics", "boolean", "create_timer: count down in the physics step instead of the process step (boolean, default: false)", false},
+    {"notification", "integer", "notify_group: notification constant as integer (e.g. NOTIFICATION_READY=13, NOTIFICATION_PROCESS=3, NOTIFICATION_ENTER_TREE=10, NOTIFICATION_EXIT_TREE=11)", false},
+    {"enabled", "boolean", "set_debug_collisions_hint: draw collision shapes while the scene runs (boolean, e.g. true)", false},
+    {"paused", "boolean", "set_pause: pause state: true pauses the scene tree, false resumes (boolean)", false},
 };
 
-const std::vector<ParamSpec> kCreateSceneTreeTimerParams = {
-    {"delay_sec", "number", "Timer delay in seconds (number, e.g. 1.5)", true},
-    {"process_always", "boolean", "Process even while the scene tree is paused (boolean, default: true)", false},
-    {"process_in_physics", "boolean", "Count down in the physics step instead of the process step (boolean, default: false)", false},
-};
+inline mcp::JsonValue scene_tree_alias_args_with_action(
+    const mcp::JsonValue &args, const char *action) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (args.IsObject()) {
+    out = args;
+  }
+  out["action"] = mcp::JsonValue(action);
+  return out;
+}
 
-const std::vector<ParamSpec> kGetSceneTreeNodesInGroupParams = {
-    {"group_name", "string", "Name of the group to look up (string, e.g. 'enemies')", true},
-};
-
-const std::vector<ParamSpec> kIsSceneTreePausedParams = {};
-
-const std::vector<ParamSpec> kNotifySceneTreeGroupParams = {
-    {"group_name", "string", "Name of the group whose nodes receive the notification (string, e.g. 'enemies')", true},
-    {"notification", "integer", "Notification constant as integer (e.g. NOTIFICATION_READY=13, NOTIFICATION_PROCESS=3, NOTIFICATION_ENTER_TREE=10, NOTIFICATION_EXIT_TREE=11)", true},
-};
-
-const std::vector<ParamSpec> kReloadSceneTreeCurrentSceneParams = {};
-
-const std::vector<ParamSpec> kSetSceneTreeDebugCollisionsHintParams = {
-    {"enabled", "boolean", "Draw collision shapes while the scene runs (boolean, e.g. true)", true},
-};
-
-const std::vector<ParamSpec> kSetSceneTreePauseParams = {
-    {"paused", "boolean", "Pause state: true pauses the scene tree, false resumes (boolean)", true},
-};
+inline ToolAlias scene_tree_action_alias(const char *name,
+                                         const char *canonical,
+                                         const char *action) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = canonical;
+  alias.adapt_args = [action](const mcp::JsonValue &args) {
+    return scene_tree_alias_args_with_action(args, action);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(8);
+  v.reserve(1);
   v.push_back(make_spec_tool(ToolSpec{
-      "call_scene_tree_group",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. Call a method on every node belonging to a group in that game SceneTree. Requires 'group_name' and 'method'; optional 'arguments' (array) is passed to the call. Returns 'ok' only — call_group collects no return values, so this confirms the call was dispatched rather than reporting per-node results.",
-      "Scene", {"scene", "group"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kCallSceneTreeGroupParams, scene_tree_ops::handle_call_group}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_scene_tree_timer",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. Create a SceneTreeTimer in that game SceneTree, used with await or a timeout callback for delayed game logic. Requires 'delay_sec'; optional 'process_always' (default true — runs while the game tree is paused) and 'process_in_physics' (default false). Returns 'ok' with a note that the timer was created in the game process: the SceneTreeTimer object cannot be returned across processes, so observe its effect (an await or a timeout callback) in the game instead of holding a reference.",
-      "Scene", {"scene", "timer"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kCreateSceneTreeTimerParams, scene_tree_ops::handle_create_timer}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_scene_tree_nodes_in_group",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. List every node in a group within that game SceneTree. Requires 'group_name'; returns an array of node paths (absolute path of each matching node). An empty array means no node is currently in the group. Membership comes from add_to_group calls and from groups saved in scenes.",
-      "Scene", {"scene", "group"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kGetSceneTreeNodesInGroupParams, scene_tree_ops::handle_get_nodes_in_group}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "is_scene_tree_paused",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. Check whether that game SceneTree is currently paused. Takes no parameters; returns true or false. Pausing stops processing for nodes whose process_mode is not WhenPaused. Use together with set_scene_tree_pause to confirm the state you configured. The boolean is wrapped in a 'result' field.",
-      "Scene", {"scene", "pause"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kIsSceneTreePausedParams, scene_tree_ops::handle_is_paused}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "notify_scene_tree_group",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. Send a Godot notification to every node in a group in that game SceneTree. Requires 'group_name' and 'notification' — an integer NOTIFICATION_* constant (e.g. NOTIFICATION_READY=13, NOTIFICATION_PROCESS=3; the parameter schema lists more). Triggers the matching _notification callback on each node. Returns 'ok' when dispatched; per-node responses are not reported.",
-      "Scene", {"scene", "group"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kNotifySceneTreeGroupParams, scene_tree_ops::handle_notify_group}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "reload_scene_tree_current_scene",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. Reload the scene currently running in that game process from disk. Requires a scene actively running in the game; with no current scene the game returns ERR_UNCONFIGURED (3) as the result integer. Reloading recreates the scene root, so runtime state (script state, connections, node modifications) is reset from the saved file.",
-      "Scene", {"scene", "reload"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kReloadSceneTreeCurrentSceneParams, scene_tree_ops::handle_reload_current_scene}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_scene_tree_debug_collisions_hint",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. Toggle collision shape debug visualization in that game SceneTree. Requires 'enabled' (bool); sets the game's SceneTree debug collisions hint so collision shapes are drawn during gameplay. The hint only affects debug drawing, not physics behavior. Shapes render only while the game is running. Returns 'ok'.",
-      "Scene", {"scene", "debug"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kSetSceneTreeDebugCollisionsHintParams, scene_tree_ops::handle_set_debug_collisions}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_scene_tree_pause",
-      "Act on the running game process's SceneTree over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error, and the editor itself is never paused. Pause or unpause that game SceneTree. Requires 'paused' (bool). Only nodes whose process_mode permits WhenPaused keep processing while paused; process and physics callbacks of other nodes are not called. Query the resulting state with is_scene_tree_paused. Pass 'paused': false to resume the game. Returns result true.",
-      "Scene", {"scene", "pause"}, SideEffect::GameRuntime, tool_flags::kNone,
-      kSetSceneTreePauseParams, scene_tree_ops::handle_set_pause}));
+      "game_scene_tree",
+      "Act on the running game process's SceneTree over the runtime channel in one action tool — requires a game launched from the editor whose project loads the godot-autopilot extension, and game_runtime authorization; every action needs confirm=true. Unlike editor scene tools, this never touches the editor's own scene tree: without a running game it returns a structured error. action='call_group' calls 'method' with optional 'arguments' on every node of 'group_name' and returns ok when dispatched (call_group collects no return values). action='create_timer' creates a SceneTreeTimer for 'delay_sec' seconds with optional 'process_always' (default true) and 'process_in_physics' (default false) and returns ok with a note that the timer cannot cross processes. action='get_nodes_in_group' lists the absolute node paths of every node in 'group_name' (an empty array means no member). action='is_paused' returns whether the game SceneTree is paused as a wrapped boolean. action='notify_group' sends the integer 'notification' constant to every node in 'group_name'. action='reload_current_scene' reloads the running scene from disk and returns the error code as the result integer (ERR_UNCONFIGURED=3 when no scene runs). action='set_debug_collisions_hint' toggles collision-shape debug drawing with 'enabled'. action='set_pause' pauses or resumes the game with 'paused' (the editor itself is never paused). Deprecated aliases: call_scene_tree_group, create_scene_tree_timer, get_scene_tree_nodes_in_group, is_scene_tree_paused, notify_scene_tree_group, reload_scene_tree_current_scene, set_scene_tree_debug_collisions_hint, set_scene_tree_pause.",
+      "Scene",
+      {"scene", "group", "timer", "pause", "debug", "reload", "call_group",
+       "call_scene_tree_group", "create_scene_tree_timer",
+       "get_scene_tree_nodes_in_group", "is_scene_tree_paused",
+       "notify_scene_tree_group", "reload_scene_tree_current_scene",
+       "set_scene_tree_debug_collisions_hint", "set_scene_tree_pause"},
+      SideEffect::GameRuntime, tool_flags::kNone,
+      kGameSceneTreeParams, scene_tree_ops::handle_game_scene_tree,
+      schema::build_action_schema(
+          kGameSceneTreeActions, kGameSceneTreeParams,
+          "Game SceneTree action: call_group|create_timer|get_nodes_in_group|is_paused|notify_group|reload_current_scene|set_debug_collisions_hint|set_pause"),
+      {
+          scene_tree_action_alias("call_scene_tree_group", "game_scene_tree",
+                                  "call_group"),
+          scene_tree_action_alias("create_scene_tree_timer",
+                                  "game_scene_tree", "create_timer"),
+          scene_tree_action_alias("get_scene_tree_nodes_in_group",
+                                  "game_scene_tree", "get_nodes_in_group"),
+          scene_tree_action_alias("is_scene_tree_paused", "game_scene_tree",
+                                  "is_paused"),
+          scene_tree_action_alias("notify_scene_tree_group", "game_scene_tree",
+                                  "notify_group"),
+          scene_tree_action_alias("reload_scene_tree_current_scene",
+                                  "game_scene_tree", "reload_current_scene"),
+          scene_tree_action_alias("set_scene_tree_debug_collisions_hint",
+                                  "game_scene_tree",
+                                  "set_debug_collisions_hint"),
+          scene_tree_action_alias("set_scene_tree_pause", "game_scene_tree",
+                                  "set_pause"),
+      },
+      {"{\"action\":\"call_group\",\"group_name\":\"enemies\",\"method\":\"take_damage\",\"arguments\":[10],\"confirm\":true}",
+       "{\"action\":\"get_nodes_in_group\",\"group_name\":\"enemies\",\"confirm\":true}",
+       "{\"action\":\"set_pause\",\"paused\":true,\"confirm\":true}"}}));
   return v;
 }
 

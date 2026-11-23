@@ -9,6 +9,7 @@
 #include "core/observability/log_persist.hpp"
 #include "core/observability/sanitize_policy.hpp"
 #include "core/observability/trace_recorder.hpp"
+#include "util/string_util.hpp"
 
 namespace godot_autopilot {
 namespace monitor {
@@ -276,9 +277,11 @@ uint64_t perf(const std::string &name, const std::string &attrs, int64_t bytes) 
 RequestRecord begin_request(const std::string &request_id,
                             const std::string &method,
                             const std::string &params_digest,
-                            const std::string &traceparent) {
+                            const std::string &traceparent,
+                            const std::string &client_request_id) {
   RequestRecord record;
   record.request_id = request_id;
+  record.client_request_id = client_request_id;
   record.method = method;
   record.correlation_id = traceparent;
   const std::string parent_trace = parse_traceparent_trace_id(traceparent);
@@ -490,43 +493,7 @@ std::string sanitize_field(const std::string &text) {
 }
 
 std::string json_escape(const std::string &text) {
-  std::string out;
-  out.reserve(text.size() + 2);
-  for (unsigned char c : text) {
-    switch (c) {
-      case '"':
-        out += "\\\"";
-        break;
-      case '\\':
-        out += "\\\\";
-        break;
-      case '\b':
-        out += "\\b";
-        break;
-      case '\f':
-        out += "\\f";
-        break;
-      case '\n':
-        out += "\\n";
-        break;
-      case '\r':
-        out += "\\r";
-        break;
-      case '\t':
-        out += "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          char buf[8];
-          std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned>(c));
-          out += buf;
-        } else {
-          out += static_cast<char>(c);
-        }
-        break;
-    }
-  }
-  return out;
+  return util::json_escape(text);
 }
 
 std::string build_attrs(

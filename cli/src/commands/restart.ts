@@ -5,6 +5,7 @@ import { isAlive, stopForce, stopGraceful } from "../process";
 import type { InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 import { instanceView, start } from "./start";
+import { collectTaskStorePoisoning, gracefulRestartSuggestion } from "./stop-diagnosis";
 import {
   DEFAULT_STOP_WAIT_SEC,
   parseWaitSec,
@@ -13,6 +14,11 @@ import {
   stopMethod,
   waitUntilDead,
 } from "./stop";
+
+export function restartPortNote(previousPort: number, newPort: number): string | null {
+  if (previousPort === newPort) return null;
+  return `restarted on port ${newPort}; the MCP port is owned by the plugin, so it may differ from the previous port ${previousPort}`;
+}
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
   try {
@@ -42,10 +48,11 @@ async function restart(positional: string[], opts: GlobalOptions): Promise<numbe
     }
     const gone = await waitUntilDead(entry.pid, stopWaitSec);
     if (!gone) {
+      const poisoned = method === "graceful" && collectTaskStorePoisoning(entry);
       throw new CliError(
         ExitCode.Transport,
         `instance ${entry.id} (pid ${entry.pid}) is still running after ${stopWaitSec}s; refusing to start a replacement to avoid two editors on the same project`,
-        "retry with --force, or stop it manually before running gda restart again",
+        gracefulRestartSuggestion(poisoned),
       );
     }
   }
@@ -72,12 +79,14 @@ async function restart(positional: string[], opts: GlobalOptions): Promise<numbe
     );
   }
 
+  const portNote = restartPortNote(entry.port, started.port);
   writeJson(
     {
       ok: true,
       restarted: true,
       previous: { id: entry.id, pid: entry.pid, port: entry.port },
       ...instanceView(started),
+      ...(portNote !== null ? { note: portNote } : {}),
     },
     opts,
   );

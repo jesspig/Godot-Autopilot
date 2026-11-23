@@ -24,6 +24,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_catalog.hpp"
 #include "tools/base/tool_registry.hpp"
+#include "support/tool_catalog_baseline.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>
@@ -32,11 +33,11 @@
 
 namespace {
 
-constexpr size_t kMetaToolCount = 7;
+constexpr size_t kMetaToolCount = 5;
 
 const char *const kMetaToolNames[kMetaToolCount] = {
-    "ping",      "search_tools",  "list_categories", "get_tool_detail",
-    "call_tool", "batch_execute", "code_execute"};
+    "search_tools", "get_tool_detail", "call_tool", "batch_execute",
+    "code_execute"};
 
 const char *const kValidCategories[] = {
     "Analysis",   "Animation",  "Audio",      "Capture",    "Config",     "Debug",
@@ -97,7 +98,7 @@ struct RegisteredServerFixture : ::testing::Test {
 
 } // namespace
 
-TEST_F(RegisteredServerFixture, ListToolsReturnsExactlySevenMetaTools) {
+TEST_F(RegisteredServerFixture, ListToolsReturnsExactlyFiveMetaTools) {
   auto result = client->ListTools();
   ASSERT_EQ(result.tools.size(), kMetaToolCount);
 }
@@ -147,20 +148,45 @@ TEST_F(RegisteredServerFixture, CatalogEntriesWellFormed) {
 TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
   size_t non_empty = 0;
   size_t empty = 0;
+  std::string empty_names;
   const auto tools = catalog.get_all_tools();
   for (const auto &tool : tools) {
     if (has_schema_params(tool.input_schema)) {
       ++non_empty;
     } else {
       ++empty;
+      if (!empty_names.empty()) {
+        empty_names += ", ";
+      }
+      empty_names += tool.name;
     }
   }
-  EXPECT_EQ(tools.size(), 459);
-  EXPECT_EQ(non_empty, 393);
-  EXPECT_EQ(empty, 66);
+  const gda_test::ToolCatalogBaseline &baseline =
+      gda_test::load_tool_catalog_baseline();
+  EXPECT_EQ(tools.size(), baseline.expected_catalog_total);
+  EXPECT_EQ(non_empty, baseline.expected_non_empty);
+  EXPECT_EQ(empty, baseline.expected_empty) << empty_names;
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);
+}
+
+TEST_F(RegisteredServerFixture, ReloadScriptSchemaExposesKeepStateOptional) {
+  auto info = catalog.get_tool("reload_script");
+  ASSERT_TRUE(info.has_value());
+  const mcp::JsonValue *props = info->input_schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  ASSERT_TRUE(props->IsObject());
+  const mcp::JsonValue *keep = props->Find("keep_state");
+  ASSERT_NE(keep, nullptr);
+  ASSERT_TRUE(keep->IsObject());
+  EXPECT_EQ(keep->At("type").GetString(), "boolean");
+  const mcp::JsonValue *required = info->input_schema.Find("required");
+  ASSERT_NE(required, nullptr);
+  ASSERT_TRUE(required->IsArray());
+  for (const auto &item : required->GetArray()) {
+    EXPECT_NE(item.GetString(), "keep_state");
+  }
 }
 
 TEST_F(RegisteredServerFixture, ToolDetailSideEffectIsMachineReadable) {
@@ -196,13 +222,12 @@ TEST_F(RegisteredServerFixture, SchemaSampledTools) {
   const char *const kNonEmpty[] = {
       "property_get",          "intersect_physics_2d_ray",
       "execute_script",        "call_scene_tree_group",
-      "set_tilemap_cell",      "queue_game_input",
+      "set_tilemap_cells",     "game_input",
       "get_scene_tree",        "batch_execute",
       "call_tool",             "code_execute",
       "search_tools",          "get_tool_detail"};
-  const char *const kEmpty[] = {"get_engine_version",   "create_physics_2d_body",
-                                "ping",                 "system_status",
-                                "list_categories"};
+  const char *const kEmpty[] = {"get_os_unique_id",
+                                "create_physics_2d_body", "system_status"};
   for (const char *name : kNonEmpty) {
     auto info = catalog.get_tool(name);
     ASSERT_TRUE(info.has_value()) << name;

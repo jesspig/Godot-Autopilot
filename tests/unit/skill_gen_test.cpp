@@ -23,26 +23,17 @@ namespace {
 
 using namespace godot_autopilot::skill_gen;
 
-constexpr size_t kSkillCount = 10;
+constexpr size_t kSkillCount = 1;
 constexpr size_t kSkillFileCount = 10;
 const char *const kExpectedSkillNames[kSkillCount] = {
-    "godot-autopilot",
-    "godot-autopilot-setup",
-    "godot-autopilot-tools",
-    "godot-autopilot-scene-system",
-    "godot-autopilot-resources",
-    "godot-autopilot-scripting",
-    "godot-autopilot-runtime",
-    "godot-autopilot-servers",
-    "godot-autopilot-content",
-    "godot-autopilot-csharp"};
+    "godot-autopilot"};
 
 const char *const kManualWhitelist[] = {
     "new_errors_since_last_call", "retry_after_ms", "memory", "user", "res",
     "godot", "at_frame", "stop_on_error", "rollback_on_error", "parent_path",
     "max_depth", "include_properties", "source_code", "function_name",
     "timeout_ms", "auto_owner", "SceneRoot", "target", "retryable", "isError",
-    "true", "false",
+    "true", "false", "theme_type",
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
     "writes_file", "writes_scene", "is_error", "confirm_required",
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
@@ -123,7 +114,17 @@ const char *const kManualWhitelist[] = {
 
     "dynamic", "required", "type", "description", "error", "file", "args",
     "name", "params", "tags", "category", "instance_ambiguous",
-    "no_active_instance"};
+    "no_active_instance",
+
+    "already_connected", "apply_physics_", "closed_tabs", "closed_tabs_warning",
+    "create_physics_", "csharp_", "engine_managed", "execution_time_ms",
+    "extension_api", "get_physics_", "main_scene", "not_connected",
+    "registered_resource", "reloaded_scenes", "saved_scenes", "script_class",
+    "set_physics_", "stale_references", "uid_preserved",
+    "unsupported_binary_references", "update_file", "updated_files",
+    "when_timeout", "would_delete", "wrapped_source",
+    "channel_lost", "game_ready_timeout", "no_scene_open", "scene_ready",
+    "script_error", "startup_in_progress", "timeout_cause", "viewport_degenerate"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -294,7 +295,7 @@ protected:
   }
 };
 
-TEST(SkillGenTest, AllTenSkillsPresent) {
+TEST(SkillGenTest, AllSkillsPresent) {
   const std::vector<SkillSpec> skills = all_skills();
   ASSERT_EQ(skills.size(), kSkillCount);
 
@@ -409,6 +410,9 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
       }
     }
   }
+  for (const std::string &alias : registry_catalog().alias_names()) {
+    allowed.insert(alias);
+  }
   for (const char *word : kManualWhitelist) {
     allowed.insert(word);
   }
@@ -431,15 +435,15 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
 
 TEST_F(SkillRegistryFixture, SkillBooksDescribeDiscovery) {
   const std::vector<SkillSpec> all = all_skills();
-  const SkillSpec *tools_skill = nullptr;
+  const SkillSpec *entry_skill = nullptr;
   for (const SkillSpec &spec : all) {
-    if (spec.name == "godot-autopilot-tools") {
-      tools_skill = &spec;
+    if (spec.name == "godot-autopilot") {
+      entry_skill = &spec;
     }
   }
-  ASSERT_NE(tools_skill, nullptr);
-  ASSERT_FALSE(tools_skill->files.empty());
-  const std::string &body = tools_skill->files[0].body;
+  ASSERT_NE(entry_skill, nullptr);
+  ASSERT_FALSE(entry_skill->files.empty());
+  const std::string &body = entry_skill->files[0].body;
   EXPECT_NE(body.find("gda search"), std::string::npos);
   EXPECT_NE(body.find("gda describe"), std::string::npos);
   EXPECT_NE(body.find("gda tools list"), std::string::npos);
@@ -453,9 +457,9 @@ TEST(SkillGenTest, CliChannelContract) {
   for (const SkillSpec &spec : skills) {
     ASSERT_FALSE(spec.files.empty()) << spec.name;
     const std::string &body = spec.files[0].body;
-    EXPECT_NE(body.find("godot-autopilot"), std::string::npos)
-        << spec.name << ": SKILL.md must mention the godot-autopilot book family";
-    if (spec.name == "godot-autopilot-tools") {
+    EXPECT_NE(body.find("Godot Autopilot"), std::string::npos)
+        << spec.name << ": SKILL.md must mention the Godot Autopilot entry";
+    if (spec.name == "godot-autopilot") {
       EXPECT_TRUE(contains_ci_token(body, "gda"))
           << spec.name << ": SKILL.md must mention the gda CLI channel";
       EXPECT_NE(body.find("gda tools list"), std::string::npos);
@@ -503,10 +507,14 @@ TEST(SkillGenTest, SkillBooksCarryNoScriptBridge) {
 
 TEST(SkillGenTest, EverySkillHasSkillMd) {
   for (const SkillSpec &spec : all_skills()) {
-    ASSERT_EQ(spec.files.size(), size_t{1})
-        << spec.name << " must ship exactly one self-contained SKILL.md";
+    ASSERT_FALSE(spec.files.empty()) << "no files: " << spec.name;
     EXPECT_EQ(spec.files[0].relative_path, "SKILL.md")
         << "files[0] must be SKILL.md: " << spec.name;
+    for (size_t i = 1; i < spec.files.size(); ++i) {
+      EXPECT_TRUE(is_skill_aux_path(spec.files[i].relative_path))
+          << spec.name << ": auxiliary file must be under references/: "
+          << spec.files[i].relative_path;
+    }
   }
 }
 

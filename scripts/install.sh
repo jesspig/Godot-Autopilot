@@ -202,6 +202,35 @@ verify_checksum() {
   fi
 }
 
+write_update_manifest() {
+  local asset_path="$1" manifest_dir="${HOME}/.godot-autopilot/cache/manifests"
+  local digest size fetched_at
+  if command -v sha256sum >/dev/null 2>&1; then
+    digest="$(sha256sum "$asset_path" | awk '{print $1}')"
+  else
+    digest="$(shasum -a 256 "$asset_path" | awk '{print $1}')"
+  fi
+  size="$(wc -c < "$asset_path" | tr -d ' ')"
+  fetched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  mkdir -p "$manifest_dir" || return 0
+  local tmp="${manifest_dir}/cli-${VERSION}.json.$$"
+  cat > "$tmp" <<EOF
+{
+  "artifact": "cli",
+  "version": "${VERSION}",
+  "source": "github",
+  "asset": "${ASSET}",
+  "sha256": "${digest}",
+  "size": ${size},
+  "platform": "${PLATFORM}",
+  "lang": "",
+  "fetched_at": "${fetched_at}",
+  "builtin": false
+}
+EOF
+  mv -f "$tmp" "${manifest_dir}/cli-${VERSION}.json"
+}
+
 fetch() {
   local url="$1" dest="$2"
   run mkdir -p "$(dirname "$dest")"
@@ -227,6 +256,9 @@ if [ -n "$ARCHIVE" ]; then
   run cp "$SRC" "$CACHE_DIR/$ASSET"
   if [ "$DRY_RUN" -eq 0 ]; then
     verify_checksum "$CACHE_DIR/$ASSET" "$SUMS"
+    if [ "$NO_VERIFY" -eq 0 ]; then
+      write_update_manifest "$CACHE_DIR/$ASSET"
+    fi
   fi
 else
   ASSET_TAG=""
@@ -243,6 +275,9 @@ else
   if fetch "$SUMS_URL" "$CACHE_DIR/sha256sums.txt"; then
     if [ "$DRY_RUN" -eq 0 ]; then
       verify_checksum "$CACHE_DIR/$ASSET" "$CACHE_DIR/sha256sums.txt"
+      if [ "$NO_VERIFY" -eq 0 ]; then
+        write_update_manifest "$CACHE_DIR/$ASSET"
+      fi
     fi
   elif [ "$NO_VERIFY" -eq 1 ]; then
     printf 'warning: %s unavailable; skipping checksum\n' "$SUMS_URL" >&2
@@ -297,12 +332,20 @@ case "$EXT" in
   *) TARGET="$PREFIX/gda" ;;
 esac
 TMP="${TARGET}.new-$$"
+BACKUP=""
 run cp "$BIN" "$TMP"
 run chmod +x "$TMP"
 if [ -f "$TARGET" ]; then
-  run mv "$TARGET" "${TARGET}.old-$(date +%s)"
+  BACKUP="${TARGET}.old-$(date +%s)"
+  run mv "$TARGET" "$BACKUP"
 fi
-run mv "$TMP" "$TARGET"
+if ! mv "$TMP" "$TARGET"; then
+  if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
+    mv "$BACKUP" "$TARGET" || true
+  fi
+  rm -f "$TMP"
+  fail "failed to install new binary; previous version was restored"
+fi
 
 if [ "$NO_PATH" -eq 0 ]; then
   case ":$PATH:" in

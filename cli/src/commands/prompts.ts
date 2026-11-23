@@ -1,4 +1,4 @@
-import type { GlobalOptions } from "../args";
+import { parseTransport, type GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { request } from "../mcp/client";
 import { callTimeoutSec, loadToolArguments } from "../payload";
@@ -8,6 +8,22 @@ import { resolveTarget, type TargetContext } from "../target";
 import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
+
+function ipcEndpointFor(opts: GlobalOptions, target: ReturnType<typeof resolveTarget>) {
+  return opts.socketText !== undefined
+    ? { path: opts.socketText, token: process.env.GODOT_AUTOPILOT_IPC_TOKEN ?? "" }
+    : target.ipcEndpoint;
+}
+
+function requestOptions(opts: GlobalOptions, target: ReturnType<typeof resolveTarget>) {
+  return {
+    port: target.port,
+    timeoutSec: callTimeoutSec(opts),
+    transport: parseTransport(opts.transportText),
+    ipcEndpoint: ipcEndpointFor(opts, target),
+    noFallback: opts.noFallback,
+  };
+}
 
 interface PromptMessage {
   role?: unknown;
@@ -53,10 +69,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const sub = positional[0];
   if (sub === "list") {
     const target = resolveTarget(opts, TARGET_CONTEXT);
-    const response = await request("prompts/list", {}, {
-      port: target.port,
-      timeoutSec: callTimeoutSec(opts),
-    });
+    const response = await request("prompts/list", {}, requestOptions(opts, target));
     if (response.error !== undefined) {
       throw new CliError(ExitCode.ToolFailure, `prompts/list failed: ${response.error.message ?? "server error"} (code ${response.error.code})`);
     }
@@ -73,10 +86,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       throw new CliError(ExitCode.Usage, "prompts get takes exactly one <name> argument.");
     }
     const target = resolveTarget(opts, TARGET_CONTEXT);
-    const response = await request("prompts/get", { name, arguments: promptArguments(opts) }, {
-      port: target.port,
-      timeoutSec: callTimeoutSec(opts),
-    });
+    const response = await request("prompts/get", { name, arguments: promptArguments(opts) }, requestOptions(opts, target));
     if (response.error !== undefined) {
       throw new CliError(ExitCode.ToolFailure, `prompts/get failed: ${response.error.message ?? "server error"} (code ${response.error.code})`);
     }

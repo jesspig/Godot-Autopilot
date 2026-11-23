@@ -2,6 +2,7 @@
 #include "tools/base/tool_invoke.hpp"
 #include "util/scene_path.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/domains/property/property_ops.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
@@ -712,6 +713,7 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
     if (!parent) {
       mcp::JsonValue e = spec_error("parent node not found: " + parent_path +
                                     " — " + hint);
+      e = startup_gated_error(editor_in_startup_window(), e);
       e["rolled_back"] = mcp::JsonValue(false);
       return e;
     }
@@ -1060,10 +1062,11 @@ mcp::JsonValue handle_spawn_bundle(const mcp::JsonValue &args) {
   int64_t groups_connected = 0;
   for (const auto &group_name : groups) {
     mcp::JsonValue group_args(mcp::JsonValue::object_tag);
+    group_args["action"] = mcp::JsonValue("add");
     group_args["node_path"] = mcp::JsonValue(bundle_path);
     group_args["group_name"] = mcp::JsonValue(group_name);
     mcp::JsonValue group_result =
-        tools::invoke_tool("add_group_node", group_args);
+        tools::invoke_tool("node_group", group_args);
     if (auto *err = group_result.Find("error"))
       return bundle_step_error(err->IsString() ? err->GetString()
                                                : group_result.Dump());

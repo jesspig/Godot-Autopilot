@@ -10,6 +10,7 @@
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/script_editor.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -76,45 +77,6 @@ public:
     log_buffer_.push_back({text, is_error, now_ms()});
     if (log_buffer_.size() > MAX_LOG)
       log_buffer_.erase(log_buffer_.begin());
-  }
-
-  void add_error(int hr, int min, int sec, int msec,
-                 const std::string &source_file, const std::string &source_func,
-                 int source_line, const std::string &error,
-                 const std::string &error_descr, bool is_warning,
-                 const std::vector<std::string> &stack_files,
-                 const std::vector<std::string> &stack_funcs,
-                 const std::vector<int> &stack_lines) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    errors_.push_back({hr, min, sec, msec, source_file, source_func,
-                       source_line, error, error_descr, is_warning, stack_files,
-                       stack_funcs, stack_lines});
-    if (errors_.size() > MAX_ERRORS)
-      errors_.erase(errors_.begin());
-  }
-
-  void add_game_output(const std::string &text, int type) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    game_output_.push_back({text, type, now_ms()});
-    if (game_output_.size() > MAX_GAME_OUTPUT)
-      game_output_.erase(game_output_.begin());
-  }
-
-  void set_stack_dump(const std::vector<StackFrame> &frames) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    stack_ = frames;
-  }
-
-  void set_scene_tree_raw(const std::vector<std::string> &node_lines) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    scene_tree_lines_ = node_lines;
-  }
-
-  void add_monitor_frame(const std::vector<double> &values) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    monitors_.push_back({values, now_ms()});
-    if (monitors_.size() > MAX_MONITORS)
-      monitors_.erase(monitors_.begin());
   }
 
   size_t stack_size() {
@@ -932,6 +894,179 @@ mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_session_info completed");
   return r;
+}
+
+mcp::JsonValue handle_debugger_stream(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_debugger_stream called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  std::string source;
+  if (auto *sp = args.Find("source")) {
+    if (!sp->IsString()) {
+      return util::error_json("invalid parameter: source must be a string");
+    }
+    source = sp->GetString();
+  }
+  if (!source.empty() && source != "editor" && source != "game" &&
+      source != "plugin") {
+    return util::error_json(
+        "invalid source '" + source +
+        "': expected editor, game or plugin");
+  }
+  if (action == "log") {
+    if (source == "plugin") {
+      return handle_plugin_log_get(args);
+    }
+    if (source == "game") {
+      return handle_debugger_get_output(args);
+    }
+    return handle_output_get_log(args);
+  }
+  if (action == "output") {
+    if (source == "plugin" || source == "editor") {
+      return util::error_json(
+          "source '" + source +
+          "' is not available for action 'output': use action 'log' with "
+          "source 'editor' for the editor engine log, or source 'plugin' for "
+          "the plugin LogSystem buffer");
+    }
+    return handle_debugger_get_output(args);
+  }
+  if (action == "errors") {
+    if (source == "plugin" || source == "editor") {
+      return util::error_json(
+          "source '" + source +
+          "' is not available for action 'errors': use action 'log' with "
+          "source 'editor' for the editor engine log, or source 'plugin' for "
+          "the plugin LogSystem buffer");
+    }
+    return handle_debugger_get_errors(args);
+  }
+  if (action == "session") {
+    return handle_debugger_get_session_info(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected log, output, errors or session");
+}
+
+namespace {
+
+mcp::JsonValue no_debugger_session_error() {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue("no active debugger session");
+  error["code"] = mcp::JsonValue("no_active_debugger_session");
+  error["hint"] = mcp::JsonValue(
+      "start the game from the editor (editor_session action=play_main or "
+      "editor_scene_control action=play) and retry");
+  return error;
+}
+
+godot::Ref<godot::EditorDebuggerSession> find_active_debugger_session(
+    int32_t *out_session_id) {
+  auto *plugin = DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return {};
+  for (int32_t id : plugin->get_session_ids()) {
+    godot::Ref<godot::EditorDebuggerSession> session = plugin->get_session(id);
+    if (session.is_valid() && session->is_active()) {
+      if (out_session_id)
+        *out_session_id = id;
+      return session;
+    }
+  }
+  return {};
+}
+
+mcp::JsonValue script_breakpoints_json(godot::ScriptEditor *script_editor) {
+  godot::PackedStringArray raw = script_editor->get_breakpoints();
+  mcp::JsonValue entries(mcp::JsonValue::array_tag);
+  for (int i = 0; i < raw.size(); i++) {
+    const godot::String entry = raw[i];
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["raw"] = mcp::JsonValue(util::to_std(entry));
+    const int colon = entry.rfind(":");
+    if (colon > 0) {
+      item["path"] = mcp::JsonValue(util::to_std(entry.substr(0, colon)));
+      item["line"] = mcp::JsonValue(
+          static_cast<int64_t>(entry.substr(colon + 1).to_int()));
+      item["enabled"] = mcp::JsonValue(true);
+    }
+    entries.PushBack(std::move(item));
+  }
+  mcp::JsonValue payload(mcp::JsonValue::object_tag);
+  payload["breakpoints"] = std::move(entries);
+  payload["count"] = mcp::JsonValue(static_cast<int64_t>(raw.size()));
+  return payload;
+}
+
+} // namespace
+
+mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "debugger_breakpoints called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    return util::error_json("EditorInterface not available");
+  }
+  godot::ScriptEditor *script_editor = editor->get_script_editor();
+  if (!script_editor) {
+    return util::error_json("ScriptEditor not available");
+  }
+  if (action == "list") {
+    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    result["result"] = script_breakpoints_json(script_editor);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "debugger_breakpoints list completed");
+    return result;
+  }
+  if (action != "set" && action != "clear") {
+    return util::error_json(
+        "unknown action '" + action + "': expected list, set or clear");
+  }
+  auto *pp = args.Find("path");
+  if (!pp || !pp->IsString() || pp->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: path (script res:// path)");
+  }
+  auto *lp = args.Find("line");
+  if (!lp || !lp->IsInt() || lp->GetInt() < 1) {
+    return util::error_json(
+        "missing required parameter: line (1-based integer)");
+  }
+  const std::string path = pp->GetString();
+  const int64_t line = lp->GetInt();
+  int32_t session_id = 0;
+  godot::Ref<godot::EditorDebuggerSession> session =
+      find_active_debugger_session(&session_id);
+  if (session.is_null()) {
+    LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
+                              "debugger_breakpoints " + action +
+                                  " skipped: no active debugger session");
+    return no_debugger_session_error();
+  }
+  const bool enabled = action == "set";
+  session->set_breakpoint(godot::String(path.c_str()),
+                          static_cast<int32_t>(line), enabled);
+  mcp::JsonValue info = script_breakpoints_json(script_editor);
+  info["path"] = mcp::JsonValue(path);
+  info["line"] = mcp::JsonValue(line);
+  info["enabled"] = mcp::JsonValue(enabled);
+  info["session_id"] = mcp::JsonValue(static_cast<int64_t>(session_id));
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["result"] = std::move(info);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "debugger_breakpoints " + action + " completed: " +
+                                path + ":" + std::to_string(line));
+  return result;
 }
 
 void register_classes() {

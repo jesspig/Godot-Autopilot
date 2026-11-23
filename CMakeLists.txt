@@ -32,8 +32,12 @@ endif()
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" GDA_VERSION)
 string(STRIP "${GDA_VERSION}" GDA_VERSION)
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" GDA_VERSION_NUMERIC "${GDA_VERSION}")
+if(GDA_VERSION_NUMERIC STREQUAL "")
+    message(FATAL_ERROR "[gda] VERSION must start with major.minor.patch: ${GDA_VERSION}")
+endif()
 
-project(Godot-Autopilot VERSION ${GDA_VERSION} LANGUAGES C CXX)
+project(Godot-Autopilot VERSION ${GDA_VERSION_NUMERIC} LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -77,7 +81,9 @@ add_library(godot-autopilot SHARED
     ${GDA_API_STORAGE_SOURCES}
     ${GDA_API_TRANSPORT_SOURCES}
     ${GDA_API_CLI_SOURCES}
-    ${GDA_API_INSTANCE_GUARD_SOURCES})
+    ${GDA_API_INSTANCE_GUARD_SOURCES}
+    src/tools/domains/image/image_ops.cpp
+    src/tools/domains/mesh/mesh_ops.cpp)
 
 add_dependencies(godot-autopilot gda_skill_embed_header)
 

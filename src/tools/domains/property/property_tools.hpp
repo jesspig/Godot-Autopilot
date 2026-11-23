@@ -24,13 +24,8 @@ const std::vector<ParamSpec> kPropertySetParams = {
     {"property", "string", "Single property name to set, dot-separated paths allowed (e.g. 'position', 'material.albedo_color'). Mutually exclusive with 'properties'; required in single form", false},
     {"value", "json", "Single property value. Resource references use two forms: {\"path\": \"res://xxx.tres\"} or {\"resource\": \"memory://name\"} (memory rejected on nodes). Dictionary properties take a JSON object; SpriteFrames 'animations' accepts an array or an object mapping names to {frames, speed, loop}. Required in single form", false},
     {"properties", "object", "Batch map of property names to values applied in one call (e.g. {\"position\": {\"x\": 1, \"y\": 2}, \"visible\": false}). Object-typed entries run first, then the rest, mirroring create_scene_node; mutually exclusive with property/value; max 32 entries", false},
+    {"atomic", "boolean", "Batch form only: when true (default for the batch alias) the batch is all-or-nothing; when false best-effort partial success is returned with applied_properties plus failed entries", false},
     {"type_hint", "string", "Variant type hint for single form only (e.g. Vector2, Color, int, float). Omit to infer from metadata; must not be used with 'properties'", false},
-};
-
-const std::vector<ParamSpec> kSetPropertiesBatchParams = {
-    {"path", "string", "Node path in the edited scene (string, e.g. 'Player' or 'Player/Camera2D')", true},
-    {"properties", "object", "Batch map of property names to values applied in one call (e.g. {\"position\": {\"x\": 1, \"y\": 2}, \"visible\": false}). Object-typed entries run first, then the rest, mirroring property_set batch; slash families accept an object of suffixes; max 32 entries after expansion", true},
-    {"atomic", "boolean", "When true (default) the batch is all-or-nothing: first failure rolls back already applied entries and returns an error; when false best-effort partial success is returned with applied_properties plus failed entries", false},
 };
 
 const std::vector<ParamSpec> kSetNodeTransformParams = {
@@ -62,23 +57,64 @@ const std::vector<ParamSpec> kSignalDisconnectParams = {
     {"method", "string", "Method name of the connected callable (string, e.g. 'set_health')", true},
 };
 
+inline mcp::JsonValue set_properties_batch_args(
+    const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *path = args.Find("path");
+  const mcp::JsonValue *properties = args.Find("properties");
+  if (path != nullptr) out["path"] = *path;
+  if (properties != nullptr) out["properties"] = *properties;
+  const mcp::JsonValue *atomic = args.Find("atomic");
+  out["atomic"] = atomic != nullptr ? *atomic : mcp::JsonValue(true);
+  return out;
+}
+
+inline mcp::JsonValue validate_set_properties_batch(
+    const mcp::JsonValue &args) {
+  const mcp::JsonValue *path = args.Find("path");
+  const mcp::JsonValue *properties = args.Find("properties");
+  const mcp::JsonValue *atomic = args.Find("atomic");
+  if (path == nullptr || !path->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: path");
+    return error;
+  }
+  if (properties == nullptr || !properties->IsObject()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: properties");
+    return error;
+  }
+  if (atomic != nullptr && !atomic->IsBool()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("invalid parameter: atomic must be a boolean");
+    return error;
+  }
+  return mcp::JsonValue();
+}
+
 } // namespace
 
 inline ToolSpec make_set_node_transform_spec();
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(7);
+  v.reserve(6);
   v.push_back(make_spec_tool(ToolSpec{
       "property_get",
       "Read a single property value from a scene node. Requires 'path' and 'property'; errors with candidate suggestions when the node or property does not exist (use property_get_list to see valid names). Returns the exact serialized value — unlike get_scene_tree's include_properties summary, which returns up to 20 filtered properties in one snapshot. Optional 'properties' (array of 1-32 non-empty names, mutually exclusive with 'property') reads many properties in one round trip and returns {name: value} plus 'missing' for absent names instead of failing the batch. Properties starting with 'metadata/' read node metadata via has_meta/get_meta and report absent keys in 'missing' (single reads report 'meta not found').",
       "Properties", {"property", "get"}, SideEffect::None, tool_flags::kNone,
       kPropertyGetParams, property_ops::handle_get}));
-  v.push_back(make_spec_tool(ToolSpec{
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "property_set",
-      "Set properties on a scene node. Single form requires 'path', 'property' and 'value'; batch form passes 'properties' as an object map instead (mutually exclusive, max 32, object-typed entries first then the rest, mirroring create_scene_node). Property names accept dot paths (a.b.c) into sub-resources with full-path errors and candidates. Omit 'type_hint' to infer the Variant type from metadata (single form only). Resource values resolve via {\"path\": \"res://...\"}; object-typed properties accept inline {\"type\": \"RectangleShape2D\", \"properties\": {...}} (nesting limit 4, echoed in 'inline_resources'). Dictionary properties take JSON objects; SpriteFrames 'animations' accepts an engine array or a dict mapping names to {frames, speed, loop} assembled into the engine array form. memory:// rejected on nodes. Returns 'ok' with undo info and editor undo registration (undoable:false for object values). Script global-class typed arrays validate each element by script identity and build script-typed arrays (failures carry 'element_script_loaded'). Properties starting with 'metadata/' address node metadata: keys must be non-empty without spaces, :, (), [], / or .., values are stored directly from JSON without type checks via set_meta with editor undo (set_meta/remove_meta) and echo 'meta_old'/'meta_new'.",
+      "Set properties on a scene node. Color values must be objects {r, g, b, a} with 0-1 components (a optional), e.g. {\"r\":1.0,\"g\":0.5,\"b\":0.5,\"a\":1.0}, not [r,g,b,a] arrays. Single form requires 'path', 'property' and 'value'; batch form passes 'properties' as an object map instead (mutually exclusive, max 32, object-typed entries first then the rest, mirroring create_scene_node). Batch form accepts optional 'atomic' to select all-or-nothing rollback versus best-effort partial success. Property names accept dot paths (a.b.c) into sub-resources with full-path errors and candidates. Omit 'type_hint' to infer the Variant type from metadata (single form only). Resource values resolve via {\"path\": \"res://...\"}; object-typed properties accept inline {\"type\": \"RectangleShape2D\", \"properties\": {...}} (nesting limit 4, echoed in 'inline_resources'). Dictionary properties take JSON objects; SpriteFrames 'animations' accepts an engine array or a dict mapping names to {frames, speed, loop} assembled into the engine array form. memory:// rejected on nodes. Returns 'ok' with undo info and editor undo registration (undoable:false for object values). Script global-class typed arrays validate each element by script identity and build script-typed arrays (failures carry 'element_script_loaded'). Properties starting with 'metadata/' address node metadata: keys must be non-empty without spaces, :, (), [], / or .., values are stored directly from JSON without type checks via set_meta with editor undo (set_meta/remove_meta) and echo 'meta_old'/'meta_new'.",
       "Properties", {"property", "set"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kPropertySetParams, property_ops::handle_set}));
+      kPropertySetParams, property_ops::handle_set},
+      {
+          ToolAlias{
+              "set_properties_batch", "property_set",
+              set_properties_batch_args, {}, "0.4.0", "0.6.0",
+              validate_set_properties_batch},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "property_get_list",
       "List every property of a scene node with its metadata. Requires 'path'; returns an array of entries with name, type (Variant type name and id), hint (property hint name), hint_string, usage flags and class_name. Use it to discover valid property names and enum ordering before property_get or property_set.",
@@ -94,11 +130,6 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Remove a signal connection previously created by signal_connect. Requires the same four parameters: 'source_path', 'signal', 'target_path', 'method'. Returns 'disconnected', or 'not_connected' when the signal+callable pair does not exist (idempotent — repeated calls are safe). Persistent connections removed here stop being saved with the scene.",
       "Properties", {"signal", "disconnect"}, SideEffect::WritesScene, tool_flags::kNone,
       kSignalDisconnectParams, property_ops::handle_signal_disconnect}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_properties_batch",
-      "Set many properties on one scene node in a single undo step. Requires 'path' and 'properties' as an object map (max 32 entries after slash-family expansion); 'atomic' (boolean, default true) selects all-or-nothing rollback versus best-effort partial success. Object-typed entries apply first, then the rest, mirroring property_set. Each entry uses the same strict conversion chain as property_set (resource references resolved, NodePath strings become node references, arrays converted per element, inline resource descriptions create pathless sub-resources, slash families expand per item). Each entry is read back and rejected values restore the old value. All applied entries share one editor undo action; object-typed values report undoable:false with a reason. Returns applied_properties, property_warnings ({path, property, warning} only when the engine adjusted a value), failed ([{property, error}] empty on full success, non-empty on atomic:false partial success), undo ([{path, property, old_value}]) plus undoable state. Entries starting with 'metadata/' address node metadata with the same key rules as property_set, stored directly from JSON without type checks and rolled back atomically with the rest.",
-      "Properties", {"property", "batch"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kSetPropertiesBatchParams, property_ops::handle_set_batch}));
   v.push_back(make_spec_tool(make_set_node_transform_spec()));
   return v;
 }

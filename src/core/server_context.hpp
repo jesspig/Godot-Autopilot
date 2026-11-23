@@ -27,19 +27,12 @@ public:
 
   bool start();
   void stop();
-  bool restart(uint16_t port);
-  bool restart(const PortAssignment &assignment);
 
   int get_port() const;
   const std::string &get_host() const;
   bool is_running() const;
 
   const std::string &last_error() const { return last_error_; }
-
-  const PortAssignment &port_assignment() const;
-  void set_port_assignment(const PortAssignment &assignment);
-  const EndpointTable &endpoints() const;
-  void set_endpoints(const EndpointTable &endpoints);
 
 private:
   CommandQueue &queue_;

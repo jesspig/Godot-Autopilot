@@ -9,6 +9,10 @@
 #include <utility>
 #include <vector>
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+
 #include "core/observability/log_system.hpp"
 #include "core/path_util.hpp"
 #include "core/storage/project_store.hpp"
@@ -26,19 +30,18 @@ std::string registry_instance_file_name(const std::string &instance_id) {
 }
 
 bool write_registry_file(const std::string &path, const std::string &content) {
-  std::ofstream out(to_fs_path(path), std::ios::binary | std::ios::trunc);
-  if (!out) {
+  if (!write_file_atomically(path, content)) {
     LogSystem::instance().log(LogLevel::Error, LogCategory::System,
                                "Instance registry write failed: " + path);
     return false;
   }
-  out << content;
-  out.close();
-  if (!out) {
-    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
-                               "Instance registry write failed: " + path);
-    return false;
+#ifndef _WIN32
+  if (::chmod(to_fs_path(path).c_str(), S_IRUSR | S_IWUSR) != 0) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::System,
+        "Instance registry permission hardening failed: " + path);
   }
+#endif
   return true;
 }
 

@@ -4,6 +4,7 @@
 #include "core/command_queue.hpp"
 #include <cstdint>
 #include <exception>
+#include <optional>
 #include <functional>
 #include <memory>
 #include <string>
@@ -104,12 +105,16 @@ mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &lab
 mcp::JsonValue resolve_deferred_wait(const std::string &name,
                                       mcp::JsonValue result);
 
+bool has_deferred_marker(const mcp::JsonValue &result);
+
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args);
 
 mcp::CallToolResult export_blocked_result();
 
 std::string export_blocked_error_text();
+
+std::optional<std::string> resolve_alias_canonical(const std::string &name);
 
 } // namespace dispatch
 } // namespace godot_autopilot

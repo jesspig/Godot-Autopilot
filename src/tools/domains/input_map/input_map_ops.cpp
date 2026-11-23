@@ -1,9 +1,11 @@
 #include "tools/domains/input_map/input_map_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_map.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
@@ -241,19 +243,52 @@ int64_t resolve_key_name_code(const std::string &name) {
   if (it != key_code_by_bare_name().end())
     return it->second;
 
-  bool all_digits = true;
-  for (char c : u) {
-    if (c < '0' || c > '9') {
-      all_digits = false;
-      break;
-    }
-  }
-  if (all_digits && u.size() <= 8) {
-    const int64_t value = std::stoll(u);
+  int64_t value = 0;
+  if (u.size() <= 8 && util::parse_decimal_int64(u, value)) {
     if (value > 0 && value <= 0xFFFFFF)
       return value;
   }
   return 0;
+}
+
+godot::Key resolve_input_key(const std::string &name) {
+  std::string u = name;
+  for (char &c : u)
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  const bool key_prefixed = u.rfind("KEY_", 0) == 0;
+  std::string bare = u;
+  if (key_prefixed)
+    bare = bare.substr(4);
+  if (!key_prefixed && bare.size() >= 2 && bare[0] == 'F' &&
+      std::all_of(bare.begin() + 1, bare.end(), [](char c) {
+        return c >= '0' && c <= '9';
+      }))
+    return godot::KEY_NONE;
+  const int64_t code = resolve_key_name_code(name);
+  if (code > 0 && code <= 0xFFFFFF)
+    return static_cast<godot::Key>(code);
+  if (name.size() == 1) {
+    const unsigned char c = static_cast<unsigned char>(name[0]);
+    if (c >= 0x20 && c <= 0x7E)
+      return static_cast<godot::Key>(c);
+  }
+  return godot::KEY_NONE;
+}
+
+godot::Key resolve_function_key(const std::string &name) {
+  if (name.size() < 2 || name.size() > 3 || name[0] != 'f')
+    return godot::KEY_NONE;
+  for (size_t i = 1; i < name.size(); ++i) {
+    if (name[i] < '0' || name[i] > '9')
+      return godot::KEY_NONE;
+  }
+  const int index = std::atoi(name.c_str() + 1);
+  if (index < 1 || index > 12)
+    return godot::KEY_NONE;
+  const int64_t code = resolve_key_name_code("KEY_F" + std::to_string(index));
+  if (code <= 0 || code > 0xFFFFFF)
+    return godot::KEY_NONE;
+  return static_cast<godot::Key>(code);
 }
 
 JV handle_action_add_event(const JV &args) {
@@ -634,7 +669,7 @@ JV handle_erase_action(const JV &args) {
   return r;
 }
 
-JV handle_get_actions(const JV &) {
+JV handle_get_actions(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_input_map_actions called");
   auto *im = godot::InputMap::get_singleton();
@@ -643,10 +678,23 @@ JV handle_get_actions(const JV &) {
     e["error"] = JV("InputMap not available");
     return e;
   }
-  auto names = im->get_actions();
   JV result_arr(JV::array_tag);
-  for (int i = 0; i < names.size(); i++) {
-    result_arr.PushBack(JV(util::to_std(godot::String(names[i]))));
+  const JV *action_p = args.Find("action");
+  if (action_p != nullptr) {
+    if (!action_p->IsString()) {
+      JV e(JV::object_tag);
+      e["error"] = JV("invalid parameter: action must be a string");
+      return e;
+    }
+    const std::string action = action_p->GetString();
+    if (im->has_action(godot::StringName(action.c_str()))) {
+      result_arr.PushBack(JV(action));
+    }
+  } else {
+    auto names = im->get_actions();
+    for (int i = 0; i < names.size(); i++) {
+      result_arr.PushBack(JV(util::to_std(godot::String(names[i]))));
+    }
   }
   JV r(JV::object_tag);
   r["result"] = std::move(result_arr);
@@ -807,6 +855,181 @@ JV handle_persist(const JV &args) {
       "save_input_map completed: " + std::to_string(persisted) +
           " actions persisted, " + std::to_string(skipped.size()) + " skipped");
   return r;
+}
+
+namespace {
+
+JV input_map_action_error(const std::string &message) {
+  JV error(JV::object_tag);
+  error["error"] = JV(message);
+  return error;
+}
+
+bool read_input_map_action(const JV &args, std::string &out, JV &error) {
+  const JV *action = args.Find("action");
+  if (action == nullptr) {
+    error = input_map_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = input_map_action_error(
+        "invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+JV input_map_legacy_target(const JV &args) {
+  JV out(JV::object_tag);
+  const JV *name = args.Find("name");
+  if (name != nullptr) {
+    out["action"] = *name;
+  }
+  return out;
+}
+
+} // namespace
+
+JV handle_get_input_map(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_input_map_action(args, action, error)) {
+    return error;
+  }
+  const JV *name_p = args.Find("name");
+  if (name_p != nullptr && !name_p->IsString()) {
+    return input_map_action_error(
+        "invalid parameter: name must be a string");
+  }
+  auto *im = godot::InputMap::get_singleton();
+  if (!im) {
+    return input_map_action_error("InputMap not available");
+  }
+  if (action == "list") {
+    JV result_arr(JV::array_tag);
+    if (name_p != nullptr) {
+      const std::string name = name_p->GetString();
+      if (im->has_action(godot::StringName(name.c_str()))) {
+        result_arr.PushBack(JV(name));
+      }
+    } else {
+      auto names = im->get_actions();
+      for (int i = 0; i < names.size(); i++) {
+        result_arr.PushBack(JV(util::to_std(godot::String(names[i]))));
+      }
+    }
+    JV r(JV::object_tag);
+    r["result"] = std::move(result_arr);
+    return r;
+  }
+  if (action == "has") {
+    if (name_p == nullptr) {
+      return input_map_action_error(
+          "missing required parameter for action 'has': name");
+    }
+    const std::string name = name_p->GetString();
+    const bool found =
+        im->has_action(godot::StringName(name.c_str()));
+    JV r(JV::object_tag);
+    r["result"] = JV(found);
+    r["found"] = JV(found);
+    r["name"] = JV(name);
+    return r;
+  }
+  if (action == "query") {
+    if (name_p == nullptr) {
+      return input_map_action_error(
+          "missing required parameter for action 'query': name");
+    }
+    const std::string name = name_p->GetString();
+    auto *ps = godot::ProjectSettings::get_singleton();
+    if (!ps) {
+      return input_map_action_error("ProjectSettings not available");
+    }
+    const godot::String setting_path =
+        godot::String(("input/" + name).c_str());
+    if (!ps->has_setting(setting_path)) {
+      return input_map_action_error("input action '" + name +
+                                    "' not found in project settings");
+    }
+    godot::Variant stored = ps->get_setting(setting_path);
+    if (stored.get_type() != godot::Variant::DICTIONARY) {
+      return input_map_action_error(
+          "malformed input setting for action '" + name +
+          "': expected a dictionary at input/" + name);
+    }
+    JV config = VariantJson::serialize(stored);
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["action"] = JV(name);
+    r["source"] = JV("project_settings");
+    const JV *deadzone = config.Find("deadzone");
+    if (deadzone != nullptr) {
+      r["deadzone"] = *deadzone;
+    }
+    const JV *events = config.Find("events");
+    if (events != nullptr) {
+      r["events"] = *events;
+    }
+    r["config"] = std::move(config);
+    return r;
+  }
+  return input_map_action_error(
+      "unknown action '" + action +
+      "' for get_input_map (expected list, has, query)");
+}
+
+JV handle_set_input_map_action(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_input_map_action(args, action, error)) {
+    return error;
+  }
+  if (action != "set") {
+    return input_map_action_error(
+        "unknown action '" + action + "' for set_input_map_action (expected set)");
+  }
+  const JV *name_p = args.Find("name");
+  if (name_p == nullptr || !name_p->IsString()) {
+    return input_map_action_error(
+        "missing required parameter for action 'set': name");
+  }
+  std::string name = name_p->GetString();
+  JV legacy = args;
+  legacy.GetObject().erase("action");
+  legacy.GetObject().erase("name");
+  legacy["action"] = JV(name);
+  return handle_set_action_bundle(legacy);
+}
+
+JV handle_erase_input_map(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_input_map_action(args, action, error)) {
+    return error;
+  }
+  const JV *name_p = args.Find("name");
+  if (name_p == nullptr || !name_p->IsString()) {
+    return input_map_action_error(
+        "missing required parameter for action '" + action + "': name");
+  }
+  if (action == "action") {
+    return handle_erase_action(input_map_legacy_target(args));
+  }
+  if (action == "event") {
+    const JV *index_p = args.Find("event_index");
+    if (index_p == nullptr || !index_p->IsInt()) {
+      return input_map_action_error(
+          "missing required parameter for action 'event': event_index");
+    }
+    JV legacy = input_map_legacy_target(args);
+    legacy["event_index"] = *index_p;
+    return handle_action_erase_event(legacy);
+  }
+  return input_map_action_error(
+      "unknown action '" + action +
+      "' for erase_input_map (expected action, event)");
 }
 
 } // namespace input_map_ops

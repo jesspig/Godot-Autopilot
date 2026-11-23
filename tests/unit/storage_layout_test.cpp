@@ -49,6 +49,15 @@ TEST(StorageLayoutTest, GlobalConfigPathLivesInCentralRoot) {
   unset_store_env("GODOT_AUTOPILOT_HOME");
 }
 
+TEST(StorageLayoutTest, TaskDirLivesInCentralRoot) {
+  set_store_env("GODOT_AUTOPILOT_HOME", "C:/gda/home");
+  const std::string root = ProjectStore::root_dir();
+  const std::string task_dir = StoragePaths::task_dir();
+  EXPECT_EQ(task_dir, "C:/gda/home/.godot-autopilot/tasks");
+  EXPECT_TRUE(path_within(task_dir, root));
+  unset_store_env("GODOT_AUTOPILOT_HOME");
+}
+
 TEST(StorageLayoutTest, ProjectConfigPathLivesInProjectDirectory) {
   set_store_env("GODOT_AUTOPILOT_HOME", "C:/gda/home");
   const std::string project_dir = StoragePaths::project_dir("C:/projects/Demo");

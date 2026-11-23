@@ -8,13 +8,17 @@ import { cacheRoot, cacheAssetPath, selectLatest, verifyManifest } from "../cach
 import { CliError, ExitCode } from "../errors";
 import { readPluginInstanceIndex } from "../instances";
 import { isAlive, stopForce } from "../process";
-import { builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
+import { builtinRetiredSkills, builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
 import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
 import { start } from "./start";
 import { writeJson } from "./json-output";
 
 type Source = "auto" | "online" | "cache" | "builtin" | "offline";
+
+export function shouldStopRunningForInstall(archiveReady: boolean): boolean {
+  return archiveReady;
+}
 
 function parseSource(text: string | undefined): Source {
   if (text === undefined) return "auto";
@@ -122,6 +126,21 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
     throw new CliError(ExitCode.Transport, "no skills source is available (online, cache, builtin).");
   }
   writeTree(target, files, opts.force === true);
+  const retired = builtinRetiredSkills();
+  const existing = new Set(
+    fs
+      .readdirSync(target, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name),
+  );
+  const stale = retired.filter((name) => existing.has(name));
+  const removed: string[] = [];
+  if (opts.prune === true) {
+    for (const name of stale) {
+      fs.rmSync(path.join(target, name), { recursive: true, force: true });
+      removed.push(name);
+    }
+  }
   writeJson(
     {
       ok: true,
@@ -132,6 +151,8 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
       target,
       files: Object.keys(files).length,
       skills: [...new Set(Object.keys(files).map((file) => file.split("/")[0]))].sort(),
+      stale,
+      removed,
     },
     opts,
   );
@@ -145,9 +166,6 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
   const running = readPluginInstanceIndex().filter(
     (record) => record.projectPath === project && record.pid !== null && isAlive(record.pid),
   );
-  for (const record of running) {
-    if (record.pid !== null) stopForce(record.pid);
-  }
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "plugin-install-"));
   try {
     let zip: string | undefined;
@@ -190,6 +208,11 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
     );
     if (sourceDir === undefined) {
       throw new CliError(ExitCode.Transport, "the plugin archive does not contain godot-autopilot.gdextension.");
+    }
+    if (shouldStopRunningForInstall(sourceDir !== undefined)) {
+      for (const record of running) {
+        if (record.pid !== null) stopForce(record.pid);
+      }
     }
     const backup = `${target}.old-${Date.now()}`;
     if (fs.existsSync(target)) {

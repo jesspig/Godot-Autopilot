@@ -20,6 +20,9 @@ struct CaptureSaveOptions {
 mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args);
 mcp::JsonValue handle_review_scene(const mcp::JsonValue &args);
 
+bool viewport_capture_is_degenerate(int image_width, int image_height,
+                                    int viewport_width, int viewport_height);
+
 std::string base64_encode(const uint8_t *data, size_t len);
 
 void prune_capture_files(const godot::String &dir_path, int keep);
@@ -40,6 +43,13 @@ mcp::JsonValue save_capture_bytes(const godot::PackedByteArray &bytes,
 
 mcp::JsonValue with_capture_save_options(mcp::JsonValue pending,
                                          const CaptureSaveOptions &options);
+
+bool is_pending_subcall_response(const mcp::JsonValue &response,
+                                 int64_t *out_request_id,
+                                 int64_t *out_timeout_ms);
+
+mcp::JsonValue unwrap_subcall_section(const mcp::JsonValue &response,
+                                      bool await_pending);
 
 } // namespace capture_ops
 } // namespace godot_autopilot

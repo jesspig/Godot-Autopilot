@@ -1,5 +1,8 @@
 #include "tools/base/autopilot_tools.hpp"
 
+#include "core/path_util.hpp"
+#include "util/input_guards.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -26,6 +29,7 @@
 
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
+#include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
 #include "tools/base/dispatch.hpp"
@@ -67,31 +71,6 @@ std::string string_field(const godot::Dictionary &dict, const char *key,
     return fallback;
   }
   return util::to_std(value.operator godot::String());
-}
-
-bool parse_side_effect(const std::string &text, SideEffect &out) {
-  if (text.empty()) {
-    out = SideEffect::None;
-    return true;
-  }
-  if (text == "writes_file") {
-    out = SideEffect::WritesFile;
-  } else if (text == "writes_config") {
-    out = SideEffect::WritesConfig;
-  } else if (text == "shows_alert") {
-    out = SideEffect::ShowsAlert;
-  } else if (text == "modifies_window") {
-    out = SideEffect::ModifiesWindow;
-  } else if (text == "process") {
-    out = SideEffect::Process;
-  } else if (text == "code_execute") {
-    out = SideEffect::CodeExecute;
-  } else if (text == "game_runtime") {
-    out = SideEffect::GameRuntime;
-  } else {
-    return false;
-  }
-  return true;
 }
 
 int64_t reject_registration(const std::string &message) {
@@ -177,18 +156,8 @@ bool has_gd_suffix(const std::string &filename) {
   if (filename.size() < 4) {
     return false;
   }
-  std::string lower = filename;
-  std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
-    return static_cast<char>(std::tolower(c));
-  });
+  const std::string lower = util::ascii_lowercase(filename);
   return lower.compare(lower.size() - 3, 3, ".gd") == 0;
-}
-
-std::string join_scan_path(const std::string &dir, const std::string &entry) {
-  if (!dir.empty() && dir.back() == '/') {
-    return dir + entry;
-  }
-  return dir + "/" + entry;
 }
 
 std::set<std::string> dynamic_tool_name_set() {
@@ -218,7 +187,7 @@ void collect_rescan_files(const std::string &root,
       if (entry != "." && entry != "..") {
         const std::string name = util::to_std(entry);
         if (!name.empty() && name[0] != '.') {
-          const std::string full = join_scan_path(top.first, name);
+          const std::string full = join_path(top.first, name);
           if (dir->current_is_dir()) {
             if (top.second < kRescanMaxDepth) {
               pending.emplace_back(full, top.second + 1);
@@ -597,6 +566,12 @@ godot::Dictionary AutopilotTools::get_tool(const godot::String &name) const {
 
 godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
                                             const godot::Dictionary &args) {
+  if (ExportGuard::is_exporting()) {
+    godot::Dictionary blocked;
+    blocked["error"] = godot::String::utf8(
+        dispatch::export_blocked_error_text().c_str());
+    return blocked;
+  }
   const std::string tool_name = util::to_std(name);
   auto invoke = [tool_name, args]() -> mcp::JsonValue {
     mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));

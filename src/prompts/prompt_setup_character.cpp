@@ -70,7 +70,7 @@ std::string prompt_setup_character() {
 {
   "name": "attach_script_to_node",
   "arguments": {
-    "path": "Player",
+    "node_path": "Player",
     "script_path": "res://player.gd"
   }
 }

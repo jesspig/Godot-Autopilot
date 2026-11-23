@@ -2,6 +2,7 @@
 #define GODOT_AUTOPILOT_BM25_INDEX_HPP
 
 #include <cmath>
+#include <cstddef>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -14,6 +15,19 @@ struct Bm25Result {
   std::string name;
   double score;
 };
+
+inline double bm25_average_document_length(
+    const std::vector<size_t> &token_counts) {
+  if (token_counts.empty()) {
+    return 1.0;
+  }
+  double sum = 0.0;
+  for (size_t count : token_counts) {
+    sum += static_cast<double>(count);
+  }
+  const double avg = sum / static_cast<double>(token_counts.size());
+  return avg == 0.0 ? 1.0 : avg;
+}
 
 class Bm25Index {
 public:

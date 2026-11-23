@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { DEPLOY_TARGETS, addonDir } from "../lib/config";
+import { addonDir, resolveProjects } from "../lib/config";
+import { errorMessage } from "../lib/cmake";
 
 function removeQuietly(target: string): void {
   try {
@@ -9,8 +10,8 @@ function removeQuietly(target: string): void {
   } catch {}
 }
 
-export function cleanTargets(): void {
-  for (const projectDir of DEPLOY_TARGETS) {
+export function cleanTargets(projects: readonly string[]): void {
+  for (const projectDir of projects) {
     const godotCache = path.join(projectDir, ".godot");
     if (fs.existsSync(godotCache)) {
       console.log(`[CLEAN] Removing ${godotCache}...`);
@@ -24,8 +25,15 @@ export function cleanTargets(): void {
   }
 }
 
-export function runClean(): number {
-  cleanTargets();
+export function runClean(projects: readonly string[]): number {
+  let targets: string[];
+  try {
+    targets = resolveProjects(projects);
+  } catch (error) {
+    console.log(`[ERROR] ${errorMessage(error)}`);
+    return 1;
+  }
+  cleanTargets(targets);
   console.log("[DONE] Clean complete.");
   return 0;
 }

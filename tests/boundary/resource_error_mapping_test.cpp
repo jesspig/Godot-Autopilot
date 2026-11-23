@@ -6,18 +6,18 @@
 
 using godot_autopilot::resource_error_code;
 
-TEST(ResourceErrorMappingTest, MapsTimeoutToRequestTimeout) {
-  EXPECT_EQ(resource_error_code("main_thread_timeout"),
-            mcp::McpErrorCode::RequestTimeout);
-}
-
 TEST(ResourceErrorMappingTest, MapsNotFoundToInvalidParams) {
   EXPECT_EQ(resource_error_code("resource_not_found"),
             mcp::McpErrorCode::InvalidParams);
 }
 
-TEST(ResourceErrorMappingTest, MapsReadFailedToInternalError) {
+TEST(ResourceErrorMappingTest, ReadFailedFallsBackToInternalError) {
   EXPECT_EQ(resource_error_code("resource_read_failed"),
+            mcp::McpErrorCode::InternalError);
+}
+
+TEST(ResourceErrorMappingTest, TimeoutCodeIsNotMappedByResourceLayer) {
+  EXPECT_EQ(resource_error_code("main_thread_timeout"),
             mcp::McpErrorCode::InternalError);
 }
 

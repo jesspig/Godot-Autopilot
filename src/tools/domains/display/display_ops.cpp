@@ -381,5 +381,225 @@ JV handle_tts_stop(const JV &args) {
   return util::ok_result(JV("ok"));
 }
 
+JV handle_tts_pause(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_tts pause called");
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return util::error_json("DisplayServer not available");
+  }
+  ds->tts_pause();
+  return util::ok_result(JV("ok"));
+}
+
+JV handle_tts_resume(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_tts resume called");
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return util::error_json("DisplayServer not available");
+  }
+  ds->tts_resume();
+  return util::ok_result(JV("ok"));
+}
+
+JV handle_tts_is_speaking(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_tts is_speaking called");
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return util::error_json("DisplayServer not available");
+  }
+  JV info(JV::object_tag);
+  info["speaking"] = JV(ds->tts_is_speaking());
+  JV r(JV::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+JV handle_info_get(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_display_info called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "clipboard") {
+    return handle_clipboard_get(args);
+  }
+  if (action == "mouse") {
+    return handle_mouse_get_position(args);
+  }
+  if (action == "voices") {
+    return handle_tts_get_voices(args);
+  }
+  if (action == "window") {
+    return handle_window_get_rect(args);
+  }
+  if (action != "screens") {
+    return util::error_json(
+        "unknown action '" + action +
+        "': expected screens, clipboard, mouse, voices or window");
+  }
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return util::error_json("DisplayServer not available");
+  }
+  const int count = ds->get_screen_count();
+  int first = 0;
+  int last = count;
+  if (auto *sp = args.Find("screen")) {
+    if (sp->IsInt()) {
+      first = static_cast<int>(sp->GetInt());
+      last = first + 1;
+    }
+  }
+  JV screens(JV::array_tag);
+  const double max_scale =
+      static_cast<double>(ds->screen_get_max_scale());
+  for (int index = first; index < last; index++) {
+    godot::Vector2i position = ds->screen_get_position(index);
+    godot::Vector2i size = ds->screen_get_size(index);
+    godot::Rect2i usable = ds->screen_get_usable_rect(index);
+    JV entry(JV::object_tag);
+    entry["index"] = JV(static_cast<int64_t>(index));
+    entry["dpi"] = JV(static_cast<int64_t>(ds->screen_get_dpi(index)));
+    JV pos(JV::object_tag);
+    pos["x"] = JV(static_cast<int64_t>(position.x));
+    pos["y"] = JV(static_cast<int64_t>(position.y));
+    entry["position"] = std::move(pos);
+    JV dims(JV::object_tag);
+    dims["x"] = JV(static_cast<int64_t>(size.x));
+    dims["y"] = JV(static_cast<int64_t>(size.y));
+    entry["size"] = std::move(dims);
+    JV usable_rect(JV::object_tag);
+    usable_rect["x"] = JV(static_cast<int64_t>(usable.position.x));
+    usable_rect["y"] = JV(static_cast<int64_t>(usable.position.y));
+    usable_rect["w"] = JV(static_cast<int64_t>(usable.size.x));
+    usable_rect["h"] = JV(static_cast<int64_t>(usable.size.y));
+    entry["usable_rect"] = std::move(usable_rect);
+    entry["scale"] =
+        JV(static_cast<double>(ds->screen_get_scale(index)));
+    entry["max_scale"] = JV(max_scale);
+    entry["orientation"] =
+        JV(static_cast<int64_t>(ds->screen_get_orientation(index)));
+    entry["refresh_rate"] =
+        JV(static_cast<double>(ds->screen_get_refresh_rate(index)));
+    screens.PushBack(std::move(entry));
+  }
+  JV result(JV::object_tag);
+  result["count"] = JV(static_cast<int64_t>(count));
+  result["screens"] = std::move(screens);
+  JV r(JV::object_tag);
+  r["result"] = std::move(result);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_display_info completed");
+  return r;
+}
+
+JV handle_window_control(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_window_create(args);
+  }
+  if (action == "foreground") {
+    return handle_window_move_to_foreground(args);
+  }
+  if (action == "attention") {
+    return handle_window_request_attention(args);
+  }
+  if (action == "flag") {
+    return handle_window_set_flag(args);
+  }
+  if (action == "mode") {
+    return handle_window_set_mode(args);
+  }
+  if (action == "position") {
+    return handle_window_set_position(args);
+  }
+  if (action == "size") {
+    return handle_window_set_size(args);
+  }
+  if (action == "title") {
+    return handle_window_set_title(args);
+  }
+  if (action == "popup") {
+    return handle_window_popup(args);
+  }
+  if (action == "popup_centered") {
+    return handle_window_popup_centered(args);
+  }
+  if (action == "transient") {
+    return handle_window_set_transient(args);
+  }
+  if (action == "exclusive") {
+    return handle_window_set_exclusive(args);
+  }
+  if (action == "unparent_when_invisible") {
+    return handle_window_set_unparent_when_invisible(args);
+  }
+  if (action == "close") {
+    return handle_window_close(args);
+  }
+  return util::error_json(
+      "unknown action '" + action +
+      "': expected create, foreground, attention, flag, mode, position, size, "
+      "title, popup, popup_centered, transient, exclusive, "
+      "unparent_when_invisible or close");
+}
+
+JV handle_mouse_control(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_mouse called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "mode") {
+    return handle_mouse_set_mode(args);
+  }
+  if (action == "warp") {
+    return handle_mouse_warp(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected mode or warp");
+}
+
+JV handle_tts_control(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_tts called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "speak") {
+    return handle_tts_speak(args);
+  }
+  if (action == "stop") {
+    return handle_tts_stop(args);
+  }
+  if (action == "pause") {
+    return handle_tts_pause(args);
+  }
+  if (action == "resume") {
+    return handle_tts_resume(args);
+  }
+  if (action == "is_speaking") {
+    return handle_tts_is_speaking(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected speak, stop, pause, resume or "
+                          "is_speaking");
+}
+
 } // namespace display_ops
 } // namespace godot_autopilot

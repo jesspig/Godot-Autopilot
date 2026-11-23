@@ -1,6 +1,7 @@
 #include "tools/domains/doc/doc_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -63,14 +64,6 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
   }
 }
 
-std::string lower_text(const std::string &s) {
-  std::string out = s;
-  std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-    return static_cast<char>(std::tolower(c));
-  });
-  return out;
-}
-
 std::string trim_text(const std::string &s) {
   size_t begin = s.find_first_not_of(" \t\r\n");
   if (begin == std::string::npos) {
@@ -83,7 +76,7 @@ std::string trim_text(const std::string &s) {
 std::string compact_name(const std::string &s) {
   std::string out;
   out.reserve(s.size());
-  for (char c : lower_text(s)) {
+  for (char c : util::ascii_lowercase(s)) {
     if (c != '_') {
       out.push_back(c);
     }
@@ -424,6 +417,24 @@ const VariantBuiltin *find_variant_builtin(const std::string &name) {
 mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_docs_class called");
+  if (const mcp::JsonValue *query = args.Find("query")) {
+    if (!query->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: query must be a string");
+      return e;
+    }
+    if (const mcp::JsonValue *conflict = args.Find("class")) {
+      if (conflict != nullptr && conflict->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(
+            "class and query are mutually exclusive: pass class to read one "
+            "class or query to search class names");
+        return e;
+      }
+    }
+    return handle_search(args);
+  }
   auto *np = args.Find("class");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -452,6 +463,16 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     }
     member_param = mp->GetString();
   }
+  bool exact = false;
+  if (auto *exact_p = args.Find("exact")) {
+    if (!exact_p->IsBool()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: exact must be a boolean");
+      return e;
+    }
+    exact = exact_p->GetBool();
+  }
   bool want_methods = true;
   bool want_properties = true;
   bool want_signals = true;
@@ -466,7 +487,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     size_t pos = 0;
     while (pos <= section_param.size()) {
       size_t comma = section_param.find(',', pos);
-      std::string token = lower_text(trim_text(section_param.substr(
+      std::string token = util::ascii_lowercase(trim_text(section_param.substr(
           pos, comma == std::string::npos ? comma : comma - pos)));
       if (token == "methods") {
         want_methods = true;
@@ -492,10 +513,31 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
       pos = comma + 1;
     }
   }
-  std::string member_lower = lower_text(member_param);
-  auto member_ok = [&member_lower](const std::string &name) {
-    return member_lower.empty() ||
-           lower_text(name).find(member_lower) != std::string::npos;
+  std::string member_lower = util::ascii_lowercase(member_param);
+  auto member_ok = [&member_lower, &member_param, exact](
+                       const std::string &name) {
+    if (member_param.empty()) {
+      return true;
+    }
+    if (exact) {
+      return name == member_param;
+    }
+    return util::ascii_lowercase(name).find(member_lower) != std::string::npos;
+  };
+  bool any_match = false;
+  auto exact_missing_error = [&]() {
+    std::string kind = "member";
+    if (want_methods && !want_properties && !want_signals && !want_enums &&
+        !want_constants) {
+      kind = "method";
+    } else if (!want_methods && want_properties && !want_signals &&
+               !want_enums && !want_constants) {
+      kind = "property";
+    }
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(kind + " not found: " + member_param +
+                                " in class " + class_name);
+    return e;
   };
   auto *cd = godot::ClassDBSingleton::get_singleton();
   if (!cd) {
@@ -521,6 +563,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
           mcp::JsonValue item(mcp::JsonValue::object_tag);
           item["name"] = mcp::JsonValue(m);
           arr.PushBack(std::move(item));
+          any_match = true;
         }
         result["methods"] = std::move(arr);
       }
@@ -534,12 +577,16 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
           item["name"] = mcp::JsonValue(c.first);
           item["value"] = mcp::JsonValue(c.second);
           arr.PushBack(std::move(item));
+          any_match = true;
         }
         result["constants"] = std::move(arr);
       }
       result["note"] = mcp::JsonValue(
           "builtin Variant value type (no ClassDB entry); methods and "
           "constants are a curated subset");
+      if (exact && !member_param.empty() && !any_match) {
+        return exact_missing_error();
+      }
       mcp::JsonValue r(mcp::JsonValue::object_tag);
       r["result"] = std::move(result);
       LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -572,6 +619,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
         continue;
       }
       arr.PushBack(variant_to_json(methods[i]));
+      any_match = true;
     }
     result["methods"] = std::move(arr);
   }
@@ -590,6 +638,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
         continue;
       }
       arr.PushBack(variant_to_json(props[i]));
+      any_match = true;
     }
     result["properties"] = std::move(arr);
   }
@@ -608,6 +657,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
         continue;
       }
       arr.PushBack(variant_to_json(signals[i]));
+      any_match = true;
     }
     result["signals"] = std::move(arr);
   }
@@ -634,9 +684,13 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
                 sn, godot::StringName(cname.c_str()))));
         ec.PushBack(std::move(cv));
         kept++;
+        any_match = true;
       }
       if (!member_lower.empty() && !member_ok(ename) && kept == 0) {
         continue;
+      }
+      if (member_ok(ename)) {
+        any_match = true;
       }
       e["constants"] = std::move(ec);
       arr.PushBack(std::move(e));
@@ -658,8 +712,12 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
           mcp::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
               sn, godot::StringName(cname.c_str()))));
       arr.PushBack(std::move(cv));
+      any_match = true;
     }
     result["constants"] = std::move(arr);
+  }
+  if (exact && !member_param.empty() && !any_match) {
+    return exact_missing_error();
   }
   result["note"] = mcp::JsonValue("class reference without docstrings");
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -671,7 +729,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "find_docs_class called");
+                            "get_docs_class query called");
   auto *qp = args.Find("query");
   if (!qp || !qp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -685,17 +743,13 @@ mcp::JsonValue handle_search(const mcp::JsonValue &args) {
     e["error"] = mcp::JsonValue("ClassDBSingleton not available");
     return e;
   }
-  std::string query_lower = query;
-  std::transform(query_lower.begin(), query_lower.end(), query_lower.begin(),
-                 ::tolower);
+  const std::string query_lower = util::ascii_lowercase(query);
   godot::PackedStringArray all_classes = cd->get_class_list();
   mcp::JsonValue results_arr(mcp::JsonValue::array_tag);
   int count = 0;
   for (int i = 0; i < all_classes.size() && count < 50; i++) {
     std::string name = util::to_std(all_classes[i]);
-    std::string name_lower = name;
-    std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(),
-                   ::tolower);
+    const std::string name_lower = util::ascii_lowercase(name);
     if (name_lower.find(query_lower) != std::string::npos) {
       mcp::JsonValue item(mcp::JsonValue::object_tag);
       item["name"] = mcp::JsonValue(name);
@@ -710,123 +764,8 @@ mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(results_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "find_docs_class completed");
+                            "get_docs_class query completed");
   return r;
-}
-
-mcp::JsonValue handle_get_method(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_docs_method called");
-  auto *cp = args.Find("class");
-  auto *mp = args.Find("method");
-  if (!cp || !cp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: class");
-    return e;
-  }
-  if (!mp || !mp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: method");
-    return e;
-  }
-  std::string class_name = cp->GetString();
-  std::string method_name = mp->GetString();
-  auto *cd = godot::ClassDBSingleton::get_singleton();
-  if (!cd) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ClassDBSingleton not available");
-    return e;
-  }
-  godot::StringName sn(class_name.c_str());
-  if (!cd->class_exists(sn)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("class not found: " + class_name);
-    return e;
-  }
-  godot::TypedArray<godot::Dictionary> methods =
-      cd->class_get_method_list(sn, false);
-  for (int i = 0; i < methods.size(); i++) {
-    godot::Dictionary d = methods[i];
-    if (d.has("name")) {
-      godot::String mname = static_cast<godot::String>(d["name"]);
-      if (util::to_std(mname) == method_name) {
-        mcp::JsonValue result = variant_to_json(d);
-        result["note"] = mcp::JsonValue("method signature without docstrings");
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = std::move(result);
-        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                  "get_docs_method completed");
-        return r;
-      }
-    }
-  }
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("method not found: " + method_name +
-                              " in class " + class_name);
-  return e;
-}
-
-mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_docs_property called");
-  auto *cp = args.Find("class");
-  auto *pp = args.Find("property");
-  if (!cp || !cp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: class");
-    return e;
-  }
-  if (!pp || !pp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
-    return e;
-  }
-  std::string class_name = cp->GetString();
-  std::string prop_name = pp->GetString();
-  auto *cd = godot::ClassDBSingleton::get_singleton();
-  if (!cd) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ClassDBSingleton not available");
-    return e;
-  }
-  godot::StringName sn(class_name.c_str());
-  if (!cd->class_exists(sn)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("class not found: " + class_name);
-    return e;
-  }
-  godot::TypedArray<godot::Dictionary> props =
-      cd->class_get_property_list(sn, false);
-  for (int i = 0; i < props.size(); i++) {
-    godot::Dictionary d = props[i];
-    if (d.has("name")) {
-      godot::String pname = static_cast<godot::String>(d["name"]);
-      if (util::to_std(pname) == prop_name) {
-        mcp::JsonValue result = variant_to_json(d);
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = std::move(result);
-        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                  "get_docs_property completed");
-        return r;
-      }
-    }
-  }
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  if (prop_name.compare(0, 15, "theme_override_") == 0) {
-    e["error"] = mcp::JsonValue(
-        "property not found: " + prop_name + " in class " + class_name +
-        " — theme_override_* values are per-node theme overrides, not "
-        "ClassDB-declared properties. Query the live node with "
-        "property_get_list {\"path\": \"<node-path>\", \"property_filter\": "
-        "\"" +
-        prop_name +
-        "\"} to confirm the override exists on that node, then read it with "
-        "property_get.");
-    return e;
-  }
-  e["error"] = mcp::JsonValue("property not found: " + prop_name +
-                              " in class " + class_name);
-  return e;
 }
 
 } // namespace doc_ops

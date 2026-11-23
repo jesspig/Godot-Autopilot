@@ -27,6 +27,9 @@ inline constexpr std::string_view GDA_OP_SAMPLE = "sample";
 inline constexpr std::string_view GDA_OP_COLLECT_EVIDENCE = "collect_evidence";
 inline constexpr std::string_view GDA_OP_VALIDATE_UI_LAYOUT = "validate_ui_layout";
 inline constexpr std::string_view GDA_OP_SCENE_TREE = "scene_tree";
+inline constexpr std::string_view GDA_OP_TWEEN_CREATE = "tween_create";
+inline constexpr std::string_view GDA_OP_TWEEN_CONTROL = "tween_control";
+inline constexpr std::string_view GDA_OP_TWEEN_LIST = "tween_list";
 
 inline constexpr std::string_view GDA_FIELD_REQUEST_ID = "request_id";
 inline constexpr std::string_view GDA_FIELD_OP = "op";

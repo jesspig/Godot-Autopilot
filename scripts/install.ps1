@@ -62,6 +62,29 @@ function Invoke-Process([string]$Executable, [string[]]$Arguments) {
   }
 }
 
+function Write-UpdateManifest([string]$File) {
+  $manifestDir = Join-Path $HOME ".godot-autopilot\cache\manifests"
+  New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
+  $digest = (Get-FileHash $File -Algorithm SHA256).Hash.ToLower()
+  $size = (Get-Item $File).Length
+  $fetchedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+  $manifest = [ordered]@{
+    artifact = "cli"
+    version = $Version
+    source = "github"
+    asset = $asset
+    sha256 = $digest
+    size = $size
+    platform = $platform
+    lang = ""
+    fetched_at = $fetchedAt
+    builtin = $false
+  }
+  $tmp = Join-Path $manifestDir "cli-$Version.json.$PID"
+  ($manifest | ConvertTo-Json) | Set-Content -Path $tmp -Encoding utf8
+  Move-Item -Force $tmp (Join-Path $manifestDir "cli-$Version.json")
+}
+
 function Assert-Checksum([string]$File, [string]$Sums) {
   if (-not (Test-Path $Sums)) {
     if ($SkipChecksum) { Write-Warning "checksum file missing; skipping checksum"; return }
@@ -139,7 +162,10 @@ if ($Archive -ne "") {
   } else {
     Join-Path (Split-Path $Archive -Parent) "sha256sums.txt"
   }
-  if (-not $DryRun) { Assert-Checksum $assetPath $archiveSums }
+  if (-not $DryRun) {
+    Assert-Checksum $assetPath $archiveSums
+    if (-not $SkipChecksum) { Write-UpdateManifest $assetPath }
+  }
 } else {
   $assetTag = ""
   foreach ($tag in @("v$Version", "$Version")) {
@@ -170,7 +196,10 @@ if ($Archive -ne "") {
       }
       Write-Warning "checksum unavailable; skipping checksum"
     }
-    if ($sumsReady) { Assert-Checksum $assetPath $sumsPath }
+    if ($sumsReady) {
+      Assert-Checksum $assetPath $sumsPath
+      if (-not $SkipChecksum) { Write-UpdateManifest $assetPath }
+    }
   }
 }
 
@@ -204,12 +233,21 @@ if (-not $bin) { throw "no gda binary in $unpack" }
 New-Item -ItemType Directory -Force -Path $Prefix | Out-Null
 $target = Join-Path $Prefix "gda.exe"
 $tmp = "$target.new-$PID"
+$old = ""
 Copy-Item -Force $bin.FullName $tmp
 if (Test-Path $target) {
   $old = "$target.old-$(Get-Date -UFormat %s)"
   Move-Item -Force $target $old
 }
-Move-Item -Force $tmp $target
+try {
+  Move-Item -Force $tmp $target -ErrorAction Stop
+} catch {
+  if ($old -ne "" -and (Test-Path $old)) {
+    Move-Item -Force $old $target -ErrorAction SilentlyContinue
+  }
+  Remove-Item -Force $tmp -ErrorAction SilentlyContinue
+  throw "failed to install new binary; previous version was restored"
+}
 
 if (-not $NoPath) {
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")

@@ -5,12 +5,14 @@ import { run as categories } from "./categories";
 import { run as search } from "./search";
 import { run as describe } from "./describe";
 import { run as call } from "./call";
+import { run as batch } from "./batch";
 import { run as list } from "./list";
 import { run as start } from "./start";
 import { run as stop } from "./stop";
 import { run as restart } from "./restart";
 
 import { run as logs } from "./logs";
+import { run as docs } from "./docs";
 import { run as skills } from "./skills";
 import { run as tools } from "./tools";
 import { run as resources } from "./resources";
@@ -33,6 +35,7 @@ export const COMMANDS: Record<string, Command> = {
   search: { run: search },
   describe: { run: describe },
   call: { run: call },
+  batch: { run: batch },
   list: { run: list },
   start: { run: start },
   stop: { run: stop },
@@ -46,6 +49,7 @@ export const COMMANDS: Record<string, Command> = {
   tasks: { run: tasks },
   projects: { run: projects },
   cache: { run: cache },
+  docs: { run: docs },
   install: { run: install },
   update: { run: update },
   trace: { run: trace },

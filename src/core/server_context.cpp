@@ -36,6 +36,7 @@
 #include "core/transport/ipc_endpoint.hpp"
 #include "core/transport/ipc_transport.hpp"
 #include "core/storage/project_store.hpp"
+#include "core/storage/storage_paths.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include "core/storage/instance_guard.hpp"
@@ -252,13 +253,13 @@ bool ServerContext::start() {
                               "MCP server initializing: host=" + host_ +
                                   " port=" + std::to_string(port_));
 
-    {
-      ipc_token_ = api_token::generate_token();
-      if (ipc_token_.empty()) {
-        LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
-                                  "IPC token generation failed; IPC will be "
-                                  "disabled");
-      }
+    ipc_token_ = api_token::generate_token();
+    if (ipc_token_.empty()) {
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "IPC token generation failed; IPC will be "
+                                "disabled");
+    }
+    if (!ipc_token_.empty()) {
 #ifdef _WIN32
       std::string ipc_error;
       if (ipc_transport::ipc_transport_instance().listen_tcp(
@@ -304,6 +305,37 @@ bool ServerContext::start() {
     }
 
     transport_ = godot_transport_reset();
+    transport_->set_inbound_rewrite([](mcp::JsonRpcMessage &message) {
+      auto *request = std::get_if<mcp::JsonRpcRequest>(&message);
+      if (request == nullptr || request->method != "tools/call" ||
+          !request->params || !request->params->IsObject()) {
+        return;
+      }
+      mcp::JsonValue *params = &*request->params;
+      const mcp::JsonValue *name_value = params->Find("name");
+      if (name_value == nullptr || !name_value->IsString()) {
+        return;
+      }
+      const std::string name = name_value->GetString();
+      auto canonical = dispatch::resolve_alias_canonical(name);
+      if (!canonical) {
+        return;
+      }
+      mcp::JsonValue inner(mcp::JsonValue::object_tag);
+      inner["name"] = mcp::JsonValue(name);
+      if (const mcp::JsonValue *arguments = params->Find("arguments")) {
+        inner["arguments"] = *arguments;
+      } else {
+        inner["arguments"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+      }
+      mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+      wrapped["name"] = mcp::JsonValue("call_tool");
+      wrapped["arguments"] = std::move(inner);
+      *params = std::move(wrapped);
+      LogSystem::instance().log(
+          LogLevel::Debug, LogCategory::Tools,
+          "direct tool alias '" + name + "' rewritten to call_tool wrapper");
+    });
 
     ipc_transport::ipc_transport_instance().set_line_handler(
         [transport = transport_](std::uint64_t connection_id,
@@ -352,8 +384,8 @@ bool ServerContext::start() {
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
     opts.enable_progressive_discovery = true;
-    const std::filesystem::path task_dir =
-        to_fs_path(HomeResolver::gda_home()) / "tasks";
+    route_sdk_logs();
+    const std::filesystem::path task_dir = to_fs_path(StoragePaths::task_dir());
     std::error_code task_dir_error;
     std::filesystem::create_directories(task_dir, task_dir_error);
     if (task_dir_error) {
@@ -428,8 +460,10 @@ bool ServerContext::start() {
           }
         }
       }
-      monitor::begin_request(monitor::request_id_text(req.id), std::string(method), digest,
-                             traceparent);
+      const std::string internal_request_key = mcp_wire::request_id_key(req.id);
+      monitor::begin_request(
+          internal_request_key, std::string(method), digest, traceparent,
+          godot_transport_instance()->client_request_id_text(internal_request_key));
     };
     opts.outgoing_filters = std::make_shared<mcp::FilterPipeline>();
     opts.outgoing_filters->AddFilter(
@@ -438,13 +472,18 @@ bool ServerContext::start() {
               if (const auto *response =
                       std::get_if<mcp::JsonRpcResponse>(&message)) {
                 monitor::end_request(
-                    monitor::request_id_text(response->id), true, "",
+                    mcp_wire::request_id_key(response->id), true, "",
                     static_cast<int64_t>(response->result.Dump().size()));
               } else if (const auto *error =
                              std::get_if<mcp::JsonRpcErrorResponse>(&message)) {
-                const std::string error_request_id =
-                    error->id ? monitor::request_id_text(*error->id)
+                const std::string error_request_key =
+                    error->id ? mcp_wire::request_id_key(*error->id)
                               : std::string();
+                const std::string error_request_id =
+                    error->id
+                        ? godot_transport_instance()->client_request_id_text(
+                              error_request_key)
+                        : std::string();
                 ErrorPathEvent path_event;
                 path_event.request_id = error_request_id;
                 path_event.error_code = static_cast<int>(error->error.code);
@@ -459,7 +498,7 @@ bool ServerContext::start() {
                 }
                 log_error_path(path_event);
                 monitor::note_protocol_error(
-                    error_request_id,
+                    error_request_key,
                     static_cast<int64_t>(error->error.code),
                     error->error.message, 0);
               }
@@ -639,62 +678,11 @@ void ServerContext::stop() {
                                            {"port", std::to_string(port_)}}));
 }
 
-bool ServerContext::restart(uint16_t port) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                            "MCP server restart requested on port " +
-                                std::to_string(port));
-  LogSystem::instance().log_detailed(
-      LogLevel::Info, LogCategory::Transport, "MCP server restart requested",
-      "endpoint=" + host_ + ":" + std::to_string(port) +
-          " previous_port=" + std::to_string(port_));
-  monitor::lifecycle("server_restart",
-                     monitor::build_attrs({{"host", host_},
-                                           {"port", std::to_string(port)}}));
-  stop();
-  requested_port_ = port;
-  port_ = port;
-  return start();
-}
-
-bool ServerContext::restart(const PortAssignment &assignment) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                            "MCP server restart requested on port " +
-                                std::to_string(assignment.port));
-  LogSystem::instance().log_detailed(
-      LogLevel::Info, LogCategory::Transport, "MCP server restart requested",
-      "port=" + std::to_string(assignment.port) +
-          " previous_port=" + std::to_string(port_));
-  stop();
-  requested_port_ = assignment.port;
-  port_ = assignment.port;
-  if (!start()) {
-    return false;
-  }
-  if (assignment.port > 0 && assignment.source != PortSource::kUserApplied) {
-    port_assignment_ = assignment;
-  }
-  return true;
-}
-
 int ServerContext::get_port() const { return port_; }
 
 const std::string &ServerContext::get_host() const { return host_; }
 
 bool ServerContext::is_running() const { return running_; }
-
-const PortAssignment &ServerContext::port_assignment() const {
-  return port_assignment_;
-}
-
-void ServerContext::set_port_assignment(const PortAssignment &assignment) {
-  port_assignment_ = assignment;
-}
-
-const EndpointTable &ServerContext::endpoints() const { return endpoints_; }
-
-void ServerContext::set_endpoints(const EndpointTable &endpoints) {
-  endpoints_ = endpoints;
-}
 
 void ServerContext::register_tools() {
   const ToolSurface surface = resolve_tool_surface();

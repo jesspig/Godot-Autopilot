@@ -58,29 +58,14 @@ struct Exemption {
 };
 
 inline constexpr Exemption kDestructiveExemptions[] = {
-    {"create_os_process",
-     "only mentions kill_os_process in a cross reference; starting an "
-     "external program is the danger tier"},
-    {"erase_input_map_action",
+    {"erase_input_map",
      "clears a project setting; project content is versioned (write tier)"},
-    {"erase_input_map_action_event",
-     "clears a project setting; project content is versioned (write tier)"},
-    {"kill_os_process",
-     "terminates an external process, not an object that lives inside the "
-     "host (danger tier)"},
-    {"remove_autoload",
-     "clears a project setting; project content is versioned (write tier)"},
-    {"remove_group_node",
-     "removes the group membership only; the node object itself is left "
-     "untouched and the change is registered with the editor undo/redo"},
     {"remove_physics_3d_body_collision_exception",
      "removes a relation entry between two physics bodies; no object is "
      "destroyed"},
-    {"remove_resource_file",
-     "deletes a file on disk; project content is versioned (write tier)"},
-    {"control_game_tween",
-     "the tween lives in the game process, not in the host (game_runtime "
-     "tier)"},
+    {"os_process",
+     "starts, inspects and kills external processes, not objects that live "
+     "inside the host (danger tier)"},
 };
 
 struct ToolDeclaration {

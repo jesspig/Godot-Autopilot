@@ -1,5 +1,7 @@
 #include "tools/domains/input/input_click_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "tools/domains/input/input_ops.hpp"
+#include "tools/domains/input_map/input_map_ops.hpp"
 #include "util/error_util.hpp"
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/display_server.hpp>
@@ -22,52 +24,7 @@ namespace godot_autopilot {
 namespace input_click_ops {
 
 godot::Key parse_key_name(const std::string &key_str) {
-  if (key_str.empty())
-    return godot::KEY_NONE;
-
-  if (key_str.size() == 1) {
-    char c = key_str[0];
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-    if (c >= 0x20 && c <= 0x7E) {
-      return static_cast<godot::Key>(c);
-    }
-  }
-
-  std::string u = key_str;
-  for (auto &c : u) {
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-  }
-
-  if (u == "SPACE")
-    return godot::KEY_SPACE;
-  if (u == "ENTER")
-    return godot::KEY_ENTER;
-  if (u == "ESCAPE")
-    return godot::KEY_ESCAPE;
-  if (u == "SHIFT")
-    return godot::KEY_SHIFT;
-  if (u == "CONTROL" || u == "CTRL")
-    return godot::KEY_CTRL;
-  if (u == "ALT")
-    return godot::KEY_ALT;
-  if (u == "TAB")
-    return godot::KEY_TAB;
-  if (u == "BACKSPACE")
-    return godot::KEY_BACKSPACE;
-  if (u == "DELETE")
-    return godot::KEY_DELETE;
-  if (u == "LEFT")
-    return godot::KEY_LEFT;
-  if (u == "RIGHT")
-    return godot::KEY_RIGHT;
-  if (u == "UP")
-    return godot::KEY_UP;
-  if (u == "DOWN")
-    return godot::KEY_DOWN;
-
-  return godot::KEY_NONE;
+  return input_map_ops::resolve_input_key(key_str);
 }
 
 godot::MouseButton parse_mouse_button_name(const std::string &button_str) {
@@ -497,6 +454,82 @@ mcp::JsonValue handle_type_text(const mcp::JsonValue &args) {
   inner["ok"] = mcp::JsonValue(true);
   inner["length"] = mcp::JsonValue(text_str.length());
   return util::ok_result(std::move(inner));
+}
+
+namespace {
+
+mcp::JsonValue mouse_action_error(const std::string &message) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(message);
+  return error;
+}
+
+bool read_mouse_action(const mcp::JsonValue &args, std::string &out,
+                       mcp::JsonValue &error) {
+  const mcp::JsonValue *action = args.Find("action");
+  if (action == nullptr) {
+    error = mouse_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = mouse_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+mcp::JsonValue strip_mouse_action(const mcp::JsonValue &args) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+mcp::JsonValue handle_input_mouse(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_mouse_action(args, action, error)) {
+    return error;
+  }
+  const mcp::JsonValue legacy = strip_mouse_action(args);
+  if (action == "move") {
+    return input_ops::handle_mouse_move(legacy);
+  }
+  if (action == "press") {
+    return input_ops::handle_mouse_button_press(legacy);
+  }
+  if (action == "release") {
+    return input_ops::handle_mouse_button_release(legacy);
+  }
+  if (action == "click") {
+    return handle_click_mouse(legacy);
+  }
+  if (action == "scroll") {
+    return handle_scroll_mouse(legacy);
+  }
+  if (action == "drag") {
+    return handle_drag_mouse(legacy);
+  }
+  return mouse_action_error(
+      "unknown action '" + action +
+      "' for input_mouse (expected move, press, release, click, scroll, drag)");
+}
+
+mcp::JsonValue handle_input_text(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_mouse_action(args, action, error)) {
+    return error;
+  }
+  if (action != "type") {
+    return mouse_action_error(
+        "unknown action '" + action + "' for input_text (expected type)");
+  }
+  return handle_type_text(strip_mouse_action(args));
 }
 
 } // namespace input_click_ops

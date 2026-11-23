@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 
+#include <mcp/Log.hpp>
+
 namespace godot_autopilot {
 
 namespace {
@@ -26,6 +28,8 @@ namespace {
 constexpr const char *kInternalErrorPrefix = "internal error: ";
 constexpr const char *kHandlerErrorPrefix = "handler error: ";
 constexpr const char *kNonStdExceptionPrefix = "internal error: non-std exception";
+constexpr const char *kTaskStoreLogPrefix = "task store:";
+constexpr const char *kSdkLogPrefix = "MCP SDK: ";
 
 bool starts_with(const std::string &text, const char *prefix) {
   const std::string head(prefix);
@@ -47,6 +51,32 @@ std::string quote_error_path_value(const std::string &value) {
   }
   quoted.push_back('"');
   return quoted;
+}
+
+LogLevel sdk_log_level(mcp::LogLevel level) {
+  switch (level) {
+  case mcp::LogLevel::Error:
+    return LogLevel::Error;
+  case mcp::LogLevel::Warning:
+    return LogLevel::Warning;
+  case mcp::LogLevel::Info:
+    return LogLevel::Info;
+  default:
+    return LogLevel::Debug;
+  }
+}
+
+std::string sdk_log_text(const mcp::LogRecord &record) {
+  std::string text = kSdkLogPrefix + std::string(record.message);
+  if (record.context != nullptr) {
+    if (!record.context->request_id.empty()) {
+      text += " req=" + record.context->request_id;
+    }
+    if (!record.context->method.empty()) {
+      text += " method=" + record.context->method;
+    }
+  }
+  return text;
 }
 
 } // namespace
@@ -75,6 +105,20 @@ void log_error_path(const ErrorPathEvent &event) {
   LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::Transport,
                                      "MCP error path",
                                      format_error_path_detail(event));
+}
+
+void route_sdk_logs() {
+  if (mcp::GetLogLevel() < mcp::LogLevel::Error) {
+    mcp::SetLogLevel(mcp::LogLevel::Error);
+  }
+  mcp::SetLogHandler([](const mcp::LogRecord &record) {
+    const std::string message(record.message);
+    const LogCategory category = starts_with(message, kTaskStoreLogPrefix)
+                                     ? LogCategory::Tools
+                                     : LogCategory::Transport;
+    LogSystem::instance().log(sdk_log_level(record.level), category,
+                              sdk_log_text(record));
+  });
 }
 
 void LogSystem::log(LogLevel level, LogCategory category,

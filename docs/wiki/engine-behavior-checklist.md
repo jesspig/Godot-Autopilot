@@ -1,23 +1,25 @@
 ---
 type: 验收清单
 title: 引擎行为验收清单
-description: 已删除 L2 引擎轨 48 份用例蒸馏出的引擎行为验收点（按工具域分组）、历史事故回归点与 A 类迁移对照表；验收执行走 gda-e2e-testing 技能
+description: 已删除 L2 引擎轨 48 份用例蒸馏出的引擎行为验收点（按工具域分组）、历史事故回归点与 A 类迁移对照表
 tags:
   - 测试
   - 验收
   - e2e
   - L2蒸馏
-timestamp: "2026-11-09T02:46:53+08:00"
+timestamp: "2026-11-23T17:28:29+08:00"
 resource: src/tools/
 ---
 
 # 引擎行为验收清单
 
-> **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供 Agent e2e 验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。**验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)**（衔接说明见页尾，技能流程零改动）。
+> **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供端到端验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。
+>
+> 审计日期：2026-11-23。本轮补记路径 containment（`weakly_canonical` 解析）、`call_tool` elicitation 与 `trash` confirm、导出期拦截、C# 桥 token 与生命周期；A 类迁移对照表规模与当前集成层口径统一为 88 项 / 10 文件。
 
 ## 用途与边界
 
-- **为什么有本页**：48 份 L2 用例删除后，其覆盖的「必须真实编辑器/游戏进程才能验收」的行为语义不能丢——进程内可复现的契约面已由集成层 109 项钉住（[tests.md](tests.md)「集成层」），本页承载**划回 e2e 的引擎触达面**，逐域列出行为点并回溯来源。
+- **为什么有本页**：48 份 L2 用例删除后，其覆盖的「必须真实编辑器/游戏进程才能验收」的行为语义不能丢——进程内可复现的契约面已由集成层 88 项钉住（[tests.md](tests.md)「集成层」），本页承载**划回 e2e 的引擎触达面**，逐域列出行为点并回溯来源。
 - **来源纪律**：每条行为点标注来源（用例编号或历史事故的 changelog/git 记录），无来源的条目不收；蒸馏自 git 历史（`git show c023a5c~1:tests/config/NN_*.json`）、旧版 tests.md 用例表（`0dad560~2`）与 `.handoff/evidence/` 四份迁移对照表。
 - **域覆盖口径**：本页只列 48 份用例覆盖到的工具域；未覆盖的域（physics/nav/audio/render/display/os/text/animation/gridmap/tween/analyze/test/debug 等）不因缺页而失去行为——它们的行为面由工具自述与 [modules/tools_ops_a.md](modules/tools_ops_a.md)、[modules/tools_ops_b.md](modules/tools_ops_b.md) 承载。
 - **前置标注**：依赖 .NET 编辑器、游戏进程、GUI 渲染等前置的条目在所属域内标注；集成层已覆盖的参数校验错误串不重复收录。
@@ -27,7 +29,7 @@ resource: src/tools/
 | 域 | 对应实现 | 48 用例来源 |
 |---|---|---|
 | 1. 元工具与工具面契约 | 元工具（register_all）、工具注册/排除面 | 00、03、40、42 |
-| 2. 授权门 | authorization（默认拒绝/注入语义） | 47（35/16/23/37 为授权前置态） |
+| 2. 确认门（原授权门，0.3.2 移除） | confirmation（高风险 `confirm=true`） | 47（35/16/23/37 为授权前置态） |
 | 3. 场景节点与属性 | scene_ops、property_ops、scene_spec_ops、spriteframes_ops | 01、02、08、13、20、28、32、34、42（写入链路）、15（写回显） |
 | 4. 编辑器会话与场景文件 | editor_ops（打开/保存/脏标记/核验） | 07、25、33、43、15 |
 | 5. 编辑器 UI 与输入 | editor_ui_ops、editor_ui_actions、input_ops、input_map_ops | 09、10、11、24（编辑器侧） |
@@ -57,14 +59,15 @@ resource: src/tools/
 - 空参必报缺参：schema `required` 非空但空参未报错记 warnings；历史上 4 个工具（`start_input_gamepad_vibration` / `stop_input_gamepad_vibration` / `get_resource_extensions` / `reimport_resource_files`）的缺口已于 2026-10-21 修复（`03_tools_contract.json` warnings 基线语义，旧 tests.md「warnings 语义」节）。
 - **回归点（遍历豁免与改判，changelog/2026-10-19 至 10-22-log.md）**：`create_scene_node` 由 `None` 改判 `writes_scene` 退出遍历（空参不再意外建根，连带 `intersect_physics_2d_ray` 的 `could not resolve 2D physics space: …` 文案进入预期错误豁免表）——工具声明变更必须同步核对遍历候选与豁免表。
 - json 参数类型接受任意 JSON：property_set 直写标量/布尔/对象/数组不再被类型校验拒绝（`42_tool_contract.json`）。
-- e2e 抽查建议：跑一轮 demo 时顺带用 search_tools/describe 核对新增工具的 `side_effect` 与 schema 是否如实声明；发现"空参不报错"或"未声明副作用"即登记。
+- e2e 抽查建议：跑一轮工程时顺带用 search_tools/describe 核对新增工具的 `side_effect` 与 schema 是否如实声明；发现"空参不报错"或"未声明副作用"即登记。
+- **回归点（2026-11-23 副作用改判与导出期拦截）**：`run_gdscript_tests` 的 `side_effect` 由 `None` 改为 `CodeExecute`（flags 由 `kNone` 改 `kMutating`），高风险四类（Destructive / Process / CodeExecute / GameRuntime）合计由 26 增至 27。导出期拦截现经 `prompts_detail::reject_if_exporting()` 覆盖提示词入口，动态工具 `AutopilotTools.call_tool` 在导出期返回 `export_blocked_error_text()`。e2e 抽查：导出中分别调用领域工具、MCP 资源、提示词与动态工具 `call_tool`，均须被拒。
 
-## 域 2：授权门
+## 域 2：确认门（原授权门，0.3.2 已移除）
 
-- 默认拒绝态（不声明 requires 时执行器注入 `GODOT_AUTOPILOT_ALLOW=none` 哨兵；e2e 对应「未授权能力不注入」）：write 档工具在授权门（`deny_if_unauthorized`，先于 handler 参数校验）即被拒，响应为结构化拒绝形状——`error` 为 authorization required 精确全串、`code=authorization_required`、`authorization_required=write`（`47_authorization_gate.json`，集成层 `authorization_gate_test.cpp` 已逐字钉住进程内可达部分）。
-- 授权态与通道态可区分：同一工具在「未授权」与「已授权但无游戏」两种态下错误文案不同，验收时须分辨（`35_scene_tree_gate.json` 两态口径）。
-- 历史缺口注记：授权拒绝路径此前从未被自动断言（42 号仅手工验证 REST 403），47 号补上自动断言缺口（`47_authorization_gate.json` description 自述）。
-- e2e 抽查建议：e2e 环境按需注入能力组合（面板/env/配置三来源）；遇到 authorization required 时先核对本轮授权姿态再判缺陷。
+- 历史语义（`47_authorization_gate.json` 蒸馏）：授权门 `deny_if_unauthorized` 先于 handler 参数校验，默认拒绝写档工具，拒绝形状为 `error` 全串 + `code=authorization_required` + `authorization_required=<capability>`。0.3.2 起授权门、`GODOT_AUTOPILOT_ALLOW` 与三档能力整体移除，对应集成层断言 `authorization_gate_test.cpp` 一并删除；现行等价门面为高风险 `side_effect`（`destructive`/`process`/`code_execute`/`game_runtime`）缺 `confirm=true` 时返回 `confirmation_required`。
+- 授权态与通道态可区分的验收语义仍适用：同一工具在「缺 `confirm` 被拒」与「`confirm` 通过但无游戏」两种态下错误文案不同，验收时须分辨（`35_scene_tree_gate.json` 两态口径）。
+- e2e 抽查建议：遇到 `confirmation_required` 时先核对本轮调用是否显式带 `confirm=true` 再判缺陷；高风险工具的 confirm 门不得被别名或批量编排绕过。
+- **回归点（2026-11-23 确认 / elicitation 收紧）**：`call_tool` 代理高风险工具时取**目标工具**的 side_effect 判定是否发起 elicitation（直调取表面副作用，`elicitation_detail::effective_side_effect` / `should_elicit`）；仅在缺 `confirm` 且客户端声明支持 elicitation 时发起。`os_file_write(action=trash)` 另需显式 `confirm=true`（`os_ops_detail::trash_needs_confirm`）。e2e 抽查：不带 confirm 调用 trash 应被拒；带 confirm 后进入真实删除路径。
 
 ## 域 3：场景节点与属性
 
@@ -107,10 +110,12 @@ resource: src/tools/
 ## 域 6：截图与视觉辅助
 
 - capture 参数校验（集成层 `capture_params_validation_test.cpp` 已钉住错误串）：`after_frames` 负数/非整数、`when` 仅限 target=game、`scale` 越界、`save`/`save_dir` 类型错误、`res://../` 逃逸与 `user://` 拒绝（`12_capture_params.json`）。
+- **退化视口错误迁移（11-18 收紧）**：编辑器目标 2D 视口渲染图像任一边 ≤8px 或可见矩形为零判退化，触发 3D 回退；两者均不可用返回结构化错误 `no_scene_open`（无场景打开）/ `viewport_degenerate`（附 `captured_viewport`/`size` 诊断）——旧行为静默 ok + 占位图（e2e Q1 的 2×2 图）；e2e 抽查：空工程捕获应报 error 或产出正常尺寸图像。
 - 工程外绝对路径拒绝（`path rejected: absolute path is outside the project root` 语义）：进程内不可复现（ProjectSettings 单例边界），错误串等价性由源码背书，验收在真实编辑器中发生（`12_capture_params.json` 的 editor_save_dir_outside_project 步，T-04 R-04-01）。
+- **回归点（2026-11-23 路径 containment）**：`normalize_project_path` 现以 `std::filesystem::weakly_canonical` 解析绝对路径与 `res://`（后者经可注入的 scheme globalize provider），新增错误 `absolute path resolves outside the project root` / `path resolves outside the project root`——符号链接逃逸不再仅靠词法前缀判断（纯逻辑由单元测试 `scheme_path_containment_test` 钉住）。e2e 抽查：真实编辑器中构造指向工程外的符号链接路径，捕获 / 资源写入须被拒。
 - 视觉辅助参数（集成层 `vision_assist_validation_test.cpp` 已钉住）：`annotate_nodes`/`annotate_nodes_max`/`diff_image`/`review_scene_visually` 全参数负例（`17_vision_assist.json`）。
 - `diff_image requires diff_against_last` 前置校验：进程内不可复现（EditorInterface 单例边界），真实编辑器中验收（`17_vision_assist.json` 的 diff_image_requires_diff 步，T-04 R-04-02）。
-- 帧相位与落盘（`48_capture_frame_phase.json`）：`when` 表达式命中抓拍返回 `when_satisfied_frame`/`captured_frame` 两帧号字段且 `captured_frame > when_satisfied_frame`；`after_frames` 延迟抓拍；连续 10 次 save 落盘互不相同的 `saved_path` 并经 list_directory 清单核对；`capture_editor_viewport(target=game)` 的 save 落盘（修复 target=game 静默忽略 save 的回归）。
+- 帧相位与落盘（`48_capture_frame_phase.json`）：`when` 表达式命中抓拍返回 `when_satisfied_frame`/`captured_frame` 两帧号字段且 `captured_frame > when_satisfied_frame`；`after_frames` 延迟抓拍；连续 10 次 save 落盘互不相同的 `saved_path` 并经 list_directory 清单核对；`capture_editor_viewport(target=game)` 的 save 落盘（修复 target=game 静默忽略 save 的回归）。2026-11-23 起 `dispatch::resolve_deferred_wait` 对 `capture_editor_viewport` 与 `capture_game_viewport` 同样经 `finalize_capture_response` 定型。
 - **前置：`48` 号帧相位与落盘语义必须 GUI 游戏渲染**（headless 游戏进程无渲染输出，无法取图；该用例曾因此临时改写测试床 `main_run_args` 并列入 isolated 名单）。`12`/`17` 的参数校验 headless 即可。
 - e2e 抽查建议：GUI 会话中做一次 when/after_frames 抓拍与 save 落盘清单核对，顺带核对 capture 目录无越权路径写入。
 
@@ -133,13 +138,13 @@ resource: src/tools/
 - CJK 落盘往返：含中文注释脚本 create_script 断言 verified/readback/cache_refreshed（godot-cpp `String(const char*)` latin1 构造曾致 3 字节 CJK 变 6 字节乱码）；read_file 全量内容逐字节比对；find_in_files 中文 query 命中（`19_cjk_roundtrip.json`；控制台输出侧的 GBK/ACP 回环由 单元测试 editor_output_decode_test 钉住）。
 - 根路径 create_script（B3 同款切割修复）：见域 7 的 `31_theme_root.json` 条目。
 - **code_execute 超时与预算（39_exec_budget.json）**：死循环脚本 + `timeout_ms=300` 返回 `code=exec_timeout` 结构化错误、不挂死编辑器主线程（协作式截止检查点注入）；正常脚本不被超时机制误伤；越界 `timeout_ms` 被参数校验拒绝不进入脚本执行。参数上限与宿主派发预算同源（静态上限 27000 ms 与长阻塞预算取 min，见 [tests.md](tests.md) 数值总表行）。
-- e2e 抽查建议：demo 中真实跑一段含中文注释与 @export 的脚本（写盘→挂载→读属性链路），再故意跑一个死循环验证 exec_timeout 返回而非挂死。
+- e2e 抽查建议：工程中真实跑一段含中文注释与 @export 的脚本（写盘→挂载→读属性链路），再故意跑一个死循环验证 exec_timeout 返回而非挂死。
 
 ## 域 9：瓦片地图
 
 - fill_tilemap_rect 矩形铺砖：from/to 角点（含逆序归一）成功铺砖、erase 反序擦除、set_count 统计、单条 undo 动作；超 100000 格上限报错；缺 from/缺 source_id/缺 node_path 报错（`14_tilemap_rect.json`；归一与上限纯逻辑由 单元测试 tilemap_ops_test 钉住）。
 - 夹具构建链：create_tilemap_tileset + add_tilemap_atlas_source + save_resource 落盘后挂到 TileMapLayer（`14_tilemap_rect.json`）。
-- e2e 抽查建议：demo 含瓦片地图时核对一次矩形铺砖/擦除与 undo 单条性；无瓦片场景可跳过本域。
+- e2e 抽查建议：工程含瓦片地图时核对一次矩形铺砖/擦除与 undo 单条性；无瓦片场景可跳过本域。
 
 ## 域 10：游戏运行时通道
 
@@ -148,7 +153,8 @@ resource: src/tools/
 - click_game_ui_element 坐标换算端到端：`window_position` 由游戏进程内 `run_ui_click` 计算（viewport→screen transform 复合 canvas transform），必须在真实游戏里点固定 rect 控件观测（历史补测骨架：320x180 视口 → 1280x720 窗口 4x 下 `window_position={640,360}`）；换算正确性由 单元测试 game_ui_coords_test 与 coords_inverse_test 覆盖纯函数层（`23_click_ui_coords.json` 覆盖力声明）。
 - 键名入参在游戏进程内的判决：queue_game_input 的键名解析发生在游戏进程内，error+hint 两键可区分「被接受」与「被拒」（`24_keycode_alias.json` 游戏侧声明）。
 - **回归点（B1 第三层）**：8 个 SceneTree 工具（set_scene_tree_pause / is_scene_tree_paused / reload_scene_tree_current_scene / set_scene_tree_debug_collisions_hint / call_scene_tree_group / notify_scene_tree_group / get_scene_tree_nodes_in_group / create_scene_tree_timer）统一经运行时通道转发到游戏进程，**编辑器自身场景树永不被触碰**——真实游戏中验证暂停态/计时器/组调用/重载落点确在游戏进程（历史代码缺陷曾操作编辑器树致插件停摆）（`35_scene_tree_gate.json` 回归守卫声明）。
-- **回归点（B7，就绪门不可达）**：无游戏进程时默认 `wait_ready=true` 的游戏工具立即返回 `game not running: ...` 精确文案（修复前无 peer 的常驻会话也被计数致该路径几乎不可达）；`wait_ready=false` 走同一立即失败路径；就绪窗口（peer 已连接但 `gda:ready` 未到）的排队与重放需真实游戏进程复现（`37_game_ready_gate.json`；决策表由 单元测试 ready_policy_test 覆盖）。
+- **回归点（B7，就绪门不可达）**：无游戏进程时默认 `wait_ready=true` 的游戏工具立即返回 `game not running: ...` 精确文案（修复前无 peer 的常驻会话也被计数致该路径几乎不可达）；`wait_ready=false` 走同一立即失败路径；就绪窗口（peer 已连接但 `gda:ready` 未到，或已到但 `scene_ready=false`/场景未入树）的排队与重放需真实游戏进程复现；SendNow 判定要求 ready>0 且 scene_ready>0 同时成立（`37_game_ready_gate.json`；决策表由 单元测试 ready_policy_test 覆盖）。
+- **回归点（11-18 可靠性增强）**：① force restart 后启动窗（无编辑场景根且插件启动 5000ms 内）首调 create/play 返回 `startup_in_progress`（`retryable=true`），不再误归因「parent node not found」/「no game process started」；② game_script 执行节点在 `/root` 下（不在当前场景内），persist=false 调用后即删——相对路径以临时节点为基准，场景节点需绝对路径或 `../`；③ game_input hold 瞬态态读回须落 hold 窗口内（到期自动释放），event duration_ms=0 只 press 不释放，注入事件不到达 `_unhandled_input`（改 `_process` 轮询）；④ 编辑器侧 eval 超时回执带 `timeout_cause`（`script_error`/`channel_lost`/`unknown`），排队未就绪返回 `game_ready_timeout`。
 - **回归点（class-body parse error 残留）**：execute_game_script 对裸语句（含 for/if/return）先包裹再编译（顶层 `wrapped=true`），成功调用不留 class-body parse error——同一游戏进程内 get_debugger_errors 断言 `total_errors=0` 起步（`45_runtime_observability.json`；包裹与信封抬升纯逻辑由 单元测试 gdscript_wrap_test / game_response_envelope_test 覆盖）。
 - get_debugger_errors 错误增量游标：受控 push_error 后 `total_errors`/`total_groups`/`next_seq` 与 `since_seq` 排他过滤逐项断言（`45_runtime_observability.json`；游标纯逻辑由 单元测试 error_cursor_test 覆盖）。**环境敏感注记**：Godot 4.7.2 编辑器启动期会报一条引擎 ERROR（root certificate store，Windows 平台）计入编辑器错误缓冲，使 `total_errors` 的绝对计数断言差 1——绝对计数断言在 e2e 中改用增量（since_seq）口径。
 - get_game_status 节点观测排除保留子树：经 execute_game_script 创建 `__gda_runtime` 命名的运行时子树后，`node_count`/`instrumentation_node_count` 不计该子树——插件自建节点不污染游戏侧观测计数（`45_runtime_observability.json` 的 instrumentation_node_count 阶段）。
@@ -162,20 +168,21 @@ resource: src/tools/
 - csharp_* 六域工具编辑器侧参数校验（集成层无此套件，历史 JSON 声明 30 步）：定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态（非数组/超上限）、token 类型与正数（`38_csharp_bridge.json`）。
 - locator 缺失覆盖：memory 不存在名返回四段式 memory-not-found 定位错误（定位先于桥单例获取，mono/非 mono 双稳）（`38_csharp_bridge.json`）。
 - 反射真调口径（.NET 下验收）：私有成员门（`allow_non_public` 默认拒绝读/写 `_secret`、显式开启后取值）、固定元数方法调用、params 打包、泛型风格名 no-overload 全串、subscribe/unsubscribe token 链（`38_csharp_bridge.json` 真调骨架段）。
+- **回归点（2026-11-23 C# 桥 token 与生命周期）**：subscribe token 由实例级 `_nextToken=1` 改为静态 `_nextGlobalToken` + `Interlocked.Increment`（`BridgeEvents.AllocateToken`，首 token 为 0、跨桥实例唯一）；`GdaCSharpRuntime._ExitTree()` 调 `unsubscribeAll()` 并对 holder `RemoveMeta("bridge")`；桥就绪判定 `csharp_bridge_detail::bridge_ready_expression` 要求 holder 上 `has_meta("bridge")` 且 `get_meta("bridge") != null`（非仅节点存在，边界由单元测试 `bridge_locator_test` 钉住）。e2e 抽查：移除运行时桥节点后无残留订阅与失效 bridge meta，重建后 `bridge_ready=true`。
 - list_members 过滤分页（纯编辑器侧、不依赖桥）：默认分页、`name_contains`、`limit/offset` 切片与越界、`kind` 过滤、truncated 语义；counts 计数来自引擎 ClassDB（`38_csharp_bridge.json` T-24/T-25 增补）。
 - **回归点（res:// 交给 dotnet 构建不发生）**：`build_csharp_assembly` 原把 `res://` 工程文件路径原样交给 dotnet（MSB1009、构建不发生），修复为经 `ProjectSettings.globalize_path` 换算系统绝对路径；断言 result.project_file/command 契约与 `probe_script` 校验（非法 probe_script 在参数校验阶段拒绝）、`next_action`/`restart_required`/`editor_assembly_probe` 可读（`38_csharp_bridge.json`、`44_csharp_tooling.json`，changelog/2026-10-21-log.md）。
 - 缺桥错误载荷与可执行片段：runtime=game 缺桥时返回含 `suggested_action` 与 `execute_game_script.source_code` 的可执行片段（load GdaCSharpRuntime.cs → new → add_child），用 execute_game_script 执行同源片段断言 bridge_created/bridge_ready（`38_csharp_bridge.json` game_bridge_missing 段）。
 - **回归点（诊断假阳性分野）**：create_csharp_script 的 `diagnostics.ok`（ResourceLoader 可加载）与 `diagnostics.instantiable`（Script::can_instantiate）两字段分野，ok=true 而 instantiable=false 正是原假阳性现场（`44_csharp_tooling.json`）。
 - **回归点（ACP 回环乱码）**：build_csharp_assembly 的 console_output 经 UTF-8 严格校验 + 系统代码页回退 + ACP 回环修复（还原 Godot OS_Windows::execute 以 CP_ACP 预解码 dotnet UTF-8 输出造成的「姝ｅ湪」类乱码），`output_digest` 不含已知乱码前缀作回归哨兵（`44_csharp_tooling.json`；解码纯逻辑由 单元测试 editor_output_decode_test 覆盖）。
 - 运行期新建 C# 全局类在当次会话内不可实例化（.NET 程序集须编辑器启动时加载，GDExtension 无热重载 API）——属上游装载时序边界而非工具缺陷，历史上以 soft_error 前缀区分软失败；e2e 遇到同款报错按环境边界登记、不判工具回归（`38_csharp_bridge.json` 降级依据段，changelog/2026-10-21-log.md）。
-- e2e 抽查建议：仅在 .NET 编辑器环境执行；核对 diagnostics 两字段分野与构建 output_digest 无乱码哨兵即可，反射真调按 demo 需要抽一两个成员访问。
+- e2e 抽查建议：仅在 .NET 编辑器环境执行；核对 diagnostics 两字段分野与构建 output_digest 无乱码哨兵即可，反射真调按工程需要抽一两个成员访问。
 
 ## 域 12：动态用户工具
 
 - 注册→调用→注销闭环：code_execute 内 `AutopilotTools.register_tool` 注册用户工具 → MCP call_tool 调用回显 → search_tools 命中且 get_tool_detail 标记 `dynamic=true` → code_execute 内 `api.call_tool` 直连（code-mode 桥）→ `get_tool` 取 handle 后 `unregister_tool` → 再调报 `domain tool ... not found`（`26_user_tools_code_mode.json`）。
 - 目录扫描 rescan：code_execute 写 probe 工具文件（`register_autopilot_tools(api)` 实例方法约定）→ `api.rescan` 注册非空 → call_tool 回显 → 二次 rescan 幂等（registered 空、failed 存在）（`27_user_tools_rescan.json`）。
-- **前置：code_execute + user_tools 能力**；user_tools 开关写配置自包含（env 优先于配置，env 不含 user_tools 时 set_enabled 无效）。
-- e2e 抽查建议：demo 需要临时专用工具时走一次注册/调用/注销闭环，核对 dynamic 标记与注销后不可再调。
+- **前置：code_execute 带 `confirm=true`**；`user_tools` 能力门已随 0.3.2 移除，动态工具注册与调用（含 rescan）不再门控。
+- e2e 抽查建议：工程需要临时专用工具时走一次注册/调用/注销闭环，核对 dynamic 标记与注销后不可再调。
 
 ## 域 13：可观测性与主线程韧性
 
@@ -217,14 +224,9 @@ resource: src/tools/
 
 > 附注：mcp-cpp-sdk 客户端响应等待缺陷属已删除测试客户端（`tests/runner`）的缺陷，生产服务端不受影响，不构成引擎行为验收点，此处仅存目（旧 tests.md「已知遗留」）。
 
-## 与 gda-e2e-testing 的衔接
-
-- 验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)：以 `examples/<名称>` 为场地、按其任务书与验收清单推进，本页的域条目与回归点作为**验收时的行为对照面**（发现偏离即记入该技能产出的问题记录）。
-- 本页不改变该技能流程；分析闭环由 [gda-e2e-analysis 技能](../../.agents/skills/gda-e2e-analysis/SKILL.md) 承接。测试计数口径见 [tests.md](tests.md)「数值核算总表」。
-
 ## A 类迁移对照表
 
-> 48 份 L2 用例的「集成层迁移 + 划回 e2e」合并定稿。等价口径：错误串逐字一致（C-06，含 em dash 与引号转义）；结构键与值一致；`not_empty` 声明以非空断言对应；env 注入等价复刻旧 runner `requires` 语义。集成层规模 **109 项 / 12 文件**（引用 [tests.md](tests.md)「数值核算总表」集成行，不自造口径）。原始四份来源：`.handoff/evidence/T-02/mapping.md`（00/10/47 试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`（03 工具面契约）；R-01 台账（引擎触达剔除记录）在各来源文件内。
+> 48 份 L2 用例的「集成层迁移 + 划回 e2e」合并定稿。等价口径：错误串逐字一致（C-06，含 em dash 与引号转义）；结构键与值一致；`not_empty` 声明以非空断言对应；env 注入等价复刻旧 runner `requires` 语义。集成层规模 **88 项 / 10 文件**（引用 [tests.md](tests.md)「数值核算总表」集成行，不自造口径）。原始四份来源：`.handoff/evidence/T-02/mapping.md`（00/10/47 试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`（03 工具面契约）；R-01 台账（引擎触达剔除记录）在各来源文件内。
 
 ### 已迁用例对照
 
@@ -258,7 +260,7 @@ resource: src/tools/
 | 6. 截图与视觉辅助 | 12（合法落盘路径）、17（正向）、48 | GUI 游戏帧相位抓拍、连续 save 落盘清单核对、越权路径拒绝 |
 | 7. 资源与引用事务 | 04（资源面）、05、06、22、31（theme） | 建资源→引用→rename→move 事务序列、UID 流转、根/子目录落盘 |
 | 8. 脚本与 GDScript 执行 | 04（execute_script 与诊断）、18、19、31、39 | 真实脚本编译执行、缓存刷新链路、CJK 落盘、exec_timeout 超时行为 |
-| 9. 瓦片地图 | 14 | demo 含瓦片时的铺砖/擦除/undo 与夹具构建链 |
+| 9. 瓦片地图 | 14 | 工程含瓦片时的铺砖/擦除/undo 与夹具构建链 |
 | 10. 游戏运行时通道 | 16（生命周期）、23（坐标换算）、24（游戏侧）、35（游戏内行为）、37（就绪窗口）、45、46 | 真实游戏进程（play + 游戏侧扩展）下的 job 生命周期、坐标换算端到端、SceneTree 落点、错误增量游标、UI 遮挡命中 |
 | 11. C# 与 .NET | 38、44 | .NET 编辑器下反射真调、程序集构建、诊断分野、编码哨兵（见域 11 前置） |
 | 12. 动态用户工具 | 26、27 | 用户脚本工具注册/调用/注销与 rescan 生命周期 |
@@ -267,7 +269,6 @@ resource: src/tools/
 
 ## 相关页面
 
-- [测试体系（tests.md）](tests.md)——集成层 109 项的套件覆盖清单、回归属性清单与数值核算总表
-- [工具注册表（modules/tools_registry.md）](modules/tools_registry.md)——授权三档、排除划分与遍历判定
+- [测试体系（tests.md）](tests.md)——集成层 88 项的套件覆盖清单、回归属性清单与数值核算总表
+- [工具注册表（modules/tools_registry.md）](modules/tools_registry.md)——注册管线、工具面与排除划分判定
 - [领域工具 A 组（modules/tools_ops_a.md）](modules/tools_ops_a.md) / [B 组（modules/tools_ops_b.md）](modules/tools_ops_b.md)——各域工具实现细节
-- [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)——验收执行载体

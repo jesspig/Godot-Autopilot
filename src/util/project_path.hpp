@@ -3,7 +3,10 @@
 
 #include <godot_cpp/classes/project_settings.hpp>
 #include "error_util.hpp"
+#include <filesystem>
+#include <functional>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace godot_autopilot {
@@ -82,6 +85,41 @@ inline bool project_path_equal_prefix(const std::string &path,
   return path.size() == root.size() || path[root.size()] == '/';
 }
 
+enum class ProjectPathResolveStatus { Inside, Outside, Unresolved };
+
+inline bool containment_status_allows(ProjectPathResolveStatus status) {
+  return status == ProjectPathResolveStatus::Inside;
+}
+
+inline std::function<std::string(const std::string &)> &scheme_globalize_provider() {
+  static std::function<std::string(const std::string &)> provider;
+  return provider;
+}
+
+inline void set_scheme_globalize_provider(std::function<std::string(const std::string &)> provider) {
+  scheme_globalize_provider() = std::move(provider);
+}
+
+inline ProjectPathResolveStatus project_path_resolve_status(
+    const std::string &absolute_path, const std::string &absolute_root) {
+  std::error_code ec;
+  const std::filesystem::path canonical_root =
+      std::filesystem::weakly_canonical(std::filesystem::path(absolute_root), ec);
+  if (ec)
+    return ProjectPathResolveStatus::Unresolved;
+  const std::filesystem::path canonical_path = std::filesystem::weakly_canonical(
+      std::filesystem::path(absolute_path), ec);
+  if (ec)
+    return ProjectPathResolveStatus::Unresolved;
+  std::string root_str = project_path_slashes(canonical_root.generic_string());
+  const std::string path_str = project_path_slashes(canonical_path.generic_string());
+  while (root_str.size() > 1 && root_str.back() == '/')
+    root_str.pop_back();
+  return project_path_equal_prefix(path_str, root_str)
+             ? ProjectPathResolveStatus::Inside
+             : ProjectPathResolveStatus::Outside;
+}
+
 inline ProjectPath normalize_project_path(const std::string &raw,
                                           bool allow_user, bool allow_root) {
   const std::string input = project_path_slashes(raw);
@@ -101,6 +139,9 @@ inline ProjectPath normalize_project_path(const std::string &raw,
     if (absolute_escaped || absolute.empty() ||
         !project_path_equal_prefix(absolute, absolute_root))
       return {{}, "absolute path is outside the project root"};
+    if (project_path_resolve_status(absolute, absolute_root) ==
+        ProjectPathResolveStatus::Outside)
+      return {{}, "absolute path resolves outside the project root"};
     std::string relative = absolute.substr(absolute_root.size());
     if (!relative.empty() && relative[0] == '/')
       relative.erase(0, 1);
@@ -131,6 +172,17 @@ inline ProjectPath normalize_project_path(const std::string &raw,
     return {{}, "path escapes the namespace root"};
   if (clean.empty() && !allow_root)
     return {{}, "path must name an item below the namespace root"};
+
+  const auto &provider = scheme_globalize_provider();
+  if (provider && scheme == "res") {
+    const std::string absolute_root = project_path_slashes(provider("res://"));
+    const std::string scheme_path = scheme + "://" + clean;
+    const std::string absolute = project_path_slashes(provider(scheme_path));
+    if (!absolute_root.empty() && !absolute.empty() &&
+        !containment_status_allows(
+            project_path_resolve_status(absolute, absolute_root)))
+      return {{}, "path resolves outside the project root"};
+  }
   return {scheme + "://" + clean, {}};
 }
 

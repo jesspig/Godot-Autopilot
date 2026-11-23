@@ -1,5 +1,6 @@
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
+#include "util/input_guards.hpp"
 #include "core/observability/log_persist.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
@@ -20,6 +21,7 @@
 #include <exception>
 #include <future>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -96,61 +98,80 @@ void record_dispatch_exception(const std::string &name,
           " queue=0ms args=" + args_text + " err=internal");
 }
 
-std::string received_keys_suffix(const mcp::JsonValue &args) {
-  if (!args.IsObject() || args.GetObject().empty()) {
-    return " (received no parameters)";
+void log_alias_hit(const ToolAlias &alias) {
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Tools,
+      "tool alias '" + alias.name + "' resolved to '" + alias.canonical + "'");
+}
+
+std::optional<ToolAlias> resolve_tool_alias(const std::string &name) {
+  auto registry = get_active_registry();
+  if (!registry) {
+    return std::nullopt;
   }
-  std::string text = " (received keys: ";
-  bool first = true;
-  for (const auto &entry : args.GetObject()) {
-    if (!first) {
-      text += ", ";
-    }
-    first = false;
-    text += entry.first;
-  }
-  text += ")";
-  return text;
+  return registry->resolve_alias(name);
 }
 
 mcp::JsonValue call_handler_impl(const std::string &name,
                                  const mcp::JsonValue &args) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
+  std::optional<ToolAlias> alias;
+  if (auto registry = get_active_registry()) {
+    alias = registry->resolve_alias(name);
+  }
+  mcp::JsonValue alias_error;
+  if (alias && alias->validate_args) {
+    alias_error = alias->validate_args(args);
+  }
+  const bool has_alias_error = alias && !alias_error.IsNull();
+  const std::string lookup_name = alias ? alias->canonical : name;
+  const mcp::JsonValue call_args =
+      alias && !has_alias_error ? apply_alias_args(*alias, args) : args;
   HandlerFn handler;
   {
     monitor::LockProbe probe("dispatch_handlers_lock", 5.0);
     std::lock_guard<std::mutex> lock(g_handlers_mutex);
-    auto it = g_handlers.find(name);
+    auto it = g_handlers.find(lookup_name);
     if (it != g_handlers.end()) {
       handler = it->second;
     } else {
-      auto meta_it = g_meta_handlers.find(name);
+      auto meta_it = g_meta_handlers.find(lookup_name);
       if (meta_it != g_meta_handlers.end()) {
         handler = meta_it->second;
       }
     }
   }
-  if (handler) {
+  if (has_alias_error) {
+    result = std::move(alias_error);
+  } else if (handler) {
     try {
-      result = handler(args);
+      result = handler(call_args);
     } catch (const std::exception &ex) {
       result = mcp::JsonValue(mcp::JsonValue::object_tag);
       result["error"] =
-          mcp::JsonValue(dispatch_exception_message(name, ex.what(), args));
-      record_dispatch_exception(name, args, result);
+          mcp::JsonValue(dispatch_exception_message(name, ex.what(), call_args));
+      record_dispatch_exception(name, call_args, result);
     } catch (...) {
       result = mcp::JsonValue(mcp::JsonValue::object_tag);
       result["error"] = mcp::JsonValue(
-          dispatch_exception_message(name, "unexpected C++ exception", args));
-      record_dispatch_exception(name, args, result);
+          dispatch_exception_message(name, "unexpected C++ exception", call_args));
+      record_dispatch_exception(name, call_args, result);
     }
   } else {
     result = mcp::JsonValue(mcp::JsonValue::object_tag);
     result["error"] =
-        mcp::JsonValue("domain tool '" + name +
-                       "' not found" + received_keys_suffix(args) +
+        mcp::JsonValue("domain tool '" + lookup_name +
+                       "' not found" + util::received_keys_suffix(args) +
                        " — use search_tools to discover available "
                        "tools");
+  }
+  if (alias) {
+    log_alias_hit(*alias);
+    if (has_deferred_marker(result)) {
+      result = annotate_alias_result(*alias, std::move(result));
+    } else {
+      result = apply_alias_result(*alias, std::move(result), args);
+    }
   }
   const bool has_error = !spec_detail::verdict_of(result).ok;
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -263,6 +284,27 @@ void emit_dispatch_timeout_observation(const std::string &name,
 }
 
 } // namespace
+
+bool has_deferred_marker(const mcp::JsonValue &result) {
+  if (!result.IsObject()) {
+    return false;
+  }
+  return result.Find("__gda_pending") != nullptr ||
+         result.Find("__gda_wait") != nullptr ||
+         result.Find("__gda_job") != nullptr;
+}
+
+std::optional<std::string> resolve_alias_canonical(const std::string &name) {
+  auto registry = get_active_registry();
+  if (!registry) {
+    return std::nullopt;
+  }
+  auto alias = registry->resolve_alias(name);
+  if (!alias) {
+    return std::nullopt;
+  }
+  return alias->canonical;
+}
 
 std::string dispatch_exception_message(const std::string &name,
                                        const std::string &reason,
@@ -573,6 +615,8 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
       result = os_ops::wait_os_process(id, timeout);
     } else if (kind == "editor_scene_switch") {
       result = editor_ops::wait_scene_switch(id, timeout);
+    } else if (kind == "csharp_build") {
+      result = editor_ops::wait_csharp_build(*wait_p, timeout);
     } else {
       mcp::JsonValue error(mcp::JsonValue::object_tag);
       error["error"] = mcp::JsonValue("unknown deferred wait kind: " + kind);
@@ -584,8 +628,9 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
     const int64_t rid = pending_p->GetInt();
     mcp::JsonValue pending_options = result;
     mcp::JsonValue awaited = runtime_ops::wait_pending_response(rid, timeout);
-    if (name == "capture_game_viewport" ||
-        (awaited.IsObject() && awaited.Contains("path"))) {
+    const bool is_capture_tool =
+        name == "capture_game_viewport" || name == "capture_editor_viewport";
+    if (is_capture_tool) {
       awaited =
           runtime_ops::finalize_capture_response(awaited, pending_options);
     }
@@ -598,6 +643,9 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
   }
   if (has_deferred_trace) {
     spec_detail::finish_deferred_trace(deferred_trace_key, result);
+  }
+  if (auto alias = resolve_tool_alias(name)) {
+    result = apply_alias_result(*alias, std::move(result));
   }
   return result;
 }
@@ -617,6 +665,10 @@ mcp::JsonValue call_handler(const std::string &name,
   if (auto registry = get_active_registry()) {
     if (auto tool = registry->find_any(name)) {
       flags = tool->tool_flags();
+    } else if (auto alias = registry->resolve_alias(name)) {
+      if (auto tool = registry->find_any(alias->canonical)) {
+        flags = tool->tool_flags();
+      }
     }
   }
   const auto submit_time = std::chrono::steady_clock::now();

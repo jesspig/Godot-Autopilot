@@ -31,6 +31,7 @@ export interface ExtractedPayload {
 interface RpcErrorInfo {
   code: number | null;
   message: string;
+  data?: unknown;
 }
 
 function utcStamp(): string {
@@ -43,17 +44,32 @@ function readRpcError(envelope: unknown): RpcErrorInfo | null {
   if (raw === undefined || raw === null) return null;
   if (typeof raw === "string") return { code: null, message: raw };
   if (typeof raw !== "object" || Array.isArray(raw)) return { code: null, message: "" };
-  const record = raw as { code?: unknown; message?: unknown };
+  const record = raw as { code?: unknown; message?: unknown; data?: unknown };
   const code = typeof record.code === "number" ? record.code : null;
   const message = typeof record.message === "string" ? record.message : "";
-  return { code, message };
+  return record.data !== undefined ? { code, message, data: record.data } : { code, message };
 }
 
 function formatRpcError(info: RpcErrorInfo): string {
   const text = info.message.trim();
   const body = text === "" ? "the server returned a JSON-RPC error envelope" : text;
-  const code = info.code === null ? "" : ` (code ${info.code})`;
-  return `tool failure: ${body}${code}`;
+  const structured =
+    info.data !== null && typeof info.data === "object" && !Array.isArray(info.data)
+      ? (info.data as Record<string, unknown>).structured_error
+      : undefined;
+  const structuredCode =
+    structured !== null && typeof structured === "object" && !Array.isArray(structured)
+      ? (structured as Record<string, unknown>).code
+      : undefined;
+  const hasStructuredCode = typeof structuredCode === "string" && structuredCode !== "";
+  let detail = "";
+  if (info.code !== null) detail += `code ${info.code}`;
+  if (hasStructuredCode) {
+    if (detail !== "") detail += "; ";
+    detail += `structured_error=${structuredCode}`;
+  }
+  const suffix = detail === "" ? "" : ` (${detail})`;
+  return `tool failure: ${body}${suffix}`;
 }
 
 function hasFailureFields(record: Record<string, unknown>): boolean {
@@ -113,7 +129,15 @@ function redactedEnvelope(envelope: unknown): unknown {
 export function extractPayload(envelope: JsonRpcResponse, opts: ExtractOptions = {}): ExtractedPayload {
   const rpcError = readRpcError(envelope);
   if (rpcError !== null) {
-    const display = opts.raw === true ? redactedEnvelope(envelope) : { error: { code: rpcError.code, message: rpcError.message } };
+    const display = opts.raw === true
+      ? redactedEnvelope(envelope)
+      : {
+          error: {
+            code: rpcError.code,
+            message: rpcError.message,
+            ...(rpcError.data !== undefined ? { data: rpcError.data } : {}),
+          },
+        };
     return { display, toolFailed: true, failureMessage: formatRpcError(rpcError) };
   }
 
@@ -203,12 +227,30 @@ export function extractPayload(envelope: JsonRpcResponse, opts: ExtractOptions =
   return { display, toolFailed };
 }
 
+export function taskResultFailed(result: unknown): boolean {
+  if (result === null || typeof result !== "object" || Array.isArray(result)) return false;
+  const record = result as { isError?: unknown; content?: unknown };
+  if (record.isError === true) return true;
+  if (!Array.isArray(record.content)) return false;
+  for (const item of record.content) {
+    if (item === null || typeof item !== "object") continue;
+    const part = item as { type?: unknown; text?: unknown };
+    if (part.type !== "text" || typeof part.text !== "string") continue;
+    try {
+      const parsed = JSON.parse(part.text);
+      if (hasInnerError(parsed)) return true;
+    } catch {
+    }
+  }
+  return false;
+}
+
 export function assertCallFamilyUsage(command: string, opts: GlobalOptions): void {
   if (command !== "search" && command !== "tools" && (opts.category !== undefined || opts.tagsText !== undefined)) {
     throw new CliError(ExitCode.Usage, "--category and --tags apply to the search and tools list commands.");
   }
-  if (command !== "call" && (opts.argsJson !== undefined || opts.argsFile !== undefined)) {
-    throw new CliError(ExitCode.Usage, "--args and --args-file only apply to the call command.");
+  if (command !== "call" && command !== "batch" && (opts.argsJson !== undefined || opts.argsFile !== undefined)) {
+    throw new CliError(ExitCode.Usage, "--args and --args-file only apply to the call and batch commands.");
   }
 }
 

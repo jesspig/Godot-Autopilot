@@ -20,10 +20,6 @@ const std::vector<ParamSpec> kExecuteScriptParams = {
     {"source_code", "string", "Alias of expression: GDScript code to execute in the editor process; a single expression auto-returns its value. Pass exactly one of expression or source_code (aliases — providing both is rejected)", false},
 };
 
-const std::vector<ParamSpec> kLoadScriptParams = {
-    {"path", "string", "Script file path (e.g. res://player.gd)", true},
-};
-
 const std::vector<ParamSpec> kCreateScriptParams = {
     {"path", "string", "Script file path to create (e.g. res://scripts/enemy.gd)", true},
     {"source_code", "string", "GDScript source code; compiled before saving, compilation errors abort the call", false},
@@ -68,6 +64,7 @@ const std::vector<ParamSpec> kCallScriptNodeParams = {
 
 const std::vector<ParamSpec> kReloadScriptParams = {
     {"path", "string", "Script file path (e.g. res://player.gd)", true},
+    {"keep_state", "boolean", "Passed to the final reload(true/false): when the script has live instances (a node already uses it) keep_state must be true, otherwise Godot returns ERR_ALREADY_IN_USE (22); default false", false},
 };
 
 const std::vector<ParamSpec> kGetScriptPropertyListParams = {
@@ -78,17 +75,12 @@ const std::vector<ParamSpec> kGetScriptPropertyListParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(11);
+  v.reserve(10);
   v.push_back(make_spec_tool(ToolSpec{
       "execute_script",
       "Execute arbitrary GDScript synchronously in the editor process. Pass the code as either expression or source_code — they are aliases, pass exactly one; providing both is rejected with invalid parameter, and providing neither reports missing required parameter: expression or source_code. Single-expression input returns its value automatically, while multi-line code needs an explicit return statement; this auto-return is editor-side only — execute_game_script never auto-returns a single bare expression and needs an explicit return for a value. print() output appears in the output field, errors in the errors field. Compilation errors include line mapping and the wrapped source. There is no timeout — long code blocks the editor. The environment exposes SceneRoot (edited scene root) for node access; for the running game process use execute_game_script instead.",
       "Scripts", {"script", "execute", "gdscript"}, SideEffect::CodeExecute, tool_flags::kMutating,
       kExecuteScriptParams, script_ops::handle_execute_gdscript}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "load_script",
-      "Load a GDScript resource from a res:// path. Requires path; errors when the file is missing or the loaded resource is not a Script. Returns the script's class, path and object_id. Use it before get_script_property or reload_script to obtain a valid script. Optional fresh (default false) re-reads the .gd file from disk with CACHE_MODE_IGNORE instead of returning the editor's cached instance — pass fresh:true after the file changed outside the editor, and leave it false for the cache-respecting behaviour.",
-      "Scripts", {"script", "load"}, SideEffect::None, tool_flags::kNone,
-      kLoadScriptParams, script_ops::handle_load}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_script",
       "Create a new GDScript file and save it to disk. Requires path and source_code; source_code is written as UTF-8, so non-ASCII (e.g. CJK) content round-trips byte-exact. The script is compiled before saving and compilation errors abort the call with parser output. overwrite defaults to false — an existing file errors unless overwrite=true. Returns path, class and overwritten; cache_refreshed reports whether the freshly written file was re-read into the resource cache (cache_refresh_error is included when that reload failed); global_class_name is included when the script declares one. The file content is read back from disk after saving and verified against source_code (see verified/readback/disk_bytes/content_hash fields — disk_bytes is the read-back byte length and content_hash is the FNV-1a-64 hex of the bytes actually read from disk, with content_hash_algo naming the algorithm, so a successful response is self-proving without a follow-up read); locked-file write failures surface as verified=false instead of silent success. Do not issue create_script calls for the same file in parallel requests — serial writes to the same path are not synchronized. After changing a script that the running game uses, call reload_game_scripts first and then reload_current_scene (or retry the operation) — reloading the scene alone does not guarantee the on-disk version is re-read (CACHE_MODE_REUSE).",

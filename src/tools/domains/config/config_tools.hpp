@@ -1,9 +1,12 @@
 #ifndef GODOT_AUTOPILOT_CONFIG_TOOLS_HPP
 #define GODOT_AUTOPILOT_CONFIG_TOOLS_HPP
 
+#include <functional>
+#include <initializer_list>
 #include <mcp/JsonValue.hpp>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "tools/domains/config/config_ops.hpp"
@@ -19,153 +22,302 @@ const std::vector<ParamSpec> kGetProjectSettingsParams = {
     {"default", "object", "Serialized JSON value returned when the setting does not exist; otherwise a null value is returned", false},
 };
 
-const std::vector<ParamSpec> kSetProjectSettingsParams = {
-    {"name", "string", "Project setting name, e.g. application/config/name; must already exist or be added by this call", true},
-    {"value", "json", "Serialized JSON value; when a string, the engine keeps the existing setting's type if one is stored, e.g. 1920 for an int setting", true},
-};
-
-const std::vector<ParamSpec> kHasProjectSettingsParams = {
-    {"name", "string", "Project setting name to check for existence in project.godot", true},
-};
-
-const std::vector<ParamSpec> kSaveProjectSettingsParams = {};
-
-const std::vector<ParamSpec> kGetEngineVersionParams = {};
-
-const std::vector<ParamSpec> kGetEngineFpsParams = {};
-
-const std::vector<ParamSpec> kGetEngineFramesDrawnParams = {};
-
-const std::vector<ParamSpec> kSetEngineTimeScaleParams = {
-    {"scale", "number", "Time scale multiplier: 1.0 = real time, 0.5 = half speed, 2.0 = double speed; 0.0 stops gameplay processing", true},
-};
-
-const std::vector<ParamSpec> kGetEngineTimeScaleParams = {};
-
-const std::vector<ParamSpec> kSetEngineMaxFpsParams = {
-    {"fps", "integer", "Frame rate cap in frames per second; 0 disables the cap (uncapped)", true},
+const std::vector<ParamSpec> kUpdateProjectSettingsParams = {
+    {"name", "string", "Project setting name for action='set', e.g. application/config/name; must already exist or be added by the call", false},
+    {"value", "json", "Serialized JSON value for action='set'; when a string, the engine keeps the existing setting's type if one is stored, e.g. 1920 for an int setting", false},
 };
 
 const std::vector<ParamSpec> kGetEditorSettingsParams = {
     {"name", "string", "Editor setting name, e.g. interface/theme/base_color; settings come from the editor's own preferences. Alongside 'result' (the raw value, unchanged) the response carries the property list metadata: 'hint' (integer PropertyHint) plus 'hint_string' when non-empty; enum settings (hint 2) also include 'enum_options', an array of {'label', 'value'} entries that decodes bare integers such as run/window_placement/game_embed_mode", true},
 };
 
-const std::vector<ParamSpec> kSetEditorSettingsParams = {
+const std::vector<ParamSpec> kUpdateEditorSettingsParams = {
     {"name", "string", "Editor setting name to write, e.g. interface/theme/base_color", true},
     {"value", "json", "Serialized JSON value to store; editor settings persist automatically", true},
 };
 
-const std::vector<ParamSpec> kHasEditorSettingsParams = {
-    {"name", "string", "Editor setting name to check for existence in the editor's preferences", true},
+const std::vector<ParamSpec> kGetEngineStateParams = {};
+
+const std::vector<ParamSpec> kUpdateEngineStateParams = {
+    {"scale", "number", "Time scale multiplier for action='time_scale': 1.0 = real time, 0.5 = half speed, 2.0 = double speed; 0.0 stops gameplay processing", false},
+    {"fps", "integer", "Frame rate cap for action='max_fps'; 0 disables the cap (uncapped)", false},
 };
 
-const std::vector<ParamSpec> kGetAutoloadListParams = {};
+const std::vector<ParamSpec> kGetAutoloadsParams = {};
 
-const std::vector<ParamSpec> kAddAutoloadParams = {
-    {"name", "string", "Autoload singleton name, e.g. Global; becomes the autoload/Name project setting and the node's name in the scene tree; must not exist yet and must not contain '/'.", true},
-    {"path", "string", "res:// scene or script to autoload, e.g. res://global.gd; must exist, load and be instantiable", true},
-    {"enabled", "boolean", "Whether the singleton marker is stored; defaults to true, which writes the leading * marker exactly like the editor does", false},
+const std::vector<ParamSpec> kUpdateAutoloadsParams = {
+    {"name", "string", "Autoload singleton name, e.g. Global; must not contain '/' and must not exist for action='add' while it must already be registered for action='remove' and action='move'", false},
+    {"path", "string", "res:// scene or script to autoload for action='add', e.g. res://global.gd; must exist, load and be instantiable", false},
+    {"enabled", "boolean", "Whether the singleton marker is stored for action='add'; defaults to true, which writes the leading * marker exactly like the editor does", false},
+    {"new_index", "integer", "Zero-based target position in the autoload load order for action='move'; must lie between 0 and the list size minus one", false},
 };
 
-const std::vector<ParamSpec> kRemoveAutoloadParams = {
-    {"name", "string", "Autoload singleton name to remove, e.g. Global; must already be registered", true},
-};
+inline std::vector<std::string> config_actions(
+    std::initializer_list<const char *> actions) {
+  std::vector<std::string> out;
+  out.reserve(actions.size());
+  for (const char *action : actions) {
+    out.emplace_back(action);
+  }
+  return out;
+}
 
-const std::vector<ParamSpec> kMoveAutoloadParams = {
-    {"name", "string", "Autoload singleton name to reposition, e.g. Global; must already be registered", true},
-    {"new_index", "integer", "Zero-based target position in the autoload load order; must lie between 0 and the list size minus one", true},
-};
+inline std::vector<std::string> config_examples(
+    std::initializer_list<const char *> examples) {
+  std::vector<std::string> out;
+  out.reserve(examples.size());
+  for (const char *example : examples) {
+    out.emplace_back(example);
+  }
+  return out;
+}
+
+inline ToolSpec config_action_spec(ToolSpec spec,
+                                   std::initializer_list<const char *> actions,
+                                   std::initializer_list<const char *> examples) {
+  spec.raw_schema = schema::build_action_schema(
+      config_actions(actions), spec.params,
+      "Action to perform; per-action parameters are documented in the tool "
+      "description");
+  spec.examples = config_examples(examples);
+  return spec;
+}
+
+inline ToolSpec config_optional_action_spec(
+    ToolSpec spec, std::initializer_list<const char *> actions,
+    std::initializer_list<const char *> examples) {
+  mcp::JsonValue raw = schema::build_schema(spec.params);
+  mcp::JsonValue action(mcp::JsonValue::object_tag);
+  action["type"] = mcp::JsonValue("string");
+  action["description"] = mcp::JsonValue(
+      "Action to perform; defaults to 'get' when omitted");
+  mcp::JsonValue values(mcp::JsonValue::array_tag);
+  for (const char *value : actions) {
+    values.PushBack(mcp::JsonValue(value));
+  }
+  action["enum"] = std::move(values);
+  mcp::JsonValue *properties = raw.Find("properties");
+  if (properties != nullptr && properties->IsObject()) {
+    (*properties)["action"] = std::move(action);
+  }
+  spec.raw_schema = std::move(raw);
+  spec.examples = config_examples(examples);
+  return spec;
+}
+
+inline mcp::JsonValue config_args_with_action(const mcp::JsonValue &args,
+                                              const char *action) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue(action);
+  return out;
+}
+
+inline bool config_result_has_error(const mcp::JsonValue &result) {
+  return result.IsObject() &&
+         (result.Find("error") != nullptr ||
+          result.Find("structured_error") != nullptr ||
+          result.Find("runtime_error") != nullptr);
+}
+
+inline ToolAlias config_alias(const char *name, const char *canonical,
+                              const char *action) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = canonical;
+  alias.adapt_args = [action](const mcp::JsonValue &args) {
+    return config_args_with_action(args, action);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
+
+inline mcp::JsonValue project_config_found(const mcp::JsonValue &result) {
+  if (config_result_has_error(result)) {
+    return result;
+  }
+  const mcp::JsonValue *found = result.Find("result");
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["result"] = found != nullptr && found->IsBool()
+                      ? *found
+                      : mcp::JsonValue(false);
+  return out;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(17);
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_project_settings",
-      "Read a project setting by name from the project configuration (project.godot). Use it to query project-wide values such as display, physics or input defaults. The optional default is returned when the setting does not exist. Returns the serialized value; contrast with get_editor_settings, which reads editor preferences.",
-      "Config", {"config", "project", "settings", "get"}, SideEffect::None, tool_flags::kNone,
-      kGetProjectSettingsParams, config_ops::handle_project_settings_get}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_project_settings",
-      "Set a project setting in memory. Note: the change is NOT written to project.godot automatically, so call save_project_settings afterwards or the setting is lost when the editor closes. value is a serialized JSON value; the engine keeps the existing type when known. Differs from set_editor_settings, which persists automatically. Returns ok.",
-      "Config", {"config", "project", "settings", "set"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kSetProjectSettingsParams, config_ops::handle_project_settings_set}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "has_project_settings",
-      "Check whether a project setting exists by name in the project configuration (project.godot). Use it before reading with get_project_settings to distinguish a missing setting from a stored default value. Contrast with has_editor_settings, which tests editor preferences instead. Returns a boolean result.",
-      "Config", {"config", "project", "settings", "has"}, SideEffect::None, tool_flags::kNone,
-      kHasProjectSettingsParams, config_ops::handle_project_settings_has}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "save_project_settings",
-      "Persist all project settings to project.godot. Call it after set_project_settings so in-memory changes survive an editor restart; without it the changes are discarded on exit. This is the required flush step, no other config tool writes project.godot. Returns ok, or an error with the code when saving fails.",
-      "Config", {"config", "project", "settings", "save"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kSaveProjectSettingsParams, config_ops::handle_project_settings_save}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_engine_version",
-      "Read the version of the running Godot engine, useful for branching behavior or reporting the environment. Returns an object with major, minor and patch (integers) plus string, the full version label such as '4.7.1-stable'. Takes no parameters; all four fields are always present.",
-      "Config", {"config", "engine", "version"}, SideEffect::None, tool_flags::kNone,
-      kGetEngineVersionParams, config_ops::handle_engine_get_version}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_engine_fps",
-      "Measure the current real-time frames per second rendered by the engine, e.g. to verify performance after scene changes. Unlike set_engine_max_fps (a cap on the frame rate) and get_engine_frames_drawn (a cumulative counter), this reports the live measured rate. Returns a float that fluctuates per frame.",
-      "Config", {"config", "engine", "fps", "get"}, SideEffect::None, tool_flags::kNone,
-      kGetEngineFpsParams, config_ops::handle_engine_get_fps}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_engine_frames_drawn",
-      "Read the total number of frames drawn since the engine started, a monotonically increasing counter that resets only on restart. Use it to measure elapsed frames between two points or to detect stalls, complementing get_engine_fps (the live rate). Returns an integer.",
-      "Config", {"config", "engine", "frames"}, SideEffect::None, tool_flags::kNone,
-      kGetEngineFramesDrawnParams, config_ops::handle_engine_get_frames_drawn}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_engine_time_scale",
-      "Set the global time scale multiplier for the game loop: 1.0 is real time, 0.5 halves the speed, 2.0 doubles it. The scale affects both process and physics timing; values below 1.0 create slow-motion effects, and 0.0 stops gameplay processing. Returns ok; read the current value with get_engine_time_scale.",
-      "Config", {"config", "engine", "time", "scale", "set"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetEngineTimeScaleParams, config_ops::handle_engine_set_time_scale}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_engine_time_scale",
-      "Read the current global time scale previously set by set_engine_time_scale, defaulting to 1.0 (real time). Pair it with set_engine_time_scale when debugging slow-motion or sped-up gameplay, or to confirm a scale change was applied. Returns a float representing the multiplier applied to the game loop.",
-      "Config", {"config", "engine", "time", "scale", "get"}, SideEffect::None, tool_flags::kNone,
-      kGetEngineTimeScaleParams, config_ops::handle_engine_get_time_scale}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_engine_max_fps",
-      "Cap the engine's frame rate at fps frames per second; 0 disables the cap entirely and lets the engine run uncapped. This sets an upper limit only, it does not measure the actual rate, use get_engine_fps for that. Returns ok.",
-      "Config", {"config", "engine", "fps", "max"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetEngineMaxFpsParams, config_ops::handle_engine_set_max_fps}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_editor_settings",
-      "Read an editor preference by name from the editor's own settings store, which persists automatically across sessions. Use it for editor UI configuration such as theme, docks or input preferences. Differs from get_project_settings, which reads project.godot values. Returns the serialized value.",
-      "Config", {"config", "editor", "settings", "get"}, SideEffect::None, tool_flags::kNone,
-      kGetEditorSettingsParams, config_ops::handle_editor_settings_get}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_editor_settings",
-      "Set an editor preference by name, e.g. interface or plugin options. Use it to tweak editor behavior without touching project.godot. Unlike set_project_settings, editor settings persist automatically, no explicit save step is required, and the value survives editor restarts. Returns ok; verify the applied value with get_editor_settings.",
-      "Config", {"config", "editor", "settings", "set"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kSetEditorSettingsParams, config_ops::handle_editor_settings_set}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "has_editor_settings",
-      "Check whether an editor preference exists by name in the editor's settings store. Use it to probe whether a preference is customized before reading it with get_editor_settings. Contrast with has_project_settings, which tests the project configuration (project.godot) instead. Returns a boolean result.",
-      "Config", {"config", "editor", "settings", "has"}, SideEffect::None, tool_flags::kNone,
-      kHasEditorSettingsParams, config_ops::handle_editor_settings_has}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_autoload_list",
-      "List all autoload singletons registered in the project configuration (project.godot) in load order. Each entry carries name, path (the res:// target with the leading * singleton marker stripped), enabled (whether the * marker is present) and order. Read-only; change the list with add_autoload, remove_autoload or move_autoload. Returns the entries in result plus count.",
-      "Config", {"config", "autoload", "list"}, SideEffect::None, tool_flags::kNone,
-      kGetAutoloadListParams, config_ops::handle_autoload_list}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_autoload",
-      "Add a new autoload singleton to the project configuration. name must be unique (an existing autoload/Name setting is rejected) and must not contain '/'; path must be a res:// scene or script that loads and can be instantiated. enabled defaults to true and controls the leading * singleton marker, stored exactly like the editor writes it. The change is saved to project.godot immediately. Returns ok plus name, path, enabled and order.",
-      "Config", {"config", "autoload", "add"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kAddAutoloadParams, config_ops::handle_autoload_add}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "remove_autoload",
-      "Remove an autoload singleton from the project configuration. The autoload/Name setting is cleared and project.godot is saved, reported under updated_files. Files under res:// that still mention the removed name or path are reported as stale_references {file, token} objects so callers can clean them up; name matches are substring-based and may include false positives. Returns ok plus removed, updated_files, stale_references and a note.",
-      "Config", {"config", "autoload", "remove"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kRemoveAutoloadParams, config_ops::handle_autoload_remove}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "move_autoload",
-      "Move an autoload singleton to a new position in the load order. new_index is zero-based and must lie within the current list; every entry is then renumbered 0..n-1 through the project setting order and project.godot is saved. Returns ok plus name, old_index and new_index.",
-      "Config", {"config", "autoload", "move"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kMoveAutoloadParams, config_ops::handle_autoload_move}));
+  v.reserve(8);
+  v.push_back(make_spec_tool(with_aliases(
+      config_optional_action_spec(
+          ToolSpec{
+              "get_project_settings",
+              "Read project configuration (project.godot), actions: get (default, serialized value of one setting; the optional default is returned when it does not exist) and has (boolean existence check reported as result, with found; use it to distinguish a missing setting from a stored default value). name is the setting key, e.g. display/window/size/viewport_width. Deprecated alias: has_project_settings.",
+              "Config",
+              {"config", "project", "settings", "get", "has",
+               "has_project_settings"},
+              SideEffect::None,
+              tool_flags::kNone,
+              kGetProjectSettingsParams,
+              config_ops::handle_get_project_settings},
+          {"get", "has"},
+          {"{\"action\":\"get\",\"name\":\"application/config/name\"}",
+           "{\"action\":\"has\",\"name\":\"application/config/name\"}"}),
+      {
+          [](ToolAlias alias) {
+            alias.project_result = project_config_found;
+            return alias;
+          }(config_alias("has_project_settings", "get_project_settings",
+                         "has")),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_action_spec(
+          ToolSpec{
+              "update_project_settings",
+              "Change project configuration (project.godot), actions: set (write one setting in memory; value is a serialized JSON value and the engine keeps the existing type when known) and save (persist all in-memory project settings to project.godot; required after set or the change is lost when the editor closes). Returns ok; saving failures carry the engine error code. Deprecated aliases: set_project_settings, save_project_settings.",
+              "Config",
+              {"config", "project", "settings", "set", "save",
+               "set_project_settings", "save_project_settings"},
+              SideEffect::WritesConfig,
+              tool_flags::kMutating,
+              kUpdateProjectSettingsParams,
+              config_ops::handle_update_project_settings},
+          {"set", "save"},
+          {"{\"action\":\"set\",\"name\":\"application/config/name\",\"value\":\"Demo\"}",
+           "{\"action\":\"save\"}"}),
+      {
+          config_alias("set_project_settings", "update_project_settings",
+                       "set"),
+          config_alias("save_project_settings", "update_project_settings",
+                       "save"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_optional_action_spec(
+          ToolSpec{
+              "get_editor_settings",
+              "Read editor preferences (the editor's own settings store, persisted across sessions), actions: get (default, serialized value of one preference; the response also carries hint, hint_string and enum_options when available) and has (boolean existence check reported as result, with found). name is the preference key, e.g. interface/theme/base_color. Deprecated alias: has_editor_settings.",
+              "Config",
+              {"config", "editor", "settings", "get", "has",
+               "has_editor_settings"},
+              SideEffect::None,
+              tool_flags::kNone,
+              kGetEditorSettingsParams,
+              config_ops::handle_get_editor_settings},
+          {"get", "has"},
+          {"{\"action\":\"get\",\"name\":\"interface/theme/base_color\"}",
+           "{\"action\":\"has\",\"name\":\"interface/theme/base_color\"}"}),
+      {
+          [](ToolAlias alias) {
+            alias.project_result = project_config_found;
+            return alias;
+          }(config_alias("has_editor_settings", "get_editor_settings",
+                         "has")),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_action_spec(
+          ToolSpec{
+              "update_editor_settings",
+              "Change an editor preference by name, e.g. interface or plugin options, actions: set (store the serialized value; editor settings persist automatically, no explicit save step is required, and the value survives editor restarts). Returns ok; verify the applied value with get_editor_settings action='get'. Deprecated alias: set_editor_settings.",
+              "Config",
+              {"config", "editor", "settings", "set",
+               "set_editor_settings"},
+              SideEffect::WritesConfig,
+              tool_flags::kMutating,
+              kUpdateEditorSettingsParams,
+              config_ops::handle_update_editor_settings},
+          {"set"},
+          {"{\"action\":\"set\",\"name\":\"interface/theme/base_color\",\"value\":\"#202020\"}"}),
+      {
+          config_alias("set_editor_settings", "update_editor_settings",
+                       "set"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_action_spec(
+          ToolSpec{
+              "get_engine_state",
+              "Read live engine state, actions: version (major, minor, patch and the full string such as '4.7.1-stable'), fps (measured real-time frame rate), frames_drawn (cumulative frames since startup, resets only on restart), time_scale (current global time scale, default 1.0). All actions return their value in result. Deprecated aliases: get_engine_version, get_engine_fps, get_engine_frames_drawn, get_engine_time_scale.",
+              "Config",
+              {"config", "engine", "version", "fps", "frames", "time_scale",
+               "get_engine_version", "get_engine_fps",
+               "get_engine_frames_drawn", "get_engine_time_scale"},
+              SideEffect::None,
+              tool_flags::kNone,
+              kGetEngineStateParams,
+              config_ops::handle_get_engine_state},
+          {"version", "fps", "frames_drawn", "time_scale"},
+          {"{\"action\":\"version\"}",
+           "{\"action\":\"fps\"}",
+           "{\"action\":\"frames_drawn\"}",
+           "{\"action\":\"time_scale\"}"}),
+      {
+          config_alias("get_engine_version", "get_engine_state", "version"),
+          config_alias("get_engine_fps", "get_engine_state", "fps"),
+          config_alias("get_engine_frames_drawn", "get_engine_state",
+                       "frames_drawn"),
+          config_alias("get_engine_time_scale", "get_engine_state",
+                       "time_scale"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_action_spec(
+          ToolSpec{
+              "update_engine_state",
+              "Change live engine state, actions: time_scale (global multiplier for the game loop: 1.0 real time, 0.5 half speed, 2.0 double speed, 0.0 stops gameplay; affects process and physics timing) and max_fps (frame rate cap; 0 disables the cap and lets the engine run uncapped). Returns ok; read the applied value with get_engine_state. Deprecated aliases: set_engine_time_scale, set_engine_max_fps.",
+              "Config",
+              {"config", "engine", "time_scale", "max_fps",
+               "set_engine_time_scale", "set_engine_max_fps"},
+              SideEffect::ModifiesWindow,
+              tool_flags::kMutating,
+              kUpdateEngineStateParams,
+              config_ops::handle_update_engine_state},
+          {"time_scale", "max_fps"},
+          {"{\"action\":\"time_scale\",\"scale\":0.5}",
+           "{\"action\":\"max_fps\",\"fps\":60}"}),
+      {
+          config_alias("set_engine_time_scale", "update_engine_state",
+                       "time_scale"),
+          config_alias("set_engine_max_fps", "update_engine_state",
+                       "max_fps"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_action_spec(
+          ToolSpec{
+              "get_autoloads",
+              "List all autoload singletons registered in project.godot in load order, actions: list (each entry carries name, path with the leading * singleton marker stripped, enabled and order; the response also reports count). Read-only; change the list with update_autoloads. Deprecated alias: get_autoload_list.",
+              "Config",
+              {"config", "autoload", "list", "get_autoload_list"},
+              SideEffect::None,
+              tool_flags::kNone,
+              kGetAutoloadsParams,
+              config_ops::handle_get_autoloads},
+          {"list"},
+          {"{\"action\":\"list\"}"}),
+      {
+          config_alias("get_autoload_list", "get_autoloads", "list"),
+      })));
+  v.push_back(make_spec_tool(with_aliases(
+      config_action_spec(
+          ToolSpec{
+              "update_autoloads",
+              "Change the project autoload singletons in project.godot and save immediately, actions: add (name must be unique and must not contain '/', path must be a res:// scene or script that loads and can be instantiated, enabled defaults to true and controls the leading * marker), remove (clears the autoload/Name setting and reports removed, updated_files, stale_references {file, token} and scan_truncated when the reference scan was cut) and move (new_index is zero-based within the current list; every entry is renumbered 0..n-1). Returns ok plus the action-specific fields. Deprecated aliases: add_autoload, remove_autoload, move_autoload.",
+              "Config",
+              {"config", "autoload", "add", "remove", "move", "add_autoload",
+               "remove_autoload", "move_autoload"},
+              SideEffect::WritesConfig,
+              tool_flags::kMutating,
+              kUpdateAutoloadsParams,
+              config_ops::handle_update_autoloads},
+          {"add", "remove", "move"},
+          {"{\"action\":\"add\",\"name\":\"Global\",\"path\":\"res://global.gd\"}",
+           "{\"action\":\"remove\",\"name\":\"Global\"}",
+           "{\"action\":\"move\",\"name\":\"Global\",\"new_index\":0}"}),
+      {
+          config_alias("add_autoload", "update_autoloads", "add"),
+          config_alias("remove_autoload", "update_autoloads", "remove"),
+          config_alias("move_autoload", "update_autoloads", "move"),
+      })));
   return v;
 }
 

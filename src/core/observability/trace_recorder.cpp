@@ -1,4 +1,6 @@
 #include "core/observability/trace_recorder.hpp"
+#include "util/hash_util.hpp"
+#include "util/string_util.hpp"
 
 #include <atomic>
 #include <cctype>
@@ -42,6 +44,72 @@ bool is_sensitive_key(const std::string &raw_key) {
          ends_with(key, "_secret") || ends_with(key, "_password");
 }
 
+bool json_value_end(const std::string &text, std::size_t start,
+                    std::size_t *end) {
+  const std::size_t n = text.size();
+  std::size_t i = start;
+  while (i < n && is_blank(text[i])) {
+    ++i;
+  }
+  if (i >= n) {
+    return false;
+  }
+  if (text[i] == '"') {
+    ++i;
+    while (i < n) {
+      if (text[i] == '\\') {
+        i += 2;
+        continue;
+      }
+      if (text[i] == '"') {
+        *end = i + 1;
+        return true;
+      }
+      ++i;
+    }
+    return false;
+  }
+  if (text[i] == '{' || text[i] == '[') {
+    const char open = text[i];
+    const char close = open == '{' ? '}' : ']';
+    int depth = 0;
+    bool in_string = false;
+    while (i < n) {
+      const char c = text[i];
+      if (in_string) {
+        if (c == '\\') {
+          i += 2;
+          continue;
+        }
+        if (c == '"') {
+          in_string = false;
+        }
+      } else if (c == '"') {
+        in_string = true;
+      } else if (c == open) {
+        ++depth;
+      } else if (c == close) {
+        --depth;
+        if (depth == 0) {
+          *end = i + 1;
+          return true;
+        }
+      }
+      ++i;
+    }
+    return false;
+  }
+  while (i < n && !is_blank(text[i]) && text[i] != ',' && text[i] != '}' &&
+         text[i] != ']') {
+    ++i;
+  }
+  if (i == start) {
+    return false;
+  }
+  *end = i;
+  return true;
+}
+
 std::string strip_key_values(const std::string &text) {
   std::string out;
   out.reserve(text.size());
@@ -80,30 +148,21 @@ std::string strip_key_values(const std::string &text) {
       while (value < n && is_blank(text[value])) {
         ++value;
       }
-      if (value < n && text[value] == '"') {
-        std::size_t value_end = value + 1;
-        bool value_closed = false;
-        while (value_end < n) {
-          if (text[value_end] == '\\') {
-            value_end += 2;
-            continue;
-          }
-          if (text[value_end] == '"') {
-            value_closed = true;
-            break;
-          }
-          ++value_end;
-        }
-        if (value_closed) {
-          char buf[64];
-          std::snprintf(buf, sizeof(buf), "\"<stripped len=%llu>\"",
-                        static_cast<unsigned long long>(value_end - value - 1));
-          out.append(text, i, key_end + 1 - i);
-          out += ':';
-          out += buf;
-          i = value_end + 1;
-          continue;
-        }
+      std::size_t value_end = value;
+      if (json_value_end(text, value, &value_end)) {
+        const std::size_t first = value < n ? static_cast<std::size_t>(text[value]) : 0;
+        const std::size_t stripped_length =
+            first == static_cast<std::size_t>('"') && value_end > value + 1
+                ? value_end - value - 2
+                : value_end - value;
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "\"<stripped len=%llu>\"",
+                      static_cast<unsigned long long>(stripped_length));
+        out.append(text, i, key_end + 1 - i);
+        out += ':';
+        out += buf;
+        i = value_end;
+        continue;
       }
     }
     out.append(text, i, key_end + 1 - i);
@@ -113,40 +172,7 @@ std::string strip_key_values(const std::string &text) {
 }
 
 void append_escaped(std::string &out, const std::string &value) {
-  for (unsigned char c : value) {
-    switch (c) {
-      case '"':
-        out += "\\\"";
-        break;
-      case '\\':
-        out += "\\\\";
-        break;
-      case '\b':
-        out += "\\b";
-        break;
-      case '\f':
-        out += "\\f";
-        break;
-      case '\n':
-        out += "\\n";
-        break;
-      case '\r':
-        out += "\\r";
-        break;
-      case '\t':
-        out += "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          char buf[8];
-          std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned>(c));
-          out += buf;
-        } else {
-          out += static_cast<char>(c);
-        }
-        break;
-    }
-  }
+  util::append_json_escaped(out, value);
 }
 
 void append_string_field(std::string &out, const char *name, const std::string &value, bool first) {
@@ -365,14 +391,7 @@ SanitizeResult TraceRecorder::sanitize_args(const std::string &args_dump, bool d
 }
 
 std::string TraceRecorder::fnv1a_hex(const std::string &text) {
-  uint64_t hash = 14695981039346656037ULL;
-  for (unsigned char c : text) {
-    hash ^= static_cast<uint64_t>(c);
-    hash *= 1099511628211ULL;
-  }
-  char buf[17];
-  std::snprintf(buf, sizeof(buf), "%016llx", static_cast<unsigned long long>(hash));
-  return std::string(buf);
+  return util::fnv1a64_hex_printf(text);
 }
 
 std::string TraceRecorder::decode_base64(const std::string &input) {

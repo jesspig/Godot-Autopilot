@@ -1,6 +1,7 @@
 #include "variant_json.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
+#include "util/input_guards.hpp"
 #include "util/owned_exception.hpp"
 #include <cctype>
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -18,7 +19,75 @@
 
 namespace godot_autopilot {
 
+bool node_ref_path_is_safe(const std::string &path) {
+  if (path.empty()) {
+    return false;
+  }
+  std::size_t start = 0;
+  while (start <= path.size()) {
+    const std::size_t end = path.find('/', start);
+    const std::size_t length =
+        (end == std::string::npos ? path.size() : end) - start;
+    if (length == 2 && path[start] == '.' && path[start + 1] == '.') {
+      return false;
+    }
+    if (end == std::string::npos) {
+      break;
+    }
+    start = end + 1;
+  }
+  return true;
+}
+
 namespace {
+
+bool node_is_within_scene_root(godot::Node *node, godot::Node *scene_root) {
+  if (node == nullptr || scene_root == nullptr) {
+    return false;
+  }
+  for (godot::Node *cursor = node; cursor != nullptr;
+       cursor = cursor->get_parent()) {
+    if (cursor == scene_root) {
+      return true;
+    }
+  }
+  return false;
+}
+
+godot::Node *edited_scene_root() {
+  auto *editor = godot::EditorInterface::get_singleton();
+  return editor != nullptr ? editor->get_edited_scene_root() : nullptr;
+}
+
+godot::Variant resolve_whitelisted_object_id(const std::string &oid_str) {
+  godot::Node *scene_root = edited_scene_root();
+  if (scene_root == nullptr) {
+    return godot::Variant();
+  }
+  int64_t id = 0;
+  if (!util::parse_decimal_int64(oid_str, id)) {
+    return godot::Variant();
+  }
+  auto *object = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
+  auto *node = godot::Object::cast_to<godot::Node>(object);
+  if (!node_is_within_scene_root(node, scene_root)) {
+    return godot::Variant();
+  }
+  return godot::Variant(static_cast<godot::Object *>(node));
+}
+
+godot::Variant resolve_whitelisted_object_id(int64_t id) {
+  godot::Node *scene_root = edited_scene_root();
+  if (scene_root == nullptr) {
+    return godot::Variant();
+  }
+  auto *object = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
+  auto *node = godot::Object::cast_to<godot::Node>(object);
+  if (!node_is_within_scene_root(node, scene_root)) {
+    return godot::Variant();
+  }
+  return godot::Variant(static_cast<godot::Object *>(node));
+}
 
 std::string str_from_variant(const godot::Variant &v) {
   godot::String s = v.operator godot::String();
@@ -29,15 +98,6 @@ std::string str_from_variant(const godot::Variant &v) {
 std::string to_std_string(const godot::String &s) {
   godot::CharString utf8 = s.utf8();
   return std::string(utf8.ptr());
-}
-
-std::string to_lower(const std::string &s) {
-  std::string r;
-  r.reserve(s.size());
-  for (char c : s) {
-    r.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-  }
-  return r;
 }
 
 std::optional<godot::Variant::Type> parse_type_hint(const std::string &hint) {
@@ -95,7 +155,7 @@ std::optional<godot::Variant::Type> parse_type_hint(const std::string &hint) {
       {"packed_vector4_array", godot::Variant::PACKED_VECTOR4_ARRAY},
       {"packedvector4array", godot::Variant::PACKED_VECTOR4_ARRAY},
   };
-  auto it = map.find(to_lower(hint));
+  auto it = map.find(util::ascii_lowercase(hint));
   if (it != map.end())
     return it->second;
   return std::nullopt;
@@ -163,19 +223,17 @@ bool try_deserialize_node_ref(const mcp::JsonValue &j,
   if (ref_it == obj.end())
     return false;
   out_variant = godot::Variant();
-  godot::String node_path_str(ref_it->second.GetString().c_str());
-  auto *editor = godot::EditorInterface::get_singleton();
-  if (!editor)
+  const std::string node_path = ref_it->second.GetString();
+  if (!node_ref_path_is_safe(node_path)) {
     return true;
-  auto *scene_root = editor->get_edited_scene_root();
-  if (!scene_root)
-    return true;
-  godot::Node *top = scene_root;
-  while (top->get_parent()) {
-    top = top->get_parent();
   }
-  godot::Node *found = top->get_node_or_null(godot::NodePath(node_path_str));
-  if (found) {
+  godot::Node *scene_root = edited_scene_root();
+  if (scene_root == nullptr) {
+    return true;
+  }
+  godot::String node_path_str(node_path.c_str());
+  godot::Node *found = scene_root->get_node_or_null(godot::NodePath(node_path_str));
+  if (node_is_within_scene_root(found, scene_root)) {
     out_variant = godot::Variant(static_cast<godot::Object *>(found));
   }
   return true;
@@ -207,25 +265,19 @@ godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
     auto &obj = j.GetObject();
     auto oid_s_it = obj.find("object_id_str");
     if (oid_s_it != obj.end() && oid_s_it->second.IsString()) {
-      std::string oid_str = oid_s_it->second.GetString();
-      try {
-        int64_t id = std::stoll(oid_str);
-        auto *op = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
-        if (op)
-          return godot::Variant(op);
-      } catch (...) {
-        LogSystem::instance().log(
-            LogLevel::Warning, LogCategory::System,
-            "variant_json: stoll parse failed for object_id (value=" +
-                oid_str + ")");
+      godot::Variant resolved =
+          resolve_whitelisted_object_id(oid_s_it->second.GetString());
+      if (resolved.get_type() != godot::Variant::NIL) {
+        return resolved;
       }
     }
     auto oid_i_it = obj.find("object_id");
     if (oid_i_it != obj.end() && oid_i_it->second.IsInt()) {
-      auto *op = godot::ObjectDB::get_instance(
-          static_cast<uint64_t>(oid_i_it->second.GetInt()));
-      if (op)
-        return godot::Variant(op);
+      godot::Variant resolved =
+          resolve_whitelisted_object_id(oid_i_it->second.GetInt());
+      if (resolved.get_type() != godot::Variant::NIL) {
+        return resolved;
+      }
     }
     godot::Dictionary d;
     for (const auto &[key, val] : obj) {
@@ -552,25 +604,19 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
       }
       auto oid_s_it = j.GetObject().find("object_id_str");
       if (oid_s_it != j.GetObject().end() && oid_s_it->second.IsString()) {
-        std::string oid_str = oid_s_it->second.GetString();
-        try {
-          int64_t id = std::stoll(oid_str);
-          auto *op = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
-          if (op)
-            return godot::Variant(op);
-        } catch (...) {
-          LogSystem::instance().log(
-              LogLevel::Warning, LogCategory::System,
-              "variant_json: stoll parse failed for object_id (value=" +
-                  oid_str + ")");
+        godot::Variant resolved =
+            resolve_whitelisted_object_id(oid_s_it->second.GetString());
+        if (resolved.get_type() != godot::Variant::NIL) {
+          return resolved;
         }
       }
       auto oid_i_it = j.GetObject().find("object_id");
       if (oid_i_it != j.GetObject().end() && oid_i_it->second.IsInt()) {
-        auto *op = godot::ObjectDB::get_instance(
-            static_cast<uint64_t>(oid_i_it->second.GetInt()));
-        if (op)
-          return godot::Variant(op);
+        godot::Variant resolved =
+            resolve_whitelisted_object_id(oid_i_it->second.GetInt());
+        if (resolved.get_type() != godot::Variant::NIL) {
+          return resolved;
+        }
       }
       auto class_it = j.GetObject().find("class");
       if (class_it != j.GetObject().end() && class_it->second.IsString()) {

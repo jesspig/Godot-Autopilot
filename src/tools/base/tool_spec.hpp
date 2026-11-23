@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TOOL_SPEC_HPP
 #define GODOT_AUTOPILOT_TOOL_SPEC_HPP
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -21,6 +22,7 @@
 #include <tools/base/runtime_ops.hpp>
 #include <tools/base/schema_builder.hpp>
 #include <tools/base/confirmation.hpp>
+#include <tools/base/tool_args.hpp>
 #include <tools/base/tool_base.hpp>
 #include <tools/base/tool_invoke.hpp>
 
@@ -41,6 +43,18 @@ constexpr uint32_t kHealthProbe = 1u << 7;
 constexpr uint32_t kLongBlocking = 1u << 8;
 } // namespace tool_flags
 
+struct ToolAlias {
+  std::string name;
+  std::string canonical;
+  std::function<mcp::JsonValue(const mcp::JsonValue &)> adapt_args;
+  std::function<mcp::JsonValue(const mcp::JsonValue &)> project_result;
+  std::string deprecated_since;
+  std::string removal_version;
+  std::function<mcp::JsonValue(const mcp::JsonValue &)> validate_args;
+  std::function<mcp::JsonValue(const mcp::JsonValue &, const mcp::JsonValue &)>
+      project_result_with_args;
+};
+
 struct ToolSpec {
   std::string name;
   std::string description;
@@ -51,6 +65,8 @@ struct ToolSpec {
   std::vector<ParamSpec> params;
   std::function<mcp::JsonValue(const mcp::JsonValue &)> handler;
   mcp::JsonValue raw_schema;
+  std::vector<ToolAlias> aliases;
+  std::vector<std::string> examples;
 };
 
 namespace spec_detail {
@@ -187,6 +203,11 @@ inline std::unordered_map<std::string, DeferredTrace> &deferred_traces() {
   return traces;
 }
 
+inline std::vector<std::string> &deferred_trace_order() {
+  static std::vector<std::string> order;
+  return order;
+}
+
 inline bool deferred_key_of(const mcp::JsonValue &result, std::string *key) {
   if (!result.IsObject()) {
     return false;
@@ -214,8 +235,13 @@ inline bool deferred_key_of(const mcp::JsonValue &result, std::string *key) {
 inline void stash_deferred_trace(const std::string &key, DeferredTrace record) {
   std::lock_guard<std::mutex> lock(deferred_trace_mutex());
   std::unordered_map<std::string, DeferredTrace> &traces = deferred_traces();
-  if (traces.size() >= kDeferredTraceCap) {
-    traces.erase(traces.begin());
+  std::vector<std::string> &order = deferred_trace_order();
+  if (traces.find(key) == traces.end()) {
+    while (traces.size() >= kDeferredTraceCap && !order.empty()) {
+      traces.erase(order.front());
+      order.erase(order.begin());
+    }
+    order.push_back(key);
   }
   traces[key] = std::move(record);
 }
@@ -229,6 +255,8 @@ inline bool take_deferred_trace(const std::string &key, DeferredTrace *record) {
   }
   *record = std::move(it->second);
   traces.erase(it);
+  std::vector<std::string> &order = deferred_trace_order();
+  order.erase(std::remove(order.begin(), order.end(), key), order.end());
   return true;
 }
 
@@ -289,6 +317,27 @@ inline bool finish_deferred_trace(const std::string &key,
   emit_tool_call(std::move(record.event), duration_ms, error_text, std::string(),
                  bool_field(final_result, "retryable"));
   return true;
+}
+
+inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
+                                            const std::vector<ParamSpec> &params) {
+  mcp::JsonValue accepted(mcp::JsonValue::object_tag);
+  if (params.empty()) {
+    return accepted;
+  }
+  try {
+    Args declared(args, params);
+    declared.validate_declared();
+    std::vector<ParamSpec> strict_params = params;
+    strict_params.push_back(ParamSpec{"confirm", "boolean", "", false});
+    Args strict(args, strict_params);
+    strict.reject_unknown();
+  } catch (const ToolArgError &ex) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue(ex.what());
+    return error;
+  }
+  return accepted;
 }
 
 } // namespace spec_detail
@@ -353,6 +402,13 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
       }
     }
     call_args = std::move(clean);
+  }
+  if ((spec_.flags & tool_flags::kDynamic) != 0) {
+    mcp::JsonValue validation =
+        spec_detail::validate_dynamic_args(call_args, spec_.params);
+    if (validation.Find("error") != nullptr) {
+      return validation;
+    }
   }
   mcp::JsonValue result = spec_.handler(call_args);
   result = pipeline::run_post(spec_, call_args, std::move(result));
@@ -439,6 +495,58 @@ inline SideEffect SpecTool::side_effects() const { return spec_.side_effect; }
 inline uint32_t SpecTool::tool_flags() const { return spec_.flags; }
 
 inline const ToolSpec &SpecTool::spec() const { return spec_; }
+
+inline mcp::JsonValue apply_alias_args(const ToolAlias &alias,
+                                       const mcp::JsonValue &args) {
+  mcp::JsonValue adapted = alias.adapt_args ? alias.adapt_args(args) : args;
+  if (args.IsObject() && adapted.IsObject()) {
+    const mcp::JsonValue *confirm = args.Find("confirm");
+    if (confirm != nullptr && adapted.Find("confirm") == nullptr) {
+      adapted["confirm"] = *confirm;
+    }
+  }
+  return adapted;
+}
+
+inline mcp::JsonValue annotate_alias_result(const ToolAlias &alias,
+                                            mcp::JsonValue result) {
+  if (!result.IsObject()) {
+    mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+    wrapped["result"] = std::move(result);
+    result = std::move(wrapped);
+  }
+  result["deprecated_alias"] = mcp::JsonValue(alias.name);
+  result["canonical_name"] = mcp::JsonValue(alias.canonical);
+  result["alias_removal_version"] = mcp::JsonValue(alias.removal_version);
+  if (!alias.deprecated_since.empty()) {
+    result["deprecated_since"] = mcp::JsonValue(alias.deprecated_since);
+  }
+  return result;
+}
+
+inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
+                                         mcp::JsonValue result) {
+  if (alias.project_result) {
+    result = alias.project_result(result);
+  }
+  return annotate_alias_result(alias, std::move(result));
+}
+
+inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
+                                         mcp::JsonValue result,
+                                         const mcp::JsonValue &args) {
+  if (alias.project_result_with_args) {
+    result = alias.project_result_with_args(result, args);
+  } else if (alias.project_result) {
+    result = alias.project_result(result);
+  }
+  return annotate_alias_result(alias, std::move(result));
+}
+
+inline ToolSpec with_aliases(ToolSpec spec, std::vector<ToolAlias> aliases) {
+  spec.aliases = std::move(aliases);
+  return spec;
+}
 
 inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec) {
   return std::make_unique<SpecTool>(std::move(spec));

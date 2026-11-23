@@ -1,4 +1,5 @@
 #include "tools/base/code_exec_ops.hpp"
+#include "tools/base/batch_verdict.hpp"
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
@@ -9,6 +10,7 @@
 #include "tools/base/tool_invoke.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <cctype>
 #include <chrono>
@@ -467,6 +469,26 @@ int max_timeout_ms() {
   return static_cast<int>(ceiling);
 }
 
+int32_t batch_resolve_history_id(int32_t object_history_id,
+                                 bool has_target_object) {
+  if (has_target_object &&
+      object_history_id != static_cast<int32_t>(
+                               godot::EditorUndoRedoManager::INVALID_HISTORY)) {
+    return object_history_id;
+  }
+  return static_cast<int32_t>(godot::EditorUndoRedoManager::GLOBAL_HISTORY);
+}
+
+BatchRollbackReport batch_rollback_report(int64_t actions_created,
+                                          int64_t undoable_successes,
+                                          int64_t rolled_back) {
+  BatchRollbackReport report;
+  report.expected_actions =
+      std::max<int64_t>(0, std::max(actions_created, undoable_successes));
+  report.partial = rolled_back < report.expected_actions;
+  return report;
+}
+
 void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
                          std::string &error) {
   history = nullptr;
@@ -485,11 +507,17 @@ void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
             tools::ScopedTraceContext restore(ctx);
             auto *editor = godot::EditorInterface::get_singleton();
             auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
-            snapshot.history =
-                manager
-                    ? manager->get_history_undo_redo(static_cast<int32_t>(
-                          godot::EditorUndoRedoManager::GLOBAL_HISTORY))
-                    : nullptr;
+            if (manager == nullptr)
+              return;
+            godot::Node *root = editor->get_edited_scene_root();
+            const int32_t object_history =
+                root != nullptr
+                    ? manager->get_object_history_id(root)
+                    : static_cast<int32_t>(
+                          godot::EditorUndoRedoManager::INVALID_HISTORY);
+            const int32_t history_id =
+                batch_resolve_history_id(object_history, root != nullptr);
+            snapshot.history = manager->get_history_undo_redo(history_id);
             if (snapshot.history)
               snapshot.version_before = snapshot.history->get_version();
           },
@@ -586,6 +614,12 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   int pending_count = 0;
   bool stopped = false;
   size_t stopped_after = 0;
+  int64_t undoable_successes = 0;
+  auto note_undoable = [&](const mcp::JsonValue &value) {
+    const mcp::JsonValue *undoable = value.Find("undoable");
+    if (undoable != nullptr && undoable->IsBool() && undoable->GetBool())
+      ++undoable_successes;
+  };
 
   const auto &arr = ops->GetArray();
   std::vector<mcp::JsonValue> payloads;
@@ -662,25 +696,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         } else {
           return true;
         }
-        bool valid = !middle.empty();
-        size_t pos = 0;
-        if (valid && middle[0] == '-') {
-          pos = 1;
-          if (middle.size() == 1)
-            valid = false;
-        }
-        for (; valid && pos < middle.size(); ++pos) {
-          if (!std::isdigit(static_cast<unsigned char>(middle[pos])))
-            valid = false;
-        }
-        long long n = 0;
-        if (valid) {
-          try {
-            n = std::stoll(middle);
-          } catch (...) {
-            valid = false;
-          }
-        }
+        int64_t parsed = 0;
+        const bool valid = util::parse_signed_decimal_int64(middle, parsed);
+        const long long n = static_cast<long long>(parsed);
         if (!valid || n < 0 ||
             n >= static_cast<long long>(arr.size())) {
           error_out =
@@ -887,7 +905,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                                                            handler_result);
       }
       const bool awaited_error =
-          awaited.IsObject() && awaited.Find("error") != nullptr;
+          awaited.IsObject() && !batch_detail::op_succeeded(awaited);
       result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
       if (awaited_error) {
         if (auto *awaited_err = awaited.Find("error");
@@ -906,16 +924,24 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
           break;
         }
       } else {
+        note_undoable(awaited);
         ++succeeded;
       }
       continue;
     }
 
-    if (auto *err = handler_result.Find("error")) {
+    const bool handler_failed = !batch_detail::op_succeeded(handler_result);
+    if (handler_failed) {
+      const mcp::JsonValue *err = handler_result.Find("error");
+      const mcp::JsonValue fallback_error(mcp::JsonValue(
+          err != nullptr && err->IsString()
+              ? err->GetString()
+              : std::string("tool returned a structured or runtime error")));
+      const mcp::JsonValue &error_value = (err != nullptr && err->IsString()) ? *err : fallback_error;
       result_item["status"] = mcp::JsonValue("error");
-      result_item["error"] = *err;
+      result_item["error"] = error_value;
       mcp::JsonValue error_body(mcp::JsonValue::object_tag);
-      error_body["error"] = *err;
+      error_body["error"] = error_value;
       result_item["result"] = std::move(error_body);
       push_payload(result_item);
       results.PushBack(std::move(result_item));
@@ -926,6 +952,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         break;
       }
     } else {
+      note_undoable(handler_result);
       result_item["status"] = mcp::JsonValue("ok");
       result_item["data"] = handler_result;
       result_item["result"] = std::move(handler_result);
@@ -954,9 +981,10 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     if (history && runtime_ops::has_editor_queue()) {
       BatchUndoRollback rollback;
       if (batch_rollback_undo(history, version_before, rollback)) {
+        const BatchRollbackReport report = batch_rollback_report(
+            rollback.actions_created, undoable_successes, rollback.rolled_back);
         r["rolled_back"] = mcp::JsonValue(rollback.rolled_back);
-        r["rollback_partial"] =
-            mcp::JsonValue(rollback.rolled_back != rollback.actions_created);
+        r["rollback_partial"] = mcp::JsonValue(report.partial);
       }
     }
   }

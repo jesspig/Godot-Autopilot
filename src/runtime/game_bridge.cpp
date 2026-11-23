@@ -10,6 +10,8 @@
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
+#include "util/json_godot.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <cmath>
@@ -31,6 +33,10 @@
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
+#include <godot_cpp/classes/tween.hpp>
+#include <godot_cpp/classes/property_tweener.hpp>
+#include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/viewport_texture.hpp>
@@ -386,15 +392,6 @@ struct UiElementFilter {
   bool visible_only = false;
 };
 
-std::string ui_lowercase(const std::string &text) {
-  std::string lowered = text;
-  for (char &c : lowered) {
-    if (c >= 'A' && c <= 'Z')
-      c = static_cast<char>(c - 'A' + 'a');
-  }
-  return lowered;
-}
-
 bool ui_element_matches_filter(const UiElement &element,
                                const UiElementFilter &filter) {
   if (filter.visible_only && !element.visible)
@@ -414,7 +411,7 @@ bool ui_element_matches_filter(const UiElement &element,
     std::string haystack = element.path + "\n" + element.type + "\n";
     if (element.has_text)
       haystack += element.text;
-    if (ui_lowercase(haystack).find(filter.filter_lower) == std::string::npos)
+    if (util::ascii_lowercase(haystack).find(filter.filter_lower) == std::string::npos)
       return false;
   }
   return true;
@@ -1204,6 +1201,151 @@ private:
   }
 };
 
+JV build_ui_click_result(const std::string &target_path,
+                         const std::string &target_mouse_filter,
+                         double center_x, double center_y,
+                         double window_center_x, double window_center_y,
+                         int64_t rounds, bool strict_hit) {
+  std::string hit_path;
+  bool hit_mismatch = false;
+  {
+    godot::Viewport *click_viewport = nullptr;
+    godot::Control *target_ctrl = nullptr;
+    if (godot::SceneTree *tree = get_scene_tree()) {
+      if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+              resolve_game_node_suffixed(tree->get_root(), target_path))) {
+        target_ctrl = ctrl;
+        click_viewport = ctrl->get_viewport();
+      }
+      if (!click_viewport)
+        click_viewport =
+            godot::Object::cast_to<godot::Viewport>(tree->get_root());
+    }
+    godot::Control *hovered =
+        click_viewport ? click_viewport->gui_get_hovered_control() : nullptr;
+    if (hovered)
+      hit_path = util::to_std(godot::String(hovered->get_path()));
+    hit_mismatch =
+        target_ctrl && !ui_hit_matches_target(target_ctrl, hovered);
+  }
+  if (strict_hit && hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    JV body = error_result("click target not hit: expected " + target_path +
+                           " but the hovered control is " + actual);
+    JV details(JV::object_tag);
+    details["code"] = JV("click_occluded");
+    details["target_path"] = JV(target_path);
+    details["hit_path"] = JV(hit_path);
+    details["target_mouse_filter"] = JV(target_mouse_filter);
+    details["strict_hit"] = JV(true);
+    body["structured_error"] = std::move(details);
+    body["hit_path"] = JV(hit_path);
+    body["hit_mismatch"] = JV(true);
+    body["hint"] = JV(
+        "another visible Control is covering the target: run "
+        "validate_game_ui_layout to list possibly_occluded controls, inspect "
+        "get_game_ui_elements mouse_filter/z_index, or click the reported "
+        "hit_path instead; omit strict_hit to keep the click as a warning");
+    return body;
+  }
+  JV clicked(JV::object_tag);
+  clicked["ok"] = JV(true);
+  clicked["path"] = JV(target_path);
+  JV position(JV::object_tag);
+  position["x"] = JV(center_x);
+  position["y"] = JV(center_y);
+  clicked["position"] = std::move(position);
+  JV viewport_position(JV::object_tag);
+  viewport_position["x"] = JV(center_x);
+  viewport_position["y"] = JV(center_y);
+  clicked["viewport_position"] = std::move(viewport_position);
+  JV window_position(JV::object_tag);
+  window_position["x"] = JV(window_center_x);
+  window_position["y"] = JV(window_center_y);
+  clicked["window_position"] = std::move(window_position);
+  clicked["clicks"] = JV(rounds);
+  clicked["hit_path"] = JV(hit_path);
+  clicked["hit_mismatch"] = JV(hit_mismatch);
+  if (hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    clicked["warning"] = JV(
+        "click may be occluded: the viewport hovered control is " + actual +
+        " instead of " + target_path +
+        " — pass strict_hit=true to fail on this mismatch");
+  }
+  JV inner(JV::object_tag);
+  inner["result"] = std::move(clicked);
+  return ok_result(std::move(inner));
+}
+
+class GameBridgeUiClickAwaiter : public godot::Node {
+  GDCLASS(GameBridgeUiClickAwaiter, godot::Node)
+
+  int64_t request_id_ = 0;
+  std::string target_path_;
+  std::string target_mouse_filter_;
+  double center_x_ = 0.0;
+  double center_y_ = 0.0;
+  double window_center_x_ = 0.0;
+  double window_center_y_ = 0.0;
+  int64_t rounds_ = 1;
+  bool strict_hit_ = false;
+  uint64_t start_process_frames_ = 0;
+  bool finished_ = false;
+
+ protected:
+  static void _bind_methods() {}
+
+ public:
+  void setup(int64_t request_id, const std::string &target_path,
+             const std::string &target_mouse_filter, double center_x,
+             double center_y, double window_center_x, double window_center_y,
+             int64_t rounds, bool strict_hit) {
+    request_id_ = request_id;
+    target_path_ = target_path;
+    target_mouse_filter_ = target_mouse_filter;
+    center_x_ = center_x;
+    center_y_ = center_y;
+    window_center_x_ = window_center_x;
+    window_center_y_ = window_center_y;
+    rounds_ = rounds;
+    strict_hit_ = strict_hit;
+    set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
+    set_process(true);
+    auto *engine = godot::Engine::get_singleton();
+    start_process_frames_ = engine ? engine->get_process_frames() : 0;
+  }
+
+  void cancel() {
+    if (finished_)
+      return;
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    queue_free();
+  }
+
+  void _process(double delta) override {
+    (void)delta;
+    if (finished_)
+      return;
+    auto *engine = godot::Engine::get_singleton();
+    const uint64_t current_frame =
+        engine ? engine->get_process_frames() : start_process_frames_;
+    if (current_frame - start_process_frames_ < 1)
+      return;
+    JV body = build_ui_click_result(target_path_, target_mouse_filter_,
+                                    center_x_, center_y_, window_center_x_,
+                                    window_center_y_, rounds_, strict_hit_);
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    body[GDA_FIELD_OK] = JV(!body.Contains("error"));
+    send_response(request_id_, std::move(body));
+    queue_free();
+  }
+};
+
 JV op_get_output(const JV &params) {
   int64_t limit = 200;
   if (auto *l = params.Find("limit")) {
@@ -1273,7 +1415,7 @@ JV op_get_tree() {
 }
 
 JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
-                bool truncated) {
+                bool truncated, int64_t request_id) {
   if (!click.IsObject())
     return error_result("ui_elements click must be an object");
   auto *path_p = click.Find("path");
@@ -1427,81 +1569,23 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
         return injected;
     }
   }
-  std::string hit_path;
-  bool hit_mismatch = false;
-  {
-    godot::Viewport *click_viewport = nullptr;
-    godot::Control *target_ctrl = nullptr;
-    if (godot::SceneTree *tree = get_scene_tree()) {
-      if (auto *ctrl = godot::Object::cast_to<godot::Control>(
-              resolve_game_node_suffixed(tree->get_root(), match->path))) {
-        target_ctrl = ctrl;
-        click_viewport = ctrl->get_viewport();
-      }
-      if (!click_viewport)
-        click_viewport =
-            godot::Object::cast_to<godot::Viewport>(tree->get_root());
-    }
-    godot::Control *hovered =
-        click_viewport ? click_viewport->gui_get_hovered_control() : nullptr;
-    if (hovered)
-      hit_path = util::to_std(godot::String(hovered->get_path()));
-    hit_mismatch =
-        target_ctrl && !ui_hit_matches_target(target_ctrl, hovered);
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree || !tree->get_root()) {
+    return build_ui_click_result(match->path, match->mouse_filter, center_x,
+                                 center_y, static_cast<double>(window_center.x),
+                                 static_cast<double>(window_center.y), rounds,
+                                 strict_hit);
   }
-  if (strict_hit && hit_mismatch) {
-    const std::string actual =
-        hit_path.empty() ? std::string("no hovered control") : hit_path;
-    JV body = error_result("click target not hit: expected " + match->path +
-                           " but the hovered control is " + actual);
-    JV details(JV::object_tag);
-    details["code"] = JV("click_occluded");
-    details["target_path"] = JV(match->path);
-    details["hit_path"] = JV(hit_path);
-    details["target_mouse_filter"] = JV(match->mouse_filter);
-    details["strict_hit"] = JV(true);
-    body["structured_error"] = std::move(details);
-    body["hit_path"] = JV(hit_path);
-    body["hit_mismatch"] = JV(true);
-    body["hint"] = JV(
-        "another visible Control is covering the target: run "
-        "validate_game_ui_layout to list possibly_occluded controls, inspect "
-        "get_game_ui_elements mouse_filter/z_index, or click the reported "
-        "hit_path instead; omit strict_hit to keep the click as a warning");
-    return body;
-  }
-  JV clicked(JV::object_tag);
-  clicked["ok"] = JV(true);
-  clicked["path"] = JV(match->path);
-  JV position(JV::object_tag);
-  position["x"] = JV(center_x);
-  position["y"] = JV(center_y);
-  clicked["position"] = std::move(position);
-  JV viewport_position(JV::object_tag);
-  viewport_position["x"] = JV(center_x);
-  viewport_position["y"] = JV(center_y);
-  clicked["viewport_position"] = std::move(viewport_position);
-  JV window_position(JV::object_tag);
-  window_position["x"] = JV(static_cast<double>(window_center.x));
-  window_position["y"] = JV(static_cast<double>(window_center.y));
-  clicked["window_position"] = std::move(window_position);
-  clicked["clicks"] = JV(static_cast<int64_t>(rounds));
-  clicked["hit_path"] = JV(hit_path);
-  clicked["hit_mismatch"] = JV(hit_mismatch);
-  if (hit_mismatch) {
-    const std::string actual =
-        hit_path.empty() ? std::string("no hovered control") : hit_path;
-    clicked["warning"] = JV(
-        "click may be occluded: the viewport hovered control is " + actual +
-        " instead of " + match->path +
-        " — pass strict_hit=true to fail on this mismatch");
-  }
-  JV inner(JV::object_tag);
-  inner["result"] = std::move(clicked);
-  return ok_result(std::move(inner));
+  GameBridgeUiClickAwaiter *awaiter = memnew(GameBridgeUiClickAwaiter);
+  awaiter->setup(request_id, match->path, match->mouse_filter, center_x,
+                 center_y, static_cast<double>(window_center.x),
+                 static_cast<double>(window_center.y), rounds, strict_hit);
+  tree->get_root()->add_child(awaiter);
+  register_cancel_handler(request_id, [awaiter] { awaiter->cancel(); });
+  return JV();
 }
 
-JV op_ui_elements(const JV &params) {
+JV op_ui_elements_impl(const JV &params, int64_t request_id) {
   int64_t max_elements = GDA_UI_ELEMENTS_DEFAULT;
   if (auto *m = params.Find("max_elements")) {
     if (m->IsInt() && m->GetInt() > 0)
@@ -1513,7 +1597,7 @@ JV op_ui_elements(const JV &params) {
   if (auto *filter_p = params.Find("filter"); filter_p && filter_p->IsString()) {
     const std::string filter_text = filter_p->GetString();
     filter.has_filter = !filter_text.empty();
-    filter.filter_lower = ui_lowercase(filter_text);
+    filter.filter_lower = util::ascii_lowercase(filter_text);
   }
   if (auto *types_p = params.Find("types"); types_p && types_p->IsArray()) {
     for (const auto &item : types_p->GetArray()) {
@@ -1534,7 +1618,7 @@ JV op_ui_elements(const JV &params) {
   const std::vector<UiElement> elements =
       collect_ui_elements(root, max_elements, filter, truncated);
   if (auto *click_p = params.Find("click"))
-    return run_ui_click(*click_p, elements, truncated);
+    return run_ui_click(*click_p, elements, truncated, request_id);
   JV arr(JV::array_tag);
   for (const UiElement &element : elements) {
     JV item(JV::object_tag);
@@ -1638,6 +1722,10 @@ JV op_ui_elements(const JV &params) {
   return ok_result(std::move(r));
 }
 
+JV op_ui_elements(const JV &params) {
+  return op_ui_elements_impl(params, 0);
+}
+
 godot::SceneTree *g_ready_tree = nullptr;
 
 void send_ready_message(bool scene_ready) {
@@ -1652,6 +1740,186 @@ void send_ready_message(bool scene_ready) {
   godot::Array payload;
   payload.push_back(godot::String(body.Dump().c_str()));
   dbg->send_message(gda_string(GDA_MSG_READY), payload);
+}
+
+std::unordered_map<int64_t, godot::Ref<godot::Tween>> &game_tweens() {
+  static std::unordered_map<int64_t, godot::Ref<godot::Tween>> store;
+  return store;
+}
+
+bool tween_number(const JV &params, const char *key, double &out) {
+  const JV *value = params.Find(key);
+  if (!value || !value->IsNumber())
+    return false;
+  out = util::json_number(value, 0.0);
+  return true;
+}
+
+JV op_tween_create(const JV &params) {
+  const JV *kind_p = params.Find("kind");
+  const std::string kind =
+      (kind_p && kind_p->IsString()) ? kind_p->GetString() : std::string("property");
+  const bool needs_node = kind != "interval";
+  const JV *path_p = params.Find("node_path");
+  if (needs_node &&
+      (!path_p || !path_p->IsString() || path_p->GetString().empty()))
+    return error_result("missing required parameter: node_path");
+  godot::Node *node = nullptr;
+  godot::SceneTree *tree = nullptr;
+  if (needs_node) {
+    node = resolve_node(path_p->GetString());
+    if (!node)
+      return error_result("node not found: " + path_p->GetString());
+    tree = node->get_tree();
+    if (!tree)
+      return error_result("no scene tree for node " + path_p->GetString());
+  } else {
+    tree = godot::SceneTree::get_singleton();
+    if (!tree)
+      return error_result("no scene tree available for tween interval");
+  }
+  godot::Ref<godot::Tween> tween = tree->create_tween();
+  if (!tween.is_valid())
+    return error_result("SceneTree::create_tween returned null");
+  if (const JV *trans = params.Find("trans"))
+    tween->set_trans(
+        static_cast<godot::Tween::TransitionType>(trans->GetInt()));
+  if (const JV *ease = params.Find("ease"))
+    tween->set_ease(static_cast<godot::Tween::EaseType>(ease->GetInt()));
+  if (const JV *loops = params.Find("loops"))
+    tween->set_loops(static_cast<int>(loops->GetInt()));
+  const JV *parallel = params.Find("parallel");
+  tween->set_parallel(parallel && parallel->IsBool() && parallel->GetBool());
+
+  JV inner(JV::object_tag);
+  inner["kind"] = JV(kind);
+  if (path_p) {
+    inner["path"] = *path_p;
+  }
+  if (kind == "property") {
+    const JV *prop_p = params.Find("property");
+    if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
+      return error_result("missing required parameter: property");
+    const JV *target_p = params.Find("target_value");
+    double duration = 0.0;
+    if (!target_p || !tween_number(params, "duration", duration) ||
+        duration <= 0.0)
+      return error_result("missing required parameter: duration");
+    godot::Variant initial =
+        node->get(godot::StringName(prop_p->GetString().c_str()));
+    const std::string type_hint =
+        util::to_std(godot::Variant::get_type_name(initial.get_type()));
+    godot::Variant final_value = VariantJson::deserialize(*target_p, type_hint);
+    godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
+        node, godot::NodePath(godot::String(prop_p->GetString().c_str())),
+        final_value, duration);
+    if (!tweener.is_valid())
+      return error_result("tween_property rejected property '" +
+                          prop_p->GetString() + "'");
+    inner["property"] = *prop_p;
+  } else if (kind == "method") {
+    const JV *method_p = params.Find("method");
+    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+      return error_result("missing required parameter: method");
+    const std::string method = method_p->GetString();
+    if (!node->has_method(godot::StringName(method.c_str())))
+      return error_result("method not found on the target node: " + method);
+    const JV *from_p = params.Find("from");
+    const JV *to_p = params.Find("to");
+    double duration = 0.0;
+    if (!from_p || !to_p || !tween_number(params, "duration", duration) ||
+        duration <= 0.0)
+      return error_result("missing required parameters: from/to/duration");
+    tween->tween_method(
+        godot::Callable(node, godot::StringName(method.c_str())),
+        VariantJson::deserialize(*from_p), VariantJson::deserialize(*to_p),
+        duration);
+    inner["method"] = *method_p;
+  } else if (kind == "callback") {
+    const JV *method_p = params.Find("method");
+    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+      return error_result("missing required parameter: method");
+    const std::string method = method_p->GetString();
+    if (!node->has_method(godot::StringName(method.c_str())))
+      return error_result("method not found on the target node: " + method);
+    godot::Callable callable(node, godot::StringName(method.c_str()));
+    if (const JV *args_p = params.Find("callback_args")) {
+      if (args_p->IsArray()) {
+        godot::Array bound;
+        for (const auto &item : args_p->GetArray())
+          bound.push_back(VariantJson::deserialize(item));
+        callable = callable.bindv(bound);
+      }
+    }
+    tween->tween_callback(callable);
+    inner["method"] = *method_p;
+  } else if (kind == "interval") {
+    double duration = 0.0;
+    if (!tween_number(params, "duration", duration) || duration <= 0.0)
+      return error_result("missing required parameter: duration");
+    tween->tween_interval(duration);
+  } else {
+    return error_result("invalid tween kind: " + kind);
+  }
+
+  const int64_t tween_id = tween->get_instance_id();
+  game_tweens()[tween_id] = tween;
+  inner["tween_id"] = JV(tween_id);
+  inner["running"] = JV(tween->is_running());
+  return ok_result(std::move(inner));
+}
+
+JV op_tween_control(const JV &params) {
+  const JV *id_p = params.Find("tween_id");
+  if (!id_p || !id_p->IsInt())
+    return error_result("missing required parameter: tween_id");
+  const JV *action_p = params.Find("action");
+  if (!action_p || !action_p->IsString())
+    return error_result("missing required parameter: action");
+  const std::string action = action_p->GetString();
+  auto &store = game_tweens();
+  auto it = store.find(id_p->GetInt());
+  if (it == store.end() || !it->second.is_valid())
+    return error_result("tween not found: " + std::to_string(id_p->GetInt()));
+  godot::Ref<godot::Tween> tween = it->second;
+  if (action == "play") {
+    tween->play();
+  } else if (action == "pause") {
+    tween->pause();
+  } else if (action == "stop") {
+    tween->stop();
+  } else if (action == "kill") {
+    tween->kill();
+    store.erase(it);
+  } else {
+    return error_result("invalid action: expected play|pause|stop|kill");
+  }
+  JV inner(JV::object_tag);
+  inner["tween_id"] = *id_p;
+  inner["action"] = *action_p;
+  inner["running"] = JV(tween.is_valid() && tween->is_running());
+  return ok_result(std::move(inner));
+}
+
+JV op_tween_list(const JV &params) {
+  (void)params;
+  JV items(JV::array_tag);
+  auto &store = game_tweens();
+  for (auto it = store.begin(); it != store.end();) {
+    if (!it->second.is_valid()) {
+      it = store.erase(it);
+      continue;
+    }
+    JV item(JV::object_tag);
+    item["tween_id"] = JV(it->first);
+    item["running"] = JV(it->second->is_running());
+    items.PushBack(std::move(item));
+    ++it;
+  }
+  JV inner(JV::object_tag);
+  inner["tweens"] = std::move(items);
+  inner["count"] = JV(static_cast<int64_t>(store.size()));
+  return ok_result(std::move(inner));
 }
 
 class GameBridgeListener : public godot::RefCounted {
@@ -1692,8 +1960,8 @@ public:
     if (p_data.size() < 1)
       return true;
     std::string req_str = util::to_std(godot::String(p_data[0]));
-    JV request = JV::Parse(req_str);
-    if (!request.IsObject()) {
+    JV request(JV::object_tag);
+    if (!util::try_parse_json(req_str, request) || !request.IsObject()) {
       push_game_error("game_bridge.cpp", "on_gda_message", 0,
                       "malformed gda request", req_str.substr(0, 200), false,
                       {});
@@ -1738,7 +2006,7 @@ public:
     } else if (op == GDA_OP_INPUT_STATUS) {
       body = op_input_status(params);
     } else if (op == GDA_OP_UI_ELEMENTS) {
-      body = op_ui_elements(params);
+      body = op_ui_elements_impl(params, request_id);
     } else if (op == GDA_OP_CAPTURE) {
       body = op_capture(params, request_id);
     } else if (op == GDA_OP_EVAL_ASSERT) {
@@ -1757,6 +2025,12 @@ public:
       body = op_get_tree();
     } else if (op == GDA_OP_SCENE_TREE) {
       body = op_scene_tree(params);
+    } else if (op == GDA_OP_TWEEN_CREATE) {
+      body = op_tween_create(params);
+    } else if (op == GDA_OP_TWEEN_CONTROL) {
+      body = op_tween_control(params);
+    } else if (op == GDA_OP_TWEEN_LIST) {
+      body = op_tween_list(params);
     } else {
       body = error_result("unknown op: " + op);
     }
@@ -2181,6 +2455,7 @@ void register_listener() {
     register_input_bridge_classes();
     register_verify_bridge_classes();
     godot::ClassDB::register_class<GameBridgeCaptureAwaiter>();
+    godot::ClassDB::register_class<GameBridgeUiClickAwaiter>();
     godot::ClassDB::register_class<GameBridgeLogger>();
     class_registered = true;
   }

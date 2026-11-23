@@ -1,0 +1,761 @@
+{
+  "schema": 1,
+  "source": "src/tools/domains/*/*_tools.hpp",
+  "catalog_current": 252,
+  "catalog_target": 270,
+  "catalog_expected": 277,
+  "catalog_target_range": [
+    250,
+    300
+  ],
+  "domain_current_total": 246,
+  "domain_target_total": 265,
+  "planned_domain_target_total": 266,
+  "net_new_total": 6,
+  "strict_prune_count": 32,
+  "meta_current": 5,
+  "meta_target": 5,
+  "system_current": 1,
+  "system_target": 1,
+  "hot_names": [
+    "property_get",
+    "property_set",
+    "create_scene_node",
+    "get_scene_tree",
+    "capture_editor_viewport",
+    "call_tool"
+  ],
+  "domains": [
+    {
+      "name": "Analysis",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "analyze_project"
+      ]
+    },
+    {
+      "name": "Animation",
+      "current": 10,
+      "target": 6,
+      "plan_target": 6,
+      "merge_groups": [
+        "animation_clip",
+        "animation_track",
+        "animation_player",
+        "animation_tree"
+      ]
+    },
+    {
+      "name": "Audio",
+      "current": 5,
+      "target": 13,
+      "plan_target": 13,
+      "merge_groups": [
+        "audio_bus",
+        "audio_player",
+        "audio_device",
+        "audio_capture",
+        "audio_wav"
+      ]
+    },
+    {
+      "name": "Capture",
+      "current": 2,
+      "target": 2,
+      "plan_target": 2,
+      "merge_groups": [
+        "capture_editor_viewport",
+        "review_scene_visually"
+      ]
+    },
+    {
+      "name": "Config",
+      "current": 8,
+      "target": 11,
+      "plan_target": 11,
+      "merge_groups": [
+        "config_read",
+        "config_write",
+        "autoload"
+      ]
+    },
+    {
+      "name": "C#",
+      "current": 2,
+      "target": 3,
+      "plan_target": 3,
+      "merge_groups": [
+        "csharp_member",
+        "csharp_event",
+        "dotnet"
+      ]
+    },
+    {
+      "name": "Debug",
+      "current": 6,
+      "target": 9,
+      "plan_target": 10,
+      "merge_groups": [
+        "debug_info",
+        "debug_stack",
+        "debug_log",
+        "debug_visual",
+        "debug_physics_fps",
+        "debug_monitors"
+      ],
+      "note": "D-08 记当前 16，源码实测为 15；D-07 删除 6 项后为 9，故有效目标取 9"
+    },
+    {
+      "name": "Debugger",
+      "current": 4,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "debugger_stream",
+        "debugger_plugin_log",
+        "debugger_game_log",
+        "debugger_session"
+      ]
+    },
+    {
+      "name": "Display",
+      "current": 8,
+      "target": 14,
+      "plan_target": 14,
+      "merge_groups": [
+        "display_info",
+        "display_clipboard",
+        "display_dialog",
+        "display_mouse",
+        "display_tts",
+        "display_window",
+        "display_screen"
+      ]
+    },
+    {
+      "name": "Docs",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "get_docs_class"
+      ]
+    },
+    {
+      "name": "Editor",
+      "current": 16,
+      "target": 24,
+      "plan_target": 24,
+      "merge_groups": [
+        "editor_state",
+        "editor_ui",
+        "editor_files",
+        "editor_scene_control",
+        "editor_save",
+        "editor_selection",
+        "editor_undo",
+        "editor_ui_action",
+        "editor_config",
+        "editor_inspect",
+        "editor_csharp",
+        "editor_script",
+        "editor_breakpoints",
+        "editor_session",
+        "editor_info"
+      ]
+    },
+    {
+      "name": "Game",
+      "current": 9,
+      "target": 13,
+      "plan_target": 13,
+      "merge_groups": [
+        "game_state",
+        "game_job",
+        "game_ui",
+        "game_evidence",
+        "game_script",
+        "game_input",
+        "game_tween",
+        "game_localization"
+      ]
+    },
+    {
+      "name": "GridMap",
+      "current": 4,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "create_gridmap",
+        "gridmap_item",
+        "set_gridmap_cells",
+        "get_gridmap_used_cells"
+      ]
+    },
+    {
+      "name": "Group",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "node_group"
+      ]
+    },
+    {
+      "name": "Image",
+      "current": 4,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "image_edit",
+        "image_pixel",
+        "image_save",
+        "texture_gen"
+      ]
+    },
+    {
+      "name": "Input",
+      "current": 6,
+      "target": 7,
+      "plan_target": 7,
+      "merge_groups": [
+        "input_state",
+        "input_action",
+        "input_key",
+        "input_mouse",
+        "input_text",
+        "input_gamepad"
+      ]
+    },
+    {
+      "name": "InputMap",
+      "current": 4,
+      "target": 5,
+      "plan_target": 5,
+      "merge_groups": [
+        "get_input_map_actions",
+        "set_input_map_action_bundle",
+        "erase_input_map",
+        "save_input_map"
+      ]
+    },
+    {
+      "name": "Log",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "get_game_log_entries"
+      ]
+    },
+    {
+      "name": "Mesh",
+      "current": 4,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "mesh_surface",
+        "mesh_inspect",
+        "multimesh",
+        "multimesh_instance"
+      ]
+    },
+    {
+      "name": "Nav",
+      "current": 14,
+      "target": 6,
+      "plan_target": 6,
+      "merge_groups": [
+        "create_navigation",
+        "nav_query",
+        "nav_control"
+      ]
+    },
+    {
+      "name": "OS",
+      "current": 12,
+      "target": 11,
+      "plan_target": 11,
+      "merge_groups": [
+        "process",
+        "env",
+        "time",
+        "system",
+        "file",
+        "file_manager",
+        "alert",
+        "path"
+      ]
+    },
+    {
+      "name": "Physics",
+      "current": 46,
+      "target": 32,
+      "plan_target": 32,
+      "merge_groups": [
+        "body",
+        "area",
+        "space",
+        "joint",
+        "shape",
+        "query",
+        "soft_body",
+        "debug",
+        "bundle"
+      ]
+    },
+    {
+      "name": "Properties",
+      "current": 6,
+      "target": 6,
+      "plan_target": 6,
+      "merge_groups": [
+        "property_get",
+        "property_set",
+        "set_node_transform",
+        "property_get_list",
+        "signal"
+      ]
+    },
+    {
+      "name": "Render",
+      "current": 29,
+      "target": 30,
+      "plan_target": 30,
+      "merge_groups": [
+        "environment",
+        "instance",
+        "viewport",
+        "camera",
+        "canvas",
+        "light",
+        "particles",
+        "resource",
+        "inspect",
+        "free"
+      ]
+    },
+    {
+      "name": "Resources",
+      "current": 10,
+      "target": 20,
+      "plan_target": 20,
+      "merge_groups": [
+        "load",
+        "query",
+        "create",
+        "property",
+        "file",
+        "save",
+        "uid",
+        "import",
+        "curve",
+        "mesh"
+      ]
+    },
+    {
+      "name": "Scene",
+      "current": 7,
+      "target": 9,
+      "plan_target": 9,
+      "merge_groups": [
+        "get_scene_tree",
+        "create_scene_node",
+        "edit_scene_node",
+        "delete_scene_node",
+        "camera",
+        "instantiate"
+      ]
+    },
+    {
+      "name": "SceneTree",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "game_scene_tree"
+      ]
+    },
+    {
+      "name": "Scripts",
+      "current": 10,
+      "target": 6,
+      "plan_target": 6,
+      "merge_groups": [
+        "query",
+        "file",
+        "attach",
+        "execute",
+        "call"
+      ]
+    },
+    {
+      "name": "SpriteFrames",
+      "current": 1,
+      "target": 2,
+      "plan_target": 2,
+      "merge_groups": [
+        "update",
+        "get"
+      ]
+    },
+    {
+      "name": "Testing",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "run_tests"
+      ]
+    },
+    {
+      "name": "Text",
+      "current": 3,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "font",
+        "shaped",
+        "query"
+      ]
+    },
+    {
+      "name": "Theme",
+      "current": 3,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "info",
+        "update_theme",
+        "update_layout"
+      ]
+    },
+    {
+      "name": "TileMap",
+      "current": 3,
+      "target": 3,
+      "plan_target": 3,
+      "merge_groups": [
+        "create",
+        "set_cells",
+        "tileset"
+      ]
+    },
+    {
+      "name": "Tileset",
+      "current": 1,
+      "target": 1,
+      "plan_target": 1,
+      "merge_groups": [
+        "update_tileset"
+      ]
+    },
+    {
+      "name": "Tween",
+      "current": 3,
+      "target": 2,
+      "plan_target": 2,
+      "merge_groups": [
+        "game_tween",
+        "editor_preview"
+      ]
+    }
+  ],
+  "new_tools": [
+    {
+      "name": "pack_scene",
+      "domain": "Scene",
+      "purpose": "PackedScene::pack 磁盘打包与 SceneState 读取"
+    },
+    {
+      "name": "animation_runtime",
+      "domain": "Animation",
+      "purpose": "AnimationPlayer 播放/seek/速度与轨道读取"
+    },
+    {
+      "name": "bake_navigation_mesh",
+      "domain": "Nav",
+      "purpose": "NavigationMeshGenerator 烘焙"
+    },
+    {
+      "name": "astar_path",
+      "domain": "Nav",
+      "purpose": "AStarGrid2D/AStar2D/AStar3D 路径查询"
+    },
+    {
+      "name": "image_ops",
+      "domain": "Image",
+      "purpose": "Image/Noise/Gradient 生成与保存"
+    },
+    {
+      "name": "mesh_ops",
+      "domain": "Mesh",
+      "purpose": "SurfaceTool/Mesh/MultiMesh 生成与碰撞"
+    }
+  ],
+  "alias_placeholders": [
+    {
+      "old_tool": "get_audio_device_inputs",
+      "canonical": "get_audio_input_devices",
+      "action": "",
+      "arg_adapt": "无",
+      "result_projection": "旧 result 取 devices",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_audio_bus_count",
+      "canonical": "get_audio_bus_layout",
+      "action": "count",
+      "arg_adapt": "无",
+      "result_projection": "buses.size()",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_audio_bus_name",
+      "canonical": "get_audio_bus_layout",
+      "action": "name",
+      "arg_adapt": "bus_index",
+      "result_projection": "buses[bus_index].name",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_debug_monitor",
+      "canonical": "get_debug_monitors",
+      "action": "values",
+      "arg_adapt": "monitor -> ids=[monitor]",
+      "result_projection": "取首个 value",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_debug_monitor_catalog",
+      "canonical": "get_debug_monitors",
+      "action": "catalog",
+      "arg_adapt": "catalog=true",
+      "result_projection": "取 catalog 数组",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_debug_object_count",
+      "canonical": "get_debug_monitors",
+      "action": "values",
+      "arg_adapt": "ids=[OBJECT_COUNT]",
+      "result_projection": "取 OBJECT_COUNT 值",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_debug_memory_usage",
+      "canonical": "get_debug_monitors",
+      "action": "values",
+      "arg_adapt": "ids=[MEMORY_STATIC]",
+      "result_projection": "取 MEMORY_STATIC 值",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_debug_node_count",
+      "canonical": "get_debug_monitors",
+      "action": "values",
+      "arg_adapt": "ids=[OBJECT_NODE_COUNT]",
+      "result_projection": "取 OBJECT_NODE_COUNT 值",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_debug_custom_monitor_names",
+      "canonical": "get_debug_monitors",
+      "action": "custom",
+      "arg_adapt": "include_custom=true",
+      "result_projection": "取 custom_names 数组",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_docs_method",
+      "canonical": "get_docs_class",
+      "action": "member",
+      "arg_adapt": "section=methods, member=method, exact=true",
+      "result_projection": "取单条 method 字典",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_docs_property",
+      "canonical": "get_docs_class",
+      "action": "member",
+      "arg_adapt": "section=properties, member=property, exact=true",
+      "result_projection": "取单条 property 字典",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_theme_color",
+      "canonical": "set_theme_item_bundle",
+      "action": "set",
+      "arg_adapt": "{theme_type:{varname:color}} -> colors",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_theme_constant",
+      "canonical": "set_theme_item_bundle",
+      "action": "set",
+      "arg_adapt": "{theme_type:{varname:constant}} -> constants",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_theme_font_size",
+      "canonical": "set_theme_item_bundle",
+      "action": "set",
+      "arg_adapt": "{theme_type:{varname:size}} -> font_sizes",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_theme_stylebox_flat",
+      "canonical": "set_theme_item_bundle",
+      "action": "set",
+      "arg_adapt": "{theme_type:{varname:stylebox}} -> styleboxes",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_control_anchor_preset",
+      "canonical": "set_control_layout",
+      "action": "anchor",
+      "arg_adapt": "control_path -> path; preset/keep_offsets 透传",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_tilemap_cell",
+      "canonical": "set_tilemap_cells",
+      "action": "set",
+      "arg_adapt": "单格包装为 cells:[{...}]",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_gridmap_cell",
+      "canonical": "fill_gridmap_box",
+      "action": "fill",
+      "arg_adapt": "position -> from=to=position",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "add_input_map_action",
+      "canonical": "set_input_map_action_bundle",
+      "action": "set",
+      "arg_adapt": "action/deadzone",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "add_input_map_action_event",
+      "canonical": "set_input_map_action_bundle",
+      "action": "set",
+      "arg_adapt": "events:[event]",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_input_map_action_deadzone",
+      "canonical": "set_input_map_action_bundle",
+      "action": "set",
+      "arg_adapt": "deadzone",
+      "result_projection": "旧 {result:\"ok\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "has_input_map_action",
+      "canonical": "get_input_map_actions",
+      "action": "has",
+      "arg_adapt": "action",
+      "result_projection": "旧布尔",
+      "status": "planned"
+    },
+    {
+      "old_tool": "has_resource_dependency",
+      "canonical": "get_resource_dependencies",
+      "action": "has",
+      "arg_adapt": "dependency",
+      "result_projection": "旧布尔",
+      "status": "planned"
+    },
+    {
+      "old_tool": "move_resource_file",
+      "canonical": "rename_resource_file",
+      "action": "move",
+      "arg_adapt": "path + new_directory",
+      "result_projection": "旧 move 返回",
+      "status": "planned"
+    },
+    {
+      "old_tool": "load_script",
+      "canonical": "load_resource",
+      "action": "load",
+      "arg_adapt": "type_hint=Script; fresh -> cache_mode",
+      "result_projection": "旧 script 引用",
+      "status": "planned"
+    },
+    {
+      "old_tool": "set_properties_batch",
+      "canonical": "property_set",
+      "action": "batch",
+      "arg_adapt": "properties + atomic",
+      "result_projection": "旧 batch 返回",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_scene_snapshot",
+      "canonical": "get_scene_tree",
+      "action": "snapshot",
+      "arg_adapt": "verify/paths/observe",
+      "result_projection": "旧 snapshot 信封",
+      "status": "planned"
+    },
+    {
+      "old_tool": "get_scene_node_screen_rect",
+      "canonical": "get_scene_tree",
+      "action": "screen_rect",
+      "arg_adapt": "paths",
+      "result_projection": "旧 nodes 段",
+      "status": "planned"
+    },
+    {
+      "old_tool": "verify_scene_saved",
+      "canonical": "get_scene_tree",
+      "action": "verify",
+      "arg_adapt": "verify=true",
+      "result_projection": "旧 verify 对象",
+      "status": "planned"
+    },
+    {
+      "old_tool": "capture_game_viewport",
+      "canonical": "capture_editor_viewport",
+      "action": "game",
+      "arg_adapt": "target=\"game\"",
+      "result_projection": "旧截图信封",
+      "status": "planned"
+    },
+    {
+      "old_tool": "ping",
+      "canonical": "system_status",
+      "action": "",
+      "arg_adapt": "无",
+      "result_projection": "{result:\"pong\"}",
+      "status": "planned"
+    },
+    {
+      "old_tool": "list_categories",
+      "canonical": "search_tools",
+      "action": "categories",
+      "arg_adapt": "categories=true, limit=0",
+      "result_projection": "旧 categories 数组",
+      "status": "planned"
+    }
+  ],
+  "notes": [
+    "D-08 的 Debug 当前计数为 16，源码按域文件实数为 15；D-07 删除 6 项后有效目标为 9。",
+    "D-08 的域目标合计 258 未计入净新增 6 项；本文件按 257 + 6 + 1 + 5 推导 catalog_expected=269。",
+    "catalog_target=270 保留为计划声明值；执行期允许 250–300。"
+  ]
+}

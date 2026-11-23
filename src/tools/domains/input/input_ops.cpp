@@ -1,5 +1,6 @@
 #include "tools/domains/input/input_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "tools/domains/input_map/input_map_ops.hpp"
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
@@ -15,52 +16,7 @@ namespace input_ops {
 namespace {
 
 godot::Key parse_key(const std::string &key_str) {
-  if (key_str.empty())
-    return godot::KEY_NONE;
-
-  if (key_str.size() == 1) {
-    char c = key_str[0];
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-    if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
-      return static_cast<godot::Key>(c);
-    }
-  }
-
-  std::string u = key_str;
-  for (auto &c : u) {
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-  }
-
-  if (u == "SPACE")
-    return godot::KEY_SPACE;
-  if (u == "ENTER")
-    return godot::KEY_ENTER;
-  if (u == "ESCAPE")
-    return godot::KEY_ESCAPE;
-  if (u == "SHIFT")
-    return godot::KEY_SHIFT;
-  if (u == "CONTROL" || u == "CTRL")
-    return godot::KEY_CTRL;
-  if (u == "ALT")
-    return godot::KEY_ALT;
-  if (u == "TAB")
-    return godot::KEY_TAB;
-  if (u == "BACKSPACE")
-    return godot::KEY_BACKSPACE;
-  if (u == "DELETE")
-    return godot::KEY_DELETE;
-  if (u == "LEFT")
-    return godot::KEY_LEFT;
-  if (u == "RIGHT")
-    return godot::KEY_RIGHT;
-  if (u == "UP")
-    return godot::KEY_UP;
-  if (u == "DOWN")
-    return godot::KEY_DOWN;
-
-  return godot::KEY_NONE;
+  return input_map_ops::resolve_input_key(key_str);
 }
 
 godot::MouseButton parse_mouse_button(const std::string &button_str) {
@@ -484,6 +440,123 @@ mcp::JsonValue handle_gamepad_vibration_stop(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   return r;
+}
+
+namespace {
+
+mcp::JsonValue input_action_error(const std::string &message) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(message);
+  return error;
+}
+
+bool read_input_action(const mcp::JsonValue &args, std::string &out,
+                       mcp::JsonValue &error) {
+  const mcp::JsonValue *action = args.Find("action");
+  if (action == nullptr) {
+    error = input_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = input_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+mcp::JsonValue legacy_input_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out.GetObject().erase("action");
+  const mcp::JsonValue *name = args.Find("name");
+  if (name != nullptr) {
+    out["action"] = *name;
+  }
+  return out;
+}
+
+mcp::JsonValue strip_input_action(const mcp::JsonValue &args) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+mcp::JsonValue handle_get_input_state(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_input_action(args, action, error)) {
+    return error;
+  }
+  const mcp::JsonValue legacy = legacy_input_args(args);
+  if (action == "action_pressed") {
+    return handle_is_action_pressed(legacy);
+  }
+  if (action == "action_just_pressed") {
+    return handle_is_action_just_pressed(legacy);
+  }
+  return input_action_error(
+      "unknown action '" + action +
+      "' for get_input_state (expected action_pressed, action_just_pressed)");
+}
+
+mcp::JsonValue handle_input_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_input_action(args, action, error)) {
+    return error;
+  }
+  const mcp::JsonValue legacy = legacy_input_args(args);
+  if (action == "press") {
+    return handle_action_press(legacy);
+  }
+  if (action == "release") {
+    return handle_action_release(legacy);
+  }
+  return input_action_error(
+      "unknown action '" + action +
+      "' for input_action (expected press, release)");
+}
+
+mcp::JsonValue handle_input_key(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_input_action(args, action, error)) {
+    return error;
+  }
+  const mcp::JsonValue legacy = strip_input_action(args);
+  if (action == "press") {
+    return handle_key_press(legacy);
+  }
+  if (action == "release") {
+    return handle_key_release(legacy);
+  }
+  return input_action_error(
+      "unknown action '" + action +
+      "' for input_key (expected press, release)");
+}
+
+mcp::JsonValue handle_input_gamepad(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_input_action(args, action, error)) {
+    return error;
+  }
+  const mcp::JsonValue legacy = strip_input_action(args);
+  if (action == "start_vibration") {
+    return handle_gamepad_vibration_start(legacy);
+  }
+  if (action == "stop_vibration") {
+    return handle_gamepad_vibration_stop(legacy);
+  }
+  return input_action_error(
+      "unknown action '" + action +
+      "' for input_gamepad (expected start_vibration, stop_vibration)");
 }
 
 } // namespace input_ops

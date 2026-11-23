@@ -331,8 +331,7 @@ git clone --recurse-submodules https://github.com/jesspig/Godot-Autopilot.git
 cd Godot-Autopilot
 bun install
 bun run gda-dev-tools build --release
-bun run gda-dev-tools deploy --release --demos 2d_dodge_the_creeps
-bun run gda-dev-tools package
+bun run gda-dev-tools package --preset release
 ```
 
 If the repository was cloned without submodules:
@@ -351,18 +350,10 @@ unzip -o dist/godot-autopilot-<version>.zip -d "<project>"
 Expand-Archive -Path dist\godot-autopilot-<version>.zip -DestinationPath "<project>" -Force
 ```
 
-Alternatively, copy the deployed addon directory:
+Alternatively, deploy the built addon directly into an existing Godot project:
 
 ```bash
-# macOS / Linux
-mkdir -p "<project>/addons"
-cp -R examples/2d_dodge_the_creeps/addons/godot-autopilot "<project>/addons/"
-```
-
-```powershell
-# Windows PowerShell
-New-Item -ItemType Directory -Force -Path "<project>\addons" | Out-Null
-Copy-Item -Recurse -Force "examples\2d_dodge_the_creeps\addons\godot-autopilot" "<project>\addons\"
+bun run gda-dev-tools deploy --release --project "<project>"
 ```
 
 Verify the same files listed in B2.

@@ -1,6 +1,6 @@
 import net from "node:net";
 
-import { CliError, ExitCode } from "../errors";
+import { CliError, ExitCode, markIpcRequestSent } from "../errors";
 import type { JsonRpcResponse } from "../mcp/client";
 
 export type IpcKind = "unix" | "tcp" | "pipe";
@@ -143,10 +143,6 @@ export class IpcSession {
 
   private onData(chunk: Buffer): void {
     this.buffer = Buffer.concat([this.buffer, chunk]);
-    if (this.buffer.length > MAX_FRAME_BYTES + 4) {
-      this.failAll(new CliError(ExitCode.Transport, "the IPC response exceeds the 4 MiB frame limit."));
-      return;
-    }
     const decoded = decodeFrames(this.buffer);
     this.buffer = decoded.remainder;
     if (decoded.overflow) {
@@ -185,10 +181,10 @@ export class IpcSession {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(
-          new CliError(
+          markIpcRequestSent(new CliError(
             ExitCode.Transport,
-            `the IPC request timed out after ${this.timeoutMs} ms (${endpointLabel(this.endpoint)}).`,
-          ),
+            `the IPC request timed out after ${this.timeoutMs} ms (${endpointLabel(this.endpoint)}); the execution result is unknown and the call was not retried.`,
+          )),
         );
       }, this.timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
@@ -211,7 +207,16 @@ export class IpcSession {
   private failAll(error: Error): void {
     for (const [id, entry] of this.pending) {
       clearTimeout(entry.timer);
-      entry.reject(error);
+      // Every pending request has been written to the socket; losing the
+      // response must not trigger a retry that could repeat side effects.
+      const mapped = error instanceof CliError
+        ? markIpcRequestSent(new CliError(
+            error.code,
+            `${error.message} The IPC request had already been sent; the execution result is unknown and the call was not retried.`,
+            error.suggestion,
+          ))
+        : error;
+      entry.reject(mapped);
       this.pending.delete(id);
     }
   }

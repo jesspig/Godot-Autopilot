@@ -1,4 +1,5 @@
 #include "tools/domains/csharp_bridge/csharp_bridge_ops.hpp"
+#include "tools/domains/csharp_bridge/bridge_locator.hpp"
 
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
@@ -7,6 +8,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -106,9 +108,7 @@ CSharpTarget resolve_locator(const JV &args, const std::string &prefix,
       return out;
     }
     int64_t obj_id = 0;
-    try {
-      obj_id = std::stoll(p_oid_str->GetString());
-    } catch (...) {
+    if (!util::parse_decimal_int64(p_oid_str->GetString(), obj_id)) {
       out.error = util::error_json("invalid " + k_oid_str +
                                    ": not a valid 64-bit integer");
       return out;
@@ -282,6 +282,19 @@ bool check_allowed(const JV &args, const std::string &tool,
     }
   }
   return true;
+}
+
+JV without_action(const JV &args) {
+  JV out(JV::object_tag);
+  if (!args.IsObject()) {
+    return out;
+  }
+  for (const auto &entry : args.GetObject()) {
+    if (entry.first != "action") {
+      out[entry.first] = entry.second;
+    }
+  }
+  return out;
 }
 
 bool fetch_editor_bridge(godot::Object *&out_bridge,
@@ -473,9 +486,12 @@ std::string bridge_repair_source() {
        "run build_csharp_assembly and restart the game\"}\n";
   s += "__gda_bridge_node.name = \"GdaCSharpRuntime\"\n";
   s += "get_tree().root.add_child(__gda_bridge_node)\n";
+  s += "var __gda_holder = get_tree().root.find_child(\"" +
+       std::string(kBridgeHolderNode) + "\", true, false)\n";
+  s += "var __gda_bridge_ready = " +
+       csharp_bridge_detail::bridge_ready_expression("__gda_holder") + "\n";
   s += "return {\"ok\": true, \"bridge_created\": true, \"bridge_ready\": "
-       "get_tree().root.find_child(\"" +
-       std::string(kBridgeHolderNode) + "\", true, false) != null}\n";
+       "__gda_bridge_ready}\n";
   return s;
 }
 
@@ -496,14 +512,10 @@ std::string emit_bridge_header() {
   std::string s;
   s += "var __gda_holder = get_tree().root.find_child(\"" +
        std::string(kBridgeHolderNode) + "\", true, false)\n";
-  s += "if __gda_holder == null:\n";
+  s += "if not (" + csharp_bridge_detail::bridge_ready_expression("__gda_holder") + "):\n";
   s += "    " + emit_bridge_missing_return(
-      "no __gda_runtime node (add GdaCSharpRuntime to the game scene and run a "
-      ".NET game build)");
-  s += "if not __gda_holder.has_meta(\"bridge\"):\n";
-  s += "    " + emit_bridge_missing_return(
-      "__gda_runtime node has no bridge meta (GdaCSharpRuntime._Ready did not "
-      "run)");
+      "no ready C# bridge node (add GdaCSharpRuntime to the game scene, build "
+      "the .NET assembly and restart the game)");
   s += "var __gda_bridge = __gda_holder.get_meta(\"bridge\")\n";
   return s;
 }
@@ -1162,6 +1174,46 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_list_members completed");
   return lr;
+}
+
+mcp::JsonValue handle_csharp_member(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  const JV sub_args = without_action(args);
+  if (action == "get") {
+    return handle_csharp_get(sub_args);
+  }
+  if (action == "set") {
+    return handle_csharp_set(sub_args);
+  }
+  if (action == "call") {
+    return handle_csharp_call(sub_args);
+  }
+  if (action == "list") {
+    return handle_csharp_list(sub_args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected get, set, call or list");
+}
+
+mcp::JsonValue handle_csharp_event(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  const JV sub_args = without_action(args);
+  if (action == "subscribe") {
+    return handle_csharp_subscribe(sub_args);
+  }
+  if (action == "unsubscribe") {
+    return handle_csharp_unsubscribe(sub_args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected subscribe or unsubscribe");
 }
 
 } // namespace csharp_bridge_ops

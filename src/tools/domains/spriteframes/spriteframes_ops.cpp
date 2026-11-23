@@ -1,4 +1,6 @@
+#include "util/project_path.hpp"
 #include "tools/domains/spriteframes/spriteframes_ops.hpp"
+#include "tools/domains/spriteframes/grid_budget.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -168,13 +170,19 @@ JV handle_add_frame(const JV &args) {
     return util::error_json("invalid parameter: vframes must be a positive integer");
   if (vframes < 1)
     return util::error_json("invalid parameter: vframes must be a positive integer");
+  if (grid_detail::grid_frame_count(hframes, vframes) < 0)
+    return util::error_json("invalid parameters: hframes*vframes exceeds the grid limit");
 
   std::string resolve_err;
   godot::Ref<godot::SpriteFrames> sf = resolve_spriteframes(name, resolve_err);
   if (sf.is_null())
     return util::error_json(resolve_err);
 
-  godot::String tex_path(texture.c_str());
+  const auto checked_tex = util::normalize_project_path(texture, false, false);
+  if (!checked_tex.error.empty())
+    return util::error_detail("path rejected", texture,
+                              "an in-project res:// file path", checked_tex.error);
+  godot::String tex_path(checked_tex.value.c_str());
   if (!godot::FileAccess::file_exists(tex_path))
     return util::error_detail("file does not exist", texture,
                               "an existing file path",
@@ -224,6 +232,25 @@ JV handle_add_frame(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_spriteframes_frame completed");
   return r;
+}
+
+mcp::JsonValue handle_update_spriteframes(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_create(args);
+  }
+  if (action == "add_animation") {
+    return handle_add_animation(args);
+  }
+  if (action == "add_frame") {
+    return handle_add_frame(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected create, add_animation or add_frame");
 }
 
 } // namespace spriteframes_ops

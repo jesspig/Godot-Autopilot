@@ -71,7 +71,7 @@ std::string summarize_payload(const std::string &payload) {
 }
 
 std::atomic<int64_t> g_next_request_id{1};
-std::atomic<int64_t> g_responses_received{0};
+std::atomic<int64_t> g_game_error_responses{0};
 std::atomic<int64_t> g_last_response_steady_ms{-1};
 
 struct PendingRequest {
@@ -87,6 +87,8 @@ struct PendingRequest {
   int32_t session_count = 0;
   bool error_breaks_suppressed = false;
   bool awaiting_ready = false;
+  int64_t responses_received = 0;
+  int64_t error_responses_at_dispatch = 0;
 };
 
 struct MainThreadTaskState {
@@ -196,6 +198,7 @@ std::shared_ptr<PendingRequest> create_pending_request(int64_t request_id,
                                                        const std::string &op) {
   auto pending = std::make_shared<PendingRequest>();
   pending->op = op;
+  pending->error_responses_at_dispatch = g_game_error_responses.load();
   {
     std::lock_guard<std::mutex> lock(g_pending_mtx);
     g_pending[request_id] = pending;
@@ -221,6 +224,25 @@ void abandon_pending_request(int64_t request_id,
 
 bool is_eval_op(const std::string &op) {
   return op == std::string(GDA_OP_EVAL) || op == std::string(GDA_OP_EVAL_ASSERT);
+}
+
+const char *eval_timeout_cause_name(bool late_response_for_request,
+                                    bool game_error_during_wait,
+                                    bool channel_response_seen) {
+  if (late_response_for_request || game_error_during_wait)
+    return "script_error";
+  if (!channel_response_seen)
+    return "channel_lost";
+  return "unknown";
+}
+
+bool late_results_contain(int64_t request_id) {
+  std::lock_guard<std::mutex> lock(g_late_results_mtx);
+  for (const LateResult &entry : g_late_results) {
+    if (entry.request_id == request_id)
+      return true;
+  }
+  return false;
 }
 
 CommandQueue *current_editor_queue() {
@@ -289,30 +311,33 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
   payload[GDA_FIELD_PARAMS] = params;
 
   const std::string payload_text = payload.Dump();
-  if (wait_ready && debugger_ready_session_count() == 0) {
-    bool should_queue = debugger_active_session_count() > 0;
-    if (!should_queue) {
-      if (auto *editor = godot::EditorInterface::get_singleton())
-        should_queue = editor->is_playing_scene();
+  const ReadyDecision ready_decision =
+      decide_game_request(debugger_ready_session_count(),
+                          debugger_scene_ready_session_count(),
+                          debugger_active_session_count(), wait_ready);
+  bool editor_playing_scene = false;
+  if (ready_decision == ReadyDecision::FailNotRunning && wait_ready) {
+    if (auto *editor = godot::EditorInterface::get_singleton())
+      editor_playing_scene = editor->is_playing_scene();
+  }
+  if (should_queue_for_ready(ready_decision, wait_ready,
+                             editor_playing_scene)) {
+    {
+      std::lock_guard<std::mutex> lock(pending->mtx);
+      pending->payload = payload_text;
+      pending->awaiting_ready = true;
     }
-    if (should_queue) {
-      {
-        std::lock_guard<std::mutex> lock(pending->mtx);
-        pending->payload = payload_text;
-        pending->awaiting_ready = true;
-      }
-      LogSystem::instance().log(
-          LogLevel::Info, LogCategory::Transport,
-          "game op \"" + op +
-              "\" queued until the game process reports gda:ready "
-              "(request_id " +
-              std::to_string(request_id) + ")");
-      JV queued(JV::object_tag);
-      queued["request_id"] = JV(request_id);
-      queued["result"] = JV("sent");
-      queued["queued_for_ready"] = JV(true);
-      return queued;
-    }
+    LogSystem::instance().log(
+        LogLevel::Info, LogCategory::Transport,
+        "game op \"" + op +
+            "\" queued until the game process reports gda:ready "
+            "(request_id " +
+            std::to_string(request_id) + ")");
+    JV queued(JV::object_tag);
+    queued["request_id"] = JV(request_id);
+    queued["result"] = JV("sent");
+    queued["queued_for_ready"] = JV(true);
+    return queued;
   }
   int32_t used_session_id = -1;
   int32_t session_count = 0;
@@ -526,6 +551,73 @@ void push_late_result(std::deque<LateResult> &buffer, LateResult entry,
     buffer.pop_front();
 }
 
+mcp::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input) {
+  const std::string op_name = input.op.empty() ? "?" : input.op;
+  std::string response_summary;
+  if (input.last_channel_response_age_ms >= 0) {
+    response_summary =
+        "responses received for this request: " +
+        std::to_string(input.responses_received) + ", last channel response " +
+        std::to_string(input.last_channel_response_age_ms) +
+        " ms ago, pending: " + std::to_string(input.pending_count);
+  } else {
+    response_summary = "no gda:response received on the channel yet, pending: " +
+                       std::to_string(input.pending_count);
+  }
+
+  JV error;
+  if (input.awaiting_ready) {
+    error = error_json(
+        "game op \"" + op_name + "\" timed out after " +
+        std::to_string(input.timeout_ms) + " ms (request_id " +
+        std::to_string(input.request_id) +
+        ") — the game process is connected but never reported gda:ready "
+        "while the request was queued (no gda:ready arrived during the "
+        "wait): verify the game project loads the godot-autopilot "
+        "extension, then wait a moment after play and retry; " +
+        response_summary);
+    JV details(JV::object_tag);
+    details["code"] = JV("game_ready_timeout");
+    details["retryable"] = JV(true);
+    details["timeout_ms"] = JV(input.timeout_ms);
+    error["structured_error"] = std::move(details);
+  } else {
+    error = error_json(
+        "game op \"" + op_name + "\" timed out after " +
+        std::to_string(input.timeout_ms) + " ms (request_id " +
+        std::to_string(input.request_id) + ") — sent to " +
+        std::to_string(input.session_count) + " debug session(s); " +
+        response_summary +
+        "; the game process may be paused or physics-frozen (query "
+        "get_game_status), or the game project may not load the "
+        "godot-autopilot extension. "
+        "If the in-game script errored, a pending await may "
+        "never complete — run get_game_log_entries to inspect "
+        "the game log. The plugin cancelled the request and, when the "
+        "debugger session was breaked, sent an engine continue so the "
+        "game main thread is released.");
+  }
+  if (input.late_results.IsArray() && !input.late_results.GetArray().empty())
+    error["late_results"] = input.late_results;
+  if (!input.awaiting_ready && is_eval_op(op_name)) {
+    JV details(JV::object_tag);
+    details["code"] = JV("eval_timeout");
+    details["timeout_ms"] = JV(input.timeout_ms);
+    details["game_may_be_busy"] = JV(true);
+    details["timeout_cause"] =
+        JV(eval_timeout_cause_name(input.late_response_for_request,
+                                   input.game_error_during_wait,
+                                   input.last_channel_response_age_ms >= 0));
+    details["note"] = JV(
+        "the game process may still be occupied: the editor stopped waiting "
+        "for the eval script, but a running GDScript call cannot be "
+        "interrupted — the game main thread resumes only after the script "
+        "returns");
+    error["structured_error"] = std::move(details);
+  }
+  return error;
+}
+
 int64_t GameJobTable::register_job(int64_t request_id, const std::string &op,
                                     int64_t timeout_ms, int64_t now_ms) {
   if (jobs.size() >= kMaxJobs)
@@ -675,79 +767,44 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
                              return pending->state != PendingRequest::State::Waiting;
                            });
   if (!completed) {
-    std::string op_name = pending->op.empty() ? "?" : pending->op;
+    std::string op_name = pending->op;
     int32_t session_id = pending->session_id;
     int32_t session_count = pending->session_count;
     bool release_error_breaks = pending->error_breaks_suppressed;
     bool awaiting_ready = pending->awaiting_ready;
+    int64_t responses_received = pending->responses_received;
+    int64_t error_responses_at_dispatch = pending->error_responses_at_dispatch;
     pending->error_breaks_suppressed = false;
     pending->state = PendingRequest::State::Cancelled;
     lock.unlock();
-    erase_pending(request_id, pending);
 
     size_t pending_count = 0;
     {
       std::lock_guard<std::mutex> pending_lock(g_pending_mtx);
       pending_count = g_pending.size();
     }
+    erase_pending(request_id, pending);
+
     int64_t last_response_ms = g_last_response_steady_ms.load();
-    std::string response_summary;
-    if (last_response_ms >= 0) {
-      response_summary = "responses received: " +
-                         std::to_string(g_responses_received.load()) +
-                         ", last response " +
-                         std::to_string(steady_now_ms() - last_response_ms) +
-                         " ms ago, pending: " + std::to_string(pending_count);
-    } else {
-      response_summary = "no gda:response received yet, pending: " +
-                         std::to_string(pending_count);
-    }
     schedule_timeout_recovery(session_id, request_id);
     if (release_error_breaks)
       restore_error_breaks();
-    JV error;
-    if (awaiting_ready) {
-      error = error_json(
-          "game op \"" + op_name + "\" timed out after " +
-          std::to_string(timeout_ms) + " ms (request_id " +
-          std::to_string(request_id) +
-          ") — the game process is connected but never reported gda:ready "
-          "while the request was queued (no gda:ready arrived during the "
-          "wait): verify the game project loads the godot-autopilot "
-          "extension, then wait a moment after play and retry; " +
-          response_summary);
-    } else {
-      error = error_json(
-          "game op \"" + op_name + "\" timed out after " +
-          std::to_string(timeout_ms) + " ms (request_id " +
-          std::to_string(request_id) + ") — sent to " +
-          std::to_string(session_count) + " debug session(s); " +
-          response_summary +
-          "; the game process may be paused or physics-frozen (query "
-          "get_game_status), or the game project may not load the "
-          "godot-autopilot extension. "
-          "If the in-game script errored, a pending await may "
-          "never complete — run get_game_log_entries to inspect "
-          "the game log. The plugin cancelled the request and, when the "
-          "debugger session was breaked, sent an engine continue so the "
-          "game main thread is released.");
-    }
-    JV late_results = late_results_snapshot();
-    if (late_results.IsArray() && !late_results.GetArray().empty())
-      error["late_results"] = std::move(late_results);
-    if (!awaiting_ready && is_eval_op(op_name)) {
-      JV details(JV::object_tag);
-      details["code"] = JV("eval_timeout");
-      details["timeout_ms"] = JV(timeout_ms);
-      details["game_may_be_busy"] = JV(true);
-      details["note"] = JV(
-          "the game process may still be occupied: the editor stopped waiting "
-          "for the eval script, but a running GDScript call cannot be "
-          "interrupted — the game main thread resumes only after the script "
-          "returns");
-      error["structured_error"] = std::move(details);
-    }
-    return error;
+
+    GameTimeoutReceiptInput input;
+    input.op = op_name;
+    input.request_id = request_id;
+    input.timeout_ms = timeout_ms;
+    input.session_count = session_count;
+    input.awaiting_ready = awaiting_ready;
+    input.responses_received = responses_received;
+    input.pending_count = static_cast<int64_t>(pending_count);
+    input.last_channel_response_age_ms =
+        last_response_ms >= 0 ? steady_now_ms() - last_response_ms : -1;
+    input.late_response_for_request = late_results_contain(request_id);
+    input.game_error_during_wait =
+        g_game_error_responses.load() > error_responses_at_dispatch;
+    input.late_results = late_results_snapshot();
+    return build_game_timeout_receipt(input);
   }
   bool release_error_breaks = pending->error_breaks_suppressed;
   pending->error_breaks_suppressed = false;
@@ -1195,7 +1252,6 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result,
 }
 
 void handle_game_response(const std::string &json_str) {
-  g_responses_received.fetch_add(1);
   g_last_response_steady_ms.store(steady_now_ms());
   maybe_recover_break();
   JV parsed = JV::Parse(json_str);
@@ -1207,8 +1263,10 @@ void handle_game_response(const std::string &json_str) {
     monitor::state("game_response", "discarded", true);
     return;
   }
-  if (parsed.Contains("runtime_error"))
+  if (parsed.Contains("runtime_error")) {
     error_watermark::record_error();
+    g_game_error_responses.fetch_add(1);
+  }
   auto *rid = parsed.Find("request_id");
   if (!rid || !rid->IsInt()) {
     LogSystem::instance().log(
@@ -1240,6 +1298,7 @@ void handle_game_response(const std::string &json_str) {
   bool late_response = false;
   {
     std::lock_guard<std::mutex> lock(pending->mtx);
+    ++pending->responses_received;
     if (pending->state != PendingRequest::State::Waiting) {
       late_response = true;
     } else {

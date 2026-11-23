@@ -22,7 +22,6 @@ class Args {
 public:
   Args(const mcp::JsonValue &raw, const std::vector<schema::ParamDef> &params);
 
-  const mcp::JsonValue &raw() const;
   bool has(const std::string &name) const;
   bool is_null(const std::string &name) const;
   std::optional<std::string> opt_string(const std::string &name) const;
@@ -42,6 +41,7 @@ public:
   int64_t get_int(const std::string &name, int64_t fallback) const;
   double get_number(const std::string &name, double fallback) const;
   bool get_bool(const std::string &name, bool fallback) const;
+  void validate_declared() const;
   void reject_unknown() const;
 
 private:

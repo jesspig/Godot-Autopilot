@@ -1,4 +1,5 @@
 #include "tools/domains/audio/audio_ops.hpp"
+#include "util/project_path.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -24,8 +25,10 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <cmath>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace audio_ops {
@@ -293,6 +296,44 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
   if (!server) {
     return util::error_json("AudioServer not available");
   }
+  std::string action = "layout";
+  if (const auto *action_p = args.Find("action")) {
+    if (!action_p->IsString()) {
+      return util::error_json(
+          "invalid parameter: action must be layout, count or name");
+    }
+    action = action_p->GetString();
+  }
+  if (action == "count") {
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] =
+        mcp::JsonValue(static_cast<int64_t>(server->get_bus_count()));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_audio_bus_layout completed");
+    return r;
+  }
+  if (action == "name") {
+    const auto *index_p = args.Find("bus_index");
+    if (!index_p || !index_p->IsInt()) {
+      return util::error_json("missing required parameter: bus_index");
+    }
+    const int index = static_cast<int>(index_p->GetInt());
+    const int count = server->get_bus_count();
+    if (index < 0 || index >= count) {
+      return util::error_json("audio bus not found at index: " +
+                              std::to_string(index));
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_audio_bus_layout completed");
+    return r;
+  }
+  if (action != "layout") {
+    return util::error_json(
+        "unknown action '" + action +
+        "' for get_audio_bus_layout (expected layout, count, name)");
+  }
   auto layout = server->generate_bus_layout();
   auto serialized = VariantJson::serialize(layout);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -322,45 +363,6 @@ mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_layout completed");
   return util::ok_result(mcp::JsonValue("ok"));
-}
-
-mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_count called");
-  auto *server = godot::AudioServer::get_singleton();
-  if (!server) {
-    return util::error_json("AudioServer not available");
-  }
-  int count = server->get_bus_count();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(static_cast<int64_t>(count));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_count completed");
-  return r;
-}
-
-mcp::JsonValue handle_bus_get_name(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_name called");
-  auto *server = godot::AudioServer::get_singleton();
-  if (!server) {
-    return util::error_json("AudioServer not available");
-  }
-  auto *bi = args.Find("bus_index");
-  if (!bi || !bi->IsInt()) {
-    return util::error_json("missing required parameter: bus_index");
-  }
-  int idx = bi->GetInt();
-  int count = server->get_bus_count();
-  if (idx < 0 || idx >= count) {
-    return util::error_json("audio bus not found at index: " + std::to_string(idx));
-  }
-  godot::String name = server->get_bus_name(idx);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(util::to_std(name));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_name completed");
-  return r;
 }
 
 mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
@@ -538,7 +540,11 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
   }
   auto *sp = args.Find("stream_path");
   if (sp && sp->IsString()) {
-    godot::String stream_path(sp->GetString().c_str());
+    const auto checked = util::normalize_project_path(sp->GetString(), false, false);
+    if (!checked.error.empty())
+      return util::error_detail("path rejected", sp->GetString(),
+                                "an in-project res:// file path", checked.error);
+    godot::String stream_path(checked.value.c_str());
     if (!godot::FileAccess::file_exists(stream_path))
       return util::error_detail("file does not exist", sp->GetString(),
                                 "an existing file path",
@@ -784,25 +790,6 @@ mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
   return util::ok_result(mcp::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_device_inputs called");
-  auto *server = godot::AudioServer::get_singleton();
-  if (!server) {
-    return util::error_json("AudioServer not available");
-  }
-  auto devices = server->get_input_device_list();
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
-  for (int i = 0; i < devices.size(); i++) {
-    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
-  }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(arr);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_device_inputs completed");
-  return r;
-}
-
 mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_input called");
@@ -1040,6 +1027,290 @@ mcp::JsonValue handle_get_input_devices(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_input_devices completed");
   return r;
+}
+
+namespace {
+
+mcp::JsonValue audio_action_error(const std::string &message) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(message);
+  return error;
+}
+
+mcp::JsonValue strip_audio_action(const mcp::JsonValue &args) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+bool read_audio_action(const mcp::JsonValue &args, std::string &out,
+                       mcp::JsonValue &error) {
+  const mcp::JsonValue *action = args.Find("action");
+  if (action == nullptr) {
+    error = audio_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = audio_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+} // namespace
+
+mcp::JsonValue handle_bus_info(const mcp::JsonValue &args) {
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  const int count = server->get_bus_count();
+  mcp::JsonValue names(mcp::JsonValue::array_tag);
+  for (int i = 0; i < count; i++) {
+    names.PushBack(mcp::JsonValue(util::to_std(server->get_bus_name(i))));
+  }
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  info["count"] = mcp::JsonValue(static_cast<int64_t>(count));
+  info["names"] = std::move(names);
+  if (const auto *index_p = args.Find("bus_index")) {
+    if (!index_p->IsInt()) {
+      return util::error_json(
+          "invalid parameter: bus_index must be an integer");
+    }
+    const int index = static_cast<int>(index_p->GetInt());
+    if (index < 0 || index >= count) {
+      return util::error_json("audio bus not found at index: " +
+                              std::to_string(index));
+    }
+    mcp::JsonValue bus(mcp::JsonValue::object_tag);
+    bus["index"] = mcp::JsonValue(static_cast<int64_t>(index));
+    bus["name"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+    bus["volume_db"] =
+        mcp::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
+    bus["muted"] = mcp::JsonValue(server->is_bus_mute(index));
+    bus["solo"] = mcp::JsonValue(server->is_bus_solo(index));
+    bus["bypass_effects"] =
+        mcp::JsonValue(server->is_bus_bypassing_effects(index));
+    bus["effect_count"] =
+        mcp::JsonValue(static_cast<int64_t>(server->get_bus_effect_count(index)));
+    info["bus"] = std::move(bus);
+  }
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+mcp::JsonValue handle_bus_metrics(const mcp::JsonValue &args) {
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  const int count = server->get_bus_count();
+  int index = 0;
+  if (const auto *index_p = args.Find("bus_index")) {
+    if (!index_p->IsInt()) {
+      return util::error_json(
+          "invalid parameter: bus_index must be an integer");
+    }
+    index = static_cast<int>(index_p->GetInt());
+  }
+  if (index < 0 || index >= count) {
+    return util::error_json("audio bus not found at index: " +
+                            std::to_string(index));
+  }
+  constexpr double kSilenceFloorDb = -200.0;
+  const int channels = server->get_bus_channels(index);
+  std::vector<double> channel_peaks;
+  channel_peaks.reserve(static_cast<size_t>(channels));
+  for (int channel = 0; channel < channels; ++channel) {
+    double db =
+        static_cast<double>(server->get_bus_peak_volume_left_db(index, channel));
+    if (!std::isfinite(db)) {
+      db = kSilenceFloorDb;
+    }
+    channel_peaks.push_back(db);
+  }
+  const double peak_left =
+      channel_peaks.empty() ? kSilenceFloorDb : channel_peaks[0];
+  const double peak_right =
+      channel_peaks.size() >= 2 ? channel_peaks[1] : peak_left;
+  mcp::JsonValue peaks(mcp::JsonValue::array_tag);
+  for (const double db : channel_peaks) {
+    peaks.PushBack(mcp::JsonValue(db));
+  }
+  const int effect_count = server->get_bus_effect_count(index);
+  mcp::JsonValue effects(mcp::JsonValue::array_tag);
+  for (int i = 0; i < effect_count; ++i) {
+    auto effect = server->get_bus_effect(index, i);
+    mcp::JsonValue entry(mcp::JsonValue::object_tag);
+    entry["index"] = mcp::JsonValue(static_cast<int64_t>(i));
+    entry["class"] = mcp::JsonValue(effect.is_valid()
+                                        ? util::to_std(effect->get_class())
+                                        : std::string());
+    effects.PushBack(std::move(entry));
+  }
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  info["bus_index"] = mcp::JsonValue(static_cast<int64_t>(index));
+  info["bus_name"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+  info["channels"] = mcp::JsonValue(static_cast<int64_t>(channels));
+  info["effect_count"] = mcp::JsonValue(static_cast<int64_t>(effect_count));
+  info["effects"] = std::move(effects);
+  info["send"] = mcp::JsonValue(
+      util::to_std(godot::String(server->get_bus_send(index))));
+  info["peak_left_db"] = mcp::JsonValue(peak_left);
+  info["peak_right_db"] = mcp::JsonValue(peak_right);
+  info["peaks_db"] = std::move(peaks);
+  info["mix_rate"] =
+      mcp::JsonValue(static_cast<double>(server->get_mix_rate()));
+  info["speaker_mode"] = mcp::JsonValue(
+      static_cast<int64_t>(server->get_speaker_mode()));
+  info["driver_name"] =
+      mcp::JsonValue(util::to_std(server->get_driver_name()));
+  info["volume_db"] =
+      mcp::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
+  info["muted"] = mcp::JsonValue(server->is_bus_mute(index));
+  info["solo"] = mcp::JsonValue(server->is_bus_solo(index));
+  info["bypass_effects"] =
+      mcp::JsonValue(server->is_bus_bypassing_effects(index));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+mcp::JsonValue handle_input_status(const mcp::JsonValue &) {
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  info["current"] =
+      mcp::JsonValue(util::to_std(server->get_input_device()));
+  info["input_mix_rate"] =
+      mcp::JsonValue(static_cast<double>(server->get_input_mix_rate()));
+  info["frames_available"] = mcp::JsonValue(
+      static_cast<int64_t>(server->get_input_frames_available()));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+mcp::JsonValue handle_audio_bus(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_audio_action(args, action, error)) {
+    return error;
+  }
+  if (action == "get_layout") {
+    return handle_bus_get_layout(strip_audio_action(args));
+  }
+  if (action == "set_layout") {
+    return handle_bus_set_layout(strip_audio_action(args));
+  }
+  if (action == "get_info") {
+    return handle_bus_info(strip_audio_action(args));
+  }
+  if (action == "info") {
+    return handle_bus_metrics(strip_audio_action(args));
+  }
+  if (action == "set_volume") {
+    return handle_bus_set_volume(strip_audio_action(args));
+  }
+  if (action == "set_mute") {
+    return handle_bus_set_mute(strip_audio_action(args));
+  }
+  if (action == "set_solo") {
+    return handle_bus_set_solo(strip_audio_action(args));
+  }
+  if (action == "set_bypass") {
+    return handle_bus_set_bypass(strip_audio_action(args));
+  }
+  if (action == "add_effect") {
+    return handle_effect_add(strip_audio_action(args));
+  }
+  return audio_action_error(
+      "unknown action '" + action +
+      "' for audio_bus (expected get_layout, set_layout, get_info, info, "
+      "set_volume, set_mute, set_solo, set_bypass, add_effect)");
+}
+
+mcp::JsonValue handle_audio_player(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_audio_action(args, action, error)) {
+    return error;
+  }
+  if (action == "play") {
+    return handle_stream_play(strip_audio_action(args));
+  }
+  if (action == "stop") {
+    return handle_stream_stop(strip_audio_action(args));
+  }
+  if (action == "set_volume") {
+    return handle_stream_set_volume(strip_audio_action(args));
+  }
+  if (action == "set_pitch") {
+    return handle_stream_set_pitch(strip_audio_action(args));
+  }
+  if (action == "seek") {
+    return handle_stream_seek(strip_audio_action(args));
+  }
+  if (action == "get_position") {
+    return handle_stream_get_playback_position(strip_audio_action(args));
+  }
+  return audio_action_error(
+      "unknown action '" + action +
+      "' for audio_player (expected play, stop, set_volume, set_pitch, seek, "
+      "get_position)");
+}
+
+mcp::JsonValue handle_audio_device(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_audio_action(args, action, error)) {
+    return error;
+  }
+  if (action == "list_outputs") {
+    return handle_get_output_device_list(strip_audio_action(args));
+  }
+  if (action == "set_output") {
+    return handle_set_output_device(strip_audio_action(args));
+  }
+  if (action == "list_inputs") {
+    return handle_get_input_devices(strip_audio_action(args));
+  }
+  if (action == "set_input") {
+    return handle_set_input_device(strip_audio_action(args));
+  }
+  if (action == "get_input_status") {
+    return handle_input_status(strip_audio_action(args));
+  }
+  return audio_action_error(
+      "unknown action '" + action +
+      "' for audio_device (expected list_outputs, set_output, list_inputs, "
+      "set_input, get_input_status)");
+}
+
+mcp::JsonValue handle_audio_capture(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_audio_action(args, action, error)) {
+    return error;
+  }
+  if (action == "start") {
+    return handle_start_input_capture(strip_audio_action(args));
+  }
+  if (action == "stop") {
+    return handle_stop_input_capture(strip_audio_action(args));
+  }
+  if (action == "create_wav") {
+    return handle_create_wav(strip_audio_action(args));
+  }
+  return audio_action_error(
+      "unknown action '" + action +
+      "' for audio_capture (expected start, stop, create_wav)");
 }
 
 } // namespace audio_ops

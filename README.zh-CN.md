@@ -1,37 +1,23 @@
 # Godot Autopilot
 
 [![许可证](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![最新版本](https://img.shields.io/github/v/release/jesspig/Godot-Autopilot)](https://github.com/jesspig/Godot-Autopilot/releases)
 [![构建状态](https://github.com/jesspig/Godot-Autopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions)
+[![发布工作流](https://github.com/jesspig/Godot-Autopilot/actions/workflows/release.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions/workflows/release.yml)
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
-![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CMacOS-lightgrey)
+![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具数](https://img.shields.io/badge/tools-452%2B-brightgreen)
+![工具数](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
 [English](README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-Godot Autopilot（GDA）是一个住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，你的 AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）就能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志——然后根据看到的结果继续迭代。
-
-不需要桥接进程，也不用把报错复制粘贴到聊天框。图形界面编辑器打开项目时服务端自动启动，关闭项目时自动停止。
-
-## 端到端演示
-
-端到端测试中 AI 实时控制游戏角色：
+Godot Autopilot（GDA）是住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志，再根据结果继续迭代。不需要桥接进程，也不用把报错复制到聊天框。图形界面编辑器打开项目时服务端自动启动，关闭项目时自动停止。
 
 ![Demo 001](assets/demo-001.gif)
 
-## 能做什么
-
-**452+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
-
-- **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号，三维块地图 GridMap 搭关卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
-- **画面与声音**——网格材质、灯光环境、音频播放、动画与补间、UI 主题、瓦片地图（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
-- **物理与导航**——射线/形状检测、刚体、导航地图与寻路（如 `intersect_physics_3d_ray`、`create_nav_3d_map`、`get_nav_3d_map_path`）。
-- **动手：输入与 UI 自动化**——模拟键盘鼠标手柄，按名称点击编辑器控件，执行编辑器快捷键，点击运行中游戏的按钮（如 `click_input_mouse`、`get_editor_ui_elements`、`click_editor_element`、`run_editor_shortcut`、`click_game_ui_element`）。
-- **脚本与排错**——在编辑器或游戏中执行 GDScript，把耗时游戏脚本作为后台任务运行，读取插件/游戏/脚本错误日志（如 `execute_script`、`execute_game_script`、`start_game_job`、`get_plugin_log`）。
-- **项目与知识**——读写、搜索、复制项目文件与目录，查看项目设置，离线查询引擎内置 API 文档（如 `read_file`、`find_in_files`、`list_directory`、`copy_file`、`get_project_settings`、`get_docs_class`）。
-- **试玩与视觉验证**——运行当前场景，注入定时输入序列，给编辑器和游戏截图并对比前后差异（如 `play_editor_current_scene`、`queue_game_input`、`capture_editor_viewport`、`capture_game_viewport`、`review_scene_visually`）。
+**252 个工具**覆盖从编辑器到游戏的完整闭环：246 个域工具 + 5 个元工具 + `system_status`（数量随版本增长，以代理通过 `search_tools` 查到的为准）。325 条旧工具名别名在 0.6.0 前经 `call_tool` 可调用（与实名工具重名的条目按实名工具优先）。技能书为 **1 张入口卡 + 9 篇 references**，教代理按调用协议执行；MCP 失效时改用 GDA CLI。参考：[工具面](docs/wiki/tool_surface_baseline.md)、[技能](docs/wiki/modules/skills.md)、[CLI](docs/wiki/modules/cli.md)。
 
 ## 快速开始
 
@@ -39,82 +25,23 @@ Godot Autopilot（GDA）是一个住在 **Godot 编辑器内部**的插件型 [M
 
 1. **安装**——在 Godot 工程根目录运行一键脚本；手动安装与源码构建见 [INSTALL.md](INSTALL.md)。
    - macOS/Linux：
+
      ```bash
      curl -fsSL https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scripts/install.sh \
        | bash -s -- --project "$PWD" --skills
      ```
+
    - Windows PowerShell：
+
      ```powershell
      & ([scriptblock]::Create((irm https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scripts/install.ps1))) `
        -Project (Get-Location).Path -Skills
      ```
+
    脚本会安装 `gda` CLI、识别 `project.godot`、安装插件，并按需安装技能书。
 2. **打开项目**——图形界面编辑器会自动启动服务端，首次启动时绑定一个空闲的环回端口（按工程持久化，取自 `20000–29999`）。无头/命令行编辑器模式不会启动服务端。
 3. **连接 AI 客户端**——运行 `gda status --json`，把其中的 `mcp_url` 加进客户端的 MCP 配置（也可以把 URL 交给代理，让它生成配置）。任何支持 Streamable HTTP 的 MCP 客户端都可以连接；示例包括 Claude Code、Codex、Cursor、OpenCode、Copilot。
 4. **提需求**——比如“创建一个能跑能跳的玩家角色，试玩一下并修掉看着不对的地方”。
-
-高风险工具（`destructive`、`process`、`code_execute`、`game_runtime`）需要 `confirm=true`；没有全局白名单。
-
-## 让 AI 代理安装
-
-把下面这句交给能在这台机器上执行命令的代理：
-
-```text
-阅读 https://github.com/jesspig/Godot-Autopilot/blob/master/INSTALL.md 并安装。
-```
-
-代理会定位 Godot 工程、安装 CLI 与插件、询问技能书装全局还是项目内、用 `gda status --json` 验证连接，并汇报 MCP URL。完整的代理规则见 [INSTALL.md](INSTALL.md)。
-
-## 技能书
-
-插件自带 **10 册自包含技能书**（总纲，以及场景、资源、脚本、运行时、服务器、内容、C#、安装、工具分册）。只选一种作用域安装：
-
-```bash
-# 全局：所有 Godot 工程共享
-gda install skills
-
-# 项目级：跟随当前工程
-gda install skills --path "<project>/.agents/skills"
-
-# 中文版
-gda install skills --zh
-gda install skills --path "<project>/.agents/skills" --zh
-```
-
-默认目标是 `~/.agents/skills`。客户端不读取该目录时，可用 `--path <客户端技能目录>`。技能书让代理按调用协议执行，而不是自己摸索。定位：MCP 是主产品通道，技能是体验层；调用指南在 MCP 失效时改用 GDA CLI。
-
-插件自带一个编辑器面板：
-
-- **Log**——仅显示插件日志，支持级别/分类过滤与搜索，方便定位失败调用。
-
-## 代理的使用方式
-
-你不需要记住工具名。代理按这个循环工作：
-
-1. **发现**——用 `search_tools` 找候选，用 `get_tool_detail` 确认参数（不要猜名字）。
-2. **执行**——单步用 `call_tool`，批量用 `batch_execute`。
-3. **验证**——截图看结果，与上次截图对比，有问题就修，再确认。
-
-## 命令行访问
-
-更想直接敲命令而不接 MCP 客户端？GDA CLI 让你在终端里驱动正在运行的 GDA 实例，无需集成 MCP 客户端。它基于 Bun + TypeScript，源码直跑，**零运行时依赖**、无构建步骤。
-
-用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
-
-```bash
-bunx "github:jesspig/Godot-Autopilot#0.3.3" ping
-```
-
-或全局安装一次，之后直接用 `gda` 命令：
-
-```bash
-bun install -g github:jesspig/Godot-Autopilot#0.3.3
-gda ping
-```
-
-命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**离线与资产族** —— `skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`。
-
-需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 
 ## 安全说明
 
@@ -124,13 +51,11 @@ gda ping
 
 - [INSTALL.md](INSTALL.md)——一键脚本、Release 手动安装、源码构建与代理安装说明。
 - [docs/wiki/index.md](docs/wiki/index.md)——项目知识库：架构、模块、测试与约定。
+- [docs/wiki/tool_surface_baseline.md](docs/wiki/tool_surface_baseline.md)——工具面、别名、schema 与能力矩阵基线。
 - [docs/wiki/build.md](docs/wiki/build.md)——构建、部署与打包。
 - [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)——完整 CLI 参考。
+- [docs/wiki/modules/skills.md](docs/wiki/modules/skills.md)——技能书与 `gda install skills`。
 - [tests/README.md](tests/README.md)——测试布局与命令。
-
-## 素材声明
-
-`examples/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试。第 6 个项目 `examples/pink_man_adventure` 是从历史 `Example/` 示例工程还原的仓库内示例：173 张 PNG 素材来自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），设计文档为本仓库原创。版权与授权见各项目目录内的 README 与 LICENSE。
 
 ## 许可证
 

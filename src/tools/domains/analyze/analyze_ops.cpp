@@ -1,8 +1,10 @@
 #include "tools/domains/analyze/analyze_ops.hpp"
 
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
+#include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_file_system_directory.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -12,8 +14,10 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_uid.hpp>
+#include <godot_cpp/classes/scene_state.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/signal.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -32,13 +36,8 @@ namespace analyze_ops {
 namespace {
 
 constexpr int64_t DEFAULT_MAX_DEPTH = 3;
+constexpr int64_t DEFAULT_MAX_STATE_NODES = 200;
 constexpr const char *AUTOLOAD_PREFIX = "autoload/";
-
-mcp::JsonValue make_error(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
-  return e;
-}
 
 bool read_string_arg(const mcp::JsonValue &args, const char *key,
                      std::string &out) {
@@ -52,7 +51,7 @@ bool read_string_arg(const mcp::JsonValue &args, const char *key,
 
 bool require_string_arg(const mcp::JsonValue &args, const char *key,
                         std::string &out) {
-  return read_string_arg(args, key, out) && !out.empty();
+  return util::require_nonempty_string_arg(args, key, out);
 }
 
 int64_t read_int_arg(const mcp::JsonValue &args, const char *key,
@@ -281,17 +280,103 @@ void append_connection_edges(
   }
 }
 
+mcp::JsonValue scene_state_summary(const godot::Ref<godot::SceneState> &state,
+                                   int64_t max_nodes) {
+  const int32_t node_count = state->get_node_count();
+  const int64_t returned = max_nodes < node_count ? max_nodes : node_count;
+  mcp::JsonValue nodes(mcp::JsonValue::array_tag);
+  for (int32_t i = 0; i < static_cast<int32_t>(returned); i++) {
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["path"] = mcp::JsonValue(util::to_std(state->get_node_path(i, false)));
+    item["type"] =
+        mcp::JsonValue(util::to_std(godot::String(state->get_node_type(i))));
+    item["owner"] =
+        mcp::JsonValue(util::to_std(state->get_node_owner_path(i)));
+    mcp::JsonValue properties(mcp::JsonValue::object_tag);
+    const int32_t property_count = state->get_node_property_count(i);
+    for (int32_t p = 0; p < property_count; p++) {
+      properties[util::to_std(
+          godot::String(state->get_node_property_name(i, p)))] =
+          VariantJson::serialize(state->get_node_property_value(i, p));
+    }
+    item["properties"] = std::move(properties);
+    mcp::JsonValue groups(mcp::JsonValue::array_tag);
+    godot::PackedStringArray node_groups = state->get_node_groups(i);
+    for (int g = 0; g < node_groups.size(); g++)
+      groups.PushBack(mcp::JsonValue(util::to_std(node_groups[g])));
+    item["groups"] = std::move(groups);
+    nodes.PushBack(std::move(item));
+  }
+  const int32_t connection_count = state->get_connection_count();
+  mcp::JsonValue connections(mcp::JsonValue::array_tag);
+  for (int32_t i = 0; i < connection_count; i++) {
+    mcp::JsonValue connection(mcp::JsonValue::object_tag);
+    connection["source"] =
+        mcp::JsonValue(util::to_std(state->get_connection_source(i)));
+    connection["signal"] = mcp::JsonValue(
+        util::to_std(godot::String(state->get_connection_signal(i))));
+    connection["target"] =
+        mcp::JsonValue(util::to_std(state->get_connection_target(i)));
+    connection["method"] = mcp::JsonValue(
+        util::to_std(godot::String(state->get_connection_method(i))));
+    connection["flags"] = mcp::JsonValue(
+        static_cast<int64_t>(state->get_connection_flags(i)));
+    connections.PushBack(std::move(connection));
+  }
+  mcp::JsonValue summary(mcp::JsonValue::object_tag);
+  summary["node_count"] = mcp::JsonValue(static_cast<int64_t>(node_count));
+  summary["returned_nodes"] = mcp::JsonValue(returned);
+  summary["truncated"] = mcp::JsonValue(returned < node_count);
+  summary["max_nodes"] = mcp::JsonValue(max_nodes);
+  summary["nodes"] = std::move(nodes);
+  summary["connection_count"] =
+      mcp::JsonValue(static_cast<int64_t>(connection_count));
+  summary["connections"] = std::move(connections);
+  return summary;
+}
+
 } // namespace
+
+mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
+  auto *action_p = args.Find("action");
+  if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: action (one of: validate_scene, "
+        "unused_resources, signal_flow)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "validate_scene")
+    return handle_validate_scene_file(args);
+  if (action == "unused_resources")
+    return handle_find_unused_resources(args);
+  if (action == "signal_flow")
+    return handle_trace_signal_flow(args);
+  return util::error_json("unknown action '" + action +
+                    "' for analyze_project — expected validate_scene, "
+                    "unused_resources or signal_flow");
+}
 
 mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))
-    return make_error("missing required parameter: path (res:// scene file, "
+    return util::error_json("missing required parameter: path (res:// scene file, "
                       "e.g. \"res://levels/level_01.tscn\")");
+  bool include_state = false;
+  if (auto *include_state_p = args.Find("include_state")) {
+    if (!include_state_p->IsBool())
+      return util::error_json("parameter 'include_state' must be a boolean");
+    include_state = include_state_p->GetBool();
+  }
+  int64_t max_nodes = DEFAULT_MAX_STATE_NODES;
+  if (auto *max_nodes_p = args.Find("max_nodes")) {
+    if (!max_nodes_p->IsInt() || max_nodes_p->GetInt() < 1)
+      return util::error_json("parameter 'max_nodes' must be an integer >= 1");
+    max_nodes = max_nodes_p->GetInt();
+  }
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader)
-    return make_error("ResourceLoader is unavailable");
+    return util::error_json("ResourceLoader is unavailable");
 
   godot::String res_path(path.c_str());
   mcp::JsonValue problems(mcp::JsonValue::array_tag);
@@ -341,6 +426,29 @@ mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
   inner["problems"] = std::move(problems);
   inner["missing_dependencies"] = std::move(missing);
   inner["dependency_count"] = mcp::JsonValue(dependency_count);
+  if (include_state) {
+    if (scene.is_null()) {
+      inner["state_error"] =
+          mcp::JsonValue("no PackedScene state available because the file "
+                         "failed to load");
+    } else {
+      godot::Ref<godot::SceneState> state = scene->get_state();
+      if (state.is_null()) {
+        inner["state_error"] = mcp::JsonValue(
+            "PackedScene::get_state() returned null for this file");
+      } else {
+        mcp::JsonValue summary = scene_state_summary(state, max_nodes);
+        inner["node_count"] = summary["node_count"];
+        inner["returned_nodes"] = summary["returned_nodes"];
+        inner["truncated"] = summary["truncated"];
+        inner["max_nodes"] = summary["max_nodes"];
+        inner["nodes"] = summary["nodes"];
+        inner["connection_count"] = summary["connection_count"];
+        inner["connections"] = summary["connections"];
+        inner["state"] = std::move(summary);
+      }
+    }
+  }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
@@ -353,30 +461,28 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
   auto *editor = godot::EditorInterface::get_singleton();
   auto *efs = editor ? editor->get_resource_filesystem() : nullptr;
   if (!efs)
-    return make_error("editor resource filesystem is unavailable");
+    return util::error_json("editor resource filesystem is unavailable");
   const bool efs_scanning = efs->is_scanning();
 
   godot::EditorFileSystemDirectory *start_dir = nullptr;
   if (directory.empty() || directory == "res://" || directory == "/") {
     start_dir = efs->get_filesystem();
   } else {
-    std::string normalized = directory;
-    if (!begins_with(normalized, "res://"))
-      normalized = "res://" + normalized;
+    std::string normalized = util::res_uri(directory);
     start_dir = efs->get_filesystem_path(godot::String(normalized.c_str()));
     if (!start_dir)
-      return make_error("directory not found in the editor filesystem: " +
+      return util::error_json("directory not found in the editor filesystem: " +
                         directory);
   }
   if (!start_dir)
-    return make_error("editor filesystem root is unavailable");
+    return util::error_json("editor filesystem root is unavailable");
 
   std::vector<std::pair<std::string, std::string>> files;
   collect_files(start_dir, files);
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader)
-    return make_error("ResourceLoader is unavailable");
+    return util::error_json("ResourceLoader is unavailable");
 
   std::set<std::string> referenced;
   std::set<std::string> unresolved_uids;
@@ -483,20 +589,20 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
 mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))
-    return make_error("missing required parameter: path (edited-scene node "
+    return util::error_json("missing required parameter: path (edited-scene node "
                       "path, e.g. \"Player\")");
 
   std::string direction = "both";
   read_string_arg(args, "direction", direction);
   if (direction != "outgoing" && direction != "incoming" &&
       direction != "both")
-    return make_error("direction must be \"outgoing\", \"incoming\" or "
+    return util::error_json("direction must be \"outgoing\", \"incoming\" or "
                       "\"both\" (got \"" +
                       direction + "\")");
 
   int64_t max_depth = read_int_arg(args, "max_depth", DEFAULT_MAX_DEPTH);
   if (max_depth < 1)
-    return make_error("max_depth must be >= 1 (got " +
+    return util::error_json("max_depth must be >= 1 (got " +
                       std::to_string(max_depth) + ")");
 
   auto *editor = godot::EditorInterface::get_singleton();
@@ -505,7 +611,7 @@ mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
   std::string hint;
   godot::Node *root_node = util::resolve_scene_node(path, scene_root, &hint);
   if (!root_node)
-    return make_error("node not found: " + path + " — " + hint);
+    return util::error_json("node not found: " + path + " — " + hint);
 
   bool do_outgoing = direction == "outgoing" || direction == "both";
   bool do_incoming = direction == "incoming" || direction == "both";

@@ -1,4 +1,5 @@
 #include "prompts/prompt_handlers.hpp"
+#include "prompts/prompt_export_guard.hpp"
 #include "core/config.hpp"
 #include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
@@ -32,10 +33,7 @@ mcp::GetPromptResult make_result(const std::string &content) {
 template <typename Fn>
 mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
                                      const std::string &label, Fn task) {
-  if (godot_autopilot::ExportGuard::is_exporting()) {
-    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
-                        dispatch::export_blocked_error_text());
-  }
+  prompts_detail::reject_if_exporting();
   auto state = std::make_shared<std::string>();
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
       queue, label, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
@@ -115,7 +113,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
   server.RegisterPrompt(
       "tool-usage",
       mcp::PromptOptions{}.Description(
-          "Usage examples for the 17 most commonly used MCP tools with JSON "
+          "Usage examples for the 19 most commonly used MCP tools with JSON "
           "input/output and gotchas"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {

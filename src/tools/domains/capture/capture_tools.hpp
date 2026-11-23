@@ -49,16 +49,142 @@ const std::vector<ParamSpec> kReviewSceneVisuallyParams = {
     {"node_viewport", "string", "Nodes table viewport: 'auto' (default), '2d' or '3d'", false},
 };
 
+mcp::JsonValue capture_game_alias_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (args.IsObject()) {
+    out = args;
+  }
+  out["target"] = mcp::JsonValue("game");
+  return out;
+}
+
+mcp::JsonValue capture_alias_error(const std::string &message) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["error"] = mcp::JsonValue(message);
+  return out;
+}
+
+mcp::JsonValue capture_game_alias_validate(const mcp::JsonValue &args) {
+  const char *allowed[] = {"timeout_ms",        "region",
+                           "max_dimension",     "annotate",
+                           "after_frames",      "when",
+                           "scale",             "annotate_nodes",
+                           "annotate_nodes_max", "wait_ready",
+                           "save",              "save_dir",
+                           "confirm"};
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      bool known = false;
+      for (const char *name : allowed) {
+        if (entry.first == name) {
+          known = true;
+          break;
+        }
+      }
+      if (!known) {
+        return capture_alias_error(
+            "unknown parameter for capture_game_viewport: " + entry.first);
+      }
+    }
+  }
+  if (const mcp::JsonValue *region = args.Find("region")) {
+    if (!region->IsObject()) {
+      return capture_alias_error(
+          "region must be an object with numeric x, y, width and height");
+    }
+    const mcp::JsonValue *rx = region->Find("x");
+    const mcp::JsonValue *ry = region->Find("y");
+    const mcp::JsonValue *rw = region->Find("width");
+    const mcp::JsonValue *rh = region->Find("height");
+    if (rx == nullptr || ry == nullptr || rw == nullptr || rh == nullptr ||
+        !rx->IsNumber() || !ry->IsNumber() || !rw->IsNumber() ||
+        !rh->IsNumber()) {
+      return capture_alias_error(
+          "region must be an object with numeric x, y, width and height "
+          "(width/height greater than 0)");
+    }
+    const double width =
+        rw->IsInt() ? static_cast<double>(rw->GetInt()) : rw->GetDouble();
+    const double height =
+        rh->IsInt() ? static_cast<double>(rh->GetInt()) : rh->GetDouble();
+    if (width <= 0.0 || height <= 0.0) {
+      return capture_alias_error(
+          "region must be an object with numeric x, y, width and height "
+          "(width/height greater than 0)");
+    }
+  }
+  if (const mcp::JsonValue *max_dimension = args.Find("max_dimension")) {
+    if (!max_dimension->IsInt() || max_dimension->GetInt() < 64 ||
+        max_dimension->GetInt() > 4096) {
+      return capture_alias_error(
+          "max_dimension must be an integer between 64 and 4096");
+    }
+  }
+  if (const mcp::JsonValue *annotate = args.Find("annotate")) {
+    if (!annotate->IsBool()) {
+      return capture_alias_error("annotate must be a boolean");
+    }
+  }
+  if (const mcp::JsonValue *nodes = args.Find("annotate_nodes")) {
+    if (!nodes->IsArray() || nodes->GetArray().empty() ||
+        nodes->GetArray().size() > 50) {
+      return capture_alias_error(
+          "annotate_nodes must be an array of 1-50 strings");
+    }
+    for (const auto &item : nodes->GetArray()) {
+      if (!item.IsString() || item.GetString().empty()) {
+        return capture_alias_error(
+            "annotate_nodes must be an array of non-empty strings");
+      }
+    }
+  }
+  if (const mcp::JsonValue *nodes_max = args.Find("annotate_nodes_max")) {
+    if (!nodes_max->IsInt() || nodes_max->GetInt() < 1 ||
+        nodes_max->GetInt() > 50) {
+      return capture_alias_error(
+          "annotate_nodes_max must be an integer between 1 and 50");
+    }
+  }
+  if (const mcp::JsonValue *after_frames = args.Find("after_frames")) {
+    if (!after_frames->IsInt() || after_frames->GetInt() < 0) {
+      return capture_alias_error(
+          "after_frames must be an integer greater than or equal to 0");
+    }
+  }
+  if (const mcp::JsonValue *when = args.Find("when")) {
+    if (!when->IsString()) {
+      return capture_alias_error("when must be a string");
+    }
+  }
+  if (const mcp::JsonValue *scale = args.Find("scale")) {
+    if (!scale->IsInt() || scale->GetInt() < 1 || scale->GetInt() > 8) {
+      return capture_alias_error(
+          "scale must be an integer between 1 and 8");
+    }
+  }
+  if (const mcp::JsonValue *wait_ready = args.Find("wait_ready")) {
+    if (!wait_ready->IsBool()) {
+      return capture_alias_error("wait_ready must be a boolean");
+    }
+  }
+  return mcp::JsonValue();
+}
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
   v.reserve(2);
-  v.push_back(make_spec_tool(ToolSpec{
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "capture_editor_viewport",
-      "Capture a viewport as a PNG image and return it inline as base64 (image content). target='editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; use it to visually verify the scene while editing, e.g. after placing nodes or changing properties. Optional 'space' picks what the editor target captures: 'viewport' (default) keeps the 2D viewport with 3D fallback behaviour, while 'window' grabs the editor main window root viewport exactly as shown on screen - docks, toolbars and the 2D grid/selection overlays included. The optional 'region' object {x, y, width, height} crops the captured image to that rectangle (width and height must be positive; the rect is clamped to the image, an empty intersection fails with code region_out_of_bounds), and optional 'max_dimension' (64-4096) downscales the result so its longest side is at most that many pixels; it never upscales. Both parameters apply to both targets: for target='game' the crop and downscale run inside the game process. They operate on the returned output image: the result reports the clamped 'region' when one was applied, source_width/source_height whenever the output was cropped or upscaled/downscaled, and width/height (plus 'space' on the editor target) for the final image. Optional 'scale' (integer 1-8, default 1) nearest-neighbour upscales the image after the crop and before 'max_dimension', so the cap still wins when both are given and width/height report the final size. For target='game', optional 'after_frames' (integer >= 0) waits that many rendered frames and optional 'when' (a GDScript expression re-evaluated every rendered frame against the current scene) holds the capture until the expression is true - together they capture short-lived feedback such as a 2 s banner or a 0.7 s death screen without slowing the game: act first, then capture with a condition; the condition holds on the rendered frame reported as when_satisfied_frame and the image is read on the next rendered frame (captured_frame > when_satisfied_frame), so the picture shows the state after the condition became true; a malformed expression fails immediately with a structured error (code when_parse_error) carrying the Expression error text, and a condition that never becomes true ends in a structured error (code when_timeout, plus frames_waited) bounded by 'timeout_ms' instead of hanging. target='editor' rejects 'after_frames'/'when' because the editor capture runs synchronously on the main thread. Optional 'diff_against_last' (default false) adds a 'diff' object comparing the final image with the previous editor capture: comparable plus changed_ratio and, when anything changed, changed_bbox; when the two sizes differ it compares the shared top-left region instead and additionally reports size_mismatch=true and current_size {x, y} next to baseline_size; when the images cannot be compared it returns comparable=false with a reason (no_baseline, unsupported_format or baseline_too_large). Optional 'annotate' (default false) draws numbered red boxes around UI controls and adds an 'elements' array (id, path, type, text, position, size) in final-image pixels whose ids match the box numbers, plus 'elements_truncated' when the 200-element cap was hit. It applies to both targets: the editor target annotates editor UI controls (window-level controls with space='window'), while target='game' annotates Controls of the running game inside the game process and returns the same elements table. Editor captures are not written to disk by default; pass save=true to also write the PNG under user://godot_autopilot/captures/ and receive its 'path' in the result, which also deletes the older gda_capture PNGs beyond the 20 most recent. target='game' captures the running game's root window over the runtime channel and returns data, format, width and height plus the absolute path of the PNG in the OS cache directory, along with region/source_width/source_height when the game applied them; it requires a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension. Both targets keep only the 20 most recent gda_capture PNG files. Optional 'timeout_ms' applies to target='game' only (default: 5000, max: 30000). Write-tier tool (side_effect writes_file): save=true writes and prunes files under user://, and target='game' always writes a PNG in the game process; in strict mode without 'write' in the allow list the call is rejected with code authorization_required before any capture happens. Optional save/save_dir now apply to both targets: save=true (or giving save_dir) writes a persistent gda_capture_<yyyyMMdd-HHmmss>_<seq>.png copy after the image is read and returns saved_path, so target='game' no longer silently ignores save; saving requires the write capability.",
+      "Capture a viewport as a PNG image and return it inline as base64 (image content). target='editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; use it to visually verify the scene while editing, e.g. after placing nodes or changing properties. A viewport counts as usable only when its rendered image is larger than 8 px on both sides and its visible rect is non-zero: a degenerate 2D viewport triggers the 3D fallback, and when both are unusable the call fails with a structured error — code no_scene_open when no scene is open, otherwise viewport_degenerate — carrying captured_viewport and size diagnostics instead of returning a tiny placeholder image (tightened behaviour: earlier builds returned ok with a placeholder). Optional 'space' picks what the editor target captures: 'viewport' (default) keeps the 2D viewport with 3D fallback behaviour, while 'window' grabs the editor main window root viewport exactly as shown on screen - docks, toolbars and the 2D grid/selection overlays included. The optional 'region' object {x, y, width, height} crops the captured image to that rectangle (width and height must be positive; the rect is clamped to the image, an empty intersection fails with code region_out_of_bounds), and optional 'max_dimension' (64-4096) downscales the result so its longest side is at most that many pixels; it never upscales. Both parameters apply to both targets: for target='game' the crop and downscale run inside the game process. They operate on the returned output image: the result reports the clamped 'region' when one was applied, source_width/source_height whenever the output was cropped or upscaled/downscaled, and width/height (plus 'space' on the editor target) for the final image. Optional 'scale' (integer 1-8, default 1) nearest-neighbour upscales the image after the crop and before 'max_dimension', so the cap still wins when both are given and width/height report the final size. For target='game', optional 'after_frames' (integer >= 0) waits that many rendered frames and optional 'when' (a GDScript expression re-evaluated every rendered frame against the current scene) holds the capture until the expression is true - together they capture short-lived feedback such as a 2 s banner or a 0.7 s death screen without slowing the game: act first, then capture with a condition; the condition holds on the rendered frame reported as when_satisfied_frame and the image is read on the next rendered frame (captured_frame > when_satisfied_frame), so the picture shows the state after the condition became true; a malformed expression fails immediately with a structured error (code when_parse_error) carrying the Expression error text, and a condition that never becomes true ends in a structured error (code when_timeout, plus frames_waited) bounded by 'timeout_ms' instead of hanging. target='editor' rejects 'after_frames'/'when' because the editor capture runs synchronously on the main thread. Optional 'diff_against_last' (default false) adds a 'diff' object comparing the final image with the previous editor capture: comparable plus changed_ratio and, when anything changed, changed_bbox; when the two sizes differ it compares the shared top-left region instead and additionally reports size_mismatch=true and current_size {x, y} next to baseline_size; when the images cannot be compared it returns comparable=false with a reason (no_baseline, unsupported_format or baseline_too_large). Optional 'annotate' (default false) draws numbered red boxes around UI controls and adds an 'elements' array (id, path, type, text, position, size) in final-image pixels whose ids match the box numbers, plus 'elements_truncated' when the 200-element cap was hit. It applies to both targets: the editor target annotates editor UI controls (window-level controls with space='window'), while target='game' annotates Controls of the running game inside the game process and returns the same elements table. Editor captures are not written to disk by default; pass save=true to also write the PNG under user://godot_autopilot/captures/ and receive its 'path' in the result, which also deletes the older gda_capture PNGs beyond the 20 most recent. target='game' captures the running game's root window over the runtime channel and returns data, format, width and height plus the absolute path of the PNG in the OS cache directory, along with region/source_width/source_height when the game applied them; it requires a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension. Both targets keep only the 20 most recent gda_capture PNG files. Optional 'timeout_ms' applies to target='game' only (default: 5000, max: 25000; larger values are clamped to the cap). Write-tier tool (side_effect writes_file): save=true writes and prunes files under user://, and target='game' always writes a PNG in the game process; in strict mode without 'write' in the allow list the call is rejected with code authorization_required before any capture happens. Optional save/save_dir now apply to both targets: save=true (or giving save_dir) writes a persistent gda_capture_<yyyyMMdd-HHmmss>_<seq>.png copy after the image is read and returns saved_path, so target='game' no longer silently ignores save; saving requires the write capability.",
       "Capture", {"capture", "screenshot", "viewport"}, SideEffect::WritesFile, tool_flags::kCaptureImage,
-      kCaptureEditorViewportParams, ::godot_autopilot::capture_ops::handle_capture_viewport}));
+      kCaptureEditorViewportParams, ::godot_autopilot::capture_ops::handle_capture_viewport},
+      {
+          ToolAlias{"capture_game_viewport", "capture_editor_viewport",
+                    capture_game_alias_args, {}, "0.4.0", "0.6.0",
+                    capture_game_alias_validate},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "review_scene_visually",
       "Review the edited scene and running game in one call for visual scene design: returns editor_capture (editor viewport screenshot with optional annotate/annotate_nodes), game_capture (running game screenshot over the runtime channel), nodes (get_scene_node_screen_rect table for annotate_nodes paths) and mapping (get_editor_viewport_geometry window=offset+image*scale). Each section fails in isolation with an error object instead of failing the call; pass include_editor/include_game=false to skip a capture, omit annotate_nodes to skip the nodes table (nodes reports skipped). Shares region/max_dimension(64-4096)/scale(1-8)/annotate/annotate_nodes(1-50)/annotate_nodes_max semantics with the capture tools; space/viewport/index control the editor mapping; node_viewport(auto/2d/3d) controls the nodes table; timeout_ms bounds only the game capture. Write-tier tool (side_effect writes_file), not a read-only call: with include_game left true (the default) the game always writes the capture PNG into the OS cache directory over the runtime channel; in strict mode without 'write' in the allow list the call is rejected with code authorization_required before any section runs.",

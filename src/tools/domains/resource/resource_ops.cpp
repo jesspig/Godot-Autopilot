@@ -1,10 +1,14 @@
 #include "tools/domains/resource/resource_ops.hpp"
+#include "tools/domains/resource/sidecar_transaction.hpp"
+#include "tools/domains/resource/uid_validation.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/path_util.hpp"
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/readback_util.hpp"
 #include "util/json_godot.hpp"
 #include "util/project_path.hpp"
@@ -43,6 +47,8 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <algorithm>
+#include <functional>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -655,6 +661,30 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
   if (th && th->IsString())
     type_hint = th->GetString();
 
+  godot::ResourceLoader::CacheMode cache_mode =
+      godot::ResourceLoader::CACHE_MODE_REUSE;
+  if (auto *cache_p = args.Find("cache_mode")) {
+    if (!cache_p->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: cache_mode must be a string");
+      return e;
+    }
+    const std::string mode = cache_p->GetString();
+    if (mode == "reuse") {
+      cache_mode = godot::ResourceLoader::CACHE_MODE_REUSE;
+    } else if (mode == "replace") {
+      cache_mode = godot::ResourceLoader::CACHE_MODE_REPLACE;
+    } else if (mode == "ignore") {
+      cache_mode = godot::ResourceLoader::CACHE_MODE_IGNORE;
+    } else {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "invalid parameter: cache_mode must be reuse, replace or ignore");
+      return e;
+    }
+  }
+
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -664,7 +694,8 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Resource> res;
   std::string load_err;
-  if (!load_resource_or_error(normalized_path, res, load_err, type_hint)) {
+  if (!load_resource_or_error(normalized_path, res, load_err, type_hint,
+                              nullptr, cache_mode)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(load_err);
     return e;
@@ -986,8 +1017,14 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
     }
   }
   if (err == godot::OK && has_oid) {
-    resource_registry::erase_oid(obj_id);
+    const std::vector<std::string> preserved_names =
+        resource_registry::erase_oid_and_extract_names(obj_id);
     resource_registry::register_resource(res, name);
+    for (const std::string &alias : preserved_names) {
+      if (alias.rfind("name:", 0) == 0 && alias.substr(5) != name) {
+        resource_registry::register_resource(res, alias.substr(5));
+      }
+    }
   }
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -1299,10 +1336,6 @@ godot::String make_token(const char *prefix, const std::string &value) {
   return godot::String(prefix) + godot::String(value.c_str()) + "\"";
 }
 
-std::string join_path(const std::string &dir, const std::string &name) {
-  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
-}
-
 bool has_binary_reference_extension(const std::string &path) {
   static const char *kBinaryExts[] = {".scn", ".res", ".csv", ".translation"};
   for (const char *ext : kBinaryExts) {
@@ -1561,18 +1594,30 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
     return e;
   }
 
-  int64_t uid;
   auto *it_uid = args.Find("uid");
-  if (it_uid && it_uid->IsNumber()) {
-    uid = it_uid->GetInt();
-  } else {
-    uid = uid_svc->create_id();
+  const bool explicit_uid = it_uid != nullptr && it_uid->IsNumber();
+  int64_t uid = explicit_uid ? it_uid->GetInt() : uid_svc->create_id();
+  const auto *it_overwrite = args.Find("overwrite");
+  const bool overwrite = it_overwrite != nullptr && it_overwrite->IsBool() &&
+                         it_overwrite->GetBool();
+  const bool already_registered = uid_svc->has_id(uid);
+  const resource_ops_detail::UidVerdict verdict =
+      resource_ops_detail::validate_uid_assignment(explicit_uid, uid,
+                                                   already_registered, overwrite);
+  if (verdict == resource_ops_detail::UidVerdict::kReject) {
+    return util::error_json(uid <= 0
+        ? "uid must be a positive integer"
+        : "uid already registered; pass overwrite=true to reassign it");
   }
   const godot::String path_gs = godot::String::utf8(path.c_str());
-  if (uid_needs_add(uid_svc->has_id(uid))) {
+  const bool added = verdict == resource_ops_detail::UidVerdict::kAcceptAdd;
+  if (added) {
     uid_svc->add_id(uid, path_gs);
   } else {
     uid_svc->set_id(uid, path_gs);
+  }
+  if (!uid_svc->has_id(uid)) {
+    return util::error_json("failed to assign uid " + std::to_string(uid));
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
@@ -1797,6 +1842,12 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
         godot::String(to_import_path.c_str()));
   }
 
+  std::vector<resource_ops_detail::SidecarMove> sidecar_moves;
+  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kUid,
+                           !uid_sidecar_absent && uid_err == godot::OK});
+  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kImport,
+                           import_sidecar_present && import_err == godot::OK});
+
   ResourceScanBudget scan_budget;
   bool scan_truncated = false;
   std::vector<std::string> text_files;
@@ -1872,8 +1923,18 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   godot::Error err = godot::DirAccess::rename_absolute(
       godot::String(from.c_str()), godot::String(to.c_str()));
   if (err != godot::OK) {
+    for (resource_ops_detail::SidecarKind kind :
+         resource_ops_detail::rollback_order(sidecar_moves)) {
+      const std::string &moved_from =
+          kind == resource_ops_detail::SidecarKind::kUid ? from_uid_path : from_import_path;
+      const std::string &moved_to =
+          kind == resource_ops_detail::SidecarKind::kUid ? to_uid_path : to_import_path;
+      godot::DirAccess::rename_absolute(godot::String(moved_to.c_str()),
+                                        godot::String(moved_from.c_str()));
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    r["error"] = mcp::JsonValue("rename failed; sidecars were restored");
     return r;
   }
 
@@ -2058,11 +2119,16 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
 
   godot::String from_gs(from.c_str());
   godot::String to_gs(to.c_str());
+  const std::string old_source_name =
+      from.substr(from.find_last_of("/\\") == std::string::npos
+                      ? 0
+                      : from.find_last_of("/\\") + 1);
 
+  godot::Ref<godot::Resource> old_cached;
   if (loader && loader->has_cached(from_gs)) {
-    auto cached = loader->get_cached_ref(from_gs);
-    if (cached.is_valid()) {
-      cached->set_path(to_gs);
+    old_cached = loader->get_cached_ref(from_gs);
+    if (old_cached.is_valid()) {
+      old_cached->set_path(to_gs);
     }
   }
 
@@ -2076,7 +2142,46 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     if (efs) {
       efs->update_file(from_gs);
       efs->update_file(to_gs);
+      if (import_sidecar_present && import_err == godot::OK &&
+          !efs->is_importing()) {
+        godot::PackedStringArray files;
+        files.push_back(to_gs);
+        efs->reimport_files(files);
+      }
     }
+  }
+
+  godot::Ref<godot::Resource> reloaded;
+  if (loader && import_sidecar_present) {
+    reloaded = loader->load(to_gs, godot::String(),
+                            godot::ResourceLoader::CACHE_MODE_REPLACE);
+    if (reloaded.is_valid()) {
+      r["reloaded_resource"] = mcp::JsonValue(to);
+    } else {
+      r["reload_resource_warning"] = mcp::JsonValue(
+          "renamed imported resource " + to +
+          " could not be reloaded with CACHE_MODE_REPLACE; in-memory "
+          "instances may still reference the old path — run resource_reload "
+          "or reload the scene if property_get reports a stale load_path");
+    }
+  }
+
+  if (editor && !affected_open_scenes.empty()) {
+    const std::string active_before =
+        editor->get_edited_scene_root()
+            ? util::to_std(editor->get_edited_scene_root()->get_scene_file_path())
+            : std::string();
+    for (const std::string &scene_path : affected_open_scenes) {
+      editor->open_scene_from_path(godot::String(scene_path.c_str()));
+    }
+    if (!active_before.empty()) {
+      editor->open_scene_from_path(godot::String(active_before.c_str()));
+    }
+    mcp::JsonValue reopened(mcp::JsonValue::array_tag);
+    for (const std::string &scene_path : affected_open_scenes) {
+      reopened.PushBack(mcp::JsonValue(scene_path));
+    }
+    r["reloaded_open_scenes"] = std::move(reopened);
   }
 
   struct RemapRec {
@@ -2179,10 +2284,61 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   }
   r["saved_scenes"] = std::move(saved_arr);
   r["reloaded_scenes"] = std::move(reloaded_arr);
+
+  if (reloaded.is_valid() && old_cached.is_valid() && editor &&
+      !affected_open_scenes.empty()) {
+    int64_t rebound = 0;
+    const godot::String old_source_gs(old_source_name.c_str());
+    std::function<void(godot::Node *)> rebind_node_properties =
+        [&](godot::Node *node) {
+          if (node == nullptr) return;
+          godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+          for (int64_t i = 0; i < props.size(); i++) {
+            godot::Dictionary prop = props[i];
+            if (!prop.has("name")) continue;
+            const godot::StringName pname =
+                prop["name"].operator godot::StringName();
+            const godot::Variant current = node->get(pname);
+            if (current.get_type() != godot::Variant::OBJECT) continue;
+            godot::Object *held = current.operator godot::Object *();
+            if (held == nullptr) continue;
+            godot::Resource *held_res =
+                godot::Object::cast_to<godot::Resource>(held);
+            const godot::String held_path =
+                held_res != nullptr ? held_res->get_path() : godot::String();
+            const bool held_old =
+                held == old_cached.ptr() ||
+                (!held_path.is_empty() && held_path.contains(old_source_gs));
+            if (!held_old) continue;
+            node->set(pname, godot::Variant(reloaded.ptr()));
+            rebound++;
+          }
+          godot::Array children = node->get_children();
+          for (int64_t i = 0; i < children.size(); i++) {
+            rebind_node_properties(
+                godot::Object::cast_to<godot::Node>(children[i]));
+          }
+        };
+    godot::Node *root = editor->get_edited_scene_root();
+    if (root != nullptr) {
+      rebind_node_properties(root);
+    }
+    r["rebound_properties"] = mcp::JsonValue(rebound);
+  }
   return r;
 }
 
 mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
+  auto *it_directory = args.Find("new_directory");
+  if (it_directory != nullptr) {
+    if (!it_directory->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "invalid parameter: new_directory must be a string");
+      return e;
+    }
+    return handle_move(args);
+  }
   auto *it_from = args.Find("path");
   if ((!it_from || !it_from->IsString()) && args.Contains("from")) {
     it_from = args.Find("from");
@@ -2693,9 +2849,31 @@ mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args) {
 
   godot::PackedStringArray deps =
       loader->get_dependencies(godot::String(path.c_str()));
+  std::string dependency_filter;
+  if (auto *dependency_p = args.Find("dependency")) {
+    if (!dependency_p->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: dependency must be a string");
+      return e;
+    }
+    std::string normalized_dependency;
+    std::string dependency_error;
+    if (!normalize_resource_path(dependency_p->GetString(),
+                                 normalized_dependency, dependency_error)) {
+      return util::error_detail("path rejected", "dependency",
+                                dependency_error,
+                                "use a res:// project resource path");
+    }
+    dependency_filter = normalized_dependency;
+  }
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < deps.size(); i++) {
-    arr.PushBack(mcp::JsonValue(util::to_std(deps[i])));
+    const std::string dependency = util::to_std(deps[i]);
+    if (!dependency_filter.empty() && dependency != dependency_filter) {
+      continue;
+    }
+    arr.PushBack(mcp::JsonValue(dependency));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -2751,6 +2929,321 @@ mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args) {
   return r;
 }
 
+namespace {
+
+bool has_string_param(const mcp::JsonValue &args, const char *name) {
+  std::string out;
+  return util::string_arg_status(args, name, out, false) ==
+         util::StringArgStatus::Ok;
+}
+
+mcp::JsonValue missing_action_parameter(const std::string &action,
+                                        const char *name) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(
+      "missing required parameter for action '" + action + "': " + name);
+  return error;
+}
+
+bool resolve_resource_action(const mcp::JsonValue &args, const char *tool,
+                             std::initializer_list<const char *> allowed,
+                             std::string &out_action,
+                             mcp::JsonValue &out_error) {
+  const mcp::JsonValue *it_action = args.Find("action");
+  if (it_action == nullptr || !it_action->IsString()) {
+    out_error = mcp::JsonValue(mcp::JsonValue::object_tag);
+    out_error["error"] = mcp::JsonValue("missing required parameter: action");
+    return false;
+  }
+  out_action = it_action->GetString();
+  std::string allowed_text;
+  for (const char *candidate : allowed) {
+    if (out_action == candidate) {
+      return true;
+    }
+    if (!allowed_text.empty()) {
+      allowed_text += ", ";
+    }
+    allowed_text += candidate;
+  }
+  out_error = mcp::JsonValue(mcp::JsonValue::object_tag);
+  out_error["error"] = mcp::JsonValue(
+      "unknown action '" + out_action + "' for " + tool + " (expected " +
+      allowed_text + ")");
+  return false;
+}
+
+bool require_string_for_action(const mcp::JsonValue &args,
+                               const std::string &action, const char *name,
+                               mcp::JsonValue &error) {
+  if (has_string_param(args, name)) {
+    return true;
+  }
+  error = missing_action_parameter(action, name);
+  return false;
+}
+
+bool require_param_for_action(const mcp::JsonValue &args,
+                              const std::string &action, const char *name,
+                              mcp::JsonValue &error) {
+  if (args.Find(name) != nullptr) {
+    return true;
+  }
+  error = missing_action_parameter(action, name);
+  return false;
+}
+
+} // namespace
+
+mcp::JsonValue handle_load_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_load",
+                               {"load", "reload", "threaded_start",
+                                "threaded_status", "threaded_get"},
+                               action, error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (action == "load") {
+    return handle_load(args);
+  }
+  if (action == "reload") {
+    return handle_reload(args);
+  }
+  if (action == "threaded_start") {
+    return handle_load_threaded(args);
+  }
+  if (action == "threaded_status") {
+    return handle_load_threaded_get_status(args);
+  }
+  return handle_load_threaded_wait(args);
+}
+
+mcp::JsonValue handle_query_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(
+          args, "resource_query",
+          {"type", "exists", "types", "extensions", "dir", "uid", "deps",
+           "references", "property", "curve_baked"},
+          action, error)) {
+    return error;
+  }
+  if (action == "types") {
+    return handle_list_types(args);
+  }
+  if (action == "extensions") {
+    return handle_get_extensions(args);
+  }
+  if (action == "references") {
+    return handle_get_references(args);
+  }
+  if (action == "property") {
+    if (!require_string_for_action(args, action, "property", error)) {
+      return error;
+    }
+    return handle_get_property(args);
+  }
+  if (action == "curve_baked") {
+    if (!require_string_for_action(args, action, "name", error)) {
+      return error;
+    }
+    return handle_get_curve_baked_points(args);
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (action == "type") {
+    return handle_get_type(args);
+  }
+  if (action == "exists") {
+    return handle_exists(args);
+  }
+  if (action == "dir") {
+    return handle_list_dir(args);
+  }
+  if (action == "uid") {
+    return handle_get_uid(args);
+  }
+  return handle_get_dependencies(args);
+}
+
+mcp::JsonValue handle_create_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(
+          args, "resource_create",
+          {"create", "duplicate", "curve", "curve_points", "primitive",
+           "array"},
+          action, error)) {
+    return error;
+  }
+  if (action == "create") {
+    if (!require_string_for_action(args, action, "type", error)) {
+      return error;
+    }
+    return handle_create(args);
+  }
+  if (action == "duplicate") {
+    if (!require_string_for_action(args, action, "path", error)) {
+      return error;
+    }
+    return handle_duplicate(args);
+  }
+  if (action == "curve") {
+    if (!require_string_for_action(args, action, "name", error)) {
+      return error;
+    }
+    return handle_create_curve(args);
+  }
+  if (action == "curve_points") {
+    if (!require_string_for_action(args, action, "name", error)) {
+      return error;
+    }
+    if (!require_param_for_action(args, action, "points", error)) {
+      return error;
+    }
+    return handle_set_curve_points(args);
+  }
+  if (action == "primitive") {
+    if (!require_string_for_action(args, action, "type", error)) {
+      return error;
+    }
+    return handle_create_primitive_mesh(args);
+  }
+  if (!require_param_for_action(args, action, "vertices", error)) {
+    return error;
+  }
+  return handle_create_array_mesh(args);
+}
+
+mcp::JsonValue handle_mesh_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_mesh", {"surface_material"},
+                               action, error)) {
+    return error;
+  }
+  if (!require_param_for_action(args, action, "mesh_ref", error) ||
+      !require_param_for_action(args, action, "surface_idx", error) ||
+      !require_string_for_action(args, action, "material_path", error)) {
+    return error;
+  }
+  return handle_set_mesh_surface_material(args);
+}
+
+mcp::JsonValue handle_property_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_property", {"get", "set"},
+                               action, error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "property", error)) {
+    return error;
+  }
+  if (action == "get") {
+    return handle_get_property(args);
+  }
+  if (!require_param_for_action(args, action, "value", error)) {
+    return error;
+  }
+  return handle_set_property(args);
+}
+
+mcp::JsonValue handle_file_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(
+          args, "resource_file",
+          {"copy", "rename", "move", "remove", "create_dir"}, action,
+          error)) {
+    return error;
+  }
+  if (action == "rename") {
+    if (!has_string_param(args, "path") && !has_string_param(args, "from")) {
+      return missing_action_parameter(action, "path");
+    }
+    if (!has_string_param(args, "new_path") &&
+        !has_string_param(args, "to") &&
+        !has_string_param(args, "new_directory")) {
+      return missing_action_parameter(action, "new_path or new_directory");
+    }
+    return handle_rename(args);
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (action == "copy") {
+    if (!require_string_for_action(args, action, "dest_path", error)) {
+      return error;
+    }
+    return handle_copy(args);
+  }
+  if (action == "move") {
+    if (!require_string_for_action(args, action, "new_directory", error)) {
+      return error;
+    }
+    return handle_move(args);
+  }
+  if (action == "remove") {
+    return handle_remove(args);
+  }
+  return handle_create_directory(args);
+}
+
+mcp::JsonValue handle_save_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_save", {"save"}, action,
+                               error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  return handle_save(args);
+}
+
+mcp::JsonValue handle_uid_set_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_uid_set", {"set_uid"}, action,
+                               error)) {
+    return error;
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  return handle_set_uid(args);
+}
+
+mcp::JsonValue handle_import_action(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!resolve_resource_action(args, "resource_import",
+                               {"reimport", "import_options"}, action,
+                               error)) {
+    return error;
+  }
+  if (action == "reimport") {
+    if (args.Find("path") == nullptr && args.Find("files") == nullptr) {
+      return missing_action_parameter(action, "path or files");
+    }
+    return handle_reimport(args);
+  }
+  if (!require_string_for_action(args, action, "path", error)) {
+    return error;
+  }
+  if (!require_param_for_action(args, action, "options", error)) {
+    return error;
+  }
+  return handle_set_import_options(args);
+}
+
 
 bool normalize_resource_path(const std::string &raw, std::string &out,
                              std::string &error, bool allow_root) {
@@ -2784,11 +3277,11 @@ std::string describe_target(const mcp::JsonValue &args) {
   return "no identifier provided";
 }
 
-bool load_resource_or_error(const std::string &path,
-                            godot::Ref<godot::Resource> &out_res,
-                            std::string &out_error,
-                            const std::string &type_hint,
-                            const char *load_fail_suffix) {
+bool load_resource_or_error(
+    const std::string &path, godot::Ref<godot::Resource> &out_res,
+    std::string &out_error, const std::string &type_hint,
+    const char *load_fail_suffix,
+    godot::ResourceLoader::CacheMode cache_mode) {
   std::string normalized_path;
   if (!normalize_resource_path(path, normalized_path, out_error))
     return false;
@@ -2799,7 +3292,7 @@ bool load_resource_or_error(const std::string &path,
   }
   auto *loader = godot::ResourceLoader::get_singleton();
   out_res = loader ? loader->load(godot::String(normalized_path.c_str()),
-                                  godot::String(type_hint.c_str()))
+                                  godot::String(type_hint.c_str()), cache_mode)
                    : godot::Ref<godot::Resource>();
   if (out_res.is_null()) {
     out_error =
@@ -2840,13 +3333,11 @@ resolve_resource(const mcp::JsonValue &args, bool &out_has_oid,
   bool has_oid = false;
   auto *it_oid_str = args.Find("object_id_str");
   if (it_oid_str && it_oid_str->IsString()) {
-    try {
-      obj_id = std::stoll(it_oid_str->GetString());
-      has_oid = true;
-    } catch (...) {
+    if (!util::parse_signed_decimal_int64(it_oid_str->GetString(), obj_id)) {
       out_error = "invalid object_id_str: not a valid 64-bit integer";
       return godot::Ref<godot::Resource>();
     }
+    has_oid = true;
   } else {
     auto *it_oid = args.Find("object_id");
     if (it_oid && it_oid->IsInt()) {

@@ -116,6 +116,46 @@ describe("gda tasks", () => {
     expect(polls).toBeGreaterThan(1);
   });
 
+  test("wait 遇到 completed 但内层工具失败返回 ToolFailure", async () => {
+    const port = server((method) => {
+      if (method === "tasks/get") {
+        return {
+          taskId: "t-fail",
+          status: "completed",
+          result: {
+            content: [{ type: "text", text: JSON.stringify({ error: "tool failed" }) }],
+            isError: true,
+          },
+        };
+      }
+      return {};
+    });
+    const cap = capture();
+    const code = await tasks(["wait", "t-fail"], { portText: String(port), timeoutText: "5" });
+    cap.restore();
+    expect(code).toBe(ExitCode.ToolFailure);
+    expect(JSON.parse(cap.stdout()).status).toBe("completed");
+  });
+
+  test("wait 遇到 completed 且内层内容含结构化错误返回 ToolFailure", async () => {
+    const port = server((method) => {
+      if (method === "tasks/get") {
+        return {
+          taskId: "t-struct",
+          status: "completed",
+          result: {
+            content: [{ type: "text", text: JSON.stringify({ structured_error: { code: "backend_down" } }) }],
+          },
+        };
+      }
+      return {};
+    });
+    const cap = capture();
+    const code = await tasks(["wait", "t-struct"], { portText: String(port), timeoutText: "5" });
+    cap.restore();
+    expect(code).toBe(ExitCode.ToolFailure);
+  });
+
   test("cancel 发 tasks/cancel", async () => {
     let seen = "";
     const port = server((method, params) => {

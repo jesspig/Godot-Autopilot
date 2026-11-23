@@ -24,10 +24,6 @@ function isJsonMime(mime: string): boolean {
   return mime === "application/json" || mime.endsWith("+json");
 }
 
-function textOf(content: ResourceContent): string {
-  return typeof content.text === "string" ? content.text : "";
-}
-
 export function redactContents(contents: ResourceContent[]): Array<Record<string, unknown>> {
   return contents.map((content) => {
     const record: Record<string, unknown> = { uri: content.uri };

@@ -3,6 +3,7 @@
 #include "core/config.hpp"
 #include "core/editor_coords.hpp"
 #include "gda_protocol.hpp"
+#include "tools/domains/input_map/input_map_ops.hpp"
 #include "util/error_util.hpp"
 #include <cctype>
 #include <functional>
@@ -28,12 +29,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-namespace godot_autopilot {
-namespace input_map_ops {
-int64_t resolve_key_name_code(const std::string &name);
-} // namespace input_map_ops
-} // namespace godot_autopilot
 
 namespace godot_autopilot {
 namespace runtime {

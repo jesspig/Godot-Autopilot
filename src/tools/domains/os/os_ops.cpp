@@ -1,4 +1,5 @@
 #include "tools/domains/os/os_ops.hpp"
+#include "tools/domains/os/os_process_timeout.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
 #include "tools/base/dispatch.hpp"
@@ -57,6 +58,30 @@ int64_t steady_now_ms() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::steady_clock::now().time_since_epoch())
       .count();
+}
+
+JV process_status_body(godot::OS *os, int32_t pid) {
+  const bool running = os->is_process_running(pid);
+  JV info(JV::object_tag);
+  info["pid"] = JV(static_cast<int64_t>(pid));
+  info["is_running"] = JV(running);
+  if (running) {
+    info["exit_code"] = JV();
+    info["available"] = JV(false);
+    info["hint"] = JV(
+        "the process is still running; the exit code becomes readable after "
+        "it exits");
+    return info;
+  }
+  const int32_t code = os->get_process_exit_code(pid);
+  info["exit_code"] = JV(static_cast<int64_t>(code));
+  info["available"] = JV(code != -1);
+  if (code == -1) {
+    info["hint"] = JV(
+        "no exit code is available for this pid: it was not started by this "
+        "editor process or the platform does not expose it");
+  }
+  return info;
 }
 
 constexpr uint64_t kProcessSliceReadBytes = 65536;
@@ -177,17 +202,17 @@ JV kill_os_process(int64_t op_id) {
   return r;
 }
 
-JV os_process_timeout_result(int64_t pid, int64_t timeout_ms) {
+JV os_process_timeout_result(int64_t pid, int64_t timeout_ms, bool termination_confirmed) {
   JV e(JV::object_tag);
+  const std::string detail = os_ops_detail::termination_detail(termination_confirmed);
   e["error"] = JV("the external process did not finish within " +
-                  std::to_string(timeout_ms) +
-                  " ms — it was terminated and the call is cancelled (not "
-                  "retryable)");
+                  std::to_string(timeout_ms) + " ms — " + detail);
   e["code"] = JV("main_thread_timeout");
   e["retryable"] = JV(false);
   e["cancelled"] = JV(true);
   e["timeout_ms"] = JV(timeout_ms);
   e["process_id"] = JV(pid);
+  e["termination_confirmed"] = JV(termination_confirmed);
   return e;
 }
 
@@ -393,6 +418,28 @@ JV handle_os_execute(const JV &args) {
   return marker;
 }
 
+int64_t start_csharp_build(const godot::String &path,
+                           const godot::PackedStringArray &build_args) {
+  auto *os = godot::OS::get_singleton();
+  if (os == nullptr) return -1;
+  godot::Dictionary pipes = os->execute_with_pipe(path, build_args, false);
+  if (!pipes.has("pid")) return -1;
+  auto state = std::make_shared<OsProcessState>();
+  state->pid = static_cast<int64_t>(pipes["pid"]);
+  state->capture_output = true;
+  state->started_ms = steady_now_ms();
+  if (pipes.has("stdio"))
+    state->stdout_pipe = godot::Ref<godot::FileAccess>(pipes["stdio"]);
+  if (pipes.has("stderr"))
+    state->stderr_pipe = godot::Ref<godot::FileAccess>(pipes["stderr"]);
+  const int64_t op_id = g_process_seq.fetch_add(1);
+  {
+    std::lock_guard<std::mutex> lock(g_process_mutex);
+    g_process_states[op_id] = state;
+  }
+  return op_id;
+}
+
 JV wait_os_process(int64_t op_id, int64_t timeout_ms) {
   if (!runtime_ops::has_editor_queue()) {
     return util::error_json(
@@ -432,15 +479,21 @@ JV wait_os_process(int64_t op_id, int64_t timeout_ms) {
     if (state)
       pid = state->pid;
   }
-  dispatch::run_main_thread_slice(
+  bool termination_confirmed = false;
+  const JV kill_result = dispatch::run_main_thread_slice(
       queue, "execute_os_process kill",
       [op_id]() { return kill_os_process(op_id); }, kProcessKillBudgetMs);
+  const JV *killed_p = kill_result.Find("killed");
+  if (killed_p != nullptr && killed_p->IsBool()) {
+    termination_confirmed = killed_p->GetBool();
+  }
   LogSystem::instance().log_detailed(
       LogLevel::Warning, LogCategory::Tools,
-      "execute_os_process timed out and terminated the external process",
+      "execute_os_process timed out; termination_confirmed=" +
+          std::string(termination_confirmed ? "true" : "false"),
       "wait_id=" + std::to_string(op_id) + " timeout_ms=" +
           std::to_string(timeout_ms));
-  return os_process_timeout_result(pid, timeout_ms);
+  return os_process_timeout_result(pid, timeout_ms, termination_confirmed);
 }
 
 JV handle_os_get_datetime(const JV &args) {
@@ -655,6 +708,129 @@ JV handle_os_kill(const JV &args) {
   return r;
 }
 
+JV handle_os_process_status(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_process status called");
+  auto *pid_p = args.Find("pid");
+  if (!pid_p || !pid_p->IsInt() || pid_p->GetInt() <= 0 ||
+      pid_p->GetInt() > INT32_MAX) {
+    return util::error_json(
+        "missing required parameter: pid (positive 32-bit integer)");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  JV r(JV::object_tag);
+  r["result"] = process_status_body(
+      os, static_cast<int32_t>(pid_p->GetInt()));
+  return r;
+}
+
+JV handle_os_process_exit_code(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_process exit_code called");
+  auto *pid_p = args.Find("pid");
+  if (!pid_p || !pid_p->IsInt() || pid_p->GetInt() <= 0 ||
+      pid_p->GetInt() > INT32_MAX) {
+    return util::error_json(
+        "missing required parameter: pid (positive 32-bit integer)");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  JV r(JV::object_tag);
+  r["result"] = process_status_body(
+      os, static_cast<int32_t>(pid_p->GetInt()));
+  return r;
+}
+
+JV handle_os_process_is_running(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_process is_running called");
+  auto *pid_p = args.Find("pid");
+  if (!pid_p || !pid_p->IsInt() || pid_p->GetInt() <= 0 ||
+      pid_p->GetInt() > INT32_MAX) {
+    return util::error_json(
+        "missing required parameter: pid (positive 32-bit integer)");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  const int32_t pid = static_cast<int32_t>(pid_p->GetInt());
+  JV info(JV::object_tag);
+  info["pid"] = JV(static_cast<int64_t>(pid));
+  info["is_running"] = JV(os->is_process_running(pid));
+  JV r(JV::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+JV handle_os_memory_info(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info memory_info called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  godot::Dictionary info = os->get_memory_info();
+  JV r(JV::object_tag);
+  r["result"] = VariantJson::serialize(godot::Variant(info));
+  return r;
+}
+
+JV handle_os_static_memory(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info static_memory called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  JV info(JV::object_tag);
+  info["usage"] = JV(static_cast<int64_t>(os->get_static_memory_usage()));
+  info["peak_usage"] =
+      JV(static_cast<int64_t>(os->get_static_memory_peak_usage()));
+  JV r(JV::object_tag);
+  r["result"] = std::move(info);
+  return r;
+}
+
+JV handle_os_video_adapter(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info video_adapter called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  godot::PackedStringArray fields = os->get_video_adapter_driver_info();
+  JV arr(JV::array_tag);
+  for (int i = 0; i < fields.size(); ++i) {
+    arr.PushBack(JV(util::to_std(fields[i])));
+  }
+  JV r(JV::object_tag);
+  r["result"] = std::move(arr);
+  return r;
+}
+
+JV handle_os_cmdline_args(const JV &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "os_system_info cmdline_args called");
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return util::error_json("OS singleton not available");
+  }
+  godot::PackedStringArray args = os->get_cmdline_args();
+  JV arr(JV::array_tag);
+  for (int i = 0; i < args.size(); ++i) {
+    arr.PushBack(JV(util::to_std(args[i])));
+  }
+  JV r(JV::object_tag);
+  r["result"] = std::move(arr);
+  return r;
+}
+
 JV handle_os_move_to_trash(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "move_os_file_to_trash called");
@@ -756,6 +932,152 @@ JV handle_os_shell_open(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "open_os_path completed");
   return r;
+}
+
+namespace {
+
+mcp::JsonValue os_action_error(const std::string &message) {
+  JV error(JV::object_tag);
+  error["error"] = JV(message);
+  return error;
+}
+
+bool read_os_action(const JV &args, std::string &out, JV &error) {
+  const JV *action = args.Find("action");
+  if (action == nullptr) {
+    error = os_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = os_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+JV strip_os_action(const JV &args) {
+  JV out = args.IsObject() ? args : JV(JV::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+JV handle_os_has_environment(const JV &args) {
+  const JV *variable = args.Find("variable");
+  if (variable == nullptr || !variable->IsString()) {
+    return os_action_error("missing required parameter: variable");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return os_action_error("OS singleton not available");
+  }
+  const bool has = os->has_environment(
+      godot::String(variable->GetString().c_str()));
+  JV r(JV::object_tag);
+  r["result"] = JV(has);
+  return r;
+}
+
+JV handle_os_process(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "create") {
+    return handle_os_create_process(strip_os_action(args));
+  }
+  if (action == "execute") {
+    return handle_os_execute(strip_os_action(args));
+  }
+  if (action == "kill") {
+    return handle_os_kill(strip_os_action(args));
+  }
+  if (action == "status") {
+    return handle_os_process_status(strip_os_action(args));
+  }
+  if (action == "exit_code") {
+    return handle_os_process_exit_code(strip_os_action(args));
+  }
+  if (action == "is_running") {
+    return handle_os_process_is_running(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_process (expected create, execute, kill, status, exit_code, "
+      "is_running)");
+}
+
+JV handle_os_environment(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "get") {
+    return handle_os_get_environment(strip_os_action(args));
+  }
+  if (action == "set") {
+    return handle_os_set_environment(strip_os_action(args));
+  }
+  if (action == "has") {
+    return handle_os_has_environment(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_environment (expected get, set, has)");
+}
+
+JV handle_os_time(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "datetime") {
+    return handle_os_get_datetime(strip_os_action(args));
+  }
+  if (action == "unix_time") {
+    return handle_os_get_unix_time(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_time (expected datetime, unix_time)");
+}
+
+JV handle_os_system_info(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "info") {
+    return handle_os_get_system_info(strip_os_action(args));
+  }
+  if (action == "locale") {
+    return handle_os_get_locale(strip_os_action(args));
+  }
+  if (action == "fonts") {
+    return handle_os_get_system_fonts(strip_os_action(args));
+  }
+  if (action == "memory_info") {
+    return handle_os_memory_info(strip_os_action(args));
+  }
+  if (action == "static_memory") {
+    return handle_os_static_memory(strip_os_action(args));
+  }
+  if (action == "video_adapter") {
+    return handle_os_video_adapter(strip_os_action(args));
+  }
+  if (action == "cmdline_args") {
+    return handle_os_cmdline_args(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_system_info (expected info, locale, fonts, memory_info, "
+      "static_memory, video_adapter, cmdline_args)");
 }
 
 } // namespace os_ops

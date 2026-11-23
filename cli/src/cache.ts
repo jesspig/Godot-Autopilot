@@ -168,15 +168,26 @@ function compareVersion(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
+export function cliPlatformKey(platform = process.platform, arch = process.arch): string {
+  if (platform === "win32" && arch === "x64") return "windows-x64";
+  if (platform === "linux" && arch === "x64") return "linux-x64";
+  if (platform === "darwin" && arch === "arm64") return "macos-arm64";
+  if (platform === "darwin" && arch === "x64") return "macos-x64";
+  return "";
+}
+
 export function selectLatest(
   artifact: CacheArtifact,
   lang?: string,
+  platformKey?: string,
 ): CacheManifest | undefined {
+  const key = platformKey ?? (artifact === "cli" ? cliPlatformKey() : "");
   const candidates = listManifests().filter(
     (manifest) =>
       manifest.artifact === artifact &&
       !manifest.builtin &&
-      (lang === undefined || artifact !== "skills" || manifest.lang === lang),
+      (lang === undefined || artifact !== "skills" || manifest.lang === lang) &&
+      (artifact !== "cli" || key === "" || manifest.platform === key),
   );
   if (candidates.length === 0) return undefined;
   if (artifact === "cli" || artifact === "plugin") {

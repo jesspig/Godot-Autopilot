@@ -102,3 +102,14 @@ TEST(IpcFramingTest, LengthPrefixedFourMebibyteFrameRoundTrips) {
   EXPECT_EQ(frames.frames[0].size(), payload.size());
   EXPECT_TRUE(frames.frames[0] == payload);
 }
+
+TEST(IpcFramingTest, WireBufferFitsMaximumFramePlusPrefix) {
+  const std::string payload(4 * 1024 * 1024, 'q');
+  const std::string encoded =
+      godot_autopilot::ipc_framing::encode_length_prefixed(payload);
+  EXPECT_EQ(godot_autopilot::ipc_framing::max_wire_buffer_bytes(),
+            godot_autopilot::ipc_framing::kMaxFrameBytes +
+                godot_autopilot::ipc_framing::kLengthPrefixBytes);
+  EXPECT_LE(encoded.size(),
+            godot_autopilot::ipc_framing::max_wire_buffer_bytes());
+}

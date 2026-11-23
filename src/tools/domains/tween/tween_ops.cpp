@@ -14,6 +14,8 @@
 #include <godot_cpp/classes/tween.hpp>
 #include <godot_cpp/classes/property_tweener.hpp>
 #include <godot_cpp/classes/tweener.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <mcp/JsonValue.hpp>
@@ -151,6 +153,57 @@ bool check_tween_shape_params(const JV &args, JV &error) {
   return true;
 }
 
+bool check_positive_duration(const JV &args, JV &error) {
+  const JV *duration = args.Find("duration");
+  if (!duration || !duration->IsNumber() ||
+      util::json_number(duration, 0.0) <= 0.0) {
+    error = util::error_json("missing required parameter: duration "
+                             "(number of seconds greater than 0)");
+    return false;
+  }
+  return true;
+}
+
+bool read_parallel(const JV &args, bool &out, JV &error) {
+  out = false;
+  const JV *parallel = args.Find("parallel");
+  if (!parallel) {
+    return true;
+  }
+  if (!parallel->IsBool()) {
+    error = util::error_json("parallel must be a boolean");
+    return false;
+  }
+  out = parallel->GetBool();
+  return true;
+}
+
+void copy_parallel(const JV &args, JV &params) {
+  if (const JV *parallel = args.Find("parallel")) {
+    params["parallel"] = *parallel;
+  }
+}
+
+bool read_named_method(const JV &args, const char *key, godot::Node *node,
+                       std::string &out, JV &error) {
+  const JV *value = args.Find(key);
+  if (!value || !value->IsString() || value->GetString().empty()) {
+    error = util::error_json(std::string("missing required parameter: ") +
+                             key + " (non-empty method name)");
+    return false;
+  }
+  out = value->GetString();
+  if (!node->has_method(godot::StringName(out.c_str()))) {
+    error = util::error_json("method not found on the target node: " + out);
+    return false;
+  }
+  return true;
+}
+
+godot::Callable callable_on(godot::Node *node, const std::string &method) {
+  return godot::Callable(node, godot::StringName(method.c_str()));
+}
+
 } // namespace
 
 JV handle_create_game_tween(const JV &args) {
@@ -160,7 +213,7 @@ JV handle_create_game_tween(const JV &args) {
     return util::error_json("create_game_tween parameters must be an object");
   static constexpr const char *allowed[] = {
       "node_path", "property", "target_value", "duration", "trans", "ease",
-      "loops", "speed_scale", "timeout_ms", "wait_ready"};
+      "loops", "speed_scale", "parallel", "timeout_ms", "wait_ready"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
                        unknown))
@@ -190,6 +243,9 @@ JV handle_create_game_tween(const JV &args) {
     if (!speed->IsNumber() || util::json_number(speed, 0.0) <= 0.0)
       return util::error_json("speed_scale must be a number greater than 0");
   }
+  bool parallel = false;
+  if (!read_parallel(args, parallel, error))
+    return error;
   if (!check_timeout_param(args, error))
     return error;
   bool wait_ready = true;
@@ -204,6 +260,135 @@ JV handle_create_game_tween(const JV &args) {
   copy_optional(args, params, "ease");
   copy_optional(args, params, "loops");
   copy_optional(args, params, "speed_scale");
+  copy_parallel(args, params);
+  return runtime_ops::handle_gda_send("tween_create", params,
+                                      extract_timeout(args), false, wait_ready);
+}
+
+JV handle_game_tween_callback(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_tween callback called");
+  if (!args.IsObject())
+    return util::error_json("game_tween action=callback parameters must be an "
+                            "object");
+  static constexpr const char *allowed[] = {
+      "node_path", "callback_method", "callback_args", "parallel", "timeout_ms",
+      "wait_ready"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return util::error_json("unknown parameter for game_tween action=callback: " +
+                            unknown);
+  auto *path_p = args.Find("node_path");
+  auto *method_p = args.Find("callback_method");
+  if (!path_p || !path_p->IsString() || path_p->GetString().empty())
+    return util::error_json("missing required parameter: node_path "
+                            "(non-empty node path in the running game)");
+  if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+    return util::error_json("missing required parameter: callback_method "
+                            "(non-empty method name on node_path)");
+  if (auto *callback_args = args.Find("callback_args")) {
+    if (!callback_args->IsArray())
+      return util::error_json("callback_args must be an array");
+  }
+  JV error;
+  bool parallel = false;
+  if (!read_parallel(args, parallel, error))
+    return error;
+  if (!check_timeout_param(args, error))
+    return error;
+  bool wait_ready = true;
+  if (!check_wait_ready_param(args, &wait_ready, error))
+    return error;
+  JV params(JV::object_tag);
+  params["node_path"] = *path_p;
+  params["kind"] = JV("callback");
+  params["method"] = *method_p;
+  copy_optional(args, params, "callback_args");
+  copy_parallel(args, params);
+  return runtime_ops::handle_gda_send("tween_create", params,
+                                      extract_timeout(args), false, wait_ready);
+}
+
+JV handle_game_tween_method(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_tween method called");
+  if (!args.IsObject())
+    return util::error_json("game_tween action=method parameters must be an "
+                            "object");
+  static constexpr const char *allowed[] = {
+      "node_path", "method_name", "from_value", "target_value", "duration",
+      "parallel", "timeout_ms", "wait_ready"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return util::error_json("unknown parameter for game_tween action=method: " +
+                            unknown);
+  auto *path_p = args.Find("node_path");
+  auto *method_p = args.Find("method_name");
+  if (!path_p || !path_p->IsString() || path_p->GetString().empty())
+    return util::error_json("missing required parameter: node_path "
+                            "(non-empty node path in the running game)");
+  if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+    return util::error_json("missing required parameter: method_name "
+                            "(non-empty method name on node_path)");
+  if (!args.Find("from_value"))
+    return util::error_json("missing required parameter: from_value "
+                            "(starting value passed to method_name)");
+  if (!args.Find("target_value"))
+    return util::error_json("missing required parameter: target_value "
+                            "(end value passed to method_name)");
+  JV error;
+  if (!check_positive_duration(args, error))
+    return error;
+  bool parallel = false;
+  if (!read_parallel(args, parallel, error))
+    return error;
+  if (!check_timeout_param(args, error))
+    return error;
+  bool wait_ready = true;
+  if (!check_wait_ready_param(args, &wait_ready, error))
+    return error;
+  JV params(JV::object_tag);
+  params["node_path"] = *path_p;
+  params["kind"] = JV("method");
+  params["method"] = *method_p;
+  params["from"] = *args.Find("from_value");
+  params["to"] = *args.Find("target_value");
+  params["duration"] = *args.Find("duration");
+  copy_parallel(args, params);
+  return runtime_ops::handle_gda_send("tween_create", params,
+                                      extract_timeout(args), false, wait_ready);
+}
+
+JV handle_game_tween_interval(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_tween interval called");
+  if (!args.IsObject())
+    return util::error_json("game_tween action=interval parameters must be an "
+                            "object");
+  static constexpr const char *allowed[] = {
+      "duration", "parallel", "timeout_ms", "wait_ready"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return util::error_json(
+        "unknown parameter for game_tween action=interval: " + unknown);
+  JV error;
+  if (!check_positive_duration(args, error))
+    return error;
+  bool parallel = false;
+  if (!read_parallel(args, parallel, error))
+    return error;
+  if (!check_timeout_param(args, error))
+    return error;
+  bool wait_ready = true;
+  if (!check_wait_ready_param(args, &wait_ready, error))
+    return error;
+  JV params(JV::object_tag);
+  params["kind"] = JV("interval");
+  params["duration"] = *args.Find("duration");
+  copy_parallel(args, params);
   return runtime_ops::handle_gda_send("tween_create", params,
                                       extract_timeout(args), false, wait_ready);
 }
@@ -276,32 +461,58 @@ JV handle_tween_editor_property(const JV &args) {
     return util::error_json(
         "tween_editor_property parameters must be an object");
   static constexpr const char *allowed[] = {
-      "path", "property", "target_value", "duration", "trans", "ease", "loops"};
+      "action", "path", "property", "target_value", "from_value", "duration",
+      "method_name", "callback_method", "callback_args", "parallel", "trans",
+      "ease", "loops"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
                        unknown))
     return util::error_json("unknown parameter for tween_editor_property: " +
                             unknown);
+  std::string action = "property";
+  if (auto *action_p = args.Find("action")) {
+    if (!action_p->IsString())
+      return util::error_json(
+          "action must be a string (property|callback|method|interval)");
+    action = action_p->GetString();
+  }
+  if (action != "property" && action != "callback" && action != "method" &&
+      action != "interval")
+    return util::error_json(
+        "invalid action: expected property|callback|method|interval");
   auto *path_p = args.Find("path");
-  auto *prop_p = args.Find("property");
-  auto *target_p = args.Find("target_value");
-  auto *duration_p = args.Find("duration");
   if (!path_p || !path_p->IsString() || path_p->GetString().empty())
     return util::error_json("missing required parameter: path "
                             "(non-empty node path in the edited scene)");
-  if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
-    return util::error_json("missing required parameter: property "
-                            "(non-empty property name, e.g. position)");
-  if (!target_p)
-    return util::error_json("missing required parameter: target_value "
-                            "(final value the property animates to)");
-  if (!duration_p || !duration_p->IsNumber() ||
-      util::json_number(duration_p, 0.0) <= 0.0)
-    return util::error_json("missing required parameter: duration "
-                            "(number of seconds greater than 0)");
   JV error;
   if (!check_tween_shape_params(args, error))
     return error;
+  bool parallel = false;
+  if (!read_parallel(args, parallel, error))
+    return error;
+  if (action == "property") {
+    const JV *prop_p = args.Find("property");
+    if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
+      return util::error_json("missing required parameter: property "
+                              "(non-empty property name, e.g. position)");
+    if (!args.Find("target_value"))
+      return util::error_json("missing required parameter: target_value "
+                              "(final value the property animates to)");
+    if (!check_positive_duration(args, error))
+      return error;
+  } else if (action == "method") {
+    if (!args.Find("from_value"))
+      return util::error_json("missing required parameter: from_value "
+                              "(starting value passed to method_name)");
+    if (!args.Find("target_value"))
+      return util::error_json("missing required parameter: target_value "
+                              "(end value passed to method_name)");
+    if (!check_positive_duration(args, error))
+      return error;
+  } else if (action == "interval") {
+    if (!check_positive_duration(args, error))
+      return error;
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
     return util::error_json("EditorInterface not available");
@@ -320,9 +531,6 @@ JV handle_tween_editor_property(const JV &args) {
   if (!tree)
     return util::error_json("SceneTree not available for node " +
                             path_p->GetString());
-  const std::string property = prop_p->GetString();
-  const double duration = util::json_number(duration_p, 0.0);
-  godot::Variant final_value = VariantJson::deserialize(*target_p);
   godot::Ref<godot::Tween> tween = tree->create_tween();
   if (!tween.is_valid())
     return util::error_json("SceneTree::create_tween returned null");
@@ -333,17 +541,58 @@ JV handle_tween_editor_property(const JV &args) {
     tween->set_ease(static_cast<godot::Tween::EaseType>(ease->GetInt()));
   if (auto *loops = args.Find("loops"))
     tween->set_loops(static_cast<int>(loops->GetInt()));
-  godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
-      node, godot::NodePath(godot::String(property.c_str())), final_value,
-      duration);
-  if (!tweener.is_valid())
-    return util::error_json("tween_property rejected property '" + property +
-                            "' on node " + path_p->GetString());
-  const int64_t tween_id = tween_store().store(tween);
+  tween->set_parallel(parallel);
   JV inner(JV::object_tag);
-  inner["tween_id"] = JV(tween_id);
+  inner["action"] = JV(action);
   inner["path"] = JV(path_p->GetString());
-  inner["property"] = JV(property);
+  inner["parallel"] = JV(parallel);
+  if (action == "property") {
+    const std::string property = args.Find("property")->GetString();
+    const double duration = util::json_number(args.Find("duration"), 0.0);
+    godot::Variant initial = node->get(godot::StringName(property.c_str()));
+    const std::string type_hint =
+        util::to_std(godot::Variant::get_type_name(initial.get_type()));
+    godot::Variant final_value =
+        VariantJson::deserialize(*args.Find("target_value"), type_hint);
+    godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
+        node, godot::NodePath(godot::String(property.c_str())), final_value,
+        duration);
+    if (!tweener.is_valid())
+      return util::error_json("tween_property rejected property '" + property +
+                              "' on node " + path_p->GetString());
+    inner["property"] = JV(property);
+  } else if (action == "callback") {
+    std::string method;
+    if (!read_named_method(args, "callback_method", node, method, error))
+      return error;
+    godot::Callable callable = callable_on(node, method);
+    if (auto *callback_args = args.Find("callback_args")) {
+      if (!callback_args->IsArray())
+        return util::error_json("callback_args must be an array");
+      godot::Array bound;
+      for (const auto &item : callback_args->GetArray())
+        bound.push_back(VariantJson::deserialize(item));
+      callable = callable.bindv(bound);
+    }
+    tween->tween_callback(callable);
+    inner["callback_method"] = JV(method);
+  } else if (action == "method") {
+    std::string method;
+    if (!read_named_method(args, "method_name", node, method, error))
+      return error;
+    const double duration = util::json_number(args.Find("duration"), 0.0);
+    godot::Variant from = VariantJson::deserialize(*args.Find("from_value"));
+    godot::Variant to = VariantJson::deserialize(*args.Find("target_value"));
+    tween->tween_method(callable_on(node, method), from, to, duration);
+    inner["method_name"] = JV(method);
+    inner["duration"] = JV(duration);
+  } else {
+    const double duration = util::json_number(args.Find("duration"), 0.0);
+    tween->tween_interval(duration);
+    inner["duration"] = JV(duration);
+  }
+  const int64_t tween_id = tween_store().store(tween);
+  inner["tween_id"] = JV(tween_id);
   inner["running"] = JV(tween->is_running());
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
@@ -351,6 +600,46 @@ JV handle_tween_editor_property(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "tween_editor_property completed");
   return r;
+}
+
+JV handle_game_tween_bundle(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_tween called");
+  if (!args.IsObject()) {
+    return util::error_json("game_tween parameters must be an object");
+  }
+  auto *action_p = args.Find("action");
+  const std::string action =
+      (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
+  if (action.empty()) {
+    return util::error_json(
+        "missing required parameter: action (create|control)");
+  }
+  JV forwarded(JV::object_tag);
+  forwarded = args;
+  forwarded.GetObject().erase("action");
+  if (action == "create") {
+    return handle_create_game_tween(forwarded);
+  }
+  if (action == "callback") {
+    return handle_game_tween_callback(forwarded);
+  }
+  if (action == "method") {
+    return handle_game_tween_method(forwarded);
+  }
+  if (action == "interval") {
+    return handle_game_tween_interval(forwarded);
+  }
+  if (action == "control") {
+    if (auto *tween_action = args.Find("tween_action");
+        tween_action != nullptr && tween_action->IsString()) {
+      forwarded["action"] = *tween_action;
+    }
+    forwarded.GetObject().erase("tween_action");
+    return handle_control_game_tween(forwarded);
+  }
+  return util::error_json(
+      "invalid action: expected create|control|callback|method|interval");
 }
 
 } // namespace tween_ops

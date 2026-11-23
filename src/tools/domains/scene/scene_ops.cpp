@@ -1,8 +1,13 @@
 #include "tools/domains/scene/scene_ops.hpp"
+#include "tools/domains/scene/reparent_undo_order.hpp"
+#include "tools/domains/scene/scene_spec_ops.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
+#include "util/project_path.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/scene_dirty_tracker.hpp"
+#include "tools/domains/editor/editor_ops.hpp"
 #include "tools/domains/property/property_ops.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -19,6 +24,8 @@
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/curve2d.hpp>
 #include <godot_cpp/classes/curve3d.hpp>
+#include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_selection.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
@@ -34,6 +41,7 @@
 #include <godot_cpp/classes/scene_state.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/sub_viewport.hpp>
 #include <godot_cpp/classes/viewport.hpp>
@@ -59,6 +67,29 @@ constexpr int DEFAULT_MAX_DEPTH = 8;
 constexpr int UNLIMITED_TREE_DEPTH = 100000;
 constexpr int MAX_PROPERTY_COUNT = 20;
 constexpr int MAX_SCREEN_RECT_PATHS = 50;
+
+struct TreeDetailOptions {
+  bool include_properties = false;
+  bool include_groups = false;
+  bool include_owner = false;
+  bool include_index = false;
+  bool include_scene_file_path = false;
+};
+
+bool bool_arg(const mcp::JsonValue &args, const char *key) {
+  const mcp::JsonValue *value = args.Find(key);
+  return value != nullptr && value->IsBool() && value->GetBool();
+}
+
+TreeDetailOptions tree_detail_options(const mcp::JsonValue &args) {
+  TreeDetailOptions options;
+  options.include_properties = bool_arg(args, "include_properties");
+  options.include_groups = bool_arg(args, "include_groups");
+  options.include_owner = bool_arg(args, "include_owner");
+  options.include_index = bool_arg(args, "include_index");
+  options.include_scene_file_path = bool_arg(args, "include_scene_file_path");
+  return options;
+}
 
 int property_summary_key_weight(const std::string &name) {
   if (name == "scale")
@@ -140,7 +171,7 @@ void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
 }
 
 void node_to_json(godot::Node *node, int remaining_depth,
-                  bool include_properties, mcp::JsonValue &j) {
+                  const TreeDetailOptions &options, mcp::JsonValue &j) {
   if (!node)
     return;
   j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
@@ -166,11 +197,29 @@ void node_to_json(godot::Node *node, int remaining_depth,
   if (path.empty())
     path = util::to_std(node->get_name());
   j["path"] = mcp::JsonValue(path);
-  if (include_properties) {
+  if (options.include_properties) {
     mcp::JsonValue props(mcp::JsonValue::object_tag);
     collect_property_summary(node, props);
     j["properties"] = std::move(props);
   }
+  if (options.include_groups) {
+    mcp::JsonValue groups(mcp::JsonValue::array_tag);
+    godot::TypedArray<godot::StringName> names = node->get_groups();
+    for (int i = 0; i < names.size(); i++) {
+      groups.PushBack(mcp::JsonValue(util::to_std(godot::String(names[i]))));
+    }
+    j["groups"] = std::move(groups);
+  }
+  if (options.include_owner) {
+    godot::Node *owner = node->get_owner();
+    j["owner"] = mcp::JsonValue(
+        owner ? scene_relative_path(owner, root) : std::string());
+  }
+  if (options.include_index)
+    j["index"] = mcp::JsonValue(static_cast<int64_t>(node->get_index()));
+  if (options.include_scene_file_path)
+    j["scene_file_path"] =
+        mcp::JsonValue(util::to_std(node->get_scene_file_path()));
   if (remaining_depth <= 0)
     return;
   j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
@@ -179,7 +228,7 @@ void node_to_json(godot::Node *node, int remaining_depth,
     auto *child = godot::Object::cast_to<godot::Node>(children[i]);
     if (child) {
       mcp::JsonValue child_j(mcp::JsonValue::object_tag);
-      node_to_json(child, remaining_depth - 1, include_properties, child_j);
+      node_to_json(child, remaining_depth - 1, options, child_j);
       j["children"].PushBack(std::move(child_j));
     }
   }
@@ -260,6 +309,410 @@ void audit_instance_persist_connections(godot::PackedScene *packed_scene,
     else
       unresolved++;
   }
+}
+
+bool child_name_taken(godot::Node *parent, const std::string &name,
+                      const godot::Node *skip) {
+  auto children = parent->get_children();
+  for (int i = 0; i < children.size(); i++) {
+    auto *child = godot::Object::cast_to<godot::Node>(children[i]);
+    if (child && child != skip && util::to_std(child->get_name()) == name)
+      return true;
+  }
+  return false;
+}
+
+std::string unique_child_name(godot::Node *parent, const std::string &base,
+                              const godot::Node *skip) {
+  if (!child_name_taken(parent, base, skip))
+    return base;
+  int index = 2;
+  while (true) {
+    const std::string candidate = base + std::to_string(index);
+    if (!child_name_taken(parent, candidate, skip))
+      return candidate;
+    ++index;
+  }
+}
+
+void set_unowned_descendants(godot::Node *node, godot::Node *owner) {
+  if (!node || !owner)
+    return;
+  auto children = node->get_children();
+  for (int i = 0; i < children.size(); i++) {
+    auto *child = godot::Object::cast_to<godot::Node>(children[i]);
+    if (!child)
+      continue;
+    if (!child->get_owner())
+      child->set_owner(owner);
+    set_unowned_descendants(child, owner);
+  }
+}
+
+void free_detached_node(godot::Node *node) {
+  if (!node)
+    return;
+  if (godot::Node *parent = node->get_parent())
+    parent->remove_child(node);
+  memdelete(node);
+}
+
+mcp::JsonValue edit_action_error(const std::string &action,
+                                 const std::string &message) {
+  mcp::JsonValue e = util::error_json(message);
+  e["action"] = mcp::JsonValue(action);
+  return e;
+}
+
+std::string joined_paths(const std::vector<std::string> &paths) {
+  std::string joined;
+  for (size_t i = 0; i < paths.size(); i++) {
+    if (i > 0)
+      joined += ", ";
+    joined += paths[i];
+  }
+  return joined;
+}
+
+mcp::JsonValue duplicate_scene_node_impl(const mcp::JsonValue &args,
+                                         godot::Node *node,
+                                         godot::Node *scene_root) {
+  if (!scene_root)
+    return edit_action_error("duplicate", "no edited scene root available");
+  if (node == scene_root)
+    return edit_action_error(
+        "duplicate", "cannot duplicate the scene root — duplicate a child node");
+  godot::Node *parent = node->get_parent();
+  if (!parent)
+    return edit_action_error("duplicate",
+                             "node has no parent to duplicate under");
+  int64_t count = 1;
+  if (const mcp::JsonValue *count_p = args.Find("count")) {
+    if (!count_p->IsInt() || count_p->GetInt() < 1)
+      return edit_action_error("duplicate",
+                               "parameter 'count' must be an integer >= 1");
+    count = count_p->GetInt();
+  }
+  std::string suffix = "_copy";
+  if (const mcp::JsonValue *suffix_p = args.Find("name_suffix")) {
+    if (!suffix_p->IsString())
+      return edit_action_error("duplicate",
+                               "parameter 'name_suffix' must be a string");
+    if (!suffix_p->GetString().empty())
+      suffix = suffix_p->GetString();
+  }
+  if (suffix.find('/') != std::string::npos ||
+      suffix.find(':') != std::string::npos)
+    return edit_action_error(
+        "duplicate",
+        "invalid name_suffix '" + suffix +
+            "' — '/' and ':' are not allowed in node names");
+  const bool editable_instance = bool_arg(args, "editable_instance");
+  const std::string base_name = util::to_std(node->get_name());
+  const std::string source_path = scene_relative_path(node, scene_root);
+  const int insert_index = node->get_index() + 1;
+  std::vector<godot::Node *> created;
+  std::vector<std::string> created_paths;
+  std::vector<std::string> editable_paths;
+  int skipped_editable = 0;
+  auto rollback = [&created]() {
+    for (auto it = created.rbegin(); it != created.rend(); ++it)
+      free_detached_node(*it);
+    created.clear();
+  };
+  for (int64_t i = 0; i < count; i++) {
+    godot::Node *copy = node->duplicate(godot::Node::DUPLICATE_DEFAULT);
+    if (!copy) {
+      rollback();
+      return edit_action_error("duplicate",
+                               "failed to duplicate node at '" + source_path +
+                                   "'");
+    }
+    std::string copy_name = base_name + suffix;
+    if (count > 1)
+      copy_name += std::to_string(i + 1);
+    copy->set_name(godot::StringName(
+        unique_child_name(parent, copy_name, nullptr).c_str()));
+    parent->add_child(copy);
+    parent->move_child(copy, insert_index + static_cast<int>(i));
+    copy->set_owner(scene_root);
+    set_unowned_descendants(copy, scene_root);
+    if (editable_instance) {
+      if (!copy->get_scene_file_path().is_empty()) {
+        scene_root->set_editable_instance(copy, true);
+        editable_paths.push_back(scene_relative_path(copy, scene_root));
+      } else {
+        skipped_editable++;
+      }
+    }
+    created.push_back(copy);
+    created_paths.push_back(scene_relative_path(copy, scene_root));
+  }
+  scene_dirty_tracker::mark_scene_modified();
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["action"] = mcp::JsonValue("duplicate");
+  inner["source_path"] = mcp::JsonValue(source_path);
+  inner["count"] = mcp::JsonValue(count);
+  mcp::JsonValue paths(mcp::JsonValue::array_tag);
+  for (const std::string &path : created_paths)
+    paths.PushBack(mcp::JsonValue(path));
+  inner["paths"] = std::move(paths);
+  if (!editable_paths.empty()) {
+    mcp::JsonValue editables(mcp::JsonValue::array_tag);
+    for (const std::string &path : editable_paths)
+      editables.PushBack(mcp::JsonValue(path));
+    inner["editable_instances"] = std::move(editables);
+  }
+  if (skipped_editable > 0) {
+    inner["note"] = mcp::JsonValue(
+        std::to_string(skipped_editable) +
+        " copies are not scene instances, editable_instance was not applied");
+  }
+  inner["undo"] = mcp::JsonValue("delete nodes " + joined_paths(created_paths) +
+                                 " (delete_scene_node)");
+  util::add_scene_info_fields(inner, scene_info);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info);
+  return r;
+}
+
+mcp::JsonValue replace_scene_node_impl(const mcp::JsonValue &args,
+                                       godot::Node *node,
+                                       godot::Node *scene_root) {
+  if (!scene_root)
+    return edit_action_error("replace", "no edited scene root available");
+  if (node == scene_root)
+    return edit_action_error(
+        "replace", "cannot replace the scene root — replace a child node");
+  const mcp::JsonValue *replacement_path_p = args.Find("replacement_path");
+  if (!replacement_path_p || !replacement_path_p->IsString() ||
+      replacement_path_p->GetString().empty())
+    return edit_action_error(
+        "replace",
+        "missing required parameter for action 'replace': replacement_path");
+  const std::string replacement_path = replacement_path_p->GetString();
+  std::string hint;
+  godot::Node *replacement =
+      godot_autopilot::util::resolve_scene_node(replacement_path, scene_root,
+                                                &hint);
+  if (!replacement)
+    return edit_action_error("replace", "replacement node not found: " +
+                                            replacement_path + " — " + hint);
+  if (replacement == node)
+    return edit_action_error(
+        "replace", "replacement_path must not be the node being replaced");
+  if (replacement->is_ancestor_of(node) || node->is_ancestor_of(replacement))
+    return edit_action_error(
+        "replace",
+        "the replaced node and the replacement must not be ancestors of each "
+        "other");
+  godot::Node *parent = node->get_parent();
+  if (!parent)
+    return edit_action_error("replace",
+                             "node has no parent to replace it under");
+  const std::string old_name = util::to_std(node->get_name());
+  const std::string old_path = scene_relative_path(node, scene_root);
+  const std::string old_type = util::to_std(node->get_class());
+  godot::Node *old_owner = node->get_owner();
+  godot::Node *copy = replacement->duplicate(godot::Node::DUPLICATE_DEFAULT);
+  if (!copy)
+    return edit_action_error("replace", "failed to duplicate replacement node '" +
+                                            replacement_path + "'");
+  const godot::String copy_scene_file_path = copy->get_scene_file_path();
+  copy->set_name(godot::StringName(
+      unique_child_name(parent, old_name + "_replacement", node).c_str()));
+  auto old_children = node->get_children();
+  for (int i = static_cast<int>(old_children.size()) - 1; i >= 0; --i) {
+    auto *child = godot::Object::cast_to<godot::Node>(old_children[i]);
+    if (!child)
+      continue;
+    node->remove_child(child);
+    memdelete(child);
+  }
+  node->replace_by(copy, true);
+  copy->set_scene_file_path(copy_scene_file_path);
+  copy->set_name(godot::StringName(old_name.c_str()));
+  godot::Node *effective_owner =
+      (old_owner && old_owner != node) ? old_owner : scene_root;
+  copy->set_owner(effective_owner);
+  set_unowned_descendants(copy, effective_owner);
+  if (auto *editor = godot::EditorInterface::get_singleton()) {
+    if (auto *selection = editor->get_selection())
+      selection->remove_node(node);
+  }
+  free_detached_node(node);
+  scene_dirty_tracker::mark_scene_modified();
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["action"] = mcp::JsonValue("replace");
+  inner["path"] = mcp::JsonValue(scene_relative_path(copy, scene_root));
+  inner["replaced_path"] = mcp::JsonValue(old_path);
+  inner["replacement_source"] = mcp::JsonValue(replacement_path);
+  inner["replaced_type"] = mcp::JsonValue(old_type);
+  inner["type"] = mcp::JsonValue(util::to_std(copy->get_class()));
+  inner["owner"] = mcp::JsonValue(
+      effective_owner ? scene_relative_path(effective_owner, scene_root)
+                      : std::string());
+  inner["undo"] = mcp::JsonValue(
+      "recreate the replaced node under " +
+      scene_relative_path(parent, scene_root) +
+      " (create_scene_node) and delete the replacement (delete_scene_node)");
+  util::add_scene_info_fields(inner, scene_info);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info);
+  return r;
+}
+
+mcp::JsonValue reorder_scene_node_impl(const mcp::JsonValue &args,
+                                       godot::Node *node,
+                                       godot::Node *scene_root) {
+  if (!scene_root)
+    return edit_action_error("reorder", "no edited scene root available");
+  if (node == scene_root)
+    return edit_action_error(
+        "reorder", "cannot reorder the scene root — reorder a child node");
+  godot::Node *parent = node->get_parent();
+  if (!parent)
+    return edit_action_error("reorder", "node has no parent to reorder within");
+  const mcp::JsonValue *index_p = args.Find("index");
+  const mcp::JsonValue *before_p = args.Find("before_path");
+  const mcp::JsonValue *after_p = args.Find("after_path");
+  int provided = (index_p ? 1 : 0) + (before_p ? 1 : 0) + (after_p ? 1 : 0);
+  if (provided != 1)
+    return edit_action_error(
+        "reorder",
+        "provide exactly one of index, before_path or after_path");
+  const std::string node_path = scene_relative_path(node, scene_root);
+  const int old_index = node->get_index();
+  const int child_count = parent->get_child_count();
+  int target_index = old_index;
+  if (index_p) {
+    if (!index_p->IsInt() || index_p->GetInt() < 0 ||
+        index_p->GetInt() >= child_count)
+      return edit_action_error(
+          "reorder", "parameter 'index' must be an integer between 0 and " +
+                         std::to_string(child_count - 1));
+    target_index = static_cast<int>(index_p->GetInt());
+  } else {
+    const mcp::JsonValue *sibling_p = before_p ? before_p : after_p;
+    if (!sibling_p->IsString() || sibling_p->GetString().empty())
+      return edit_action_error(
+          "reorder", std::string("parameter '") +
+                         (before_p ? "before_path" : "after_path") +
+                         "' must be a non-empty node path");
+    const std::string sibling_path = sibling_p->GetString();
+    std::string hint;
+    godot::Node *sibling =
+        godot_autopilot::util::resolve_scene_node(sibling_path, scene_root,
+                                                  &hint);
+    if (!sibling)
+      return edit_action_error("reorder", "sibling node not found: " +
+                                              sibling_path + " — " + hint);
+    if (sibling == node)
+      return edit_action_error(
+          "reorder", "the sibling path must not be the node being reordered");
+    if (sibling->get_parent() != parent)
+      return edit_action_error(
+          "reorder", "sibling '" + sibling_path +
+                         "' is not a child of the same parent");
+    const int sibling_index = sibling->get_index();
+    if (before_p) {
+      target_index =
+          old_index < sibling_index ? sibling_index - 1 : sibling_index;
+    } else {
+      target_index =
+          old_index < sibling_index ? sibling_index : sibling_index + 1;
+    }
+  }
+  if (target_index == old_index) {
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["action"] = mcp::JsonValue("reorder");
+    inner["path"] = mcp::JsonValue(node_path);
+    inner["old_index"] = mcp::JsonValue(static_cast<int64_t>(old_index));
+    inner["new_index"] = mcp::JsonValue(static_cast<int64_t>(old_index));
+    inner["moved"] = mcp::JsonValue(false);
+    util::add_scene_info_fields(inner, util::edited_scene_info());
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(inner);
+    util::add_scene_info_fields(r, util::edited_scene_info());
+    return r;
+  }
+  parent->move_child(node, target_index);
+  scene_dirty_tracker::mark_scene_modified();
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["action"] = mcp::JsonValue("reorder");
+  inner["path"] = mcp::JsonValue(node_path);
+  inner["parent_path"] =
+      mcp::JsonValue(scene_relative_path(parent, scene_root));
+  inner["old_index"] = mcp::JsonValue(static_cast<int64_t>(old_index));
+  inner["new_index"] =
+      mcp::JsonValue(static_cast<int64_t>(node->get_index()));
+  inner["moved"] = mcp::JsonValue(true);
+  inner["undo"] = mcp::JsonValue("reorder " + node_path + " back to index " +
+                                 std::to_string(old_index) +
+                                 " (edit_scene_node action=reorder)");
+  util::add_scene_info_fields(inner, scene_info);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info);
+  return r;
+}
+
+struct PackOwnerChange {
+  godot::Node *node;
+  godot::Node *owner;
+};
+
+mcp::JsonValue pack_owner_chain_error(const std::string &reason,
+                                      const std::string &node_path,
+                                      const std::string &owner_path) {
+  mcp::JsonValue e = util::error_json(reason);
+  e["code"] = mcp::JsonValue("owner_chain_invalid");
+  mcp::JsonValue details(mcp::JsonValue::object_tag);
+  details["code"] = mcp::JsonValue("owner_chain_invalid");
+  details["node_path"] = mcp::JsonValue(node_path);
+  details["owner_path"] = mcp::JsonValue(owner_path);
+  details["reason"] = mcp::JsonValue(reason);
+  e["structured_error"] = std::move(details);
+  return e;
+}
+
+bool collect_pack_owner_changes(godot::Node *pack_root,
+                                godot::Node *scene_root, godot::Node *node,
+                                std::vector<PackOwnerChange> &changes,
+                                mcp::JsonValue &error) {
+  if (node != pack_root) {
+    godot::Node *owner = node->get_owner();
+    const std::string node_path = scene_relative_path(node, scene_root);
+    if (!owner) {
+      error = pack_owner_chain_error(
+          "node has no owner and would not be saved: " + node_path, node_path,
+          "");
+      return false;
+    }
+    if (owner == scene_root) {
+      changes.push_back(PackOwnerChange{node, owner});
+    } else if (owner != pack_root && !pack_root->is_ancestor_of(owner)) {
+      const std::string owner_path = scene_relative_path(owner, scene_root);
+      error = pack_owner_chain_error(
+          "node is owned by a node outside the packed subtree: " + node_path +
+              " (owner " + owner_path + ")",
+          node_path, owner_path);
+      return false;
+    }
+  }
+  auto children = node->get_children();
+  for (int i = 0; i < children.size(); i++) {
+    auto *child = godot::Object::cast_to<godot::Node>(children[i]);
+    if (child && !collect_pack_owner_changes(pack_root, scene_root, child,
+                                             changes, error))
+      return false;
+  }
+  return true;
 }
 
 } // namespace
@@ -343,7 +796,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
       e["error"] = mcp::JsonValue("parent node not found: " + parent_path +
                                   " — " + hint);
-      return e;
+      return startup_gated_error(editor_in_startup_window(), e);
     }
     parent->add_child(obj);
     auto *scene_root = editor->get_edited_scene_root();
@@ -492,6 +945,96 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         "unknown");
   }
   return r;
+}
+
+mcp::JsonValue handle_create_scene_node(const mcp::JsonValue &args) {
+  std::string mode = "node";
+  if (const mcp::JsonValue *mode_p = args.Find("mode")) {
+    if (!mode_p->IsString() || mode_p->GetString().empty()) {
+      return util::error_json(
+          "parameter 'mode' must be a non-empty string: node, scene, spec, "
+          "bundle or path");
+    }
+    mode = mode_p->GetString();
+  }
+  if (mode == "node")
+    return handle_create(args);
+  if (mode == "scene")
+    return handle_instance(args);
+  if (mode == "spec")
+    return scene_spec_ops::handle_build_from_spec(args);
+  if (mode == "bundle")
+    return scene_spec_ops::handle_spawn_bundle(args);
+  if (mode == "path")
+    return handle_create_path_node(args);
+  return util::error_json("unknown mode '" + mode +
+                          "' for create_scene_node — expected node, scene, "
+                          "spec, bundle or path");
+}
+
+mcp::JsonValue handle_edit_scene_node(const mcp::JsonValue &args) {
+  const mcp::JsonValue *action_p = args.Find("action");
+  if (action_p == nullptr || !action_p->IsString() ||
+      action_p->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: action (one of: rename, reparent, "
+        "advance_path, duplicate, reorder, replace)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "rename")
+    return handle_rename(args);
+  if (action == "reparent")
+    return handle_reparent(args);
+  if (action == "advance_path")
+    return handle_advance_path_follow(args);
+  if (action != "duplicate" && action != "reorder" && action != "replace") {
+    return util::error_json("unknown action '" + action +
+                            "' for edit_scene_node — expected rename, "
+                            "reparent, advance_path, duplicate, reorder or "
+                            "replace");
+  }
+  const mcp::JsonValue *path_p = args.Find("path");
+  if (path_p == nullptr || !path_p->IsString() ||
+      path_p->GetString().empty()) {
+    return util::error_json("missing required parameter for action '" +
+                            action + "': path");
+  }
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Node *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  std::string hint;
+  godot::Node *node = godot_autopilot::util::resolve_scene_node(
+      path_p->GetString(), scene_root, &hint);
+  if (!node) {
+    return util::error_json("node not found: " + path_p->GetString() + " — " +
+                            hint);
+  }
+  if (action == "duplicate")
+    return duplicate_scene_node_impl(args, node, scene_root);
+  if (action == "replace")
+    return replace_scene_node_impl(args, node, scene_root);
+  return reorder_scene_node_impl(args, node, scene_root);
+}
+
+mcp::JsonValue handle_scene_camera(const mcp::JsonValue &args) {
+  const mcp::JsonValue *action_p = args.Find("action");
+  if (action_p == nullptr || !action_p->IsString() ||
+      action_p->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: action (one of: focus, set_params, "
+        "project, unproject, project_ray, behind)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "focus")
+    return handle_focus_camera_on_node(args);
+  if (action == "set_params")
+    return handle_set_camera_params(args);
+  if (action == "project" || action == "unproject" ||
+      action == "project_ray" || action == "behind")
+    return handle_camera_projection(args);
+  return util::error_json(
+      "unknown action '" + action +
+      "' for scene_camera — expected focus, set_params, project, unproject, "
+      "project_ray or behind");
 }
 
 mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
@@ -778,17 +1321,32 @@ mcp::JsonValue handle_reparent(const mcp::JsonValue &args) {
                                new_local_var);
     undo_redo->add_do_method(node, godot::StringName("set_owner"),
                              old_owner);
-    undo_redo->add_undo_method(old_parent, godot::StringName("move_child"),
-                               node, old_index);
-    if (transform_managed)
-      undo_redo->add_undo_method(node, godot::StringName("set_transform"),
-                                 old_local_var);
-    undo_redo->add_undo_method(node, godot::StringName("set_owner"),
-                               old_owner);
-    undo_redo->add_undo_method(old_parent, godot::StringName("add_child"),
-                               node);
-    undo_redo->add_undo_method(new_parent, godot::StringName("remove_child"),
-                               node);
+    for (ReparentUndoStep step : reparent_undo_order(transform_managed)) {
+      switch (step) {
+        case ReparentUndoStep::kDetachFromNewParent:
+          undo_redo->add_undo_method(new_parent,
+                                     godot::StringName("remove_child"), node);
+          break;
+        case ReparentUndoStep::kAttachToOldParent:
+          undo_redo->add_undo_method(old_parent,
+                                     godot::StringName("add_child"), node);
+          break;
+        case ReparentUndoStep::kMoveChildToOldIndex:
+          undo_redo->add_undo_method(old_parent,
+                                     godot::StringName("move_child"), node,
+                                     old_index);
+          break;
+        case ReparentUndoStep::kRestoreTransform:
+          undo_redo->add_undo_method(node, godot::StringName("set_transform"),
+                                     old_local_var);
+          break;
+        case ReparentUndoStep::kRestoreOwner:
+          undo_redo->add_undo_method(node, godot::StringName("set_owner"),
+                                     old_owner);
+          break;
+      }
+    }
+    undo_redo->add_undo_reference(node);
     undo_redo->commit_action();
   } else {
     old_parent->remove_child(node);
@@ -892,6 +1450,21 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   audit_instance_persist_connections(packed_scene, instance, persist_skipped,
                                      persist_connected, persist_unresolved);
 
+  bool editable_instance = false;
+  if (auto *ei = args.Find("editable_instance")) {
+    if (!ei->IsBool()) {
+      memdelete(instance);
+      return util::error_json(
+          "parameter 'editable_instance' must be a boolean");
+    }
+    editable_instance = ei->GetBool();
+  }
+  if (editable_instance && instance->get_scene_file_path().is_empty()) {
+    memdelete(instance);
+    return util::error_json(
+        "editable_instance requires a scene instantiated from a file path");
+  }
+
   parent->add_child(instance);
 
   bool set_owner = true;
@@ -900,6 +1473,9 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
     set_owner = o->GetBool();
   if (set_owner && scene_root) {
     instance->set_owner(scene_root);
+  }
+  if (editable_instance && scene_root) {
+    scene_root->set_editable_instance(instance, true);
   }
 
   std::string instance_name = util::to_std(instance->get_name());
@@ -922,6 +1498,8 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   inner["path"] = mcp::JsonValue(result_path);
   inner["name"] = mcp::JsonValue(instance_name);
   inner["type"] = mcp::JsonValue(instance_type);
+  if (editable_instance)
+    inner["editable_instance"] = mcp::JsonValue(true);
   inner["undo"] =
       mcp::JsonValue("delete node " + result_path + " (delete_scene_node)");
   r["result"] = std::move(inner);
@@ -940,7 +1518,283 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   return r;
 }
 
+mcp::JsonValue handle_pack_scene(const mcp::JsonValue &args) {
+  const mcp::JsonValue *node_path_p = args.Find("node_path");
+  if (!node_path_p || !node_path_p->IsString() ||
+      node_path_p->GetString().empty())
+    return util::error_json("missing required parameter: node_path");
+  const mcp::JsonValue *dest_path_p = args.Find("dest_path");
+  if (!dest_path_p || !dest_path_p->IsString() ||
+      dest_path_p->GetString().empty())
+    return util::error_json("missing required parameter: dest_path");
+  bool overwrite = false;
+  if (auto *overwrite_p = args.Find("overwrite")) {
+    if (!overwrite_p->IsBool())
+      return util::error_json("parameter 'overwrite' must be a boolean");
+    overwrite = overwrite_p->GetBool();
+  }
+  const util::ProjectPath checked =
+      util::normalize_project_path(dest_path_p->GetString(), false, false);
+  if (!checked.valid())
+    return util::error_detail("destination path rejected", "dest_path",
+                              checked.error,
+                              "use a res:// path below the project root");
+  const std::string dest_path = checked.value;
+  const bool tscn_ext =
+      dest_path.size() >= 5 &&
+      dest_path.compare(dest_path.size() - 5, 5, ".tscn") == 0;
+  const bool scn_ext =
+      dest_path.size() >= 4 &&
+      dest_path.compare(dest_path.size() - 4, 4, ".scn") == 0;
+  if (!tscn_ext && !scn_ext)
+    return util::error_json(
+        "parameter 'dest_path' must end with .tscn or .scn");
+  const std::string node_path = node_path_p->GetString();
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Node *scene_root =
+      editor ? editor->get_edited_scene_root() : nullptr;
+  if (!scene_root)
+    return util::error_detail(
+        "no scene currently open in the editor", "pack_scene",
+        "an edited scene",
+        "open or create a scene first (create_editor_scene)");
+  std::string hint;
+  godot::Node *pack_root =
+      godot_autopilot::util::resolve_scene_node(node_path, scene_root, &hint);
+  if (!pack_root)
+    return util::error_json("node not found: " + node_path + " — " + hint);
+  if (pack_root == scene_root)
+    return util::error_json(
+        "cannot pack the edited scene root — pass a child node_path");
+  if (pack_root->get_child_count() == 0)
+    return util::error_json("cannot pack an empty subtree: '" + node_path +
+                            "' has no children");
+  std::vector<PackOwnerChange> owner_changes;
+  mcp::JsonValue owner_error;
+  if (!collect_pack_owner_changes(pack_root, scene_root, pack_root,
+                                  owner_changes, owner_error))
+    return owner_error;
+  const bool existed =
+      godot::FileAccess::file_exists(godot::String(dest_path.c_str()));
+  if (existed && !overwrite) {
+    mcp::JsonValue e = util::error_json(
+        "destination scene already exists: " + dest_path +
+        " — pass overwrite=true to replace it");
+    e["code"] = mcp::JsonValue("file_exists");
+    mcp::JsonValue details(mcp::JsonValue::object_tag);
+    details["code"] = mcp::JsonValue("file_exists");
+    details["path"] = mcp::JsonValue(dest_path);
+    e["structured_error"] = std::move(details);
+    return e;
+  }
+  godot::Ref<godot::PackedScene> packed;
+  packed.instantiate();
+  if (packed.is_null())
+    return util::error_json("failed to create a PackedScene resource");
+  for (const PackOwnerChange &change : owner_changes)
+    change.node->set_owner(pack_root);
+  const godot::Error pack_error = packed->pack(pack_root);
+  for (const PackOwnerChange &change : owner_changes)
+    change.node->set_owner(change.owner);
+  if (pack_error != godot::OK) {
+    mcp::JsonValue e = util::error_json(
+        "PackedScene::pack failed for '" + node_path + "' with error " +
+        std::to_string(static_cast<int>(pack_error)));
+    e["code"] = mcp::JsonValue("pack_failed");
+    return e;
+  }
+  godot::Ref<godot::SceneState> state = packed->get_state();
+  const int64_t node_count =
+      state.is_valid() ? static_cast<int64_t>(state->get_node_count()) : 0;
+  const int64_t connection_count =
+      state.is_valid() ? static_cast<int64_t>(state->get_connection_count())
+                       : 0;
+  bool dirs_created = false;
+  const size_t slash = dest_path.find_last_of('/');
+  if (slash != std::string::npos) {
+    const std::string dir = dest_path.substr(0, slash);
+    if (dir != "res:" && dir != "res:/" && dir != "res://" &&
+        !godot::DirAccess::dir_exists_absolute(godot::String(dir.c_str()))) {
+      const godot::Error mkdir_error =
+          godot::DirAccess::make_dir_recursive_absolute(
+              godot::String(dir.c_str()));
+      if (mkdir_error != godot::OK) {
+        mcp::JsonValue e = util::error_json(
+            "failed to create destination directory: " + dir + " (error " +
+            std::to_string(static_cast<int>(mkdir_error)) + ")");
+        e["code"] = mcp::JsonValue("directory_create_failed");
+        return e;
+      }
+      dirs_created = true;
+    }
+  }
+  auto *saver = godot::ResourceSaver::get_singleton();
+  if (!saver)
+    return util::error_json("ResourceSaver not available");
+  const godot::Error save_error =
+      saver->save(packed, godot::String(dest_path.c_str()));
+  if (save_error != godot::OK) {
+    if (!existed)
+      godot::DirAccess::remove_absolute(godot::String(dest_path.c_str()));
+    mcp::JsonValue e = util::error_json(
+        "failed to save packed scene to " + dest_path + " (error " +
+        std::to_string(static_cast<int>(save_error)) + ")");
+    e["code"] = mcp::JsonValue("save_failed");
+    return e;
+  }
+  if (auto *efs = editor->get_resource_filesystem())
+    efs->update_file(godot::String(dest_path.c_str()));
+  bool verified = false;
+  std::string verify_error;
+  if (auto *loader = godot::ResourceLoader::get_singleton()) {
+    godot::Ref<godot::Resource> reloaded = loader->load(
+        godot::String(dest_path.c_str()), godot::String(),
+        godot::ResourceLoader::CACHE_MODE_IGNORE);
+    auto *reloaded_scene =
+        godot::Object::cast_to<godot::PackedScene>(reloaded.ptr());
+    if (!reloaded_scene) {
+      verify_error = "reloaded file is not a PackedScene";
+    } else {
+      godot::Node *instance = reloaded_scene->instantiate();
+      if (!instance) {
+        verify_error = "reloaded PackedScene could not instantiate";
+      } else {
+        memdelete(instance);
+        verified = true;
+      }
+    }
+  } else {
+    verify_error = "ResourceLoader not available";
+  }
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["path"] = mcp::JsonValue(dest_path);
+  inner["node_path"] = mcp::JsonValue(scene_relative_path(pack_root, scene_root));
+  inner["node_count"] = mcp::JsonValue(node_count);
+  inner["connection_count"] = mcp::JsonValue(connection_count);
+  inner["verified"] = mcp::JsonValue(verified);
+  if (!verified)
+    inner["verification_error"] = mcp::JsonValue(verify_error);
+  inner["overwritten"] = mcp::JsonValue(existed);
+  if (dirs_created)
+    inner["directories_created"] = mcp::JsonValue(true);
+  inner["owner_chain_checked"] = mcp::JsonValue(true);
+  inner["undo"] = mcp::JsonValue("remove " + dest_path +
+                                 " (resource_file action=remove)");
+  util::add_scene_info_fields(inner, scene_info);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  r["path"] = mcp::JsonValue(dest_path);
+  r["verified"] = mcp::JsonValue(verified);
+  util::add_scene_info_fields(r, scene_info);
+  return r;
+}
+
+static mcp::JsonValue find_scene_nodes(const mcp::JsonValue &args,
+                                       godot::Node *root) {
+  const mcp::JsonValue *pattern_p = args.Find("pattern");
+  const mcp::JsonValue *type_p = args.Find("type");
+  const mcp::JsonValue *group_p = args.Find("group");
+  std::string pattern = "*";
+  if (pattern_p) {
+    if (!pattern_p->IsString() || pattern_p->GetString().empty())
+      return util::error_json(
+          "parameter 'pattern' must be a non-empty string");
+    pattern = pattern_p->GetString();
+  }
+  std::string type;
+  if (type_p) {
+    if (!type_p->IsString() || type_p->GetString().empty())
+      return util::error_json("parameter 'type' must be a non-empty string");
+    type = type_p->GetString();
+  }
+  std::string group;
+  if (group_p) {
+    if (!group_p->IsString() || group_p->GetString().empty())
+      return util::error_json("parameter 'group' must be a non-empty string");
+    group = group_p->GetString();
+  }
+  const mcp::JsonValue *verify_p = args.Find("verify");
+  const mcp::JsonValue *scene_path_p = args.Find("scene_path");
+  const mcp::JsonValue *include_hash_p = args.Find("include_hash");
+  if ((verify_p && verify_p->IsBool() && verify_p->GetBool()) ||
+      args.Find("paths") != nullptr ||
+      (scene_path_p && scene_path_p->IsString() &&
+       !scene_path_p->GetString().empty()) ||
+      (include_hash_p && include_hash_p->IsBool() &&
+       include_hash_p->GetBool())) {
+    return util::error_json(
+        "parameters pattern/type/group cannot be combined with verify, paths, "
+        "scene_path or include_hash — query the filtered nodes first, then "
+        "call get_scene_tree without filters for those fields");
+  }
+  const TreeDetailOptions options = tree_detail_options(args);
+  godot::TypedArray<godot::Node> matches = root->find_children(
+      godot::String(pattern.c_str()), godot::String(type.c_str()), true, true);
+  mcp::JsonValue nodes(mcp::JsonValue::array_tag);
+  int64_t count = 0;
+  for (int i = 0; i < matches.size(); i++) {
+    auto *match = godot::Object::cast_to<godot::Node>(matches[i]);
+    if (!match)
+      continue;
+    if (!group.empty() &&
+        !match->is_in_group(godot::StringName(group.c_str())))
+      continue;
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    node_to_json(match, 0, options, item);
+    nodes.PushBack(std::move(item));
+    count++;
+  }
+  mcp::JsonValue filters(mcp::JsonValue::object_tag);
+  filters["pattern"] = mcp::JsonValue(pattern);
+  filters["type"] = mcp::JsonValue(type);
+  filters["group"] = mcp::JsonValue(group);
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["root"] = mcp::JsonValue(util::to_std(root->get_name()));
+  inner["filters"] = std::move(filters);
+  inner["count"] = mcp::JsonValue(count);
+  inner["nodes"] = std::move(nodes);
+  util::add_scene_info_fields(inner, scene_info);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info);
+  return r;
+}
+
 mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
+  if (args.IsObject()) {
+    const bool filter_mode = args.Find("pattern") != nullptr ||
+                             args.Find("type") != nullptr ||
+                             args.Find("group") != nullptr;
+    if (filter_mode) {
+      auto *editor = godot::EditorInterface::get_singleton();
+      godot::Node *root =
+          editor ? editor->get_edited_scene_root() : nullptr;
+      if (!root) {
+        return util::error_detail(
+            "no scene currently open in the editor", "get_scene_tree",
+            "an edited scene",
+            "open or create a scene first (create_editor_scene)");
+      }
+      return find_scene_nodes(args, root);
+    }
+    const mcp::JsonValue *verify = args.Find("verify");
+    const mcp::JsonValue *observe = args.Find("observe");
+    const bool extended =
+        (verify != nullptr && verify->IsBool() && verify->GetBool()) ||
+        (observe != nullptr && observe->IsBool() && observe->GetBool()) ||
+        args.Find("paths") != nullptr ||
+        args.Find("scene_path") != nullptr ||
+        args.Find("include_hash") != nullptr;
+    if (extended) {
+      mcp::JsonValue snapshot_args = args;
+      if (snapshot_args.Find("verify") == nullptr) {
+        snapshot_args["verify"] = mcp::JsonValue(false);
+      }
+      return handle_get_snapshot(snapshot_args);
+    }
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   godot::Node *root = nullptr;
   if (editor) {
@@ -961,13 +1815,10 @@ mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
       max_depth = 1;
     }
   }
-  bool include_properties = false;
-  auto *ip = args.Find("include_properties");
-  if (ip && ip->IsBool())
-    include_properties = ip->GetBool();
+  const TreeDetailOptions options = tree_detail_options(args);
 
   mcp::JsonValue result(mcp::JsonValue::object_tag);
-  node_to_json(root, max_depth, include_properties, result);
+  node_to_json(root, max_depth, options, result);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result);
   return r;
@@ -1203,10 +2054,7 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
       max_depth = 1;
     }
   }
-  bool include_properties = false;
-  auto *ip = args.Find("include_properties");
-  if (ip && ip->IsBool())
-    include_properties = ip->GetBool();
+  const TreeDetailOptions options = tree_detail_options(args);
   bool want_verify = true;
   auto *vp = args.Find("verify");
   if (vp && vp->IsBool())
@@ -1241,16 +2089,28 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
     }
   }
   mcp::JsonValue tree(mcp::JsonValue::object_tag);
-  node_to_json(root, max_depth, include_properties, tree);
+  node_to_json(root, max_depth, options, tree);
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["tree"] = std::move(tree);
   if (want_verify) {
     mcp::JsonValue vsum(mcp::JsonValue::object_tag);
-    std::string target_path = util::to_std(root->get_scene_file_path());
+    std::string target_path;
+    const mcp::JsonValue *scene_path_p = args.Find("scene_path");
+    if (scene_path_p != nullptr && scene_path_p->IsString() &&
+        !scene_path_p->GetString().empty()) {
+      target_path = scene_path_p->GetString();
+    } else {
+      target_path = util::to_std(root->get_scene_file_path());
+    }
+    bool want_hash = false;
+    if (const mcp::JsonValue *hash_p = args.Find("include_hash")) {
+      want_hash = hash_p->IsBool() && hash_p->GetBool();
+    }
     if (target_path.empty()) {
       vsum["available"] = mcp::JsonValue(false);
       vsum["error"] = mcp::JsonValue(
-          "current scene has no file path — save it first");
+          "current scene has no file path — save it first (save_editor_scene), "
+          "or provide scene_path");
       vsum["path"] = mcp::JsonValue("");
     } else if (!godot::FileAccess::file_exists(
                    godot::String(target_path.c_str()))) {
@@ -1269,7 +2129,7 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
         vsum["path"] = mcp::JsonValue(target_path);
       } else {
         const scene_verify::VerifyResult vr =
-            scene_verify::compare_tree_with_text(root, text, false);
+            scene_verify::compare_tree_with_text(root, text, want_hash);
         vsum["available"] = mcp::JsonValue(true);
         vsum["match"] = mcp::JsonValue(vr.match);
         vsum["path"] = mcp::JsonValue(target_path);
@@ -1296,6 +2156,11 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
         }
         if (vr.inherited_truncated)
           vsum["inherited_truncated"] = mcp::JsonValue(true);
+        if (want_hash && vr.hash_computed) {
+          vsum["memory_hash"] =
+              mcp::JsonValue(editor_ops::hash_hex(vr.memory_hash));
+          vsum["disk_hash"] = mcp::JsonValue(editor_ops::hash_hex(vr.disk_hash));
+        }
       }
     }
     inner["verify"] = std::move(vsum);
@@ -1303,7 +2168,10 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
   if (has_paths) {
     mcp::JsonValue rect_args(mcp::JsonValue::object_tag);
     rect_args["paths"] = *paths_p;
-    rect_args["viewport"] = mcp::JsonValue("auto");
+    const mcp::JsonValue *viewport_p = args.Find("viewport");
+    rect_args["viewport"] = viewport_p != nullptr && viewport_p->IsString()
+                                ? *viewport_p
+                                : mcp::JsonValue("auto");
     mcp::JsonValue rect_res = handle_get_node_screen_rect(rect_args);
     const mcp::JsonValue *rect_inner = rect_res.Find("result");
     if (rect_inner && rect_inner->IsObject()) {

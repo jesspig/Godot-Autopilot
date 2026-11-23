@@ -96,7 +96,7 @@ async function catchCliError(p: Promise<number>): Promise<CliError> {
 }
 
 describe("请求形状", () => {
-  test("ping 直达 ping 工具", async () => {
+  test("ping 直发 tools/call name=ping，由服务端别名兜底解析", async () => {
     const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"ok":true}')])));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });

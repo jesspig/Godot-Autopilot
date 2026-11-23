@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const BOOKS = [
-  "godot-autopilot",
+const RETIRED_SKILLS = [
   "godot-autopilot-content",
   "godot-autopilot-csharp",
   "godot-autopilot-resources",
@@ -12,6 +11,10 @@ const BOOKS = [
   "godot-autopilot-servers",
   "godot-autopilot-setup",
   "godot-autopilot-tools",
+];
+
+const BOOKS = [
+  "godot-autopilot",
 ];
 
 interface SkillFile {
@@ -26,7 +29,10 @@ function walk(root: string, prefix = ""): SkillFile[] {
     const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
     if (entry.isDirectory()) {
       files.push(...walk(full, relative));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+    } else if (entry.isFile()) {
+      if (!entry.name.endsWith(".md")) {
+        throw new Error(`${relative}: only markdown files are allowed`);
+      }
       files.push({ relative, content: fs.readFileSync(full, "utf8").replace(/\r\n/g, "\n") });
     }
   }
@@ -103,7 +109,14 @@ function validateTree(tree: Record<string, string>, label: string): void {
       if (parsed.name !== book) {
         throw new Error(`${label}/${relative}: name ${parsed.name} does not match directory ${book}`);
       }
-    } else if (parts.length < 2 || !parts[1]?.endsWith(".md")) {
+    } else if (
+      parts.length === 3 &&
+      parts[1] === "references" &&
+      parts[2] !== undefined &&
+      parts[2].endsWith(".md")
+    ) {
+      continue;
+    } else {
       throw new Error(`${label}: unexpected file ${relative}`);
     }
   }
@@ -135,6 +148,7 @@ const output = {
   version,
   files: en,
   files_zh: zh,
+  retired: RETIRED_SKILLS,
 };
 const target = path.join(root, "cli", "assets", "skills.json");
 fs.writeFileSync(target, `${JSON.stringify(output, null, 2)}\n`, "utf8");

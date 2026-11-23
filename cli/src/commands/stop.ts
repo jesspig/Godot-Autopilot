@@ -1,10 +1,12 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
-import { isAlive, stopForce, stopGraceful } from "../process";
-import { findLiveByProject, loadRegistry, saveRegistry, type InstanceEntry } from "../registry";
+import { isAlive, stopDecision, stopForce, stopGraceful } from "../process";
+import { cachedEndpointAlive } from "../probe";
+import { findLiveByProject, withRegistryLock, type InstanceEntry } from "../registry";
 import { assertSingleSelector, parseTargetPort } from "../target";
 import { readRawEntries, readRawEntry } from "./registry-raw";
+import { collectTaskStorePoisoning, stopFailureHint } from "./stop-diagnosis";
 import { writeJson } from "./json-output";
 
 export const DEFAULT_STOP_WAIT_SEC = 10;
@@ -34,7 +36,15 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
   const entry = resolveTarget(positional, opts);
   const method = stopMethod(opts.force, entry.headless);
 
-  if (isAlive(entry.pid)) {
+  const endpointPort = entry.instancePort ?? entry.port ?? null;
+  const endpointAlive = typeof endpointPort === "number" && endpointPort > 0
+    ? cachedEndpointAlive(endpointPort)
+    : null;
+  const decision = stopDecision(isAlive(entry.pid), endpointPort, endpointAlive);
+  if (decision.identityWarning) {
+    err(`instance ${entry.id} (pid ${entry.pid}) endpoint on port ${endpointPort} did not confirm identity; falling back to pid-based stop`);
+  }
+  if (decision.stop) {
     if (method === "force") {
       stopForce(entry.pid);
     } else {
@@ -42,9 +52,8 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
     }
     const gone = await waitUntilDead(entry.pid, waitSec);
     if (!gone) {
-      const hint = method === "force"
-        ? "the process survived a force stop"
-        : "the process is still running; retry with --force";
+      const poisoned = method === "graceful" && collectTaskStorePoisoning(entry);
+      const hint = stopFailureHint(method, poisoned);
       writeJson({ ok: false, method, id: entry.id, pid: entry.pid, project: entry.project, hint }, opts);
       err(`instance ${entry.id} (pid ${entry.pid}) still alive after ${waitSec}s; ${hint}`);
       return ExitCode.Transport;
@@ -111,9 +120,9 @@ function entryByPort(port: number): InstanceEntry | undefined {
 }
 
 export function removeFromRegistry(id: string): void {
-  const data = loadRegistry();
-  data.instances = data.instances.filter((e) => e.id !== id);
-  saveRegistry(data);
+  withRegistryLock((data) => {
+    data.instances = data.instances.filter((e) => e.id !== id);
+  });
 }
 
 export async function waitUntilDead(pid: number, waitSec: number): Promise<boolean> {

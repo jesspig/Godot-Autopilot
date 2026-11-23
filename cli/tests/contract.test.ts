@@ -68,7 +68,10 @@ function rpcErrorResponse(reqId: unknown, message: string): Response {
 }
 
 function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown>): Response {
-  if (name === "ping") return okResponse(reqId, { pong: true });
+  if (name === "ping") {
+    state.lastWrappedParams = { name: "call_tool", arguments: { name: "ping", arguments: args } };
+    return routeWrapped(reqId, "ping", args);
+  }
   if (name === "list_categories") return okResponse(reqId, { categories: ["mock-cat"] });
   if (name === "search_tools") {
     state.lastSearchArgs = args;
@@ -101,6 +104,7 @@ function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown
 }
 
 function routeWrapped(reqId: unknown, inner: unknown, innerArgs: unknown): Response {
+  if (inner === "ping") return okResponse(reqId, { pong: true });
   if (inner === "system_status") {
     return okResponse(reqId, { ok: true, engine: "mock", status: "ready" });
   }
@@ -313,7 +317,7 @@ function checkStatus(result: RunResult, status: number): void {
 
 describe("CLI MCP contract", () => {
   test(
-    "ping: lazy handshake, direct meta tool, compact stdout",
+    "ping: direct tools/call name=ping, server alias fallback via call_tool, compact stdout",
     async () => {
       state.initialized = false;
       state.methods = [];
@@ -322,6 +326,10 @@ describe("CLI MCP contract", () => {
       expect(parseJson(result.stdout)).toEqual({ pong: true });
       expect(result.stdout.trim()).not.toContain("\n");
       expect(state.lastDirectName).toBe("ping");
+      expect(state.lastWrappedParams).toEqual({
+        name: "call_tool",
+        arguments: { name: "ping", arguments: {} },
+      });
       expect(state.methods).toEqual([
         "tools/call",
         "initialize",

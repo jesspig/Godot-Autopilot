@@ -2,7 +2,7 @@ import * as readline from "node:readline/promises";
 
 import type { GlobalOptions } from "../args";
 import { parseTransport } from "../args";
-import { CliError, ExitCode } from "../errors";
+import { CliError, ExitCode, isIpcAuthRejected } from "../errors";
 import { callTool, ensureConnection, META_DIRECT_TOOLS } from "../mcp/client";
 import { err } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload, loadToolArguments } from "../payload";
@@ -97,7 +97,8 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
       return emit(extracted, opts);
     } catch (error) {
-      if (!(error instanceof CliError) || error.code !== ExitCode.Transport || opts.noFallback === true) {
+      if (!(error instanceof CliError) || error.code !== ExitCode.Transport ||
+          opts.noFallback === true || isIpcAuthRejected(error)) {
         throw error;
       }
       err(`IPC channel unavailable (${error.message}); falling back to the port channel.`);

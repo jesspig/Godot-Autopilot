@@ -1,5 +1,9 @@
 #include "tools/domains/os/os_file_dir_ops.hpp"
+#include "tools/domains/os/trash_confirm.hpp"
 #include "core/observability/log_system.hpp"
+#include "core/path_util.hpp"
+#include "tools/domains/os/os_ops.hpp"
+#include "tools/domains/text/text_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
@@ -16,10 +20,6 @@ namespace file_dir_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string join_file_path(const std::string &dir, const std::string &name) {
-  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
-}
 
 bool is_hidden_entry(const std::string &name) {
   return !name.empty() && name[0] == '.';
@@ -75,7 +75,7 @@ JV handle_list_directory(const JV &args) {
   for (const auto &item : collected) {
     JV obj(JV::object_tag);
     obj["name"] = JV(item.first);
-    obj["path"] = JV(join_file_path(dir, item.first));
+    obj["path"] = JV(join_path(dir, item.first));
     obj["is_dir"] = JV(item.second);
     entries.PushBack(std::move(obj));
   }
@@ -110,6 +110,8 @@ JV handle_get_file_info(const JV &args) {
   bool exists = is_dir || is_file;
   int64_t size = 0;
   int64_t modified_time = 0;
+  std::string sha256;
+  std::string md5;
   if (is_file) {
     auto file = godot::FileAccess::open(path_gs, godot::FileAccess::READ);
     if (!file.is_null()) {
@@ -118,6 +120,8 @@ JV handle_get_file_info(const JV &args) {
     }
     modified_time =
         static_cast<int64_t>(godot::FileAccess::get_modified_time(path_gs));
+    sha256 = util::to_std(godot::FileAccess::get_sha256(path_gs));
+    md5 = util::to_std(godot::FileAccess::get_md5(path_gs));
   }
   JV inner(JV::object_tag);
   inner["path"] = JV(path);
@@ -126,6 +130,8 @@ JV handle_get_file_info(const JV &args) {
   inner["is_file"] = JV(is_file);
   inner["size"] = JV(size);
   inner["modified_time"] = JV(modified_time);
+  inner["sha256"] = JV(sha256);
+  inner["md5"] = JV(md5);
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -219,6 +225,102 @@ JV handle_ensure_directory(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "ensure_directory completed");
   return r;
+}
+
+namespace {
+
+JV file_action_error(const std::string &message) {
+  JV error(JV::object_tag);
+  error["error"] = JV(message);
+  return error;
+}
+
+bool read_file_action(const JV &args, std::string &out, JV &error) {
+  const JV *action = args.Find("action");
+  if (action == nullptr) {
+    error = file_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = file_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+JV strip_file_action(const JV &args) {
+  JV out = args.IsObject() ? args : JV(JV::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+JV handle_os_file_text(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_file_action(args, action, error)) {
+    return error;
+  }
+  if (action == "read") {
+    return text_ops::handle_file_read(strip_file_action(args));
+  }
+  if (action == "find") {
+    return text_ops::handle_find_in_files(strip_file_action(args));
+  }
+  return file_action_error(
+      "unknown action '" + action +
+      "' for os_file_text (expected read, find)");
+}
+
+JV handle_os_file_write(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_file_action(args, action, error)) {
+    return error;
+  }
+  if (action == "write") {
+    return text_ops::handle_file_write(strip_file_action(args));
+  }
+  if (action == "copy") {
+    return handle_copy_file_generic(strip_file_action(args));
+  }
+  if (action == "ensure") {
+    return handle_ensure_directory(strip_file_action(args));
+  }
+  if (action == "trash") {
+    const JV *confirm = args.Find("confirm");
+    const bool confirmed = confirm != nullptr && confirm->IsBool() && confirm->GetBool();
+    if (os_ops_detail::trash_needs_confirm(action, confirmed)) {
+      JV e(JV::object_tag);
+      e["error"] = JV("trash removes a file from its original location; retry with confirm=true");
+      e["code"] = JV("confirmation_required");
+      e["confirm_required"] = JV(true);
+      return e;
+    }
+    return os_ops::handle_os_move_to_trash(strip_file_action(args));
+  }
+  return file_action_error(
+      "unknown action '" + action +
+      "' for os_file_write (expected write, copy, ensure, trash)");
+}
+
+JV handle_os_file_manager(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_file_action(args, action, error)) {
+    return error;
+  }
+  if (action == "list") {
+    return handle_list_directory(strip_file_action(args));
+  }
+  if (action == "info") {
+    return handle_get_file_info(strip_file_action(args));
+  }
+  return file_action_error(
+      "unknown action '" + action +
+      "' for os_file_manager (expected list, info)");
 }
 
 } // namespace file_dir_ops

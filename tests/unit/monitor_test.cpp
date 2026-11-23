@@ -63,6 +63,27 @@ TEST(MonitorTest, RequestRegistryPutGetTakeAndClear) {
     EXPECT_EQ(registry().size(), 0u);
 }
 
+TEST(MonitorTest, SameClientIdOnDistinctInternalKeysStayIndependent) {
+    using godot_autopilot::monitor::begin_request;
+    using godot_autopilot::monitor::registry;
+    using godot_autopilot::monitor::RequestRecord;
+    registry().clear();
+
+    const RequestRecord first = begin_request("i:1", "tools/call", "", "", "7");
+    const RequestRecord second = begin_request("i:2", "tools/call", "", "", "7");
+    EXPECT_NE(first.trace_id, second.trace_id);
+    EXPECT_EQ(registry().size(), 2u);
+
+    RequestRecord out;
+    ASSERT_TRUE(registry().get("i:1", &out));
+    EXPECT_EQ(out.client_request_id, "7");
+    EXPECT_EQ(out.trace_id, first.trace_id);
+    ASSERT_TRUE(registry().get("i:2", &out));
+    EXPECT_EQ(out.client_request_id, "7");
+    EXPECT_EQ(out.trace_id, second.trace_id);
+    registry().clear();
+}
+
 TEST(MonitorTest, RequestRegistryExpireBoundaries) {
     using godot_autopilot::monitor::registry;
     using godot_autopilot::monitor::RequestRecord;

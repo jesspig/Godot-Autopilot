@@ -17,7 +17,8 @@ import {
   type ActiveInstance,
 } from "../preflight";
 import { isAlive, resolveGodotBin, spawnEditor, terminateProcess, terminationNote } from "../process";
-import { loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
+import { withRegistryLock, stateDir, type InstanceEntry } from "../registry";
+import { parseWaitSec } from "./stop";
 import { writeJson } from "./json-output";
 
 const DEFAULT_WAIT_SEC = 60;
@@ -110,10 +111,10 @@ export async function start(opts: GlobalOptions, runOpts: StartRunOptions = {}):
     instancePort: port,
     apiAvailable: false,
   };
-  const data = loadRegistry();
-  data.instances = data.instances.filter((e) => e.id !== id);
-  data.instances.push(entry);
-  saveRegistry(data);
+  withRegistryLock((data) => {
+    data.instances = data.instances.filter((e) => e.id !== id);
+    data.instances.push(entry);
+  });
 
   if (opts.play === true) {
     try {
@@ -247,11 +248,4 @@ async function runImportStep(bin: string, projectDir: string, skip: boolean): Pr
   }
 }
 
-function parseWaitSec(text: string | undefined, fallback: number): number {
-  if (text === undefined) return fallback;
-  const n = Number(text);
-  if (!Number.isFinite(n) || n < 0) {
-    throw new CliError(ExitCode.Usage, `--wait must be a non-negative number of seconds, got: ${text}`);
-  }
-  return n;
-}
+

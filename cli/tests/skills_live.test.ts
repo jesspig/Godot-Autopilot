@@ -12,15 +12,6 @@ const headers = {
 
 const SKILL_NAMES = [
   "godot-autopilot",
-  "godot-autopilot-content",
-  "godot-autopilot-csharp",
-  "godot-autopilot-resources",
-  "godot-autopilot-runtime",
-  "godot-autopilot-scene-system",
-  "godot-autopilot-scripting",
-  "godot-autopilot-servers",
-  "godot-autopilot-setup",
-  "godot-autopilot-tools",
 ];
 
 async function request(method: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -43,7 +34,7 @@ describe.skipIf(!enabled)("live modern skills", () => {
     expect(capabilities?.extensions?.["io.modelcontextprotocol/skills"]).toEqual({});
   });
 
-  test("skills/list returns the 10 bundled books", async () => {
+  test("skills/list returns the 1 bundled skill card", async () => {
     await request("server/discover", {});
     const result = await request("skills/list", { _meta: {} });
     expect(result.resultType).toBe("complete");

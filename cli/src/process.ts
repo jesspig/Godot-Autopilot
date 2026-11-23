@@ -11,6 +11,24 @@ const TERMINATE_POLL_MS = 100;
 
 export type TerminationOutcome = "already-exited" | "terminated" | "failed";
 
+export function shouldStopByPid(pidAlive: boolean, endpointPort: number | null | undefined, endpointAlive: boolean | null): boolean {
+  if (!pidAlive) return false;
+  if (typeof endpointPort === "number" && endpointPort > 0 && endpointAlive === false) return false;
+  return true;
+}
+
+export interface StopDecision {
+  stop: boolean;
+  identityWarning: boolean;
+}
+
+export function stopDecision(pidAlive: boolean, endpointPort: number | null | undefined, endpointAlive: boolean | null): StopDecision {
+  return {
+    stop: pidAlive,
+    identityWarning: pidAlive && !shouldStopByPid(pidAlive, endpointPort, endpointAlive),
+  };
+}
+
 export function isAlive(pid: number): boolean {
   if (process.platform === "win32") {
     return windowsProcessExists(pid);

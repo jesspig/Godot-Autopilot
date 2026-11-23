@@ -13,7 +13,14 @@ std::optional<ToolInfo> ToolCatalog::get_tool(const std::string &name) const {
   std::lock_guard<std::mutex> lock(mutex_);
   auto it = tools_.find(name);
   if (it == tools_.end()) {
-    return std::nullopt;
+    auto alias = aliases_.find(name);
+    if (alias == aliases_.end()) {
+      return std::nullopt;
+    }
+    it = tools_.find(alias->second);
+    if (it == tools_.end()) {
+      return std::nullopt;
+    }
   }
   return it->second;
 }
@@ -40,6 +47,24 @@ void ToolCatalog::replace_tools(std::vector<ToolInfo> tools) {
   }
   std::lock_guard<std::mutex> lock(mutex_);
   tools_ = std::move(replacement);
+  aliases_.clear();
+}
+
+void ToolCatalog::replace_aliases(
+    std::unordered_map<std::string, std::string> aliases) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  aliases_ = std::move(aliases);
+}
+
+std::vector<std::string> ToolCatalog::alias_names() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<std::string> result;
+  result.reserve(aliases_.size());
+  for (const auto &[name, _] : aliases_) {
+    result.push_back(name);
+  }
+  std::sort(result.begin(), result.end());
+  return result;
 }
 
 std::vector<std::string> ToolCatalog::get_categories() const {

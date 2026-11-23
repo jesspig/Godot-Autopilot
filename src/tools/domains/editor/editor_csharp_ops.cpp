@@ -1,4 +1,6 @@
 #include "tools/domains/editor/editor_ops.hpp"
+#include "tools/domains/editor/csharp_build_result.hpp"
+#include "tools/domains/os/os_ops.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
@@ -12,6 +14,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
+#include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -51,6 +54,8 @@
 
 namespace godot_autopilot {
 namespace editor_ops {
+
+using JV = mcp::JsonValue;
 
 namespace {
 
@@ -166,17 +171,20 @@ mcp::JsonValue probe_editor_assembly(const std::string &probe_script) {
 
 } // namespace
 
+namespace {
+const char *kBuildCsharpNote =
+    "本工具仅等效触发 C# 项目编译，不等同于在编辑器中点击 Build 后的程序集热重载。"
+    "GDExtension(C++) 无公共 API 触发编辑器内的 C# 程序集重载——该能力位于引擎 "
+    "modules/mono 内部，非 GDExtension 可调用。适合 CI / 命令行式编译验证；若需编辑器内"
+    "类或签名变更后校验渲染，仍须用户在编辑器中点 Build 或重启编辑器。构建完成后返回 "
+    "next_action 与 restart_required（success=true 即为 true，与游戏是否在运行无关）；"
+    "传入 probe_script 会 load 该 .cs 并报告 editor_assembly_probe 的 can_instantiate，"
+    "用于判断编辑器已加载程序集是否已更新。";
+} // namespace
+
 mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_csharp_assembly called");
-  static const char *kNote =
-      "本工具仅等效触发 C# 项目编译，不等同于在编辑器中点击 Build 后的程序集热重载。"
-      "GDExtension(C++) 无公共 API 触发编辑器内的 C# 程序集重载——该能力位于引擎 "
-      "modules/mono 内部，非 GDExtension 可调用。适合 CI / 命令行式编译验证；若需编辑器内"
-      "类或签名变更后校验渲染，仍须用户在编辑器中点 Build 或重启编辑器。构建完成后返回 "
-      "next_action 与 restart_required（success=true 即为 true，与游戏是否在运行无关）；"
-      "传入 probe_script 会 load 该 .cs 并报告 editor_assembly_probe 的 can_instantiate，"
-      "用于判断编辑器已加载程序集是否已更新。";
   bool wait = false;
   int64_t timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
   std::string probe_script;
@@ -263,7 +271,7 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     inner["project_path"] = mcp::JsonValue(project_path);
     inner["command"] = mcp::JsonValue(command);
     inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
-    inner["note"] = mcp::JsonValue(kNote);
+    inner["note"] = mcp::JsonValue(kBuildCsharpNote);
     inner["started"] = mcp::JsonValue(pid > 0);
     const auto *editor = godot::EditorInterface::get_singleton();
     inner["game_running"] = mcp::JsonValue(
@@ -297,109 +305,126 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   build_args.append("build");
   build_args.append("--nologo");
   build_args.append(godot::String(project_path.c_str()));
-  godot::Array output;
-  output.append(godot::PackedStringArray());
-  int32_t exit_code = 0;
+  const auto *editor = godot::EditorInterface::get_singleton();
+  const bool game_running = editor != nullptr && editor->is_playing_scene();
+  mcp::JsonValue probe;
+  if (!probe_script.empty())
+    probe = probe_editor_assembly(probe_script);
+  int64_t op_id = -1;
   {
     DotnetUiLanguageGuard english_ui_language(os);
-    exit_code = os->execute(godot::String("dotnet"), build_args, output, true);
+    op_id = os_ops::start_csharp_build(godot::String("dotnet"), build_args);
   }
-  std::vector<std::string> output_lines = collect_execute_output_lines(output);
-  std::string combined;
-  for (const std::string &line : output_lines) {
-    if (!combined.empty()) {
-      combined += "\n";
-    }
-    combined += line;
+  if (op_id < 0) {
+    return util::error_json("failed to start dotnet build process");
   }
-  mcp::JsonValue errors_arr(mcp::JsonValue::array_tag);
-  const size_t kMaxErrors = 50;
-  size_t error_total = 0;
-  bool errors_truncated = false;
+  mcp::JsonValue wait_meta(JV::object_tag);
+  wait_meta["kind"] = JV("csharp_build");
+  wait_meta["id"] = JV(op_id);
+  wait_meta["timeout_ms"] = JV(timeout_ms);
+  wait_meta["project_file"] = JV(project_file);
+  wait_meta["project_path"] = JV(project_path);
+  wait_meta["command"] = JV(command);
+  wait_meta["game_running"] = JV(game_running);
+  wait_meta["probe"] = std::move(probe);
+  wait_meta["has_probe"] = JV(!probe_script.empty());
+  mcp::JsonValue marker(JV::object_tag);
+  marker["__gda_wait"] = std::move(wait_meta);
+  return marker;
+}
+
+mcp::JsonValue wait_csharp_build(const mcp::JsonValue &wait_ctx,
+                                 int64_t timeout_ms) {
+  const JV *id_p = wait_ctx.Find("id");
+  const int64_t op_id = (id_p && id_p->IsInt()) ? id_p->GetInt() : 0;
+  const JV process = os_ops::wait_os_process(op_id, timeout_ms);
+  const JV *err = process.Find("error");
+  if (err != nullptr) return process;
+
+  const JV *exit_p = process.Find("exit_code");
+  const int64_t exit_code =
+      (exit_p && exit_p->IsInt()) ? exit_p->GetInt() : -1;
+  const JV *stdout_p = process.Find("stdout");
+  const std::string combined =
+      (stdout_p && stdout_p->IsString()) ? stdout_p->GetString() : std::string();
+  const JV *stderr_p = process.Find("stderr");
+  const std::string stderr_text =
+      (stderr_p && stderr_p->IsString()) ? stderr_p->GetString() : std::string();
+  const std::string all_output =
+      stderr_text.empty() ? combined : (combined.empty() ? stderr_text : combined + "\n" + stderr_text);
+
+  std::vector<std::string> output_lines;
   std::string line_buf;
-  line_buf.reserve(256);
-  for (size_t idx = 0; idx <= combined.size(); ++idx) {
-    char ch = (idx < combined.size()) ? combined[idx] : '\n';
+  for (size_t idx = 0; idx <= all_output.size(); ++idx) {
+    char ch = (idx < all_output.size()) ? all_output[idx] : '\n';
     if (ch == '\n' || ch == '\r') {
-      if (!line_buf.empty()) {
-        std::string lowered = line_buf;
-        std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                       [](unsigned char c) {
-                         return static_cast<char>(std::tolower(c));
-                       });
-        if (lowered.find("error") != std::string::npos) {
-          if (error_total < kMaxErrors) {
-            errors_arr.PushBack(mcp::JsonValue(line_buf));
-          } else {
-            errors_truncated = true;
-          }
-          ++error_total;
-        }
-      }
+      if (!line_buf.empty()) output_lines.push_back(line_buf);
       line_buf.clear();
     } else {
       line_buf += ch;
     }
   }
-  size_t digest_limit = sanitize_policy::enabled() ? 4000 : 64000;
-  std::string digest = combined;
-  bool output_truncated = false;
-  if (digest.size() > digest_limit) {
-    size_t total = digest.size();
-    digest = digest.substr(0, digest_limit) + "\n...(truncated, total " +
-             std::to_string(total) + " chars)";
-    output_truncated = true;
-  }
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["project_file"] = mcp::JsonValue(project_file);
-  inner["project_path"] = mcp::JsonValue(project_path);
-  inner["command"] = mcp::JsonValue(command);
-  inner["exit_code"] = mcp::JsonValue(static_cast<int64_t>(exit_code));
-  inner["success"] = mcp::JsonValue(exit_code == 0);
-  const auto *editor = godot::EditorInterface::get_singleton();
-  const bool game_running = editor != nullptr && editor->is_playing_scene();
-  inner["game_running"] = mcp::JsonValue(game_running);
-  inner["restart_required"] = mcp::JsonValue(exit_code == 0);
-  mcp::JsonValue next_action(mcp::JsonValue::array_tag);
+  const auto errors = editor_ops_detail::scan_error_lines(output_lines, 50);
+  const auto digest = editor_ops_detail::truncate_digest(
+      all_output, sanitize_policy::enabled() ? 4000 : 64000);
+
+  auto str_field = [&](const char *key) -> std::string {
+    const JV *p = wait_ctx.Find(key);
+    return (p && p->IsString()) ? p->GetString() : std::string();
+  };
+  const std::string project_file = str_field("project_file");
+  const std::string project_path = str_field("project_path");
+  const std::string command = str_field("command");
+  const JV *game_p = wait_ctx.Find("game_running");
+  const bool game_running = game_p && game_p->IsBool() && game_p->GetBool();
+
+  JV errors_arr(JV::array_tag);
+  for (const std::string &line : errors.errors) errors_arr.PushBack(JV(line));
+  JV inner(JV::object_tag);
+  inner["project_file"] = JV(project_file);
+  inner["project_path"] = JV(project_path);
+  inner["command"] = JV(command);
+  inner["exit_code"] = JV(exit_code);
+  inner["success"] = JV(exit_code == 0);
+  inner["game_running"] = JV(game_running);
+  inner["restart_required"] = JV(exit_code == 0);
+  JV next_action(JV::array_tag);
   if (exit_code == 0) {
-    next_action.PushBack(mcp::JsonValue(
+    next_action.PushBack(JV(
         "restart the running game process (stop_editor_playing, then "
         "play_editor_current_scene) so it loads the rebuilt assembly"));
-    next_action.PushBack(mcp::JsonValue(
+    next_action.PushBack(JV(
         "click Build in the editor toolbar or restart the editor to load the "
         "rebuilt assembly in the editor, then probe again with probe_script"));
   } else {
-    next_action.PushBack(mcp::JsonValue(
+    next_action.PushBack(JV(
         "fix the C# compile errors listed in errors, then call "
         "build_csharp_assembly again with wait=true"));
-    next_action.PushBack(mcp::JsonValue(
+    next_action.PushBack(JV(
         "when output_digest is empty, check dotnet_environment and "
         "get_debugger_log for a missing SDK or project file"));
   }
   inner["next_action"] = std::move(next_action);
-  if (!probe_script.empty())
-    inner["editor_assembly_probe"] = probe_editor_assembly(probe_script);
+  const JV *has_probe = wait_ctx.Find("has_probe");
+  if (has_probe && has_probe->IsBool() && has_probe->GetBool()) {
+    const JV *probe_p = wait_ctx.Find("probe");
+    if (probe_p) inner["editor_assembly_probe"] = *probe_p;
+  }
   inner["errors"] = std::move(errors_arr);
-  inner["output_digest"] = mcp::JsonValue(digest);
-  inner["output_empty"] = mcp::JsonValue(combined.empty());
-  if (combined.empty()) {
-    inner["output_hint"] = mcp::JsonValue(
+  inner["output_digest"] = JV(digest.text);
+  inner["output_empty"] = JV(all_output.empty());
+  if (all_output.empty()) {
+    inner["output_hint"] = JV(
         "dotnet 未产生任何可捕获输出：exit_code=" +
-        std::to_string(static_cast<int64_t>(exit_code)) +
+        std::to_string(exit_code) +
         "（-1 表示进程未能启动，常见于 dotnet 不在 PATH；0 且无输出说明构建"
         "未产生日志）");
   }
-  if (output_truncated) {
-    inner["output_truncated"] = mcp::JsonValue(true);
-  }
-  if (errors_truncated) {
-    inner["errors_truncated"] = mcp::JsonValue(true);
-  }
-  inner["note"] = mcp::JsonValue(kNote);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  if (digest.truncated) inner["output_truncated"] = JV(true);
+  if (errors.truncated) inner["errors_truncated"] = JV(true);
+  inner["note"] = JV(kBuildCsharpNote);
+  JV r(JV::object_tag);
   r["result"] = std::move(inner);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "build_csharp_assembly completed");
   return r;
 }
 
