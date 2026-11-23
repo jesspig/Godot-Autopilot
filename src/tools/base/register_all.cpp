@@ -1,5 +1,6 @@
 #include "tools/base/register_all.hpp"
 #include "tools/base/call_depth_guard.hpp"
+#include "tools/base/call_tool_elicitation.hpp"
 #include "core/command_queue.hpp"
 #include "core/error_watermark.hpp"
 #include "core/export_guard.hpp"
@@ -842,73 +843,89 @@ static void register_surface_tool(
             mcp::JsonValue args = ctx.Params().arguments
                 ? *ctx.Params().arguments
                 : mcp::JsonValue(mcp::JsonValue::object_tag);
-            if (tool_name != "call_tool") {
-                const SideEffect effect = side_effect_of(*surface_tool);
-                if (confirmation::required_for(effect) &&
-                    !confirmation::provided(args)) {
-                    bool elicitation = false;
-                    if (auto capabilities =
-                            ctx.Server().GetClientCapabilities()) {
-                        elicitation = capabilities->elicitation.has_value();
-                    }
-                    if (elicitation) {
-                        auto* responses = ctx.Params().input_responses
-                            ? &*ctx.Params().input_responses
-                            : nullptr;
-                        if (responses != nullptr && responses->IsObject()) {
-                            auto* confirm = responses->Find("confirm");
-                            if (confirm != nullptr && confirm->IsObject()) {
-                                auto* action = confirm->Find("action");
-                                if (action != nullptr && action->IsString() &&
-                                    action->GetString() == "accept") {
-                                    args["confirm"] = mcp::JsonValue(true);
-                                } else {
-                                    mcp::CallToolResult declined;
-                                    declined.is_error = true;
-                                    declined.content.push_back(mcp::TextContent{
-                                        "text",
-                                        "confirmation declined: the tool was not executed"});
-                                    return declined;
+            {
+                SideEffect effect = side_effect_of(*surface_tool);
+                if (tool_name == "call_tool") {
+                    const mcp::JsonValue *target_p = args.Find("name");
+                    if (target_p != nullptr && target_p->IsString()) {
+                        const std::string target_name = target_p->GetString();
+                        if (auto registry = get_active_registry()) {
+                            auto target = registry->find_any(target_name);
+                            if (target == nullptr) {
+                                if (auto alias = registry->resolve_alias(target_name)) {
+                                    target = registry->find_any(alias->canonical);
                                 }
                             }
-                        } else {
-                            mcp::CallToolResult required;
-                            required.input_required = mcp::InputRequiredResult{};
-                            mcp::InputRequest request;
-                            request.method = "elicitation/create";
-                            mcp::JsonValue params(
-                                mcp::JsonValue::object_tag);
-                            params["mode"] = mcp::JsonValue("form");
-                            params["message"] = mcp::JsonValue(
-                                "This tool has a " +
-                                std::string(side_effect_name(effect)) +
-                                " side effect. Confirm to continue.");
-                            mcp::JsonValue schema(
-                                mcp::JsonValue::object_tag);
-                            schema["type"] = mcp::JsonValue("object");
-                            mcp::JsonValue properties(
-                                mcp::JsonValue::object_tag);
-                            mcp::JsonValue confirm_property(
-                                mcp::JsonValue::object_tag);
-                            confirm_property["type"] =
-                                mcp::JsonValue("boolean");
-                            confirm_property["description"] = mcp::JsonValue(
-                                "Confirm the high-risk tool call");
-                            properties["confirm"] =
-                                std::move(confirm_property);
-                            schema["properties"] = std::move(properties);
-                            mcp::JsonValue required_fields(
-                                mcp::JsonValue::array_tag);
-                            required_fields.PushBack(
-                                mcp::JsonValue("confirm"));
-                            schema["required"] =
-                                std::move(required_fields);
-                            params["requestedSchema"] = std::move(schema);
-                            request.params = std::move(params);
-                            required.input_required->input_requests["confirm"] =
-                                std::move(request);
-                            return required;
+                            if (target != nullptr) {
+                                effect = elicitation_detail::effective_side_effect(
+                                    true, side_effect_of(*surface_tool),
+                                    side_effect_of(*target));
+                            }
                         }
+                    }
+                }
+                bool client_elicitation = false;
+                if (auto capabilities = ctx.Server().GetClientCapabilities()) {
+                    client_elicitation = capabilities->elicitation.has_value();
+                }
+                if (elicitation_detail::should_elicit(
+                        effect, confirmation::provided(args), client_elicitation)) {
+                    auto* responses = ctx.Params().input_responses
+                        ? &*ctx.Params().input_responses
+                        : nullptr;
+                    if (responses != nullptr && responses->IsObject()) {
+                        auto* confirm = responses->Find("confirm");
+                        if (confirm != nullptr && confirm->IsObject()) {
+                            auto* action = confirm->Find("action");
+                            if (action != nullptr && action->IsString() &&
+                                action->GetString() == "accept") {
+                                args["confirm"] = mcp::JsonValue(true);
+                            } else {
+                                mcp::CallToolResult declined;
+                                declined.is_error = true;
+                                declined.content.push_back(mcp::TextContent{
+                                    "text",
+                                    "confirmation declined: the tool was not executed"});
+                                return declined;
+                            }
+                        }
+                    } else {
+                        mcp::CallToolResult required;
+                        required.input_required = mcp::InputRequiredResult{};
+                        mcp::InputRequest request;
+                        request.method = "elicitation/create";
+                        mcp::JsonValue params(
+                            mcp::JsonValue::object_tag);
+                        params["mode"] = mcp::JsonValue("form");
+                        params["message"] = mcp::JsonValue(
+                            "This tool has a " +
+                            std::string(side_effect_name(effect)) +
+                            " side effect. Confirm to continue.");
+                        mcp::JsonValue schema(
+                            mcp::JsonValue::object_tag);
+                        schema["type"] = mcp::JsonValue("object");
+                        mcp::JsonValue properties(
+                            mcp::JsonValue::object_tag);
+                        mcp::JsonValue confirm_property(
+                            mcp::JsonValue::object_tag);
+                        confirm_property["type"] =
+                            mcp::JsonValue("boolean");
+                        confirm_property["description"] = mcp::JsonValue(
+                            "Confirm the high-risk tool call");
+                        properties["confirm"] =
+                            std::move(confirm_property);
+                        schema["properties"] = std::move(properties);
+                        mcp::JsonValue required_fields(
+                            mcp::JsonValue::array_tag);
+                        required_fields.PushBack(
+                            mcp::JsonValue("confirm"));
+                        schema["required"] =
+                            std::move(required_fields);
+                        params["requestedSchema"] = std::move(schema);
+                        request.params = std::move(params);
+                        required.input_required->input_requests["confirm"] =
+                            std::move(request);
+                        return required;
                     }
                 }
             }
