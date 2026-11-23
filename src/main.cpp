@@ -19,6 +19,7 @@
 #include <godot_cpp/godot.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+#include <version.hpp>
 
 #include "core/command_queue.hpp"
 #include "util/project_path.hpp"
@@ -235,7 +236,8 @@ void GodotAutopilotPlugin::_enter_tree() {
     log_setup_failure("autopilot tools singleton");
   }
   get_log_system().log(LogLevel::Info, LogCategory::System,
-                       "==== Godot Self-Driving plugin starting ====");
+                       "==== Godot Autopilot plugin starting (version " +
+                           std::string(GDA_VERSION) + ") ====");
   godot_autopilot::runtime_ops::set_editor_queue(
       &GodotAutopilotPlugin::queue());
   get_log_system().log(LogLevel::Info, LogCategory::System,
