@@ -322,7 +322,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 - `skills_guard_self_test`（同一脚本 `--self-test`）：注入未知册、旧关键词、未知命令、未知 status 字段、多文件与缺册反例，验证护栏本身能报错；Bun 可用时与 `skills_guard` 一起注册。
 - 守卫自测项：`migration_guard_self_test` / `comment_guard_self_test` / `no_python_guard_self_test` / `main_thread_guard_self_test` / `tool_domain_guard_self_test` / `skills_guard_self_test`——以注入违规样本的方式验证源码/技能守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
 - `cli_contract`（`cli/tests/contract.test.ts`）：CLI 契约 mock conformance，详见「回归属性清单」的 CLI wire 形状行；仓库内不写盘（图片落临时目录）。
-- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 48 文件 420 项（2026-11-24 主代理实测 `bun test cli/tests`：397 pass / 23 skip / 0 fail / 1810 `expect()` calls，耗时约 60.48 s；文件清单与核算方式见「数值核算总表」CLI 行；静态 `test()` 声明数为 419，实测 420 含运行期展开项）。
+- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 49 文件 422 项（2026-11-24 主代理实测 `bun test cli/tests`：399 pass / 23 skip / 0 fail / 1813 `expect()` calls，耗时约 69.20 s；文件清单与核算方式见「数值核算总表」CLI 行；静态 `test()` 声明数为 421，实测 422 含运行期展开项）。
 - 上述守卫与脚本项与两层 gtest 目标合为默认门：`ctest --preset debug`（或 `bun run gda-dev-tools test`）**无过滤全跑**——引擎轨删除后不再需要 `-E "^gda_runner_|^pool_"` 之类的排除模式。
 
 ## 数值核算总表
@@ -346,7 +346,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 集成 | 88（10 个 `*_test.cpp`，全部 `TEST_F`） | 静态：`^TEST(_F)?\(` 统计 `tests/integration/*_test.cpp`（本轮源码静态核算，未实测）；本轮未改 | 一致 |
 | 守卫与脚本项 | 18（guard 16 + cli 2） | 静态：统计 `tests/CMakeLists.txt` 的 `add_test(NAME ...)` 去重后 18 个注册点（`cli_unit` 的 if/else 两处算 1 个）；guard 标签 16（含 `skills_guard` / `skills_guard_self_test`）、cli 标签 2（`cli_contract` / `cli_unit`） | 一致 |
 | ctest 注册总数 | 1101 = 738 + 257 + 88 + 16 + 2（单元 + 边界 + 集成 + guard + cli） | 主代理实测 `ctest --preset debug`：100% tests passed out of 1101；静态宏计数 739 与 gtest discover 的 738 差 1 为条件编译项 | 一致 |
-| CLI TS 单测 | 48 文件 / 420 项（397 pass + 23 skip + 0 fail；2026-11-24 主代理实测 `bun test cli/tests`，1810 `expect()` calls，约 60.48 s） | 命令：`bun test cli/tests`（主代理实测）；静态：`cli/tests/*.test.ts` 45 个 + `*_test.ts` 2 个（`instance_identity_test.ts` / `registry_atomic_test.ts`）共 47 文件；静态 `test()` 声明 419，实测 418 含运行期展开项；2 处 `describe.skip` + 3 处 `skipIf` 块级跳过；旧值 37 文件 / 348 项 / 325 pass 已过期 | 一致 |
+| CLI TS 单测 | 49 文件 / 422 项（399 pass + 23 skip + 0 fail；2026-11-24 主代理实测 `bun test cli/tests`，1813 `expect()` calls，约 69.20 s） | 命令：`bun test cli/tests`（主代理实测）；静态：`cli/tests/*.test.ts` 47 个 + `*_test.ts` 2 个（`instance_identity_test.ts` / `registry_atomic_test.ts`）共 49 文件；静态 `test()` 声明 421，实测 422 含运行期展开项；2 处 `describe.skip` + 3 处 `skipIf` 块级跳过；旧值 37 文件 / 348 项 / 325 pass 已过期 | 一致 |
 | 技能卡 | EN 10 文件；EN+ZH 源共 20 文件（各 1 张入口卡 SKILL.md + 9 篇 references） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 1 个技能目录 | 一致 |
 | MCP skills 资源 | 12（1 目录 + 1 技能 + 10 文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
 | add_library 源文件 | 120 个 `.cpp`（main 1 / core 33 / tools 62 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 静态：`Get-ChildItem src -Recurse -Filter *.cpp` 实测 120；`source_manifest_guard` 实测 plugin sources 120 == src/ *.cpp 120；根 `CMakeLists.txt` 另直列 `image_ops.cpp` / `mesh_ops.cpp` | 一致 |
