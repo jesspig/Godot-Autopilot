@@ -17,6 +17,18 @@ export function shouldStopByPid(pidAlive: boolean, endpointPort: number | null |
   return true;
 }
 
+export interface StopDecision {
+  stop: boolean;
+  identityWarning: boolean;
+}
+
+export function stopDecision(pidAlive: boolean, endpointPort: number | null | undefined, endpointAlive: boolean | null): StopDecision {
+  return {
+    stop: pidAlive,
+    identityWarning: pidAlive && !shouldStopByPid(pidAlive, endpointPort, endpointAlive),
+  };
+}
+
 export function isAlive(pid: number): boolean {
   if (process.platform === "win32") {
     return windowsProcessExists(pid);
