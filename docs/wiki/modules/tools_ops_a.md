@@ -7,7 +7,7 @@ tags:
   - 领域工具
   - A组
   - action
-timestamp: "2026-11-23T17:28:29+08:00"
+timestamp: "2026-11-23T21:09:40+08:00"
 resource: src/tools/domains/
 ---
 
@@ -19,7 +19,7 @@ resource: src/tools/domains/
 
 - **canonical 工具**是本页表格第一列的真实工具名，也是 `search_tools`、`get_tool_detail`、`ToolCatalog` 唯一呈现的名字。
 - **旧工具名**只存在于“旧名（别名）”列。它们不占 catalog、不进 BM25 索引，只经 `call_tool` / `batch_execute` 解析到 canonical；调用成功时结果顶层附 `deprecated_alias`、`canonical_name`、`alias_removal_version`、`deprecated_since`。契约见 [tool_surface_conventions.md](../tool_surface_conventions.md)。
-- 全部 325 个生产别名统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；`VERSION` 当前为开发版 0.3.4-dev。到期删除别名，不恢复为正式工具。
+- 全部 325 个生产别名统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；`VERSION` 当前为正式版 0.3.4。到期删除别名，不恢复为正式工具。
 - action 工具的单工具 action 上限 8 个；action 专用参数在 schema 中为可选，handler 按 action 校验必填。每个工具至少一条示例存于 `ToolSpec.examples`，经 `get_tool_detail` 的 `tool.examples` 查看。
 - 本页只列 canonical 行为；handler 级历史细节已由 [tool_surface_report.md](../tool_surface_report.md) 与 [changelog/2026-11-16-log.md](../changelog/2026-11-16-log.md) 承接，不再复述已删除的工具。
 

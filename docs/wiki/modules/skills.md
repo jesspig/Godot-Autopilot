@@ -7,7 +7,7 @@ tags:
   - 技能
   - references
   - MCP
-timestamp: "2026-11-16T10:00:00+08:00"
+timestamp: "2026-11-23T21:09:40+08:00"
 resource:
   - skills/
   - skills-zh/
@@ -18,7 +18,7 @@ resource:
 
 # 技能卡与 references（`skills/`、`skills-zh/`）
 
-> 审计日期：2026-11-16（VERSION 为开发版 0.3.4-dev：10 册自包含技能书收敛为 1 张入口卡 + 9 篇 references；MCP skills 资源 21→12；安装器新增 `--prune`）。
+> 审计日期：2026-11-23（VERSION 为正式版 0.3.4：10 册自包含技能书收敛为 1 张入口卡 + 9 篇 references；MCP skills 资源 21→12；安装器新增 `--prune`）。
 
 ## 目录结构
 
