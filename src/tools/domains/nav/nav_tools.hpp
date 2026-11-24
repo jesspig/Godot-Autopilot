@@ -110,8 +110,8 @@ const std::vector<ParamSpec> kBakeNavigationMeshParams = {
 const std::vector<ParamSpec> kAstarPathParams = {
     {"kind", "string", "create: AStar kind to instantiate: grid_2d (AStarGrid2D), 2d (AStar2D) or 3d (AStar3D)", false},
     {"handle", "integer", "AStar handle returned by action=create; required by every action except create", false},
-    {"region", "object", "grid_2d: rectangle {x, y, width, height} for create, set_region or fill_solid_region", false},
-    {"size", "object", "grid_2d create: grid size {x, y} with positive dimensions (use instead of region)", false},
+    {"region", "object", "grid_2d: rectangle {x, y, width, height} for create, set_region or fill_solid_region; each dimension is capped at 2048 and the cell count at 1048576, rejected before the grid is resized", false},
+    {"size", "object", "grid_2d create: grid size {x, y} with positive dimensions (use instead of region); each dimension is capped at 2048 and the cell count at 1048576", false},
     {"cell_size", "object", "grid_2d create: world size of one cell {x, y}", false},
     {"offset", "object", "grid_2d create: world offset of the grid origin {x, y}", false},
     {"diagonal_mode", "string", "grid_2d create: always (default), never, at_least_one_walkable or only_if_no_obstacles", false},

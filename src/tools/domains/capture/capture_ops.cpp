@@ -1,4 +1,5 @@
 #include "tools/domains/capture/capture_ops.hpp"
+#include "tools/domains/capture/capture_retention.hpp"
 #include "util/error_util.hpp"
 #include "util/scene_path.hpp"
 #include "core/config.hpp"
@@ -373,6 +374,10 @@ std::string base64_encode(const uint8_t *data, size_t len) {
 
 void prune_capture_files(const godot::String &dir_path, int keep) {
   if (keep <= 0)
+    return;
+  if (!capture_retention::prune_allowed(
+          util::to_std(dir_path),
+          StoragePaths::captures_dir(util::current_project_root_path())))
     return;
   godot::Ref<godot::DirAccess> dir = godot::DirAccess::open(dir_path);
   if (dir.is_null())

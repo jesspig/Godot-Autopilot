@@ -1,4 +1,5 @@
 #include "tools/domains/nav/nav_ops.hpp"
+#include "tools/domains/nav/nav_budget.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"
@@ -28,6 +29,7 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
+#include <cmath>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
@@ -150,38 +152,61 @@ JV rect2i_to_json(const godot::Rect2i &value) {
                        {"height", JV(static_cast<int64_t>(value.size.y))}});
 }
 
+bool nav_read_int32(const JV *value, int32_t *out) {
+  if (value == nullptr || !value->IsNumber()) {
+    return false;
+  }
+  const double raw = util::json_number(value, 0.0);
+  if (!std::isfinite(raw) || raw < -2147483648.0 || raw > 2147483647.0 ||
+      std::floor(raw) != raw) {
+    return false;
+  }
+  *out = static_cast<int32_t>(raw);
+  return true;
+}
+
+bool nav_read_bounded_dimension(const JV *value, int32_t *out) {
+  if (value == nullptr || !value->IsNumber()) {
+    return false;
+  }
+  const double raw = util::json_number(value, 0.0);
+  const nav_budget::GridExtentVerdict verdict =
+      nav_budget::validate_grid_extent(raw, 1.0);
+  if (verdict.failure != nav_budget::GridExtentFailure::kNone) {
+    return false;
+  }
+  *out = verdict.width;
+  return true;
+}
+
 bool nav_read_vec2i(const JV &value, godot::Vector2i *out) {
   if (!value.IsObject()) {
     return false;
   }
-  const JV *x = value.Find("x");
-  const JV *y = value.Find("y");
-  if (x == nullptr || y == nullptr || !x->IsNumber() || !y->IsNumber()) {
-    return false;
-  }
-  out->x = static_cast<int32_t>(util::json_number(x, 0.0));
-  out->y = static_cast<int32_t>(util::json_number(y, 0.0));
-  return true;
+  return nav_read_int32(value.Find("x"), &out->x) &&
+         nav_read_int32(value.Find("y"), &out->y);
 }
 
 bool nav_read_rect2i(const JV &value, godot::Rect2i *out) {
   if (!value.IsObject()) {
     return false;
   }
-  const JV *x = value.Find("x");
-  const JV *y = value.Find("y");
-  const JV *width = value.Find("width");
-  const JV *height = value.Find("height");
-  if (x == nullptr || y == nullptr || width == nullptr || height == nullptr ||
-      !x->IsNumber() || !y->IsNumber() || !width->IsNumber() ||
-      !height->IsNumber()) {
+  int32_t width = 0;
+  int32_t height = 0;
+  if (!nav_read_int32(value.Find("x"), &out->position.x) ||
+      !nav_read_int32(value.Find("y"), &out->position.y) ||
+      !nav_read_bounded_dimension(value.Find("width"), &width) ||
+      !nav_read_bounded_dimension(value.Find("height"), &height)) {
     return false;
   }
-  out->position.x = static_cast<int32_t>(util::json_number(x, 0.0));
-  out->position.y = static_cast<int32_t>(util::json_number(y, 0.0));
-  out->size.x = static_cast<int32_t>(util::json_number(width, 0.0));
-  out->size.y = static_cast<int32_t>(util::json_number(height, 0.0));
-  return out->size.x >= 1 && out->size.y >= 1;
+  const nav_budget::GridExtentVerdict verdict =
+      nav_budget::validate_grid_extent(width, height);
+  if (verdict.failure != nav_budget::GridExtentFailure::kNone) {
+    return false;
+  }
+  out->size.x = verdict.width;
+  out->size.y = verdict.height;
+  return true;
 }
 
 bool nav_read_postprocessing(const JV &args, int64_t dimension,
@@ -1620,6 +1645,13 @@ JV astar_create(const JV &args) {
         return util::error_json(
             "parameter 'size' must be an object {x, y} with positive "
             "dimensions");
+      }
+      const nav_budget::GridExtentVerdict extent =
+          nav_budget::validate_grid_extent(size.x, size.y);
+      if (extent.failure != nav_budget::GridExtentFailure::kNone) {
+        return util::error_json(
+            "grid size rejected by budget: each dimension is capped at 2048 "
+            "and the cell count at 1048576");
       }
       grid->set_size(size);
     }

@@ -1,6 +1,7 @@
 #include "tools/domains/input_map/input_map_ops.hpp"
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/persistence_integrity.hpp"
 #include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
@@ -197,14 +198,25 @@ const std::unordered_map<std::string, int64_t> KEY_NAME_TO_CODE = {
     {"KEY_UNKNOWN", 8388607},
 };
 
-void persist_action(const std::string &action_name, godot::InputMap *im,
+godot::Error persist_action(const std::string &action_name, godot::InputMap *im,
                     godot::ProjectSettings *ps) {
   godot::StringName name(action_name.c_str());
   godot::Dictionary dict;
   dict["deadzone"] = im->action_get_deadzone(name);
   dict["events"] = im->action_get_events(name);
   ps->set_setting(godot::String(("input/" + action_name).c_str()), dict);
-  ps->save();
+  return ps->save();
+}
+
+JV persist_failed_result(godot::Error error, const std::string &action_name) {
+  JV e = util::error_json("action '" + action_name +
+                          "' applied in memory but ProjectSettings::save() "
+                          "failed (error " +
+                          std::to_string(static_cast<int>(error)) + ")");
+  e["code"] = JV("persist_failed");
+  e["persisted"] = JV(false);
+  e["action"] = JV(action_name);
+  return e;
 }
 
 const std::unordered_map<std::string, int64_t> &key_code_by_bare_name() {
@@ -365,7 +377,11 @@ JV handle_action_add_event(const JV &args) {
   {
     auto *ps = godot::ProjectSettings::get_singleton();
     if (ps) {
-      persist_action(action, im, ps);
+      const godot::Error persist_error = persist_action(action, im, ps);
+      const auto persist_state = godot_autopilot::persistence::persistence_state(
+          true, persist_error == godot::OK);
+      if (godot_autopilot::persistence::is_false_confirmation(persist_state))
+        return persist_failed_result(persist_error, action);
     }
   }
   JV r(JV::object_tag);
@@ -414,7 +430,11 @@ JV handle_action_erase_event(const JV &args) {
   {
     auto *ps = godot::ProjectSettings::get_singleton();
     if (ps) {
-      persist_action(action, im, ps);
+      const godot::Error persist_error = persist_action(action, im, ps);
+      const auto persist_state = godot_autopilot::persistence::persistence_state(
+          true, persist_error == godot::OK);
+      if (godot_autopilot::persistence::is_false_confirmation(persist_state))
+        return persist_failed_result(persist_error, action);
     }
   }
   JV r(JV::object_tag);
@@ -452,7 +472,11 @@ JV handle_action_set_deadzone(const JV &args) {
   {
     auto *ps = godot::ProjectSettings::get_singleton();
     if (ps) {
-      persist_action(action, im, ps);
+      const godot::Error persist_error = persist_action(action, im, ps);
+      const auto persist_state = godot_autopilot::persistence::persistence_state(
+          true, persist_error == godot::OK);
+      if (godot_autopilot::persistence::is_false_confirmation(persist_state))
+        return persist_failed_result(persist_error, action);
     }
   }
   JV r(JV::object_tag);
@@ -491,7 +515,11 @@ JV handle_add_action(const JV &args) {
       godot::Variant existing =
           ps->get_setting("input/" + godot::String(action.c_str()));
       if (existing.get_type() == godot::Variant::NIL) {
-        persist_action(action, im, ps);
+        const godot::Error persist_error = persist_action(action, im, ps);
+      const auto persist_state = godot_autopilot::persistence::persistence_state(
+          true, persist_error == godot::OK);
+      if (godot_autopilot::persistence::is_false_confirmation(persist_state))
+        return persist_failed_result(persist_error, action);
       }
     }
   }
@@ -622,7 +650,11 @@ JV handle_set_action_bundle(const JV &args) {
       e["error"] = JV("ProjectSettings not available");
       return e;
     }
-    persist_action(action, im, ps);
+    const godot::Error persist_error = persist_action(action, im, ps);
+      const auto persist_state = godot_autopilot::persistence::persistence_state(
+          true, persist_error == godot::OK);
+      if (godot_autopilot::persistence::is_false_confirmation(persist_state))
+        return persist_failed_result(persist_error, action);
   }
   JV r(JV::object_tag);
   r["result"] = JV("ok");

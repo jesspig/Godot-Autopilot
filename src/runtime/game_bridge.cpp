@@ -7,6 +7,7 @@
 #include "gda_protocol.hpp"
 #include "runtime/error_cursor.hpp"
 #include "runtime/game_node_count.hpp"
+#include "runtime/runtime_budget.hpp"
 #include "tools/domains/capture/capture_ops.hpp"
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/base/tool_base.hpp"
@@ -1743,9 +1744,21 @@ void send_ready_message(bool scene_ready) {
   dbg->send_message(gda_string(GDA_MSG_READY), payload);
 }
 
+constexpr size_t GDA_MAX_TWEENS = 256;
+
 std::unordered_map<int64_t, godot::Ref<godot::Tween>> &game_tweens() {
   static std::unordered_map<int64_t, godot::Ref<godot::Tween>> store;
   return store;
+}
+
+void sweep_finished_tweens() {
+  auto &store = game_tweens();
+  for (auto it = store.begin(); it != store.end();) {
+    if (!it->second.is_valid() || !it->second->is_running())
+      it = store.erase(it);
+    else
+      ++it;
+  }
 }
 
 bool tween_number(const JV &params, const char *key, double &out) {
@@ -1863,6 +1876,11 @@ JV op_tween_create(const JV &params) {
     return error_result("invalid tween kind: " + kind);
   }
 
+  sweep_finished_tweens();
+  if (!runtime_budget::tween_capacity_available(game_tweens().size(),
+                                                GDA_MAX_TWEENS))
+    return error_result("tween registry is full (maximum " +
+                        std::to_string(GDA_MAX_TWEENS) + " live tweens)");
   const int64_t tween_id = tween->get_instance_id();
   game_tweens()[tween_id] = tween;
   inner["tween_id"] = JV(tween_id);
@@ -1905,6 +1923,7 @@ JV op_tween_control(const JV &params) {
 JV op_tween_list(const JV &params) {
   (void)params;
   JV items(JV::array_tag);
+  sweep_finished_tweens();
   auto &store = game_tweens();
   for (auto it = store.begin(); it != store.end();) {
     if (!it->second.is_valid()) {
