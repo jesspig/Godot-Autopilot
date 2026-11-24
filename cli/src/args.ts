@@ -274,10 +274,10 @@ Global options:
   --transport <mode>  auto (default), ipc, or http
   --no-fallback       Do not fall back to HTTP when IPC fails
   --json              JSON output (default for most commands)
-  --confirm           Confirm a high-risk tool call
+  --confirm           Confirm a high-risk call; sends confirm:true and an elicitation accept
   --async             call: run as an MCP task when the server supports it
   --progress          call: print progress notifications to stderr
-  --input <json>      call: inputResponses for MRTR input_required
+  --input <json>      call: inputResponses for MRTR input_required; {"confirm":true} is accepted
   --direct            call: invoke a full-surface tool at the top level
   --docs-file <path>  Read an external extension_api.json (bypasses the cache)
   --section <name>    docs class: brief, description, methods, properties, signals, enums, constants, operators, constructors, or all
