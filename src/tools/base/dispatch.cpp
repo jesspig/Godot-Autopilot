@@ -34,6 +34,7 @@ namespace {
 std::mutex g_handlers_mutex;
 HandlerMap g_handlers;
 HandlerMap g_meta_handlers;
+thread_local int g_depth = 0;
 
 constexpr std::size_t kErrorArgsPreviewBytes = 256;
 constexpr std::size_t kTraceArgsTextBytes = 512;
@@ -184,6 +185,25 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   return result;
 }
 
+mcp::JsonValue depth_exceeded_result(const std::string &name) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue(
+      "tool invoke depth exceeded (max " +
+      std::to_string(tools::kMaxInvokeDepth) + "): '" + name + "'");
+  result["code"] = mcp::JsonValue("depth_exceeded");
+  result["retryable"] = mcp::JsonValue(false);
+  result["tool"] = mcp::JsonValue(name);
+  result["depth"] = mcp::JsonValue(tools::kMaxInvokeDepth);
+  return result;
+}
+
+mcp::JsonValue call_handler_with_context(const std::string &name,
+                                         const mcp::JsonValue &args,
+                                         const DepthContext &depth_ctx) {
+  ScopedDepthContext scope(depth_ctx);
+  return call_handler_impl(name, args);
+}
+
 int64_t env_int_clamped(const char *name, int64_t fallback, int64_t min_value,
                         int64_t max_value) {
   int64_t value = fallback;
@@ -288,6 +308,30 @@ void emit_dispatch_timeout_observation(const std::string &name,
 }
 
 } // namespace
+
+DepthContext capture_depth_context() {
+  DepthContext ctx;
+  ctx.depth = g_depth;
+  const tools::TraceContext trace = tools::capture_trace_context();
+  ctx.trace_id = trace.trace_id;
+  ctx.span_id = trace.span_id;
+  ctx.request_id = trace.request_id;
+  return ctx;
+}
+
+int current_depth() { return g_depth; }
+
+ScopedDepthContext::ScopedDepthContext(const DepthContext &ctx)
+    : saved_depth_(g_depth) {
+  g_depth = ctx.depth < 0 ? 1 : ctx.depth + 1;
+  tools::TraceContext trace;
+  trace.trace_id = ctx.trace_id;
+  trace.span_id = ctx.span_id;
+  trace.request_id = ctx.request_id;
+  trace_scope_.emplace(trace);
+}
+
+ScopedDepthContext::~ScopedDepthContext() { g_depth = saved_depth_; }
 
 bool has_deferred_marker(const mcp::JsonValue &result) {
   if (!result.IsObject()) {
@@ -655,7 +699,11 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
 }
 
 mcp::JsonValue call_handler(const std::string &name,
-                            const mcp::JsonValue &args) {
+                            const mcp::JsonValue &args,
+                            const DepthContext &depth_ctx) {
+  if (depth_ctx.depth >= tools::kMaxInvokeDepth) {
+    return depth_exceeded_result(name);
+  }
   if (godot_autopilot::ExportGuard::is_exporting()) {
     return export_blocked_json_result();
   }
@@ -664,8 +712,8 @@ mcp::JsonValue call_handler(const std::string &name,
         name, "the plugin has not attached the editor main thread queue yet "
               "(startup) or has already detached it (shutdown)");
   }
-  if (get_editor_queue().is_main_thread()) {
-    return call_handler_impl(name, args);
+  if (get_editor_queue().is_main_thread() || depth_ctx.run_on_calling_thread) {
+    return call_handler_with_context(name, args, depth_ctx);
   }
   CommandQueue &queue = get_editor_queue();
   uint32_t flags = tool_flags::kNone;
@@ -679,19 +727,15 @@ mcp::JsonValue call_handler(const std::string &name,
     }
   }
   const auto submit_time = std::chrono::steady_clock::now();
-  const tools::TraceContext trace_context = tools::capture_trace_context();
-  const std::string request_id = monitor::current_request_id();
   return run_on_main_thread_with_budget(
       queue, name, flags,
-      [name, args, submit_time, trace_context, request_id] {
-        tools::ScopedTraceContext restore(trace_context);
-        monitor::RequestScope request_scope(request_id);
+      [name, args, submit_time, depth_ctx] {
         const int64_t waited_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - submit_time)
                 .count();
         tools::set_queued_wait_ms(waited_ms);
-        return call_handler_impl(name, args);
+        return call_handler_with_context(name, args, depth_ctx);
       });
 }
 

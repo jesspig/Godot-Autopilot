@@ -1,7 +1,36 @@
 #include "tools/base/schema_builder.hpp"
 
+#include <unordered_set>
+
 namespace godot_autopilot {
 namespace schema {
+
+bool is_supported_param_type(const std::string &type) {
+  return type == "string" || type == "integer" || type == "number" ||
+         type == "boolean" || type == "object" || type == "array" ||
+         type == "json";
+}
+
+bool validate_param_defs(const std::vector<ParamDef> &params,
+                         std::string &error) {
+  std::unordered_set<std::string> names;
+  for (const ParamDef &param : params) {
+    if (param.name.empty()) {
+      error = "parameter name must be a non-empty string";
+      return false;
+    }
+    if (!names.insert(param.name).second) {
+      error = "duplicate parameter name: " + param.name;
+      return false;
+    }
+    if (!is_supported_param_type(param.type)) {
+      error = "unsupported parameter type: " + param.type;
+      return false;
+    }
+  }
+  error.clear();
+  return true;
+}
 
 void add_required_flag(mcp::JsonValue &schema, const std::string &name) {
   auto *req = schema.Find("required");

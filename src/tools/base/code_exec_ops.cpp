@@ -866,7 +866,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
     }
 
-    mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
+    mcp::JsonValue handler_result = dispatch::call_handler(
+        tool_name, tool_args, dispatch::capture_depth_context());
 
     int64_t pending_id = 0;
     const bool has_pending_marker =
