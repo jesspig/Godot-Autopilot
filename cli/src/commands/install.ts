@@ -7,7 +7,7 @@ import { extractZip, readTree, writeTree } from "../archive";
 import { cacheRoot, cacheAssetPath, selectLatest, verifyManifest } from "../cache";
 import { CliError, ExitCode } from "../errors";
 import { readPluginInstanceIndex } from "../instances";
-import { isAlive, stopForce } from "../process";
+import { isAlive, terminateGraceful } from "../process";
 import { builtinRetiredSkills, builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
 import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
@@ -211,7 +211,15 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
     }
     if (shouldStopRunningForInstall(sourceDir !== undefined)) {
       for (const record of running) {
-        if (record.pid !== null) stopForce(record.pid);
+        if (record.pid === null) continue;
+        const outcome = await terminateGraceful(record.pid);
+        if (outcome === "failed") {
+          throw new CliError(
+            ExitCode.Transport,
+            `editor (pid ${record.pid}) did not exit after a graceful stop; refusing to replace the plugin while it is running`,
+            "Close the editor and retry the install.",
+          );
+        }
       }
     }
     const backup = `${target}.old-${Date.now()}`;

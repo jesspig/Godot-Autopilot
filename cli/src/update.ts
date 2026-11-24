@@ -6,6 +6,7 @@ import { extractZip } from "./archive";
 import { cacheRoot, selectLatest, verifyManifest, cacheAssetPath } from "./cache";
 import { CliError, ExitCode } from "./errors";
 import { isAlive, stopForce } from "./process";
+import { canApplyUpdateTo } from "./security-policy";
 import { CLI_VERSION } from "./version";
 
 export interface UpdateItemResult {
@@ -115,6 +116,21 @@ export function applyUpdate(argv: string[]): number {
   };
   if (source === undefined || target === undefined || expected === "") {
     result.results[0].error = "apply-update requires --source, --target, and --expected-version";
+    writeUpdateResult(result);
+    return 2;
+  }
+  if (skipVerify) {
+    result.results[0].error = "--skip-verify is not allowed; the updated binary must be verified";
+    writeUpdateResult(result);
+    return 2;
+  }
+  if (!canApplyUpdateTo(process.execPath, target)) {
+    result.results[0].error = "--target must be the currently running gda executable";
+    writeUpdateResult(result);
+    return 2;
+  }
+  if (parentPid !== process.ppid) {
+    result.results[0].error = "--parent-pid does not match the parent process of apply-update";
     writeUpdateResult(result);
     return 2;
   }

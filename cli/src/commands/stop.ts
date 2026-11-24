@@ -1,7 +1,8 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
-import { isAlive, stopDecision, stopForce, stopGraceful } from "../process";
+import { isAlive, processStartTime, stopDecision, stopForce, stopGraceful } from "../process";
+import { matchesProcessIdentity } from "../security-policy";
 import { cachedEndpointAlive } from "../probe";
 import { findLiveByProject, withRegistryLock, type InstanceEntry } from "../registry";
 import { assertSingleSelector, parseTargetPort } from "../target";
@@ -40,6 +41,20 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
   const endpointAlive = typeof endpointPort === "number" && endpointPort > 0
     ? cachedEndpointAlive(endpointPort)
     : null;
+  if (entry.pid !== null && entry.startedAt > 0) {
+    const observedStart = processStartTime(entry.pid);
+    if (observedStart !== null &&
+        !matchesProcessIdentity(
+          { pid: entry.pid, started_at: entry.startedAt },
+          { pid: entry.pid, started_at: observedStart },
+        )) {
+      throw new CliError(
+        ExitCode.Transport,
+        `instance ${entry.id} (pid ${entry.pid}) no longer matches its recorded start time; refusing to stop a reused pid`,
+        "Run 'gda list' and select the current instance explicitly.",
+      );
+    }
+  }
   const decision = stopDecision(isAlive(entry.pid), endpointPort, endpointAlive);
   if (decision.identityWarning) {
     err(`instance ${entry.id} (pid ${entry.pid}) endpoint on port ${endpointPort} did not confirm identity; falling back to pid-based stop`);
