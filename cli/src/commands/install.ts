@@ -159,6 +159,48 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   return ExitCode.Success;
 }
 
+interface CsharpRuntimeResult {
+  status: "configured" | "already_configured" | "skipped";
+  reason: string;
+}
+
+export function configureCsharpRuntime(project: string): CsharpRuntimeResult {
+  const projectPath = path.join(project, "project.godot");
+  if (!fs.existsSync(projectPath)) return { status: "skipped", reason: "no_project_godot" };
+  const original = fs.readFileSync(projectPath, "utf8");
+  const eol = original.includes("\r\n") ? "\r\n" : "\n";
+  const hasProjectFile = fs
+    .readdirSync(project)
+    .some((entry) => entry.endsWith(".csproj") || entry.endsWith(".sln"));
+  const hasDotnetSetting = /\[dotnet\]/i.test(original) && /assembly_name\s*=/i.test(original);
+  const hasCsharpFeature = original.includes('"C#"');
+  if (!hasProjectFile && !hasDotnetSetting && !hasCsharpFeature) {
+    return { status: "skipped", reason: "gdscript_project" };
+  }
+  const runtimeScript = path.join(project, "addons", "godot-autopilot", "GdaCSharpRuntime.cs");
+  if (!fs.existsSync(runtimeScript)) return { status: "skipped", reason: "addon_missing" };
+  const lines = original.split(/\r?\n/);
+  if (lines.some((line) => /^GdaCSharpRuntime\s*=/i.test(line.trim()))) {
+    return { status: "already_configured", reason: "autoload_present" };
+  }
+  const autoloadIndex = lines.findIndex((line) => /^\[autoload\]/i.test(line.trim()));
+  const autoloadLine = 'GdaCSharpRuntime="*res://addons/godot-autopilot/GdaCSharpRuntime.cs"';
+  if (autoloadIndex >= 0) {
+    lines.splice(autoloadIndex + 1, 0, autoloadLine);
+  } else {
+    lines.push("", "[autoload]", autoloadLine);
+  }
+  const temp = `${projectPath}.gda-tmp`;
+  fs.writeFileSync(temp, lines.join(eol), "utf8");
+  try {
+    fs.renameSync(temp, projectPath);
+  } catch (error) {
+    fs.rmSync(temp, { force: true });
+    throw error;
+  }
+  return { status: "configured", reason: "autoload_added" };
+}
+
 async function installPlugin(opts: GlobalOptions): Promise<number> {
   const source = opts.offline === true ? "cache" : parseSource(opts.sourceText);
   const project = path.resolve(opts.project ?? process.cwd());
@@ -237,6 +279,9 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
       if (fs.existsSync(backup)) fs.renameSync(backup, target);
       throw error;
     }
+    const csharpRuntime = opts.withCsharpRuntime === true
+      ? configureCsharpRuntime(project)
+      : { status: "skipped" as const, reason: "not_requested" };
     if (running.length > 0) {
       await start({ ...opts, project, force: false }, { writeOutput: false });
     }
@@ -249,6 +294,12 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
         target,
         backup: fs.existsSync(backup) ? backup : null,
         restarted: running.length,
+        csharp_runtime: csharpRuntime.status,
+        csharp_runtime_reason: csharpRuntime.reason,
+        csharp_runtime_hint:
+          csharpRuntime.status === "skipped" && csharpRuntime.reason !== "gdscript_project"
+            ? "gda call update_autoloads --args '{\"action\":\"add\",\"name\":\"GdaCSharpRuntime\",\"path\":\"res://addons/godot-autopilot/GdaCSharpRuntime.cs\",\"enabled\":true}'"
+            : null,
       },
       opts,
     );

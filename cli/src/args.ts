@@ -14,6 +14,7 @@ export interface GlobalOptions {
   pathText?: string;
   sourceText?: string;
   offline?: boolean;
+  withCsharpRuntime?: boolean;
   zh?: boolean;
   check?: boolean;
   confirm?: boolean;
@@ -111,6 +112,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--progress": "progress",
   "--direct": "direct",
   "--offline": "offline",
+  "--with-csharp-runtime": "withCsharpRuntime",
   "--zh": "zh",
   "--check": "check",
   "--confirm": "confirm",
@@ -251,6 +253,7 @@ Global options:
   --path <dir>        Install target directory (install skills)
   --source <mode>     auto (default), online, cache, or builtin
   --offline           Never touch the network; use cache, then builtin
+  --with-csharp-runtime  Install time: add the GdaCSharpRuntime autoload in C# projects
   --zh                Use the Chinese skills archive (install, skills list/show)
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
