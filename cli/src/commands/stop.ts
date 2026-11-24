@@ -41,11 +41,12 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
   const endpointAlive = typeof endpointPort === "number" && endpointPort > 0
     ? cachedEndpointAlive(endpointPort)
     : null;
-  if (entry.pid !== null && entry.startedAt > 0) {
+  const recordedStart = Number(entry.startedAt);
+  if (entry.pid !== null && Number.isFinite(recordedStart) && recordedStart > 0) {
     const observedStart = processStartTime(entry.pid);
     if (observedStart !== null &&
         !matchesProcessIdentity(
-          { pid: entry.pid, started_at: entry.startedAt },
+          { pid: entry.pid, started_at: recordedStart },
           { pid: entry.pid, started_at: observedStart },
         )) {
       throw new CliError(

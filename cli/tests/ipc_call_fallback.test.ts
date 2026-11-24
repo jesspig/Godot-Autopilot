@@ -111,7 +111,7 @@ function serveHttp(onToolCall: () => void): ReturnType<typeof Bun.serve> {
           result: { content: [{ type: "text", text: '{"ok":true}' }] },
         });
       }
-      return Response.json({ jsonrpc: "2.0", id: body.id ?? 1, error: { code: -32600, message: "unexpected method" } }, 400);
+      return Response.json({ jsonrpc: "2.0", id: body.id ?? 1, error: { code: -32600, message: "unexpected method" } }, { status: 400 });
     },
   });
 }
@@ -218,7 +218,7 @@ describe("call --socket 回退安全", () => {
       httpCalls += 1;
     });
     const output = captureOutput();
-    let code = ExitCode.Success;
+    let code: number = ExitCode.Success;
     try {
       code = await runCall(["mutating_tool"], {
         socketText: endpoint.socketPath,

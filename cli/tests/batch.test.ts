@@ -79,7 +79,7 @@ async function expectSessionClosed(): Promise<void> {
       resolve();
     });
   });
-  expect(socket!.destroyed).toBe(true);
+  expect(Boolean(socket!.destroyed)).toBe(true);
 }
 
 interface ServerState {

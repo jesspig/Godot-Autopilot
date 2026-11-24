@@ -32,8 +32,7 @@ export function stopDecision(pidAlive: boolean, endpointPort: number | null | un
 export function processStartTime(pid: number): number | null {
   if (pid <= 0 || process.platform === "win32") return null;
   const r = spawnSync("ps", ["-o", "lstart=", "-p", String(pid)], {
-    stdout: "pipe",
-    stderr: "pipe",
+    encoding: "utf8",
   });
   if (r.error !== undefined || r.status !== 0) return null;
   const parsed = Date.parse(r.stdout.toString().trim());
