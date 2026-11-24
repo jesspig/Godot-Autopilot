@@ -112,7 +112,7 @@ gda docs sync
 
 ## 确认
 
-高风险副作用在执行前返回结构化 `confirmation_required`。审查描述与目标后，用 `--confirm`（CLI）或 `confirm: true`（MCP）重试。类别为 `destructive`（删除已存在对象）、`process`（控制 OS 进程）、`code_execute`（运行任意 GDScript）与 `game_runtime`（进入运行中的游戏）。
+高风险副作用在执行前返回结构化 `confirmation_required`。审查描述与目标后，用 `--confirm`（CLI）、`--input '{"confirm":true}'` 或 `confirm: true`（MCP）重试；三种入口在服务端归一为同一确认决策，畸形响应返回 `invalid_input_response`。类别为 `destructive`（删除已存在对象）、`process`（控制 OS 进程）、`code_execute`（运行任意 GDScript）与 `game_runtime`（进入运行中的游戏）。
 
 文件、配置与场景写入不需要确认，但仍改变内容：每次写入后读回目标。禁止换一个效果相同的工具绕过确认，也禁止把高风险调用藏进 batch。弃用别名与 canonical 工具走同一确认门。
 
@@ -130,7 +130,7 @@ gda docs sync
 |---|---|---|
 | `exec_timeout` | `code_execute` 脚本超过 `timeout_ms` | 拆分工作或在 schema 上限内提高超时 |
 | `eval_timeout` | 游戏侧 eval 超过宿主等待；`timeout_cause` 区分 `script_error` 与 `channel_lost` | 不要立即重试；游戏可能仍在执行 |
-| `game_ready_timeout` | 排队的游戏调用一直没等到带场景就绪的 `gda:ready` | 就绪后可重试；检查扩展是否加载 |
+| `game_ready_timeout` | 排队的游戏调用一直没等到带场景就绪的 `gda:ready`；`ready_diagnosis` 区分 `extension_not_loaded`、`scene_not_ready` 与 `ready_lost` | 就绪后按回执 `next_action` 重试 |
 | `startup_in_progress` | 编辑器启动后仍在恢复场景 | `retry_after_ms` 后重试 |
 | `no_scene_open` / `viewport_degenerate` | 编辑器截图：没有打开场景，或 2D 与 3D 视口都退化 | 打开场景或恢复视口后重试 |
 | `main_thread_timeout` | 编辑器主线程超出预算 | 先读状态；副作用可能已落地 |

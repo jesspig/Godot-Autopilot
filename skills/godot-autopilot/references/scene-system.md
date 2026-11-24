@@ -15,6 +15,12 @@ before the first call; the calling protocol lives in `references/tools.md`.
    action=reload restores the edited scene from disk.
 5. `editor_config` action=main_scene sets `path` as the project's launch scene.
 
+- Scene write tools return `disk_persisted=false`: they change the editor
+  scene in memory only. `save_editor_scene` returns `disk_persisted=true`.
+  `editor_scene_control` action=play reports `autosaved` and `disk_changed`
+  because Godot saves dirty scenes before running by default; a temporary
+  probe must be deleted and saved again to leave the disk clean.
+
 - action=create accepts only native Node subclasses; an inherited scene cannot
   be created this way. Copy the file or open it and use action=save_as.
 - Replacing a scene with unsaved changes is refused. Save first, then retry with

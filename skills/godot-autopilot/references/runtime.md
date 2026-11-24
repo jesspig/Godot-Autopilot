@@ -22,7 +22,11 @@ channel failure.
 When attached but not ready, the default `wait_ready: true` queues the request
 and replays it once the game reports `gda:ready` with `scene_ready` (current
 scene in the tree); `wait_ready: false` fails immediately. A queued call times
-out (`game_ready_timeout`) if readiness never arrives. After a force restart,
+out (`game_ready_timeout`) if readiness never arrives. The editor sends
+`gda:hello` to each attached session until the game replies with a real
+`scene_ready`; `game_ready_timeout` and `get_game_state(session)`
+now carry `ready_diagnosis` (`extension_not_loaded` / `scene_not_ready` /
+`ready_lost` / `ready`) plus `hello_attempts`. After a force restart,
 wait for scene-ready before the first call. If `wait_ready: false` keeps failing
 while a game is attached, the game project does not load the extension.
 

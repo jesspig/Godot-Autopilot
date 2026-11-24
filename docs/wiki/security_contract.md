@@ -32,7 +32,7 @@ resource:
 
 - 只有 `/mcp` 与 IPC 两个协议面；REST `/api`、Bearer 认证、allow-list / `GODOT_AUTOPILOT_ALLOW` / `GODOT_AUTOPILOT_AUTH_MODE` 与 `McpConfigDock` 已移除，CLI 为纯客户端。`api_token` 模块现仅提供 `generate_token()`（32 字节随机值的十六进制）与 `constant_time_equals()`；IPC 令牌只经实例登记 `endpoints.ipc.token` 分发，不再有令牌文件与 REST Bearer 路径。
 - 保留 `side_effect` 元数据；MCP 工具声明 `read_only_hint`、`destructive_hint`、`open_world_hint`。高风险工具（`destructive` / `process` / `code_execute` / `game_runtime`）每次调用都必须带 `arguments.confirm=true`，否则返回 `confirmation_required`。经 `call_tool` 代理时按**目标工具**的 `side_effect` 判定（`elicitation_detail::effective_side_effect`）：兼容 elicitation 的客户端在缺 confirm 时收到 `elicitation/create`，拒绝则不执行；工具层始终以 `confirmation::error()` 兜底。另 `os_file_write` 的 `action=trash` 也要求 `confirm=true`（`src/tools/domains/os/trash_confirm.hpp`）。
-- `confirm` 不是安全边界；它只阻止误触，调用方仍需自行审查目标与参数。审计仍记录工具、`side_effect`、结果与错误。
+- `confirm` 不是安全边界；它只阻止误触，调用方仍需自行审查目标与参数。审计仍记录工具、`side_effect`、结果与错误。服务端现在用 `confirmation::resolve_confirmation` 把 `args.confirm`、call_tool 嵌套 `arguments.confirm` 与 `inputResponses`（对象 `action:accept` 或布尔 `true` 简写）归一为单个决策；elicitation 只负责交互询问，`SpecTool` 仍是唯一执行门禁。畸形响应返回 `invalid_input_response`，不再静默忽略。
 - `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 的暴露面（253 个顶层工具），不改变安全姿态：导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定、主线程派发全部继续生效。full 下每个域工具走与 `call_tool` 相同的注册回调与 dispatch 预算，不新增线程、不绕过 `ExportGuard`。
 - 上下文风险由宿主承担：不支持 tool search / defer loading 的客户端不要开 full；服务端不提供按客户端自动降级。
 

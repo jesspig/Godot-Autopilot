@@ -59,7 +59,7 @@ C# 项目需要 `res://` 根下的 `.csproj`（或 `.sln`），以及 `project.g
 `property_get` 与 `game_script` 的 action=execute 只能触达 GDScript 可见成员。C# getter、重载与事件要用 `csharp_member` 的 action=list / get / set / call，以及 `csharp_event` 的 action=subscribe / unsubscribe，`runtime` 取 editor（默认）或 game。
 
 - 编辑器侧无需手动注册单例；单例缺失时插件会加载 `res://addons/godot-autopilot/GdaCSharpBridge.cs`。
-- 游戏侧需要 `GdaCSharpRuntime` 节点；它创建 `__gda_runtime` 载体。只有场景路径定位器能进入游戏；`object_id` 与 `memory` 是编辑器进程句柄。
+- 游戏侧需要 `GdaCSharpRuntime` 节点；它创建 `__gda_runtime` 载体。可用 `gda call update_autoloads --args '{"action":"add","name":"GdaCSharpRuntime","path":"res://addons/godot-autopilot/GdaCSharpRuntime.cs","enabled":true}'` 注册为 autoload，或安装时使用 `gda install plugin --with-csharp-runtime`。缺桥时返回 `missing_csharp_runtime` 并附带该命令作为 `next_action`。只有场景路径定位器能进入游戏；`object_id` 与 `memory` 是编辑器进程句柄。
 - 解析为脚本资源的定位器会被拒绝；传活实例的节点路径或 `object_id_str`。
 
 编辑、构建程序集、读调试日志，再查询活实例。
