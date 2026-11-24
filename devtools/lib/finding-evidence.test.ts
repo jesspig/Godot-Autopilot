@@ -10,9 +10,11 @@ const COMMON_DIR = execFileSync("git", ["rev-parse", "--git-common-dir"], {
   encoding: "utf8",
 }).trim();
 const HANDOFF = process.env.GDA_HANDOFF_ROOT ?? path.join(path.dirname(COMMON_DIR), ".handoff");
+const STATE_FILE = path.join(HANDOFF, "STATE.md");
+const HAS_HANDOFF = fs.existsSync(STATE_FILE);
 
 function stateText(): string {
-  return fs.readFileSync(path.join(HANDOFF, "STATE.md"), "utf8");
+  return fs.readFileSync(STATE_FILE, "utf8");
 }
 
 function findingStatus(id: string): string | null {
@@ -31,7 +33,7 @@ function evidencePath(id: string): string | null {
   return match === null ? null : match[1];
 }
 
-describe("finding evidence matrix", () => {
+describe.skipIf(!HAS_HANDOFF)("finding evidence matrix", () => {
   test("all 40 findings are closed", () => {
     const open: string[] = [];
     for (let i = 1; i <= 40; i++) {
