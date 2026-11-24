@@ -1,24 +1,47 @@
 #ifndef GODOT_AUTOPILOT_SIDECAR_TRANSACTION_HPP
 #define GODOT_AUTOPILOT_SIDECAR_TRANSACTION_HPP
 
-#include <vector>
+#include "core/config.hpp"
+
+#include <string>
 
 namespace godot_autopilot {
 namespace resource_ops_detail {
 
-enum class SidecarKind { kUid, kImport };
-
-struct SidecarMove {
-  SidecarKind kind;
-  bool moved{false};
+struct ResourceScanBudget {
+  size_t files_listed = 0;
+  size_t files_scanned = 0;
+  size_t bytes_scanned = 0;
+  std::string limit_reason;
+  bool truncated = false;
+  bool hit_limit(size_t file_bytes, size_t depth) {
+    if (depth > GDA_SCAN_MAX_DEPTH) {
+      limit_reason = "directory_depth";
+      truncated = true;
+      return true;
+    }
+    if (files_listed >= GDA_SCAN_MAX_FILES) {
+      limit_reason = "file_count";
+      truncated = true;
+      return true;
+    }
+    if (file_bytes > GDA_SCAN_MAX_FILE_BYTES) {
+      limit_reason = "single_file_bytes";
+      truncated = true;
+      return true;
+    }
+    if (file_bytes > GDA_SCAN_MAX_TOTAL_BYTES - bytes_scanned) {
+      limit_reason = "total_bytes";
+      truncated = true;
+      return true;
+    }
+    return false;
+  }
 };
 
-inline std::vector<SidecarKind> rollback_order(const std::vector<SidecarMove> &moves) {
-  std::vector<SidecarKind> order;
-  for (auto it = moves.rbegin(); it != moves.rend(); ++it) {
-    if (it->moved) order.push_back(it->kind);
-  }
-  return order;
+inline bool scan_must_abort(const ResourceScanBudget &budget,
+                            bool truncated) {
+  return budget.truncated || truncated;
 }
 
 } // namespace resource_ops_detail
