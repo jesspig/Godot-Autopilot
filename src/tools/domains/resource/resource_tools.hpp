@@ -89,7 +89,9 @@ const std::vector<ParamSpec> kSaveResourceParams = {
 
 const std::vector<ParamSpec> kSetResourceUidParams = {
     {"path", "string", "Resource file path to assign the UID to, e.g. res://my_resource.tres", true},
-    {"uid", "integer", "UID value to assign; when omitted a fresh UID is auto-generated (contract gap: required in schema but optional in the implementation)", true},
+    {"uid", "integer", "UID value to assign; when omitted a fresh UID is auto-generated", false},
+    {"overwrite", "boolean", "Required with an already registered UID: allow reassigning it to this resource; without it the call is rejected", false},
+    {"confirm", "boolean", "Required together with overwrite=true when the UID is already registered; explicit confirmation prevents silent reference redirection", false},
 };
 
 const std::vector<ParamSpec> kResourceImportParams = {
@@ -430,7 +432,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
 {"resource_save action=save name=path dest_path=res://curves/path.tres"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "resource_uid_set",
-      "Assign a UID to a resource file so it can be referenced as uid://<id>, the counterpart of resource_query action='uid' (WritesFile, no confirmation). action='set_uid' requires path; uid is optional and auto-generated when omitted. Triggers a filesystem reimport so the assignment persists. Returns the UID that was applied. Example: {\"action\": \"set_uid\", \"path\": \"res://data/config.tres\"}.",
+      "Assign a UID to a resource file so it can be referenced as uid://<id>, the counterpart of resource_query action='uid' (WritesFile, confirmation required for reassignment). action='set_uid' requires path; uid is optional and auto-generated when omitted. If UID is already registered, overwrite=true and confirm=true are both required; the response previews old path, new path and affected references. Reference scanning fails closed when truncated. Mapping and .uid sidecar are written through a journaled transaction and restored on failure. Example: {\"action\": \"set_uid\", \"path\": \"res://data/config.tres\"}.",
       "Resources", {"resource", "uid", "set", "set_resource_uid"}, SideEffect::WritesFile, tool_flags::kMutating,
       kSetResourceUidParams, resource_ops::handle_uid_set_action,
       schema::build_action_schema(

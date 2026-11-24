@@ -1585,6 +1585,9 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
   const auto *it_overwrite = args.Find("overwrite");
   const bool overwrite = it_overwrite != nullptr && it_overwrite->IsBool() &&
                          it_overwrite->GetBool();
+  const auto *it_confirm = args.Find("confirm");
+  const bool confirm = it_confirm != nullptr && it_confirm->IsBool() &&
+                       it_confirm->GetBool();
   const bool already_registered = uid_svc->has_id(uid);
   const resource_ops_detail::UidVerdict verdict =
       resource_ops_detail::validate_uid_assignment(explicit_uid, uid,
@@ -1594,16 +1597,149 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
         ? "uid must be a positive integer"
         : "uid already registered; pass overwrite=true to reassign it");
   }
+
+  const godot::String uid_text_value = uid_svc->id_to_text(uid);
+  const std::string uid_text = util::to_std(uid_text_value);
+  if (uid_text.empty()) {
+    return util::error_json("failed to convert uid " + std::to_string(uid) +
+                            " to text");
+  }
+  const std::string old_path =
+      util::to_std(uid_svc->get_id_path(uid));
+  ResourceScanBudget ref_budget;
+  bool ref_truncated = false;
+  const mcp::JsonValue affected = collect_reference_hits_budget(
+      path, uid_text, std::string(), ref_budget, ref_truncated);
+  auto reassignment_error = [&](const std::string &code,
+                                const std::string &message) {
+    mcp::JsonValue e = util::error_json(message);
+    e["code"] = mcp::JsonValue(code);
+    e["uid"] = mcp::JsonValue(static_cast<int64_t>(uid));
+    e["old_path"] = mcp::JsonValue(old_path);
+    e["new_path"] = mcp::JsonValue(path);
+    e["affected_references"] = affected;
+    e["scan_truncated"] = mcp::JsonValue(ref_truncated);
+    return e;
+  };
+  const resource_ops_detail::UidReassignFailure failure =
+      resource_ops_detail::check_uid_reassign(overwrite, confirm,
+                                              already_registered,
+                                              ref_truncated);
+  if (failure == resource_ops_detail::UidReassignFailure::kScanTruncated) {
+    mcp::JsonValue e = reassignment_error(
+        "transaction_failed",
+        "uid reassignment aborted because the reference scan was truncated");
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] =
+        mcp::JsonValue(static_cast<int64_t>(ref_budget.files_listed));
+    lim["files_scanned"] =
+        mcp::JsonValue(static_cast<int64_t>(ref_budget.files_scanned));
+    lim["bytes_scanned"] =
+        mcp::JsonValue(static_cast<int64_t>(ref_budget.bytes_scanned));
+    if (!ref_budget.limit_reason.empty())
+      lim["reason"] = mcp::JsonValue(ref_budget.limit_reason);
+    e["scan_limit"] = std::move(lim);
+    return e;
+  }
+  if (failure ==
+      resource_ops_detail::UidReassignFailure::kRequiresOverwrite) {
+    return reassignment_error(
+        "target_conflict",
+        "uid " + uid_text + " is already assigned to another resource; pass "
+        "overwrite=true to reassign it");
+  }
+  if (failure ==
+      resource_ops_detail::UidReassignFailure::kConfirmationRequired) {
+    mcp::JsonValue e = reassignment_error(
+        "confirmation_required",
+        "reassigning an existing UID requires overwrite=true and confirm=true");
+    e["confirm_required"] = mcp::JsonValue(true);
+    return e;
+  }
+
   const godot::String path_gs = godot::String::utf8(path.c_str());
-  const bool added = verdict == resource_ops_detail::UidVerdict::kAcceptAdd;
-  if (added) {
-    uid_svc->add_id(uid, path_gs);
-  } else {
+  const std::string sidecar = path + ".uid";
+  const godot::String sidecar_gs = godot::String::utf8(sidecar.c_str());
+  const bool sidecar_exists = godot::FileAccess::file_exists(sidecar_gs);
+  std::string original_sidecar;
+  if (sidecar_exists) {
+    godot::Ref<godot::FileAccess> sidecar_file =
+        godot::FileAccess::open(sidecar_gs, godot::FileAccess::READ);
+    if (sidecar_file.is_null()) {
+      return reassignment_error("transaction_failed",
+                                "failed to open existing UID sidecar: " +
+                                    sidecar);
+    }
+    original_sidecar = util::to_std(sidecar_file->get_as_text());
+    const godot::Error read_error = sidecar_file->get_error();
+    sidecar_file->close();
+    if (read_error != godot::OK && read_error != godot::ERR_FILE_EOF) {
+      return reassignment_error("transaction_failed",
+                                "failed to read existing UID sidecar: " +
+                                    sidecar);
+    }
+  }
+
+  resource_fs::GodotFileTransactionFs file_system;
+  resource_fs::FileTransactionPlan sidecar_plan;
+  sidecar_plan.operations.push_back(
+      {resource_fs::FileTransactionKind::kWrite, {}, sidecar, uid_text, true,
+       true});
+  resource_fs::FileTransactionJournal sidecar_journal;
+  const resource_fs::FileTransactionResult sidecar_result =
+      resource_fs::commit_file_transaction(sidecar_plan, sidecar_journal,
+                                           file_system);
+  if (!sidecar_result.ok) {
+    mcp::JsonValue e = reassignment_error(sidecar_result.code,
+                                          sidecar_result.message);
+    if (!sidecar_result.compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : sidecar_result.compensation_errors)
+        compensation.PushBack(mcp::JsonValue(item));
+      e["compensation_errors"] = std::move(compensation);
+    }
+    return e;
+  }
+
+  if (already_registered) {
     uid_svc->set_id(uid, path_gs);
+  } else {
+    uid_svc->add_id(uid, path_gs);
   }
-  if (!uid_svc->has_id(uid)) {
-    return util::error_json("failed to assign uid " + std::to_string(uid));
+  if (uid_svc->get_id_path(uid) != path_gs) {
+    if (old_path.empty()) {
+      uid_svc->remove_id(uid);
+    } else {
+      uid_svc->set_id(uid, godot::String::utf8(old_path.c_str()));
+    }
+    std::vector<std::string> compensation_errors;
+    if (sidecar_exists) {
+      resource_fs::FileTransactionPlan restore_plan;
+      restore_plan.operations.push_back(
+          {resource_fs::FileTransactionKind::kWrite, {}, sidecar,
+           original_sidecar, true, true});
+      resource_fs::FileTransactionJournal restore_journal;
+      const resource_fs::FileTransactionResult restored =
+          resource_fs::commit_file_transaction(restore_plan, restore_journal,
+                                               file_system);
+      if (!restored.ok) compensation_errors.push_back(restored.message);
+    } else {
+      std::string remove_error;
+      if (!file_system.remove_file(sidecar, remove_error))
+        compensation_errors.push_back(remove_error);
+    }
+    mcp::JsonValue e = reassignment_error(
+        "transaction_failed", "failed to update ResourceUID mapping for " +
+                                  uid_text);
+    if (!compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : compensation_errors)
+        compensation.PushBack(mcp::JsonValue(item));
+      e["compensation_errors"] = std::move(compensation);
+    }
+    return e;
   }
+
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
@@ -1613,6 +1749,13 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<int64_t>(uid));
+  r["uid"] = mcp::JsonValue(static_cast<int64_t>(uid));
+  r["uid_text"] = mcp::JsonValue(uid_text);
+  r["old_path"] = mcp::JsonValue(old_path);
+  r["new_path"] = mcp::JsonValue(path);
+  r["affected_references"] = affected;
+  r["sidecar_written"] = mcp::JsonValue(sidecar);
+  r["scan_truncated"] = mcp::JsonValue(false);
   return r;
 }
 
