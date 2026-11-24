@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include "support/project_path_provider.hpp"
+
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
@@ -124,6 +126,7 @@ TEST(InputValidationHardening, ResourceUriPathNormalization) {
 }
 
 TEST(InputValidationHardening, TestDirPathUsesProjectNormalizer) {
+  godot_autopilot_test::ProjectPathProviderGuard provider;
   const auto traversal =
       godot_autopilot::util::normalize_project_path("res://tests/../../outside", false, true);
   EXPECT_FALSE(traversal.valid());
@@ -134,6 +137,7 @@ TEST(InputValidationHardening, TestDirPathUsesProjectNormalizer) {
 }
 
 TEST(InputValidationHardening, ThemeReadPathUsesProjectNormalizer) {
+  godot_autopilot_test::ProjectPathProviderGuard provider;
   const auto traversal = godot_autopilot::util::normalize_project_path(
       "res://themes/../../outside.tres", true, false);
   EXPECT_FALSE(traversal.valid());

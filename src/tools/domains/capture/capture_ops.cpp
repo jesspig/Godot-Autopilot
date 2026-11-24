@@ -431,8 +431,8 @@ bool path_is_inside_gda_captures(const std::string &path) {
       util::project_path_lexical(util::project_path_slashes(path), escaped);
   if (escaped || lexical.empty())
     return false;
-  return util::project_path_equal_prefix(
-      lexical, util::project_path_slashes(captures_root));
+  return util::project_path_resolve_status(lexical, captures_root) ==
+         util::ProjectPathResolveStatus::Inside;
 }
 
 std::string capture_save_stamp() {
