@@ -39,6 +39,7 @@
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -758,6 +759,15 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       }
       wait_ready = wait_p->GetBool();
     }
+    std::optional<int32_t> session_id;
+    if (auto *session_p = args.Find("session_id")) {
+      if (!session_p->IsInt() ||
+          session_p->GetInt() < std::numeric_limits<int32_t>::min() ||
+          session_p->GetInt() > std::numeric_limits<int32_t>::max()) {
+        return util::error_json("invalid parameter: session_id must be an integer");
+      }
+      session_id = static_cast<int32_t>(session_p->GetInt());
+    }
     int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
     if (auto *tp = args.Find("timeout_ms")) {
       if (tp->IsInt() && tp->GetInt() > 0)
@@ -805,7 +815,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
           "diff_image is only supported for target='editor'");
     }
     mcp::JsonValue captured = runtime_ops::handle_gda_send(
-        "capture", params, timeout_ms, false, wait_ready);
+        "capture", params, timeout_ms, false, wait_ready, session_id);
     mcp::JsonValue result =
         with_capture_save_options(std::move(captured), save_options);
     runtime_ops::append_runtime_degradation_hint(result);
@@ -1569,7 +1579,7 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
       "region",           "max_dimension", "scale",        "annotate",
       "annotate_nodes",   "annotate_nodes_max", "include_editor", "include_game",
       "timeout_ms",       "space",       "viewport",     "index",
-      "node_viewport"};
+      "node_viewport",    "session_id"};
   for (const auto &entry : args.GetObject()) {
     bool known = false;
     for (const char *key : kAllowed) {
@@ -1704,6 +1714,7 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     copy_optional(args, game_args, "annotate_nodes");
     copy_optional(args, game_args, "annotate_nodes_max");
     copy_optional(args, game_args, "timeout_ms");
+    copy_optional(args, game_args, "session_id");
     inner["game_capture"] = unwrap_subcall_section(runtime_ops::handle_game_capture(game_args), true);
   }
   if (!nodes_param) {

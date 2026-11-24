@@ -30,6 +30,7 @@ const std::vector<ParamSpec> kCaptureEditorViewportParams = {
     {"annotate", "boolean", "Applies to both targets: when true the output image is annotated with numbered red boxes around UI controls and the result gains an elements array of {id, path, type, text, position, size} in final-image pixels whose ids match the box numbers (text is omitted when empty, elements_truncated marks a 200-element cap); the editor target marks editor UI controls (window-level controls with space='window'), while target='game' marks Controls of the running game, annotated inside the game process (default: false)", false},
     {"annotate_nodes", "array", "Applies to both targets: array of 1-50 scene node path strings to mark with numbered blue boxes (ids count independently from the red UI-control annotate boxes, starting at 1); the editor target resolves edited-scene paths while target='game' forwards the list for the game process to resolve absolute game paths; the result gains a node_elements array of {id, path, type, ok, position, size, visible, behind?, error?} in final-image pixels (one entry per input path, per-item failures carry ok:false plus error instead of failing the call; behind marks 3D nodes behind the camera; visible:false marks skipped boxes) plus node_truncated when the shared 200-box drawing budget with annotate is exceeded; single-item errors: node not found, unsupported node type, viewport incompatible (default: absent = disabled)", false},
     {"annotate_nodes_max", "integer", "Optional self-imposed tighter cap (1-50, default: 50) on annotate_nodes length; the call fails when annotate_nodes holds more entries (default: absent = 50-entry server cap)", false},
+    {"session_id", "integer", "Only for target='game': target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"wait_ready", "boolean", "Only for target='game': wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
@@ -42,6 +43,7 @@ const std::vector<ParamSpec> kReviewSceneVisuallyParams = {
     {"annotate_nodes_max", "integer", "Tighter self-imposed cap on annotate_nodes length (1-50)", false},
     {"include_editor", "boolean", "Include the editor capture section (default: true); false returns skipped", false},
     {"include_game", "boolean", "Include the game capture section over the runtime channel (default: true); false returns skipped; game not running returns a per-section error", false},
+    {"session_id", "integer", "Target game debugger session ID for the game capture section; required when multiple sessions are ready", false},
     {"timeout_ms", "integer", "Positive timeout bounding only the game capture (default: 5000)", false},
     {"space", "string", "Editor capture space: 'viewport' (default) or 'window'", false},
     {"viewport", "string", "Editor mapping viewport: '2d' (default) or '3d'", false},
@@ -69,7 +71,7 @@ mcp::JsonValue capture_game_alias_validate(const mcp::JsonValue &args) {
                            "max_dimension",     "annotate",
                            "after_frames",      "when",
                            "scale",             "annotate_nodes",
-                           "annotate_nodes_max", "wait_ready",
+                           "annotate_nodes_max", "wait_ready", "session_id",
                            "save",              "save_dir",
                            "confirm"};
   if (args.IsObject()) {

@@ -28,6 +28,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -83,8 +84,10 @@ struct PendingRequest {
   JV response;
   std::string op;
   std::string payload;
+  std::optional<int32_t> requested_session_id;
   int32_t session_id = -1;
   int32_t session_count = 0;
+  bool suppress_error_breaks = false;
   bool error_breaks_suppressed = false;
   bool awaiting_ready = false;
   int64_t responses_received = 0;
@@ -194,10 +197,12 @@ void erase_pending(int64_t request_id,
     g_pending.erase(it);
 }
 
-std::shared_ptr<PendingRequest> create_pending_request(int64_t request_id,
-                                                       const std::string &op) {
+std::shared_ptr<PendingRequest> create_pending_request(
+    int64_t request_id, const std::string &op,
+    std::optional<int32_t> requested_session_id) {
   auto pending = std::make_shared<PendingRequest>();
   pending->op = op;
+  pending->requested_session_id = requested_session_id;
   pending->error_responses_at_dispatch = g_game_error_responses.load();
   {
     std::lock_guard<std::mutex> lock(g_pending_mtx);
@@ -276,20 +281,47 @@ void cancel_all_pending(const std::string &reason) {
     restore_error_breaks();
 }
 
-JV send_request(int64_t request_id, const std::string &op, const JV &params,
-                bool suppress_error_breaks, bool wait_ready,
-                const std::shared_ptr<PendingRequest> &pending) {
-  if (!debugger_capture_initialized()) {
-    erase_pending(request_id, pending);
-    return error_json("debugger capture plugin not initialized");
+JV session_selection_error(const std::string &code, const std::string &message,
+                           const std::vector<int32_t> &session_ids) {
+  JV error = error_json(message);
+  error["code"] = JV(code);
+  error["retryable"] = JV(false);
+  JV ids(JV::array_tag);
+  for (int32_t session_id : session_ids) {
+    ids.PushBack(JV(static_cast<int64_t>(session_id)));
   }
+  error["session_ids"] = std::move(ids);
+  return error;
+}
 
+JV fail_pending_request(int64_t request_id,
+                        const std::shared_ptr<PendingRequest> &pending,
+                        JV error) {
+  bool release_error_breaks = false;
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    pending->state = PendingRequest::State::Cancelled;
+    release_error_breaks = pending->error_breaks_suppressed;
+    pending->error_breaks_suppressed = false;
+  }
+  pending->cv.notify_all();
+  erase_pending(request_id, pending);
+  if (release_error_breaks)
+    restore_error_breaks();
+  return error;
+}
+
+bool send_pending_to_session(int64_t request_id, const std::string &op,
+                             const std::string &payload, int32_t session_id,
+                             bool suppress_error_breaks,
+                             const std::shared_ptr<PendingRequest> &pending) {
   {
     std::lock_guard<std::mutex> lock(pending->mtx);
     if (pending->state != PendingRequest::State::Waiting)
-      return error_json("game request was abandoned before dispatch");
+      return false;
+    pending->session_id = session_id;
+    pending->session_count = 1;
   }
-
   if (suppress_error_breaks) {
     suppress_error_breaks_for_eval();
     bool abandoned = false;
@@ -300,9 +332,70 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
         pending->error_breaks_suppressed = true;
     }
     if (abandoned) {
+      {
+        std::lock_guard<std::mutex> lock(pending->mtx);
+        pending->session_id = -1;
+        pending->session_count = 0;
+      }
       restore_error_breaks();
-      return error_json("game request was abandoned before dispatch");
+      return false;
     }
+  }
+  if (!debugger_send_request(payload, session_id)) {
+    bool release_error_breaks = false;
+    {
+      std::lock_guard<std::mutex> lock(pending->mtx);
+      pending->session_id = -1;
+      pending->session_count = 0;
+      release_error_breaks = pending->error_breaks_suppressed;
+      pending->error_breaks_suppressed = false;
+    }
+    if (release_error_breaks)
+      restore_error_breaks();
+    return false;
+  }
+  record_sent_request(request_id, op);
+  return true;
+}
+
+JV queue_pending_for_ready(int64_t request_id, const std::string &op,
+                           const std::string &payload,
+                           bool suppress_error_breaks,
+                           const std::shared_ptr<PendingRequest> &pending) {
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    pending->payload = payload;
+    pending->awaiting_ready = true;
+    pending->suppress_error_breaks = suppress_error_breaks;
+  }
+  LogSystem::instance().log(
+      LogLevel::Info, LogCategory::Transport,
+      "game op \"" + op +
+          "\" queued until the game process reports gda:ready "
+          "(request_id " +
+          std::to_string(request_id) + ")");
+  JV queued(JV::object_tag);
+  queued["request_id"] = JV(request_id);
+  queued["result"] = JV("sent");
+  queued["queued_for_ready"] = JV(true);
+  return queued;
+}
+
+JV send_request(int64_t request_id, const std::string &op, const JV &params,
+                bool suppress_error_breaks, bool wait_ready,
+                 std::optional<int32_t> requested_session_id,
+                const std::shared_ptr<PendingRequest> &pending) {
+  if (!debugger_capture_initialized()) {
+    return fail_pending_request(
+        request_id, pending, error_json("debugger capture plugin not initialized"));
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    if (pending->state != PendingRequest::State::Waiting)
+      return fail_pending_request(
+          request_id, pending,
+          error_json("game request was abandoned before dispatch"));
   }
 
   JV payload(JV::object_tag);
@@ -311,10 +404,60 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
   payload[GDA_FIELD_PARAMS] = params;
 
   const std::string payload_text = payload.Dump();
+  const auto active_sessions = debugger_active_session_ids();
+  const auto ready_sessions = debugger_request_ready_session_ids();
+  const SessionSelectionResult selection =
+      select_game_session(ready_sessions, active_sessions, requested_session_id);
+  if (selection.kind == SessionSelection::Ambiguous) {
+    std::string ready_text;
+    for (int32_t session_id : ready_sessions) {
+      if (!ready_text.empty())
+        ready_text += ", ";
+      ready_text += std::to_string(session_id);
+    }
+    return fail_pending_request(
+        request_id, pending,
+        session_selection_error(
+            "ambiguous_session",
+            "multiple game sessions are ready; pass session_id to select one "
+            "of " +
+                ready_text,
+            ready_sessions));
+  }
+  if (selection.kind == SessionSelection::InvalidSession) {
+    return fail_pending_request(
+        request_id, pending,
+        session_selection_error(
+            "invalid_session",
+            "game session_id " + std::to_string(*requested_session_id) +
+                " is not active",
+            active_sessions));
+  }
+  if (selection.kind == SessionSelection::Selected) {
+    if (!send_pending_to_session(request_id, op, payload_text,
+                                 selection.session_id, suppress_error_breaks,
+                                 pending)) {
+      JV error = error_json("failed to send game request to session " +
+                            std::to_string(selection.session_id));
+      error["code"] = JV("send_failed");
+      error["retryable"] = JV(false);
+      return fail_pending_request(request_id, pending, std::move(error));
+    }
+    JV result(JV::object_tag);
+    result["request_id"] = JV(request_id);
+    result["result"] = JV("sent");
+    result["session_id"] = JV(static_cast<int64_t>(selection.session_id));
+    return result;
+  }
+
   const ReadyDecision ready_decision =
-      decide_game_request(debugger_ready_session_count(),
-                          debugger_scene_ready_session_count(),
-                          debugger_active_session_count(), wait_ready);
+      selection.kind == SessionSelection::NotReady
+          ? (wait_ready ? ReadyDecision::QueueForReady
+                        : ReadyDecision::FailNotReady)
+          : decide_game_request(
+                static_cast<int>(ready_sessions.size()),
+                static_cast<int>(ready_sessions.size()),
+                static_cast<int>(active_sessions.size()), wait_ready);
   bool editor_playing_scene = false;
   if (ready_decision == ReadyDecision::FailNotRunning && wait_ready) {
     if (auto *editor = godot::EditorInterface::get_singleton())
@@ -322,100 +465,41 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
   }
   if (should_queue_for_ready(ready_decision, wait_ready,
                              editor_playing_scene)) {
-    {
-      std::lock_guard<std::mutex> lock(pending->mtx);
-      pending->payload = payload_text;
-      pending->awaiting_ready = true;
-    }
-    LogSystem::instance().log(
-        LogLevel::Info, LogCategory::Transport,
-        "game op \"" + op +
-            "\" queued until the game process reports gda:ready "
-            "(request_id " +
-            std::to_string(request_id) + ")");
-    JV queued(JV::object_tag);
-    queued["request_id"] = JV(request_id);
-    queued["result"] = JV("sent");
-    queued["queued_for_ready"] = JV(true);
-    return queued;
+    return queue_pending_for_ready(request_id, op, payload_text,
+                                   suppress_error_breaks, pending);
   }
-  int32_t used_session_id = -1;
-  int32_t session_count = 0;
-  if (!debugger_broadcast_request(payload_text, &used_session_id,
-                                  &session_count)) {
-    bool release_error_breaks = false;
-    const ReadyDecision decision =
-        decide_game_request(debugger_ready_session_count(),
-                            debugger_scene_ready_session_count(),
-                            debugger_active_session_count(), wait_ready);
-    if (decision == ReadyDecision::SendNow ||
-        decision == ReadyDecision::QueueForReady) {
-      {
-        std::lock_guard<std::mutex> lock(pending->mtx);
-        pending->payload = payload_text;
-        pending->awaiting_ready = true;
-      }
-      LogSystem::instance().log(
-          LogLevel::Info, LogCategory::Transport,
-          "game op \"" + op +
-              "\" queued until the game process reports gda:ready "
-              "(request_id " +
-              std::to_string(request_id) + ")");
-      JV queued(JV::object_tag);
-      queued["request_id"] = JV(request_id);
-      queued["result"] = JV("sent");
-      queued["queued_for_ready"] = JV(true);
-      return queued;
-    }
-    {
-      std::lock_guard<std::mutex> lock(pending->mtx);
-      pending->state = PendingRequest::State::Cancelled;
-      release_error_breaks = pending->error_breaks_suppressed;
-      pending->error_breaks_suppressed = false;
-    }
-    erase_pending(request_id, pending);
-    if (release_error_breaks)
-      restore_error_breaks();
-    if (decision == ReadyDecision::FailNotRunning) {
-      return error_json("game not running: no game process is attached — start "
-                        "the game from the editor first (play the scene), then "
-                        "retry; if the game was just started, wait a moment for "
-                        "it to report ready");
-    }
-    return error_json(
-        "game started but not ready: the game process has not reported gda "
-        "ready yet — wait a moment after play, or verify the "
-        "game project loads the godot-autopilot extension");
+  if (ready_decision == ReadyDecision::FailNotRunning) {
+    return fail_pending_request(
+        request_id, pending,
+        error_json("game not running: no game process is attached — start "
+                   "the game from the editor first (play the scene), then "
+                   "retry; if the game was just started, wait a moment for "
+                   "it to report ready"));
   }
-
-  {
-    std::lock_guard<std::mutex> lock(pending->mtx);
-    pending->session_id = used_session_id;
-    pending->session_count = session_count;
-  }
-  record_sent_request(request_id, op);
-
-  JV r(JV::object_tag);
-  r["request_id"] = JV(request_id);
-  r["result"] = JV("sent");
-  return r;
+  return fail_pending_request(
+      request_id, pending,
+      error_json(
+          "game started but not ready: the game process has not reported gda "
+          "ready yet — wait a moment after play, or verify the "
+          "game project loads the godot-autopilot extension"));
 }
 
 JV dispatch_game_request(int64_t request_id, const std::string &op,
                          const JV &params, bool suppress_error_breaks,
-                         bool wait_ready) {
+                         bool wait_ready,
+                         std::optional<int32_t> requested_session_id) {
   CommandQueue *queue = current_editor_queue();
   if (!queue)
     return error_json("editor command queue not initialized");
-  auto pending = create_pending_request(request_id, op);
+  auto pending = create_pending_request(request_id, op, requested_session_id);
   auto state = std::make_shared<MainThreadTaskState>();
   const std::string label = "game request \"" + op + "\"";
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
       *queue, label, state,
       [state, pending, request_id, op, params, suppress_error_breaks,
-       wait_ready](MainThreadTaskState &st) {
+       wait_ready, requested_session_id](MainThreadTaskState &st) {
         st.result = send_request(request_id, op, params, suppress_error_breaks,
-                                  wait_ready, pending);
+                                  wait_ready, requested_session_id, pending);
       },
       GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
@@ -499,15 +583,13 @@ JV read_capture_file(const mcp::JsonValue &pending_result,
 }
 
 void send_timeout_recovery(int32_t session_id, int64_t request_id) {
-  if (session_id >= 0)
+  if (session_id >= 0) {
     debugger_send_cancel(session_id, request_id);
-  if (debugger_breaked_session_ids().empty())
-    return;
-  debugger_broadcast_engine_command(godot::String("continue"), godot::Array());
-  LogSystem::instance().log(
-      LogLevel::Info, LogCategory::Transport,
-      "engine continue sent after game op timeout (request_id " +
-          std::to_string(request_id) + ")");
+    const auto breaked = debugger_breaked_session_ids();
+    if (std::find(breaked.begin(), breaked.end(), session_id) != breaked.end()) {
+      debugger_continue_session(session_id);
+    }
+  }
 }
 
 void schedule_timeout_recovery(int32_t session_id, int64_t request_id) {
@@ -630,6 +712,18 @@ int64_t GameJobTable::register_job(int64_t request_id, const std::string &op,
   job.timeout_ms = timeout_ms;
   jobs.emplace(job.job_id, std::move(job));
   return next_id++;
+}
+
+bool GameJobTable::bind_request(int64_t job_id, int64_t request_id) {
+  auto it = jobs.find(job_id);
+  if (it == jobs.end())
+    return false;
+  it->second.request_id = request_id;
+  return true;
+}
+
+bool GameJobTable::release_job(int64_t job_id) {
+  return jobs.erase(job_id) != 0;
 }
 
 bool GameJobTable::contains(int64_t job_id) const {
@@ -823,6 +917,8 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
       }
     }
     JV error = error_json(error_text);
+    if (auto *code = response.Find("code"))
+      error["code"] = *code;
     if (auto *se = response.Find("structured_error"))
       error["structured_error"] = *se;
     if (auto *dg = response.Find("diagnosis"))
@@ -981,10 +1077,11 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
 mcp::JsonValue start_pending_op(const std::string &op,
                                 const mcp::JsonValue &params,
                                 bool suppress_error_breaks,
-                                int64_t *out_request_id, bool wait_ready) {
+                                int64_t *out_request_id, bool wait_ready,
+                                 std::optional<int32_t> session_id) {
   int64_t request_id = g_next_request_id.fetch_add(1);
   JV result = dispatch_game_request(request_id, op, params, suppress_error_breaks,
-                                    wait_ready);
+                                    wait_ready, session_id);
   if (result.Contains("error"))
     return result;
   if (out_request_id)
@@ -1085,10 +1182,11 @@ void maybe_recover_break() {
 
 mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params, int64_t timeout_ms,
-                               bool suppress_error_breaks, bool wait_ready) {
+                               bool suppress_error_breaks, bool wait_ready,
+                                std::optional<int32_t> session_id) {
   int64_t request_id = g_next_request_id.fetch_add(1);
   JV result = dispatch_game_request(request_id, op, params, suppress_error_breaks,
-                                    wait_ready);
+                                    wait_ready, session_id);
   if (result.Contains("error"))
     return result;
   int64_t effective_timeout_ms = timeout_ms;
@@ -1107,7 +1205,8 @@ void run_channel_self_check(int32_t p_session_id) {
   constexpr size_t ERROR_PREVIEW_CHARS = 256;
   auto started = std::chrono::steady_clock::now();
   JV pending =
-      handle_gda_send("status", JV(JV::object_tag), SELF_CHECK_TIMEOUT_MS);
+      handle_gda_send("status", JV(JV::object_tag), SELF_CHECK_TIMEOUT_MS,
+                      false, true, p_session_id);
   if (pending.Contains("error")) {
     LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
                               "runtime channel self-check failed to send: " +
@@ -1164,6 +1263,8 @@ void on_session_ready(int32_t session_id) {
     int64_t request_id = 0;
     std::string op;
     std::string payload;
+    std::optional<int32_t> requested_session_id;
+    bool suppress_error_breaks = false;
   };
   std::vector<ReplayItem> replay_items;
   {
@@ -1174,12 +1275,16 @@ void on_session_ready(int32_t session_id) {
       if (!pending->awaiting_ready ||
           pending->state != PendingRequest::State::Waiting)
         continue;
-      pending->awaiting_ready = false;
+      if (pending->requested_session_id.has_value() &&
+          *pending->requested_session_id != session_id)
+        continue;
       ReplayItem item;
       item.pending = pending;
       item.request_id = entry.first;
       item.op = pending->op;
       item.payload = pending->payload;
+      item.requested_session_id = pending->requested_session_id;
+      item.suppress_error_breaks = pending->suppress_error_breaks;
       replay_items.push_back(std::move(item));
     }
   }
@@ -1190,27 +1295,53 @@ void on_session_ready(int32_t session_id) {
       "gda:ready received (session " + std::to_string(session_id) + "): " +
           std::to_string(replay_items.size()) +
           " queued game op(s) to replay");
+  const auto active_sessions = debugger_active_session_ids();
+  const auto ready_sessions = debugger_request_ready_session_ids();
   for (ReplayItem &item : replay_items) {
-    int32_t used_session_id = -1;
-    int32_t session_count = 0;
-    if (debugger_broadcast_request(item.payload, &used_session_id,
-                                   &session_count)) {
+    const SessionSelectionResult selection = select_game_session(
+        ready_sessions, active_sessions, item.requested_session_id);
+    if (selection.kind == SessionSelection::Ambiguous) {
+      JV error = session_selection_error(
+          "ambiguous_session",
+          "multiple game sessions became ready; pass session_id to select one",
+          ready_sessions);
       {
         std::lock_guard<std::mutex> lock(item.pending->mtx);
-        item.pending->session_id = used_session_id;
-        item.pending->session_count = session_count;
+        item.pending->state = PendingRequest::State::Completed;
+        item.pending->response = std::move(error);
       }
-      record_sent_request(item.request_id, item.op);
+      item.pending->cv.notify_all();
+      continue;
+    }
+    if (selection.kind == SessionSelection::InvalidSession) {
+      JV error = session_selection_error(
+          "invalid_session",
+          "game session_id " + std::to_string(*item.requested_session_id) +
+              " is no longer active",
+          active_sessions);
+      {
+        std::lock_guard<std::mutex> lock(item.pending->mtx);
+        item.pending->state = PendingRequest::State::Completed;
+        item.pending->response = std::move(error);
+      }
+      item.pending->cv.notify_all();
+      continue;
+    }
+    if (selection.kind != SessionSelection::Selected)
+      continue;
+    if (send_pending_to_session(item.request_id, item.op, item.payload,
+                                selection.session_id,
+                                item.suppress_error_breaks, item.pending)) {
+      {
+        std::lock_guard<std::mutex> lock(item.pending->mtx);
+        item.pending->awaiting_ready = false;
+      }
       LogSystem::instance().log(
           LogLevel::Info, LogCategory::Transport,
           "queued game op \"" + item.op + "\" replayed after gda:ready " +
               "(request_id " + std::to_string(item.request_id) +
-              ", session " + std::to_string(used_session_id) + ")");
+              ", session " + std::to_string(selection.session_id) + ")");
       continue;
-    }
-    {
-      std::lock_guard<std::mutex> lock(item.pending->mtx);
-      item.pending->awaiting_ready = true;
     }
     LogSystem::instance().log(
         LogLevel::Warning, LogCategory::Transport,
