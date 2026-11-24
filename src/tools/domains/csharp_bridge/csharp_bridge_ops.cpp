@@ -7,6 +7,7 @@
 #include "runtime/gda_protocol.hpp"
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_base.hpp"
+#include "util/csharp_project_probe.hpp"
 #include "util/error_util.hpp"
 #include "util/input_guards.hpp"
 #include "util/scene_path.hpp"
@@ -33,6 +34,28 @@ namespace csharp_bridge_ops {
 namespace {
 
 using JV = mcp::JsonValue;
+
+namespace {
+
+JV missing_bridge_error(const std::string &message) {
+  JV err = util::error_json(message);
+  const auto probe = csharp_project_probe::probe();
+  const std::string code = probe.reason == "csharp_script_not_compiled"
+                               ? "csharp_script_not_compiled"
+                               : "missing_csharp_runtime";
+  err["code"] = JV(code);
+  err["structured_error"] = JV(mcp::JsonValue::object_tag);
+  (*err.Find("structured_error"))["code"] = JV(code);
+  (*err.Find("structured_error"))["reason"] = JV(probe.reason);
+  err["next_action"] = JV(
+      "gda call update_autoloads --args '{\"action\":\"add\","
+      "\"name\":\"GdaCSharpRuntime\","
+      "\"path\":\"res://addons/godot-autopilot/GdaCSharpRuntime.cs\","
+      "\"enabled\":true}'");
+  return err;
+}
+
+} // namespace
 
 constexpr const char *kBridgeSingleton = "GdaCSharpBridge";
 constexpr const char *kBridgeScriptPath =
@@ -321,7 +344,7 @@ bool fetch_editor_bridge(godot::Object *&out_bridge,
     script = loader->load(godot::String(kBridgeScriptPath));
   }
   if (script.is_null()) {
-    err = util::error_json(
+    err = missing_bridge_error(
         "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a "
         ".NET editor build with the bridge registered via "
         "Engine.register_singleton, then retry");
@@ -329,7 +352,7 @@ bool fetch_editor_bridge(godot::Object *&out_bridge,
   }
   godot::Variant instance = script->call(godot::StringName("new"));
   if (instance.get_type() == godot::Variant::NIL) {
-    err = util::error_json(
+    err = missing_bridge_error(
         "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a "
         ".NET editor build with the bridge registered via "
         "Engine.register_singleton, then retry");
@@ -337,7 +360,7 @@ bool fetch_editor_bridge(godot::Object *&out_bridge,
   }
   godot::Object *obj = instance;
   if (!obj) {
-    err = util::error_json(
+    err = missing_bridge_error(
         "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a "
         ".NET editor build with the bridge registered via "
         "Engine.register_singleton, then retry");
@@ -497,7 +520,8 @@ std::string bridge_repair_source() {
 
 std::string emit_bridge_missing_return(const std::string &detail) {
   std::string s;
-  s += "return {\"ok\": false, \"error\": \"csharp bridge not found in the "
+  s += "return {\"ok\": false, \"code\": \"missing_csharp_runtime\", "
+       "\"error\": \"csharp bridge not found in the "
        "running game: " + detail + "\", \"suggested_action\": \"add the "
        "GdaCSharpRuntime bridge to the running game by executing the "
        "execute_game_script.source_code snippet (it loads "

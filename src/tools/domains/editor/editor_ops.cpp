@@ -27,6 +27,7 @@
 #include <godot_cpp/classes/editor_file_system_directory.hpp>
 #include <godot_cpp/classes/editor_inspector.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_settings.hpp>
 #include <godot_cpp/classes/editor_paths.hpp>
 #include <godot_cpp/classes/editor_selection.hpp>
 #include <godot_cpp/classes/editor_toaster.hpp>
@@ -695,6 +696,7 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
     const std::string saved_path = util::to_std(file_path);
     r["path"] = mcp::JsonValue(saved_path);
     r["result"] = mcp::JsonValue("saved");
+    r["disk_persisted"] = mcp::JsonValue(true);
     attach_save_receipt(r, args, root, saved_path);
     scene_dirty_tracker::clear_scene_modified();
   }
@@ -1136,8 +1138,19 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
     mcp::JsonValue a(mcp::JsonValue::object_tag);
     a["result"] = mcp::JsonValue("already_playing");
     a["is_playing"] = mcp::JsonValue(true);
+    a["autosaved"] = mcp::JsonValue(false);
+    a["disk_changed"] = mcp::JsonValue(false);
     return a;
   }
+  bool autosave_setting = true;
+  godot::Ref<godot::EditorSettings> settings = editor->get_editor_settings();
+  if (settings.is_valid()) {
+    const godot::Variant value =
+        settings->get_setting("run/auto_save/save_before_running");
+    if (value.get_type() == godot::Variant::BOOL)
+      autosave_setting = value.operator bool();
+  }
+  const bool had_unsaved = editor->get_unsaved_scenes().size() > 0;
   editor->play_current_scene();
   if (!editor->is_playing_scene()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -1146,9 +1159,19 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
         "current scene is saved and runnable");
     return startup_gated_error(editor_in_startup_window(), e);
   }
+  const bool autosaved = autosave_setting && had_unsaved;
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   r["is_playing"] = mcp::JsonValue(true);
+  r["autosaved"] = mcp::JsonValue(autosaved);
+  r["disk_changed"] = mcp::JsonValue(autosaved);
+  r["autosave_setting"] =
+      mcp::JsonValue(std::string("run/auto_save/save_before_running"));
+  if (autosaved) {
+    r["hint"] = mcp::JsonValue(
+        "Godot saved dirty scenes before running; remove temporary nodes and "
+        "call save_editor_scene to restore the disk state");
+  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "play_editor_current_scene completed");
   return r;
