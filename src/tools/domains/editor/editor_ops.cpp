@@ -1,7 +1,11 @@
 #include "tools/domains/editor/editor_ops.hpp"
+#include "tools/domains/editor/editor_safety.hpp"
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/domains/editor/save_write_receipt.hpp"
+#include "tools/domains/scene/scene_safety.hpp"
 #include "runtime/gda_protocol.hpp"
+#include "util/project_path.hpp"
+#include "util/resource_fs.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
 #include "core/config.hpp"
@@ -37,6 +41,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
@@ -761,10 +766,94 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
                                   scene_path);
     return e;
   }
+  godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
+  bool target_unsaved = false;
+  for (int i = 0; i < unsaved.size(); i++) {
+    if (same_scene_path(unsaved[i], target_path)) {
+      target_unsaved = true;
+      break;
+    }
+  }
+  const mcp::JsonValue *discard_p = args.Find("discard_unsaved");
+  const bool discard_unsaved = discard_p != nullptr && discard_p->IsBool() &&
+                               discard_p->GetBool();
+  const mcp::JsonValue *confirm_p = args.Find("confirm");
+  const bool confirm = confirm_p != nullptr && confirm_p->IsBool() &&
+                       confirm_p->GetBool();
+  if (editor_safety::check_reload_discard(target_unsaved, discard_unsaved,
+                                          confirm) !=
+      editor_safety::ReloadDiscardFailure::kNone) {
+    mcp::JsonValue e = util::error_json(
+        "scene has unsaved changes: " + unsaved_list_str(unsaved) +
+        " — pass discard_unsaved=true and confirm=true to reload and discard them");
+    e["code"] = mcp::JsonValue("confirmation_required");
+    e["confirm_required"] = mcp::JsonValue(true);
+    e["discard_required"] = mcp::JsonValue(true);
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (int i = 0; i < unsaved.size(); i++)
+      arr.PushBack(mcp::JsonValue(util::to_std(unsaved[i])));
+    e["unsaved_scenes"] = std::move(arr);
+    return e;
+  }
+  std::string snapshot_path;
+  std::string snapshot_error;
+  if (target_unsaved) {
+    auto *root = editor->get_edited_scene_root();
+    if (!root) {
+      snapshot_error = "no edited scene root available for snapshot";
+    } else {
+      godot::Ref<godot::PackedScene> snapshot;
+      snapshot.instantiate();
+      const godot::Error pack_error = snapshot->pack(root);
+      if (pack_error != godot::OK) {
+        snapshot_error = "failed to pack in-memory scene (error " +
+                         std::to_string(static_cast<int>(pack_error)) + ")";
+      } else {
+        const std::string name = util::to_std(root->get_name());
+        std::string safe_name;
+        for (char c : name) {
+          if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '_' || c == '-')
+            safe_name.push_back(c);
+          else
+            safe_name.push_back('_');
+        }
+        if (safe_name.empty())
+          safe_name = "scene";
+        const uint64_t serial = resource_fs::next_file_transaction_serial();
+        snapshot_path = "user://gda_reload_snapshots/" + safe_name + "-" +
+                        std::to_string(serial) + ".tscn";
+        std::string dir_created;
+        std::string dir_error;
+        auto *saver = godot::ResourceSaver::get_singleton();
+        if (!resource_fs::ensure_parent_directory(snapshot_path, dir_created,
+                                                  dir_error)) {
+          snapshot_error = dir_error;
+          snapshot_path.clear();
+        } else if (!saver) {
+          snapshot_error = "ResourceSaver not available";
+          snapshot_path.clear();
+        } else {
+          const godot::Error save_error = saver->save(
+              snapshot, godot::String::utf8(snapshot_path.c_str()));
+          if (save_error != godot::OK) {
+            snapshot_error = "failed to save snapshot (error " +
+                             std::to_string(static_cast<int>(save_error)) + ")";
+            snapshot_path.clear();
+          }
+        }
+      }
+    }
+  }
   editor->reload_scene_from_path(target_path);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("reloaded");
   r["scene_path"] = mcp::JsonValue(scene_path);
+  r["discarded_unsaved"] = mcp::JsonValue(target_unsaved);
+  if (!snapshot_path.empty())
+    r["snapshot_path"] = mcp::JsonValue(snapshot_path);
+  else if (!snapshot_error.empty())
+    r["snapshot_error"] = mcp::JsonValue(snapshot_error);
   auto *reloaded_root = editor->get_edited_scene_root();
   if (reloaded_root &&
       same_scene_path(reloaded_root->get_scene_file_path(), target_path)) {
@@ -1539,6 +1628,42 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
     return util::error_json("missing required parameter: path");
   }
   std::string path = pp->GetString();
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, false, false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "use a res:// path below the project root");
+  path = checked.value;
+  if (!scene_safety::is_scene_file(path))
+    return util::error_json("parameter 'path' must end with .tscn or .scn");
+  const mcp::JsonValue *overwrite_p = args.Find("overwrite");
+  const bool overwrite = overwrite_p != nullptr && overwrite_p->IsBool() &&
+                         overwrite_p->GetBool();
+  const mcp::JsonValue *confirm_p = args.Find("confirm");
+  const bool confirm = confirm_p != nullptr && confirm_p->IsBool() &&
+                       confirm_p->GetBool();
+  const bool existed = godot::FileAccess::file_exists(
+      godot::String::utf8(path.c_str()));
+  const editor_safety::SaveAsTargetFailure target_failure =
+      editor_safety::check_save_as_target(true, true, existed, overwrite,
+                                          confirm);
+  if (target_failure != editor_safety::SaveAsTargetFailure::kNone) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    if (target_failure == editor_safety::SaveAsTargetFailure::kTargetExists) {
+      e = util::error_json("target scene already exists: " + path +
+                           " — pass overwrite=true to replace it");
+      e["code"] = mcp::JsonValue("file_exists");
+    } else {
+      e = util::error_json(
+          "overwriting an existing scene requires overwrite=true and "
+          "confirm=true: " +
+          path);
+      e["code"] = mcp::JsonValue("confirmation_required");
+      e["confirm_required"] = mcp::JsonValue(true);
+    }
+    e["path"] = mcp::JsonValue(path);
+    return e;
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     return util::error_json("EditorInterface not available");
@@ -1548,15 +1673,13 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
     return util::error_json("no scene open");
   }
   godot::String path_gs(path.c_str());
-  if (path_gs.begins_with("res://")) {
-    godot::String dir = path_gs.get_base_dir();
-    if (!godot::DirAccess::dir_exists_absolute(dir)) {
-      godot::Error err = godot::DirAccess::make_dir_recursive_absolute(dir);
-      if (err != godot::Error::OK) {
-        return util::error_json("failed to create parent directory: " + util::to_std(dir) +
-                          " (error " + std::to_string(static_cast<int>(err)) +
-                          ")");
-      }
+  godot::String dir = path_gs.get_base_dir();
+  if (!godot::DirAccess::dir_exists_absolute(dir)) {
+    godot::Error err = godot::DirAccess::make_dir_recursive_absolute(dir);
+    if (err != godot::Error::OK) {
+      return util::error_json("failed to create parent directory: " +
+                        util::to_std(dir) + " (error " +
+                        std::to_string(static_cast<int>(err)) + ")");
     }
   }
   const editor_ops_detail::FileStamp before = editor_ops_detail::file_stamp(path);

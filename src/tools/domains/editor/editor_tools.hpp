@@ -61,14 +61,18 @@ const std::vector<ParamSpec> kEditorSceneControlParams = {
     {"timeout_ms", "integer", "create: maximum time in milliseconds to wait for the editor to observe the new scene root after add_root_node (default: 2000, min: 50, max: 30000); on timeout the call errors with waited_ms, timeout_ms, node_released and editor_state diagnostics", false},
     {"path", "string", "open: path to the scene file to open, e.g. 'res://game.tscn'; errors when the current scene has unsaved changes", false},
     {"reload_if_open", "boolean", "open: when the requested scene is already the edited scene, reload it from disk instead of short-circuiting (default: false); discards unsaved changes, so save first when needed", false},
-    {"scene_path", "string", "reload: scene file path to reload from disk, e.g. 'res://game.tscn'; when omitted the currently edited scene is reloaded. All unsaved changes are discarded without confirmation", false},
+    {"scene_path", "string", "reload: scene file path to reload from disk, e.g. 'res://game.tscn'; when omitted the currently edited scene is reloaded", false},
+    {"discard_unsaved", "boolean", "reload: explicit permission to discard unsaved changes in the target scene; required together with confirm=true when the scene has unsaved changes, otherwise reload is rejected with confirmation_required", false},
+    {"confirm", "boolean", "reload: explicit confirmation together with discard_unsaved=true that unsaved changes may be discarded; the in-memory scene is snapshotted to user:// before reload when possible", false},
 };
 
 const std::vector<std::string> kSaveEditorSceneActions = {"save", "save_as",
                                                            "save_all"};
 
 const std::vector<ParamSpec> kSaveEditorSceneParams = {
-    {"path", "string", "save_as: target file path for the save, e.g. 'res://levels/level1.tscn'; missing parent directories are created automatically", false},
+    {"path", "string", "save_as: target file path for the save; must normalize to a res:// path below the project root and end with .tscn or .scn; missing parent directories are created automatically", false},
+    {"overwrite", "boolean", "save_as: allow replacing an existing target file; without it an existing target is rejected with file_exists", false},
+    {"confirm", "boolean", "save_as: explicit confirmation, required together with overwrite=true when the target already exists", false},
     {"include_hash", "boolean", "save/save_as: attach FNV-1a structural hashes of the memory tree and the on-disk file (memory_hash/disk_hash), computed over the sorted node-path sets; off by default. Node paths only — properties, script references and file bytes do not participate, so attaching a script or changing properties leaves the hash unchanged while adding/removing nodes changes it; this is a structure check, not a content proof (read the file back to verify content; script writes carry their own content_hash over the read-back bytes)", false},
     {"include_paths", "boolean", "save/save_as: always attach the missing_paths list even when node counts match (default: attached only on mismatch)", false},
 };
@@ -287,7 +291,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
        "{\"action\":\"status\"}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "editor_scene_control",
-      "Control the editor scene lifecycle in one action tool. action='create' makes a new scene with a root of type/name (optional close_current, timeout_ms); action='open' opens path (optional reload_if_open); action='close' closes the current tab when it has no unsaved changes; action='reload' reloads the edited scene or scene_path from disk, discarding unsaved changes; action='play' launches the edited scene and reports result ok/already_playing with is_playing; action='stop' stops the running game. Every action modifies editor window state; read the follow-up state with get_editor_state.",
+      "Control the editor scene lifecycle in one action tool. action='create' makes a new scene with a root of type/name (optional close_current, timeout_ms); action='open' opens path (optional reload_if_open); action='close' closes the current tab when it has no unsaved changes; action='reload' reloads the edited scene or scene_path from disk; when the target has unsaved changes it requires discard_unsaved=true and confirm=true and snapshots the in-memory scene to user:// before reloading; action='play' launches the edited scene and reports result ok/already_playing with is_playing; action='stop' stops the running game. Every action modifies editor window state; read the follow-up state with get_editor_state.",
       "Editor", {"editor", "scene", "create", "open", "close", "reload", "play", "stop", "create_editor_scene", "open_editor_scene", "close_editor_scene", "reload_editor_scene", "play_editor_current_scene", "stop_editor_playing"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kEditorSceneControlParams, editor_ops::handle_editor_scene_control,
       schema::build_action_schema(kEditorSceneControlActions,
@@ -329,7 +333,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
        "{\"action\":\"play\"}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "save_editor_scene",
-      "Save editor scenes to disk in one action tool. action='save' (the default when action is omitted, preserving the old call shape) saves the edited scene and attaches the memory/disk receipt (optional include_hash, include_paths); a scene without a file path is written to res://<root>.tscn with a note; action='save_as' writes to path and reports saved/tab_path_registered plus the same receipt; action='save_all' saves every open scene tab. All actions write files; the result carries the on-disk receipt.",
+      "Save editor scenes to disk in one action tool. action='save' (the default when action is omitted, preserving the old call shape) saves the edited scene and attaches the memory/disk receipt (optional include_hash, include_paths); a scene without a file path is written to res://<root>.tscn with a note; action='save_as' normalizes path to a res:// scene path, requires overwrite=true and confirm=true when the target exists, and reports saved/tab_path_registered plus the same receipt; action='save_all' saves every open scene tab. All actions write files; the result carries the on-disk receipt.",
       "Editor", {"editor", "scene", "save", "save_as", "save_all", "save_editor_scene_as", "save_editor_scenes"}, SideEffect::WritesFile, tool_flags::kMutating,
       kSaveEditorSceneParams, editor_ops::handle_editor_save,
       editor_optional_action_schema(kSaveEditorSceneActions,

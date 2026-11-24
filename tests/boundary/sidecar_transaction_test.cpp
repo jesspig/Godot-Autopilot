@@ -2,33 +2,44 @@
 
 #include <gtest/gtest.h>
 
-#include <vector>
+using godot_autopilot::resource_ops_detail::ResourceScanBudget;
+using godot_autopilot::resource_ops_detail::scan_must_abort;
 
-using godot_autopilot::resource_ops_detail::rollback_order;
-using godot_autopilot::resource_ops_detail::SidecarKind;
-using godot_autopilot::resource_ops_detail::SidecarMove;
-
-TEST(SidecarTransactionTest, RollbackIsReverseOfMoves) {
-  std::vector<SidecarMove> moves = {
-      {SidecarKind::kUid, true},
-      {SidecarKind::kImport, true},
-  };
-  const auto order = rollback_order(moves);
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], SidecarKind::kImport);
-  EXPECT_EQ(order[1], SidecarKind::kUid);
+TEST(SidecarTransactionTest, FileCountLimitFailsClosed) {
+  ResourceScanBudget budget;
+  budget.files_listed = godot_autopilot::GDA_SCAN_MAX_FILES;
+  EXPECT_TRUE(budget.hit_limit(0, 0));
+  EXPECT_TRUE(budget.truncated);
+  EXPECT_TRUE(scan_must_abort(budget, false));
+  EXPECT_EQ(budget.limit_reason, "file_count");
 }
 
-TEST(SidecarTransactionTest, UnmovedSidecarsAreSkipped) {
-  std::vector<SidecarMove> moves = {
-      {SidecarKind::kUid, false},
-      {SidecarKind::kImport, true},
-  };
-  const auto order = rollback_order(moves);
-  ASSERT_EQ(order.size(), 1u);
-  EXPECT_EQ(order[0], SidecarKind::kImport);
+TEST(SidecarTransactionTest, SingleFileLimitFailsClosed) {
+  ResourceScanBudget budget;
+  EXPECT_TRUE(budget.hit_limit(godot_autopilot::GDA_SCAN_MAX_FILE_BYTES + 1, 0));
+  EXPECT_TRUE(budget.truncated);
+  EXPECT_TRUE(scan_must_abort(budget, false));
+  EXPECT_EQ(budget.limit_reason, "single_file_bytes");
 }
 
-TEST(SidecarTransactionTest, EmptyMovesYieldNoRollback) {
-  EXPECT_TRUE(rollback_order({}).empty());
+TEST(SidecarTransactionTest, TotalBytesLimitFailsClosed) {
+  ResourceScanBudget budget;
+  budget.bytes_scanned = godot_autopilot::GDA_SCAN_MAX_TOTAL_BYTES;
+  EXPECT_TRUE(budget.hit_limit(1, 0));
+  EXPECT_TRUE(budget.truncated);
+  EXPECT_TRUE(scan_must_abort(budget, false));
+  EXPECT_EQ(budget.limit_reason, "total_bytes");
+}
+
+TEST(SidecarTransactionTest, DepthLimitFailsClosed) {
+  ResourceScanBudget budget;
+  EXPECT_TRUE(budget.hit_limit(0, godot_autopilot::GDA_SCAN_MAX_DEPTH + 1));
+  EXPECT_TRUE(budget.truncated);
+  EXPECT_TRUE(scan_must_abort(budget, false));
+  EXPECT_EQ(budget.limit_reason, "directory_depth");
+}
+
+TEST(SidecarTransactionTest, ExplicitTruncationAlwaysAborts) {
+  EXPECT_TRUE(scan_must_abort(ResourceScanBudget(), true));
+  EXPECT_FALSE(scan_must_abort(ResourceScanBudget(), false));
 }

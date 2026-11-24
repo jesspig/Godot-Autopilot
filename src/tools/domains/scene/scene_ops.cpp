@@ -1,6 +1,8 @@
 #include "tools/domains/scene/scene_ops.hpp"
 #include "tools/domains/scene/reparent_undo_order.hpp"
+#include "tools/domains/scene/scene_safety.hpp"
 #include "tools/domains/scene/scene_spec_ops.hpp"
+#include "util/resource_fs.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
 #include "util/project_path.hpp"
@@ -515,6 +517,46 @@ mcp::JsonValue replace_scene_node_impl(const mcp::JsonValue &args,
   const std::string old_name = util::to_std(node->get_name());
   const std::string old_path = scene_relative_path(node, scene_root);
   const std::string old_type = util::to_std(node->get_class());
+  std::string backup_name;
+  for (char c : old_name) {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+        (c >= '0' && c <= '9') || c == '_' || c == '-')
+      backup_name.push_back(c);
+    else
+      backup_name.push_back('_');
+  }
+  if (backup_name.empty())
+    backup_name = "node";
+  const uint64_t serial = resource_fs::next_file_transaction_serial();
+  const std::string backup_path =
+      "user://gda_replace_backups/" + backup_name + "-" +
+      std::to_string(serial) + ".tscn";
+  std::string backup_dir_created;
+  std::string backup_dir_error;
+  if (!resource_fs::ensure_parent_directory(backup_path, backup_dir_created,
+                                            backup_dir_error))
+    return edit_action_error("replace",
+                             "failed to prepare replacement backup: " +
+                                 backup_dir_error);
+  godot::Ref<godot::PackedScene> backup;
+  backup.instantiate();
+  if (backup.is_null())
+    return edit_action_error("replace", "failed to create replacement backup");
+  const godot::Error backup_pack_error = backup->pack(node);
+  if (backup_pack_error != godot::OK)
+    return edit_action_error(
+        "replace", "failed to pack replaced subtree for backup (error " +
+                       std::to_string(static_cast<int>(backup_pack_error)) + ")");
+  auto *backup_saver = godot::ResourceSaver::get_singleton();
+  if (!backup_saver)
+    return edit_action_error("replace",
+                             "ResourceSaver not available for backup");
+  const godot::Error backup_save_error =
+      backup_saver->save(backup, godot::String::utf8(backup_path.c_str()));
+  if (backup_save_error != godot::OK)
+    return edit_action_error(
+        "replace", "failed to save replacement backup (error " +
+                       std::to_string(static_cast<int>(backup_save_error)) + ")");
   godot::Node *old_owner = node->get_owner();
   godot::Node *copy = replacement->duplicate(godot::Node::DUPLICATE_DEFAULT);
   if (!copy)
@@ -555,10 +597,14 @@ mcp::JsonValue replace_scene_node_impl(const mcp::JsonValue &args,
   inner["owner"] = mcp::JsonValue(
       effective_owner ? scene_relative_path(effective_owner, scene_root)
                       : std::string());
-  inner["undo"] = mcp::JsonValue(
-      "recreate the replaced node under " +
+  inner["destructive"] = mcp::JsonValue(true);
+  inner["undoable"] = mcp::JsonValue(false);
+  inner["backup_path"] = mcp::JsonValue(backup_path);
+  inner["recovery"] = mcp::JsonValue(
+      "instantiate backup_path under " +
       scene_relative_path(parent, scene_root) +
-      " (create_scene_node) and delete the replacement (delete_scene_node)");
+      " with create_scene_node action=scene, then remove the replacement; "
+      "the editor undo stack cannot restore the replaced subtree");
   util::add_scene_info_fields(inner, scene_info);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
@@ -1010,8 +1056,22 @@ mcp::JsonValue handle_edit_scene_node(const mcp::JsonValue &args) {
   }
   if (action == "duplicate")
     return duplicate_scene_node_impl(args, node, scene_root);
-  if (action == "replace")
+  if (action == "replace") {
+    const mcp::JsonValue *confirm_p = args.Find("confirm");
+    const bool confirmed = confirm_p != nullptr && confirm_p->IsBool() &&
+                           confirm_p->GetBool();
+    if (scene_safety::check_replace_confirm(confirmed) !=
+        scene_safety::ReplaceConfirmFailure::kNone) {
+      mcp::JsonValue e = util::error_json(
+          "action 'replace' permanently removes the old subtree and is not "
+          "undoable through the editor undo stack; pass confirm=true to proceed");
+      e["code"] = mcp::JsonValue("confirmation_required");
+      e["confirm_required"] = mcp::JsonValue(true);
+      e["side_effect"] = mcp::JsonValue("destructive");
+      return e;
+    }
     return replace_scene_node_impl(args, node, scene_root);
+  }
   return reorder_scene_node_impl(args, node, scene_root);
 }
 
@@ -1631,33 +1691,35 @@ mcp::JsonValue handle_pack_scene(const mcp::JsonValue &args) {
   auto *saver = godot::ResourceSaver::get_singleton();
   if (!saver)
     return util::error_json("ResourceSaver not available");
+  resource_fs::GodotFileTransactionFs fs;
+  const uint64_t serial = resource_fs::next_file_transaction_serial();
+  const std::string temp_path =
+      dest_path + ".gda-pack-tmp-" + std::to_string(serial);
+  const std::string backup_path =
+      dest_path + ".gda-pack-bak-" + std::to_string(serial);
   const godot::Error save_error =
-      saver->save(packed, godot::String(dest_path.c_str()));
+      saver->save(packed, godot::String(temp_path.c_str()));
   if (save_error != godot::OK) {
-    if (!existed)
-      godot::DirAccess::remove_absolute(godot::String(dest_path.c_str()));
     mcp::JsonValue e = util::error_json(
-        "failed to save packed scene to " + dest_path + " (error " +
+        "failed to stage packed scene at " + temp_path + " (error " +
         std::to_string(static_cast<int>(save_error)) + ")");
     e["code"] = mcp::JsonValue("save_failed");
     return e;
   }
-  if (auto *efs = editor->get_resource_filesystem())
-    efs->update_file(godot::String(dest_path.c_str()));
   bool verified = false;
   std::string verify_error;
   if (auto *loader = godot::ResourceLoader::get_singleton()) {
     godot::Ref<godot::Resource> reloaded = loader->load(
-        godot::String(dest_path.c_str()), godot::String(),
+        godot::String(temp_path.c_str()), godot::String(),
         godot::ResourceLoader::CACHE_MODE_IGNORE);
     auto *reloaded_scene =
         godot::Object::cast_to<godot::PackedScene>(reloaded.ptr());
     if (!reloaded_scene) {
-      verify_error = "reloaded file is not a PackedScene";
+      verify_error = "staged file is not a PackedScene";
     } else {
       godot::Node *instance = reloaded_scene->instantiate();
       if (!instance) {
-        verify_error = "reloaded PackedScene could not instantiate";
+        verify_error = "staged PackedScene could not instantiate";
       } else {
         memdelete(instance);
         verified = true;
@@ -1666,6 +1728,56 @@ mcp::JsonValue handle_pack_scene(const mcp::JsonValue &args) {
   } else {
     verify_error = "ResourceLoader not available";
   }
+  std::string ignored_error;
+  if (scene_safety::pack_recovery_action(existed, verified, true) ==
+      scene_safety::PackRecoveryAction::kAbortBeforeCommit) {
+    fs.remove_file(temp_path, ignored_error);
+    mcp::JsonValue e = util::error_json(
+        "packed scene failed verification; original file left unchanged: " +
+        verify_error);
+    e["code"] = mcp::JsonValue("verification_failed");
+    e["verified"] = mcp::JsonValue(false);
+    e["original_preserved"] = mcp::JsonValue(existed);
+    return e;
+  }
+  bool backup_created = false;
+  if (existed) {
+    std::string backup_error;
+    if (!fs.rename_unique(dest_path, backup_path, backup_error)) {
+      fs.remove_file(temp_path, ignored_error);
+      mcp::JsonValue e = util::error_json(
+          "failed to back up destination before overwrite: " + backup_error);
+      e["code"] = mcp::JsonValue("backup_failed");
+      return e;
+    }
+    backup_created = true;
+  }
+  std::string commit_error;
+  bool commit_ok = fs.commit_staged(temp_path, dest_path, commit_error);
+  if (!commit_ok) {
+    std::vector<std::string> compensation_errors;
+    if (backup_created) {
+      std::string restore_error;
+      if (!fs.commit_staged(backup_path, dest_path, restore_error))
+        compensation_errors.push_back(restore_error);
+    }
+    fs.remove_file(temp_path, ignored_error);
+    mcp::JsonValue e = util::error_json(
+        "failed to commit packed scene to " + dest_path + ": " + commit_error);
+    e["code"] = mcp::JsonValue("write_failed");
+    e["restored"] = mcp::JsonValue(backup_created && compensation_errors.empty());
+    if (!compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : compensation_errors)
+        compensation.PushBack(mcp::JsonValue(item));
+      e["compensation_errors"] = std::move(compensation);
+    }
+    return e;
+  }
+  if (backup_created)
+    fs.remove_file(backup_path, ignored_error);
+  if (auto *efs = editor->get_resource_filesystem())
+    efs->update_file(godot::String(dest_path.c_str()));
   const util::EditedSceneInfo scene_info = util::edited_scene_info();
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(dest_path);
@@ -1676,6 +1788,8 @@ mcp::JsonValue handle_pack_scene(const mcp::JsonValue &args) {
   if (!verified)
     inner["verification_error"] = mcp::JsonValue(verify_error);
   inner["overwritten"] = mcp::JsonValue(existed);
+  inner["backup_created"] = mcp::JsonValue(backup_created);
+  inner["restored"] = mcp::JsonValue(false);
   if (dirs_created)
     inner["directories_created"] = mcp::JsonValue(true);
   inner["owner_chain_checked"] = mcp::JsonValue(true);

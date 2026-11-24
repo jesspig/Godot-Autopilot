@@ -3,12 +3,20 @@
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <mcp/detail/sha256.hpp>
+#include <atomic>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
+#include <set>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <utility>
+#include <vector>
 
 namespace godot_autopilot {
 namespace resource_fs {
@@ -416,6 +424,640 @@ inline bool ensure_parent_directory(const std::string &resource_path,
   }
   dir_created = parent;
   return true;
+}
+
+struct FileTransactionSnapshot {
+  bool exists = false;
+  bool is_directory = false;
+  uintmax_t size = 0;
+  int64_t modified_time = 0;
+  std::string sha256;
+
+  bool same_file_as(const FileTransactionSnapshot &other) const {
+    return exists == other.exists && is_directory == other.is_directory &&
+           size == other.size && sha256 == other.sha256;
+  }
+};
+
+class FileTransactionFs {
+  public:
+  virtual ~FileTransactionFs() = default;
+  virtual bool inspect(const std::string &path,
+                       FileTransactionSnapshot &snapshot,
+                       std::string &error) = 0;
+  virtual bool stage_copy(const std::string &source, const std::string &staged,
+                          std::string &error) = 0;
+  virtual bool stage_write(const std::string &staged, const std::string &content,
+                           std::string &error) = 0;
+  virtual bool rename_unique(const std::string &source,
+                             const std::string &destination,
+                             std::string &error) = 0;
+  virtual bool commit_staged(const std::string &staged,
+                             const std::string &destination,
+                             std::string &error) = 0;
+  virtual bool remove_file(const std::string &path, std::string &error) = 0;
+};
+
+class GodotFileTransactionFs final : public FileTransactionFs {
+  public:
+  bool inspect(const std::string &path, FileTransactionSnapshot &snapshot,
+               std::string &error) override {
+    snapshot = FileTransactionSnapshot();
+    error.clear();
+    const godot::String path_gs = godot::String::utf8(path.c_str());
+    if (godot::DirAccess::dir_exists_absolute(path_gs)) {
+      snapshot.exists = true;
+      snapshot.is_directory = true;
+      return true;
+    }
+    if (!godot::FileAccess::file_exists(path_gs)) {
+      return true;
+    }
+    godot::Ref<godot::FileAccess> file =
+        godot::FileAccess::open(path_gs, godot::FileAccess::READ);
+    if (file.is_null()) {
+      error = "failed to open file for transaction inspection: " + path;
+      return false;
+    }
+    snapshot.exists = true;
+    snapshot.size = file->get_length();
+    snapshot.modified_time =
+        static_cast<int64_t>(godot::FileAccess::get_modified_time(path_gs));
+    snapshot.sha256 =
+        std::string(godot::FileAccess::get_sha256(path_gs).utf8().get_data());
+    const godot::Error read_error = file->get_error();
+    file->close();
+    if (read_error != godot::OK && read_error != godot::ERR_FILE_EOF) {
+      error = "failed to read file for transaction inspection: " + path;
+      return false;
+    }
+    if (snapshot.sha256.size() != 64) {
+      error = "failed to hash file for transaction inspection: " + path;
+      return false;
+    }
+    return true;
+  }
+
+  bool stage_copy(const std::string &source, const std::string &staged,
+                  std::string &error) override {
+    if (path_exists(staged)) {
+      error = "transaction staging path already exists: " + staged;
+      return false;
+    }
+    const godot::Error result = godot::DirAccess::copy_absolute(
+        godot::String::utf8(source.c_str()), godot::String::utf8(staged.c_str()));
+    if (result != godot::OK) {
+      error = "failed to stage copy " + source + " -> " + staged + " (error " +
+              std::to_string(static_cast<int>(result)) + ")";
+      return false;
+    }
+    return true;
+  }
+
+  bool stage_write(const std::string &staged, const std::string &content,
+                   std::string &error) override {
+    GodotTextWriteFs file_system;
+    const TextWriteResult written = write_text_verified(
+        staged, content, TextWriteMode::kWrite, file_system);
+    if (!written.ok) {
+      error = "failed to stage verified write " + staged + ": " +
+              written.message;
+      return false;
+    }
+    return true;
+  }
+
+  bool rename_unique(const std::string &source,
+                     const std::string &destination,
+                     std::string &error) override {
+    std::filesystem::path source_fs;
+    std::filesystem::path destination_fs;
+    if (!native_paths(source, destination, source_fs, destination_fs, error)) {
+      return false;
+    }
+    std::error_code ec;
+    if (std::filesystem::exists(destination_fs, ec) || ec) {
+      error = "transaction backup path already exists: " + destination;
+      return false;
+    }
+    std::filesystem::rename(source_fs, destination_fs, ec);
+    if (ec) {
+      error = "failed to back up " + source + " -> " + destination + ": " +
+              ec.message();
+      return false;
+    }
+    return true;
+  }
+
+  bool commit_staged(const std::string &staged,
+                     const std::string &destination,
+                     std::string &error) override {
+    std::filesystem::path staged_fs;
+    std::filesystem::path destination_fs;
+    if (!native_paths(staged, destination, staged_fs, destination_fs, error)) {
+      return false;
+    }
+    std::error_code ec;
+    std::filesystem::create_hard_link(staged_fs, destination_fs, ec);
+    if (ec) {
+      error = "failed to commit staged file without overwriting " + destination +
+              ": " + ec.message();
+      return false;
+    }
+    std::error_code cleanup_ec;
+    std::filesystem::remove(staged_fs, cleanup_ec);
+    return true;
+  }
+
+  bool remove_file(const std::string &path, std::string &error) override {
+    const godot::Error result = godot::DirAccess::remove_absolute(
+        godot::String::utf8(path.c_str()));
+    if (result != godot::OK) {
+      error = "failed to remove transaction file " + path + " (error " +
+              std::to_string(static_cast<int>(result)) + ")";
+      return false;
+    }
+    return true;
+  }
+
+  private:
+  static bool path_exists(const std::string &path) {
+    const godot::String path_gs = godot::String::utf8(path.c_str());
+    return godot::FileAccess::file_exists(path_gs) ||
+           godot::DirAccess::dir_exists_absolute(path_gs);
+  }
+
+  static bool native_paths(const std::string &source,
+                           const std::string &destination,
+                           std::filesystem::path &source_fs,
+                           std::filesystem::path &destination_fs,
+                           std::string &error) {
+    auto *settings = godot::ProjectSettings::get_singleton();
+    if (settings == nullptr) {
+      error = "ProjectSettings is unavailable for transaction path resolution";
+      return false;
+    }
+    const godot::String source_global =
+        settings->globalize_path(godot::String::utf8(source.c_str()));
+    const godot::String destination_global = settings->globalize_path(
+        godot::String::utf8(destination.c_str()));
+    if (source_global.is_empty() || destination_global.is_empty()) {
+      error = "transaction path could not be globalized";
+      return false;
+    }
+    source_fs = std::filesystem::u8path(source_global.utf8().get_data());
+    destination_fs =
+        std::filesystem::u8path(destination_global.utf8().get_data());
+    return true;
+  }
+};
+
+enum class FileTransactionKind { kCopy, kMove, kWrite, kRequireAbsent };
+
+struct FileTransactionOp {
+  FileTransactionKind kind = FileTransactionKind::kCopy;
+  std::string source;
+  std::string destination;
+  std::string content;
+  bool has_content = false;
+  bool overwrite = false;
+};
+
+enum class FileTransactionJournalKind {
+  kTargetBackedUp,
+  kTargetCommitted,
+  kSourceRemoved
+};
+
+struct FileTransactionJournalEntry {
+  FileTransactionJournalKind kind = FileTransactionJournalKind::kTargetCommitted;
+  size_t op_index = 0;
+  std::string source;
+  std::string destination;
+  std::string backup;
+  FileTransactionSnapshot before;
+  FileTransactionSnapshot after;
+};
+
+struct FileTransactionJournal {
+  std::vector<FileTransactionJournalEntry> entries;
+};
+
+struct FileTransactionPlan {
+  std::vector<FileTransactionOp> operations;
+};
+
+struct FileTransactionResult {
+  bool ok = false;
+  bool compensated = false;
+  std::string code;
+  std::string message;
+  std::vector<std::string> compensation_errors;
+};
+
+enum class CopyOverwriteFailure { kNone, kTargetExists, kConfirmationRequired };
+
+inline CopyOverwriteFailure check_copy_overwrite(bool destination_exists,
+                                                 bool overwrite,
+                                                 bool confirm) {
+  if (!destination_exists) {
+    return CopyOverwriteFailure::kNone;
+  }
+  if (!overwrite) {
+    return CopyOverwriteFailure::kTargetExists;
+  }
+  if (!confirm) {
+    return CopyOverwriteFailure::kConfirmationRequired;
+  }
+  return CopyOverwriteFailure::kNone;
+}
+
+inline uint64_t next_file_transaction_serial() {
+  static std::atomic<uint64_t> serial{0};
+  return serial.fetch_add(1) + 1;
+}
+
+inline std::string sha256_hex(std::string_view content) {
+  static const char digits[] = "0123456789abcdef";
+  const auto digest = mcp::detail::Sha256::Hash(content);
+  std::string out;
+  out.reserve(digest.size() * 2);
+  for (uint8_t byte : digest) {
+    out.push_back(digits[byte >> 4]);
+    out.push_back(digits[byte & 0x0F]);
+  }
+  return out;
+}
+
+inline std::string file_transaction_temp_path(const std::string &destination,
+                                              uint64_t serial, size_t index) {
+  return destination + ".gda-txn-" + std::to_string(serial) + "-" +
+         std::to_string(index);
+}
+
+inline FileTransactionResult commit_file_transaction(
+    const FileTransactionPlan &plan, FileTransactionJournal &journal,
+    FileTransactionFs &fs) {
+  struct Prepared {
+    FileTransactionOp op;
+    FileTransactionSnapshot source_before;
+    FileTransactionSnapshot destination_before;
+    FileTransactionSnapshot staged_snapshot;
+    std::string staged;
+    std::string backup;
+    bool backed_up = false;
+  };
+
+  FileTransactionResult result;
+  journal.entries.clear();
+  std::vector<Prepared> prepared;
+  prepared.reserve(plan.operations.size());
+  std::set<std::string> mutation_destinations;
+  std::set<std::string> move_sources;
+  const uint64_t serial = next_file_transaction_serial();
+
+  const auto fail = [&](const std::string &code, const std::string &message) {
+    result.ok = false;
+    result.code = code;
+    result.message = message;
+    if (!journal.entries.empty()) {
+      result.compensated = true;
+      std::set<size_t> protected_targets;
+      for (auto entry = journal.entries.rbegin();
+           entry != journal.entries.rend(); ++entry) {
+        std::string error;
+        if (entry->kind == FileTransactionJournalKind::kSourceRemoved) {
+          FileTransactionSnapshot source_now;
+          if (!fs.inspect(entry->source, source_now, error)) {
+            result.compensation_errors.push_back(error);
+            protected_targets.insert(entry->op_index);
+            continue;
+          }
+          if (source_now.exists) {
+            if (!source_now.same_file_as(entry->before)) {
+              result.compensation_errors.push_back(
+                  "refusing to replace concurrently modified source: " +
+                  entry->source);
+              protected_targets.insert(entry->op_index);
+            }
+            continue;
+          }
+          FileTransactionSnapshot target_now;
+          if (!fs.inspect(entry->destination, target_now, error)) {
+            result.compensation_errors.push_back(error);
+            protected_targets.insert(entry->op_index);
+            continue;
+          }
+          if (!target_now.same_file_as(entry->after)) {
+            result.compensation_errors.push_back(
+                "refusing to restore source from modified target: " +
+                entry->destination);
+            protected_targets.insert(entry->op_index);
+            continue;
+          }
+          if (!fs.commit_staged(entry->destination, entry->source, error)) {
+            result.compensation_errors.push_back(error);
+            protected_targets.insert(entry->op_index);
+          }
+          continue;
+        }
+
+        if (protected_targets.count(entry->op_index) != 0) {
+          continue;
+        }
+        FileTransactionSnapshot target_now;
+        if (!fs.inspect(entry->destination, target_now, error)) {
+          result.compensation_errors.push_back(error);
+          protected_targets.insert(entry->op_index);
+          continue;
+        }
+        if (target_now.exists) {
+          if (entry->kind == FileTransactionJournalKind::kTargetCommitted &&
+              target_now.same_file_as(entry->after)) {
+            if (!fs.remove_file(entry->destination, error)) {
+              result.compensation_errors.push_back(error);
+              protected_targets.insert(entry->op_index);
+              continue;
+            }
+          } else if (!target_now.same_file_as(entry->before)) {
+            result.compensation_errors.push_back(
+                "refusing to replace concurrently modified target: " +
+                entry->destination);
+            protected_targets.insert(entry->op_index);
+            continue;
+          }
+        }
+        if (entry->kind == FileTransactionJournalKind::kTargetBackedUp ||
+            !entry->backup.empty()) {
+          FileTransactionSnapshot backup_now;
+          if (!fs.inspect(entry->backup, backup_now, error)) {
+            result.compensation_errors.push_back(error);
+            continue;
+          }
+          if (backup_now.exists) {
+            FileTransactionSnapshot restore_target;
+            std::string restore_error;
+            if (!fs.inspect(entry->destination, restore_target,
+                            restore_error) ||
+                restore_target.exists ||
+                !fs.commit_staged(entry->backup, entry->destination,
+                                  restore_error)) {
+              result.compensation_errors.push_back(
+                  restore_error.empty()
+                      ? "failed to restore transaction backup for " +
+                            entry->destination
+                      : restore_error);
+            }
+          }
+        }
+      }
+    }
+    for (const Prepared &item : prepared) {
+      if (!item.staged.empty()) {
+        std::string ignored;
+        fs.remove_file(item.staged, ignored);
+      }
+      if (result.compensation_errors.empty() && !item.backup.empty()) {
+        std::string ignored;
+        fs.remove_file(item.backup, ignored);
+      }
+    }
+    if (!result.compensation_errors.empty()) {
+      result.message += "; transaction compensation incomplete";
+    }
+    return result;
+  };
+
+  for (size_t i = 0; i < plan.operations.size(); ++i) {
+    const FileTransactionOp &op = plan.operations[i];
+    if (op.destination.empty()) {
+      return fail("transaction_failed", "transaction destination is empty");
+    }
+    if (op.kind != FileTransactionKind::kWrite &&
+        op.kind != FileTransactionKind::kRequireAbsent && op.source.empty()) {
+      return fail("transaction_failed", "transaction source is empty");
+    }
+    if ((op.kind == FileTransactionKind::kCopy ||
+         op.kind == FileTransactionKind::kMove) &&
+        op.source == op.destination) {
+      return fail("transaction_failed", "transaction source equals destination");
+    }
+    if (op.kind == FileTransactionKind::kMove && op.overwrite) {
+      return fail("transaction_failed", "move transactions cannot overwrite");
+    }
+    if (op.kind != FileTransactionKind::kRequireAbsent &&
+        !mutation_destinations.insert(op.destination).second) {
+      return fail("transaction_failed",
+                  "duplicate transaction destination: " + op.destination);
+    }
+    if (op.kind == FileTransactionKind::kCopy ||
+        op.kind == FileTransactionKind::kMove) {
+      move_sources.insert(op.source);
+    }
+
+    Prepared item;
+    item.op = op;
+    std::string error;
+    if (!fs.inspect(op.destination, item.destination_before, error)) {
+      return fail("transaction_failed", error);
+    }
+    if (item.destination_before.is_directory) {
+      return fail("target_conflict", "transaction target is a directory: " +
+                                         op.destination);
+    }
+    if (item.destination_before.exists &&
+        (op.kind == FileTransactionKind::kRequireAbsent ||
+         (op.kind != FileTransactionKind::kWrite && !op.overwrite))) {
+      return fail("target_conflict",
+                  "transaction target already exists: " + op.destination);
+    }
+    if (op.kind == FileTransactionKind::kCopy ||
+        op.kind == FileTransactionKind::kMove) {
+      if (!fs.inspect(op.source, item.source_before, error)) {
+        return fail("transaction_failed", error);
+      }
+      if (!item.source_before.exists || item.source_before.is_directory) {
+        return fail("transaction_failed",
+                    "transaction source is not a file: " + op.source);
+      }
+    }
+    item.staged = file_transaction_temp_path(op.destination, serial, i);
+    item.backup = file_transaction_temp_path(op.destination, serial + 1000000, i);
+    prepared.push_back(std::move(item));
+  }
+
+  for (const Prepared &item : prepared) {
+    if (item.op.kind == FileTransactionKind::kRequireAbsent) {
+      continue;
+    }
+    if (move_sources.count(item.op.destination) != 0) {
+      return fail("transaction_failed",
+                  "transaction destination is another operation's source: " +
+                      item.op.destination);
+    }
+  }
+
+  for (Prepared &item : prepared) {
+    if (item.op.kind == FileTransactionKind::kRequireAbsent) {
+      continue;
+    }
+    std::string error;
+    bool staged_ok = false;
+    if (item.op.kind == FileTransactionKind::kWrite ||
+        (item.op.kind == FileTransactionKind::kMove && item.op.has_content)) {
+      staged_ok = fs.stage_write(item.staged, item.op.content, error);
+    } else {
+      staged_ok = fs.stage_copy(item.op.source, item.staged, error);
+    }
+    if (!staged_ok) {
+      return fail("write_failed", error);
+    }
+    if (!fs.inspect(item.staged, item.staged_snapshot, error)) {
+      return fail("write_failed", error);
+    }
+    if (!item.staged_snapshot.exists || item.staged_snapshot.is_directory) {
+      return fail("write_failed", "transaction staging did not create a file");
+    }
+    if (item.op.kind == FileTransactionKind::kWrite ||
+        item.op.has_content) {
+      const auto expected = static_cast<uintmax_t>(item.op.content.size());
+      if (item.staged_snapshot.size != expected ||
+          item.staged_snapshot.sha256 != sha256_hex(item.op.content)) {
+        return fail("readback_mismatch",
+                    "staged write hash mismatch for " + item.op.destination);
+      }
+    } else if (!item.staged_snapshot.same_file_as(item.source_before)) {
+      return fail("readback_mismatch",
+                  "staged copy hash mismatch for " + item.op.destination);
+    }
+  }
+
+  for (const Prepared &item : prepared) {
+    std::string error;
+    FileTransactionSnapshot destination_now;
+    if (!fs.inspect(item.op.destination, destination_now, error)) {
+      return fail("transaction_failed", error);
+    }
+    if (!destination_now.same_file_as(item.destination_before)) {
+      return fail("target_modified",
+                  "transaction target changed during staging: " +
+                      item.op.destination);
+    }
+    if (item.op.kind == FileTransactionKind::kCopy ||
+        item.op.kind == FileTransactionKind::kMove) {
+      FileTransactionSnapshot source_now;
+      if (!fs.inspect(item.op.source, source_now, error)) {
+        return fail("transaction_failed", error);
+      }
+      if (!source_now.same_file_as(item.source_before)) {
+        return fail("source_modified",
+                    "transaction source changed during staging: " +
+                        item.op.source);
+      }
+    }
+  }
+
+  for (size_t i = 0; i < prepared.size(); ++i) {
+    Prepared &item = prepared[i];
+    std::string error;
+    if (item.op.kind == FileTransactionKind::kRequireAbsent) {
+      FileTransactionSnapshot destination_now;
+      if (!fs.inspect(item.op.destination, destination_now, error)) {
+        return fail("transaction_failed", error);
+      }
+      if (destination_now.exists) {
+        return fail("target_conflict",
+                    "transaction target appeared before commit: " +
+                        item.op.destination);
+      }
+      continue;
+    }
+
+    FileTransactionSnapshot destination_now;
+    if (!fs.inspect(item.op.destination, destination_now, error)) {
+      return fail("transaction_failed", error);
+    }
+    if (!destination_now.same_file_as(item.destination_before)) {
+      return fail("target_modified",
+                  "transaction target changed before commit: " +
+                      item.op.destination);
+    }
+    if (item.op.kind == FileTransactionKind::kCopy ||
+        item.op.kind == FileTransactionKind::kMove) {
+      FileTransactionSnapshot source_now;
+      if (!fs.inspect(item.op.source, source_now, error)) {
+        return fail("transaction_failed", error);
+      }
+      if (!source_now.same_file_as(item.source_before)) {
+        return fail("source_modified",
+                    "transaction source changed before commit: " +
+                        item.op.source);
+      }
+    }
+
+    if (item.destination_before.exists) {
+      if (!fs.rename_unique(item.op.destination, item.backup, error)) {
+        return fail("write_failed", error);
+      }
+      item.backed_up = true;
+      journal.entries.push_back({FileTransactionJournalKind::kTargetBackedUp, i,
+                                 item.op.destination, item.backup, item.backup,
+                                 item.destination_before, item.destination_before});
+      FileTransactionSnapshot backup_now;
+      if (!fs.inspect(item.backup, backup_now, error) ||
+          !backup_now.same_file_as(item.destination_before)) {
+        return fail("target_modified",
+                    "transaction target changed while being backed up: " +
+                        item.op.destination);
+      }
+    }
+    if (!fs.commit_staged(item.staged, item.op.destination, error)) {
+      return fail("write_failed", error);
+    }
+    journal.entries.push_back({FileTransactionJournalKind::kTargetCommitted, i,
+                               item.op.source, item.op.destination, item.backup,
+                               item.destination_before, item.staged_snapshot});
+    FileTransactionSnapshot committed;
+    if (!fs.inspect(item.op.destination, committed, error)) {
+      return fail("readback_mismatch", error);
+    }
+    if (!committed.same_file_as(item.staged_snapshot)) {
+      return fail("readback_mismatch",
+                  "committed file hash mismatch for " + item.op.destination);
+    }
+    if (item.op.kind == FileTransactionKind::kMove) {
+      FileTransactionSnapshot source_now;
+      if (!fs.inspect(item.op.source, source_now, error)) {
+        return fail("transaction_failed", error);
+      }
+      if (!source_now.same_file_as(item.source_before)) {
+        return fail("source_modified",
+                    "transaction source changed before removal: " +
+                        item.op.source);
+      }
+      if (!fs.remove_file(item.op.source, error)) {
+        return fail("write_failed", error);
+      }
+      journal.entries.push_back({FileTransactionJournalKind::kSourceRemoved, i,
+                                 item.op.source, item.op.destination,
+                                 item.backup, item.source_before,
+                                 item.staged_snapshot});
+    }
+  }
+
+  for (Prepared &item : prepared) {
+    if (item.backed_up || item.backup.empty()) {
+      std::string ignored;
+      fs.remove_file(item.backup, ignored);
+    }
+    if (!item.staged.empty()) {
+      std::string ignored;
+      fs.remove_file(item.staged, ignored);
+    }
+  }
+  result.ok = true;
+  result.code = "ok";
+  return result;
 }
 
 } // namespace resource_fs

@@ -57,7 +57,9 @@ const std::vector<ParamSpec> kOsFileWriteParams = {
     {"path", "string", "File path for action='write' (res:// paths are engine-managed with automatic reimport/update_file sync and script diagnostics; user:// or absolute paths are plain I/O), source file path for action='copy', directory for action='ensure', or file/folder path for action='trash'", false},
     {"content", "string", "Text content to store in the file for action='write'", false},
     {"mode", "string", "Write mode for action='write': 'WRITE' overwrites existing content (default), 'APPEND' appends to the end of the file", false},
-    {"dest_path", "string", "Destination file path for action='copy' (res:// or user://); missing parent directories are created recursively and an existing file is overwritten", false},
+    {"dest_path", "string", "Destination file path for action='copy' (res:// or user://); missing parent directories are created recursively; an existing destination is rejected unless overwrite=true and confirm=true are both supplied", false},
+    {"overwrite", "boolean", "Only with action='copy': allow replacing an existing destination (default: false); replacing also requires confirm=true", false},
+    {"confirm", "boolean", "Only with action='copy' when overwrite=true and dest_path exists: explicit confirmation for replacing the destination; also used by action='trash'", false},
 };
 
 const std::vector<ParamSpec> kOsFileManagerParams = {
@@ -261,7 +263,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       os_action_spec(
           ToolSpec{
               "os_file_write",
-              "Write-side file operations with plain byte-for-byte filesystem I/O, actions: write (write or append text content; res:// paths are engine-managed with automatic reimport/update_file sync and script diagnostics, user:// and absolute paths are plain I/O), copy (copy path to dest_path, creating missing parents and overwriting an existing destination), ensure (create a directory and missing parents; idempotent with already_existed) and trash (move a file or folder to the system trash; path is validated against the project namespaces first). Paths accept res:// and user:// below the namespace root. The .import and .uid sidecars are not copied by copy. Deprecated aliases: write_file, copy_file, ensure_directory, move_os_file_to_trash.",
+              "Write-side file operations with plain byte-for-byte filesystem I/O, actions: write (write or append text content; res:// paths are engine-managed with automatic reimport/update_file sync and script diagnostics, user:// and absolute paths are plain I/O), copy (copy path to dest_path, creating missing parents; an existing destination is rejected unless overwrite=true and confirm=true are both supplied, and the staged copy is hash-verified before atomic replacement), ensure (create a directory and missing parents; idempotent with already_existed) and trash (move a file or folder to the system trash; path is validated against the project namespaces first). Paths accept res:// and user:// below the namespace root. The .import and .uid sidecars are not copied by copy. Deprecated aliases: write_file, copy_file, ensure_directory, move_os_file_to_trash.",
               "OS",
               {"os", "file", "write", "copy", "directory", "trash",
                "write_file", "copy_file", "ensure_directory",
