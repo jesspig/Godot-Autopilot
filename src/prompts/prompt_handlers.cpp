@@ -11,6 +11,7 @@
 #include "prompts/prompt_setup_input_map.hpp"
 #include "prompts/prompt_tool_usage.hpp"
 #include "tools/base/dispatch.hpp"
+#include "util/error_util.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/McpError.hpp>
 #include <memory>
@@ -51,16 +52,16 @@ mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
       },
       GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
-    throw mcp::McpError(
+    util::throw_mcp_error(
         mcp::McpErrorCode::RequestTimeout,
         dispatch::main_thread_timeout_message(label, outcome.waited_ms,
                                               outcome.cancelled));
   }
   if (!outcome.ok) {
-    throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
+    util::throw_mcp_error(mcp::McpErrorCode::InternalError, outcome.error);
   }
   if (state->export_blocked) {
-    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+    util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
                         dispatch::export_blocked_error_text());
   }
   return make_result(state->content);

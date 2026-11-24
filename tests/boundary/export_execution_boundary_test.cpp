@@ -4,6 +4,7 @@
 #include "resources/debugger_resources.hpp"
 #include "resources/resource_handlers.hpp"
 #include "tools/base/dispatch.hpp"
+#include "util/error_util.hpp"
 
 #include <gtest/gtest.h>
 
@@ -191,6 +192,17 @@ TEST_F(ExportExecutionBoundaryTest,
   ASSERT_TRUE(queued);
   EXPECT_NE(response.find(godot_autopilot::dispatch::export_blocked_error_text()),
             std::string::npos);
+}
+
+TEST(StableMcpErrorTest, PreservesShortMessageAcrossThrow) {
+  try {
+    godot_autopilot::util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
+                                           "short error");
+    FAIL() << "expected McpError";
+  } catch (const mcp::McpError &error) {
+    EXPECT_EQ(error.Code(), mcp::McpErrorCode::HandlerError);
+    EXPECT_STREQ(error.what(), "short error");
+  }
 }
 
 } // namespace

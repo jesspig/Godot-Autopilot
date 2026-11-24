@@ -89,7 +89,7 @@ ResourceTaskResult run_resource_task(
       GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
     monitor::error_event("main_thread_timeout", "resource", uri);
-    throw mcp::McpError(
+    util::throw_mcp_error(
         mcp::McpErrorCode::RequestTimeout,
         dispatch::main_thread_timeout_message(uri, outcome.waited_ms,
                                               outcome.cancelled),
@@ -98,17 +98,17 @@ ResourceTaskResult run_resource_task(
   }
   if (!outcome.ok) {
     monitor::error_event("resource_read_failed", "resource", uri);
-    throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
+    util::throw_mcp_error(mcp::McpErrorCode::InternalError, outcome.error);
   }
   if (!state->error_code.empty()) {
     monitor::error_event(state->error_code, "resource", uri);
     if (state->error_code == "export_in_progress") {
-      throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+      util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
                           state->error_text);
     }
     mcp::JsonValue data(mcp::JsonValue::object_tag);
     data["uri"] = mcp::JsonValue(uri);
-    throw mcp::McpError(resource_error_code(state->error_code),
+    util::throw_mcp_error(resource_error_code(state->error_code),
                         state->error_text, data);
   }
   ResourceTaskResult result;
@@ -327,7 +327,7 @@ const std::vector<skill_gen::SkillSpec> &embedded_skills() {
 int register_skill_resources(mcp::McpServer &server) {
   auto handler = [](const std::string &uri) -> mcp::ReadResourceResult {
     if (godot_autopilot::ExportGuard::is_exporting()) {
-      throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+      util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
     }
     const skill_resources::ContentResult content =
         skill_resources::resolve_content(embedded_skills(), uri);
@@ -335,7 +335,7 @@ int register_skill_resources(mcp::McpServer &server) {
       monitor::error_event("resource_not_found", "resource", uri);
       mcp::JsonValue data(mcp::JsonValue::object_tag);
       data["uri"] = mcp::JsonValue(uri);
-      throw mcp::McpError(mcp::McpErrorCode::InvalidParams, content.error, data);
+      util::throw_mcp_error(mcp::McpErrorCode::InvalidParams, content.error, data);
     }
     monitor::data_flow(
         "resource_read", static_cast<int64_t>(content.text.size()),
@@ -398,7 +398,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -431,7 +431,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -474,11 +474,11 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path;
         if (!util::resource_template_value(vars, "path", path)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "missing template variable: path");
         }
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -536,7 +536,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -585,17 +585,17 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path;
         if (!util::resource_template_value(vars, "path", path)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "missing template variable: path");
         }
         std::string normalized_path;
         if (!util::normalize_resource_uri_path(path, normalized_path)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "invalid template variable: path");
         }
         path = normalized_path;
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -658,7 +658,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -717,11 +717,11 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string key;
         if (!util::resource_template_value(vars, "key", key)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "missing template variable: key");
         }
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -791,7 +791,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();

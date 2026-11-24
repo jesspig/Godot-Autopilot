@@ -6,6 +6,7 @@
 #include "tools/domains/debugger/debugger_ops.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/tool_invoke.hpp"
+#include "util/error_util.hpp"
 #include <mcp/McpError.hpp>
 #include <memory>
 #include <utility>
@@ -21,7 +22,7 @@ struct DebuggerTaskState {
 
 void reject_debugger_resource_if_exporting() {
   if (godot_autopilot::ExportGuard::is_exporting()) {
-    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+    util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
                         dispatch::export_blocked_error_text());
   }
 }
@@ -48,7 +49,7 @@ dispatch::BoundedWaitOutcome run_debugger_task(
   }
   if (state->export_blocked) {
     monitor::error_event("export_in_progress", "resource", uri);
-    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+    util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
                         dispatch::export_blocked_error_text());
   }
   return outcome;

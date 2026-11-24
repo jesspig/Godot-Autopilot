@@ -17,6 +17,7 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -43,6 +44,17 @@ fs::path short_socket(const char *name) {
   fs::path base = fs::current_path();
   if (base.filename() == "tests") {
     base = base.parent_path().parent_path().parent_path();
+  }
+  const std::wstring wide = base.wstring();
+  const DWORD required = GetShortPathNameW(wide.c_str(), nullptr, 0);
+  if (required > 0) {
+    std::wstring short_path(required, L'\0');
+    const DWORD written = GetShortPathNameW(
+        wide.c_str(), short_path.data(), static_cast<DWORD>(short_path.size()));
+    if (written > 0 && written < short_path.size()) {
+      short_path.resize(written);
+      base = fs::path(short_path);
+    }
   }
 #else
   const fs::path base = fs::temp_directory_path();
