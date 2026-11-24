@@ -68,13 +68,34 @@ function captureOutput(): { stdout(): string; restore(): void } {
   };
 }
 
+async function expectSessionClosed(): Promise<void> {
+  const socket = activeSockets[0];
+  expect(socket).toBeDefined();
+  if (socket!.destroyed) return;
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("batch IPC session did not close")), 1000);
+    socket!.once("close", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+  expect(socket!.destroyed).toBe(true);
+}
+
 interface ServerState {
   initializeCount: number;
   calls: string[];
   seenConfirm?: boolean;
 }
 
-function batchServer(state: ServerState, failTool: string | null): (socket: net.Socket) => void {
+interface BatchServerOptions {
+  failTool?: string | null;
+  hangTool?: string | null;
+  disconnectTool?: string | null;
+  invalidResponseTool?: string | null;
+}
+
+function batchServer(state: ServerState, options: BatchServerOptions = {}): (socket: net.Socket) => void {
   return frameServer((message, socket) => {
     if (message.id === undefined) return;
     let result: unknown;
@@ -86,9 +107,18 @@ function batchServer(state: ServerState, failTool: string | null): (socket: net.
       const inner = params.name === "call_tool" ? params.arguments : params;
       const name = typeof inner?.name === "string" ? inner.name : "";
       state.calls.push(name);
-      if (name === "fail_tool" || name === failTool) {
+      if (name === options.disconnectTool) {
+        socket.destroy();
+        return;
+      }
+      if (name === options.hangTool) {
+        return;
+      }
+      if (name === options.failTool || name === "fail_tool") {
         state.seenConfirm = inner?.arguments?.confirm;
         result = { isError: true, content: [{ type: "text", text: '{"error":"boom"}' }] };
+      } else if (name === options.invalidResponseTool) {
+        result = {};
       } else {
         result = { content: [{ type: "text", text: JSON.stringify({ ok: true, tool: name }) }] };
       }
@@ -104,7 +134,7 @@ let socketPath: string;
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "gb-"));
-  socketPath = path.join(process.cwd(), "gbatch.sock");
+  socketPath = path.join(dir, "gbatch.sock");
 });
 
 afterEach(async () => {
@@ -124,7 +154,7 @@ function writeBatchFile(value: unknown, raw?: string): string {
 describe("gda batch", () => {
   test("两个操作全成功：exit 0、results 两项 ok、握手只做一次", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state, null));
+    const server = await listenLoopback(socketPath, batchServer(state));
     servers.push(server);
     const file = writeBatchFile([{ tool: "alpha", args: { a: 1 } }, { tool: "beta" }]);
     const cap = captureOutput();
@@ -145,7 +175,7 @@ describe("gda batch", () => {
 
   test("一个 toolFailed：exit 1 且对应项 ok=false，confirm 写入参数", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state, "fail_tool"));
+    const server = await listenLoopback(socketPath, batchServer(state, { failTool: "fail_tool" }));
     servers.push(server);
     const file = writeBatchFile({
       operations: [{ tool: "alpha" }, { tool: "fail_tool", args: {}, confirm: true }],
@@ -162,7 +192,74 @@ describe("gda batch", () => {
     expect(output.results[0].ok).toBe(true);
     expect(output.results[1].ok).toBe(false);
     expect(state.seenConfirm).toBe(true);
+    expect(state.calls).toEqual(["alpha", "fail_tool"]);
     expect(state.initializeCount).toBe(1);
+  });
+
+  test("IPC timeout 立即停止 batch、关闭 session 并返回 Transport", async () => {
+    const state: ServerState = { initializeCount: 0, calls: [] };
+    const server = await listenLoopback(socketPath, batchServer(state, { hangTool: "alpha" }));
+    servers.push(server);
+    const file = writeBatchFile([{ tool: "alpha" }, { tool: "beta" }]);
+    const cap = captureOutput();
+    let code: number;
+    try {
+      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "0.2" });
+    } finally {
+      cap.restore();
+    }
+    expect(code).toBe(ExitCode.Transport);
+    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean; error?: string }[] };
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0].ok).toBe(false);
+    expect(output.results[0].error).toContain("timed out");
+    expect(output.results[0].error).toContain("execution result is unknown");
+    expect(state.calls).toEqual(["alpha"]);
+    expect(state.initializeCount).toBe(1);
+    await expectSessionClosed();
+  });
+
+  test("IPC 收到工具调用后断开立即停止 batch 并返回 Transport", async () => {
+    const state: ServerState = { initializeCount: 0, calls: [] };
+    const server = await listenLoopback(socketPath, batchServer(state, { disconnectTool: "alpha" }));
+    servers.push(server);
+    const file = writeBatchFile([{ tool: "alpha" }, { tool: "beta" }]);
+    const cap = captureOutput();
+    let code: number;
+    try {
+      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "2" });
+    } finally {
+      cap.restore();
+    }
+    expect(code).toBe(ExitCode.Transport);
+    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean; error?: string }[] };
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0].ok).toBe(false);
+    expect(output.results[0].error).toContain("execution result is unknown");
+    expect(state.calls).toEqual(["alpha"]);
+    expect(state.initializeCount).toBe(1);
+  });
+
+  test("batch 遇到 Transport 错误立即停止并保留退出码", async () => {
+    const state: ServerState = { initializeCount: 0, calls: [] };
+    const server = await listenLoopback(socketPath, batchServer(state, { invalidResponseTool: "alpha" }));
+    servers.push(server);
+    const file = writeBatchFile([{ tool: "alpha" }, { tool: "beta" }]);
+    const cap = captureOutput();
+    let code: number;
+    try {
+      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "2" });
+    } finally {
+      cap.restore();
+    }
+    expect(code).toBe(ExitCode.Transport);
+    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean; error?: string }[] };
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0].ok).toBe(false);
+    expect(output.results[0].error).toContain("no result.content");
+    expect(state.calls).toEqual(["alpha"]);
+    expect(state.initializeCount).toBe(1);
+    await expectSessionClosed();
   });
 
   test("非法 batch 文件：exit 3 (Usage)", async () => {

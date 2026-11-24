@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 import type { GlobalOptions } from "../args";
-import { CliError, ExitCode } from "../errors";
+import { CliError, ExitCode, isIpcRequestSent } from "../errors";
 import type { IpcEndpoint } from "../ipc/client";
 import {
   callTool,
@@ -32,8 +32,15 @@ export function batchFailureEntry(index: number, tool: string, error: string): {
   };
 }
 
-export function batchExitCode(results: readonly { ok: boolean }[]): number {
-  return results.every((result) => result.ok) ? ExitCode.Success : ExitCode.ToolFailure;
+export function batchExitCode(
+  results: readonly { ok: boolean }[],
+  errorCodes: readonly number[] = [],
+): number {
+  if (errorCodes.includes(ExitCode.Usage)) return ExitCode.Usage;
+  if (errorCodes.includes(ExitCode.Transport)) return ExitCode.Transport;
+  return results.every((result) => result.ok) && !errorCodes.includes(ExitCode.ToolFailure)
+    ? ExitCode.Success
+    : ExitCode.ToolFailure;
 }
 
 interface BatchOperation {
@@ -130,6 +137,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const session = await createBatchIpcSession(endpoint, timeoutSec * 1000);
   try {
     const results: { index: number; tool: string; ok: boolean; display: unknown; error?: string }[] = [];
+    const errorCodes: number[] = [];
     for (let index = 0; index < operations.length; index += 1) {
       const operation = operations[index];
       const args: Record<string, unknown> = { ...operation.args };
@@ -155,11 +163,16 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const code = error instanceof CliError ? error.code : ExitCode.ToolFailure;
+        errorCodes.push(code);
         results.push(batchFailureEntry(index, operation.tool, message));
+        if (isIpcRequestSent(error) || code === ExitCode.Transport) {
+          break;
+        }
       }
     }
     writeJson({ results }, opts);
-    return batchExitCode(results);
+    return batchExitCode(results, errorCodes);
   } finally {
     closeBatchIpcSession(session);
   }
