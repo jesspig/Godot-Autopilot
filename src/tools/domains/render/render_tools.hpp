@@ -51,6 +51,7 @@ const std::vector<ParamSpec> kRenderInstanceParams = {
     {"rotation_z", "number", "Euler rotation Z in degrees (default: 0.0)", false},
     {"visible", "boolean", "Only with action=set_visible: visibility state, true shows and false hides (default: true)", false},
     {"mask", "integer", "Only with action=set_layer_mask: layer mask bitfield; bit n selects layer n+1, example: 1 for layer 1, 3 for layers 1 and 2", false},
+    {"confirm", "boolean", "Only with action=free: the action is destructive and requires confirm=true; instance_rid must be owned by the GDA render RID store, otherwise use render_rid_free (which is already Destructive) for external RIDs", false},
 };
 
 const std::vector<ParamSpec> kRenderViewportParams = {
@@ -60,8 +61,8 @@ const std::vector<ParamSpec> kRenderViewportParams = {
     {"canvas_rid", "integer", "Only with action=attach_canvas: RID of a canvas", false},
     {"rect", "object", "Only with action=attach_to_screen: target rectangle {x, y, width, height}; omitted or zero size maps the whole screen", false},
     {"screen", "integer", "Only with action=attach_to_screen: screen index (default: 0)", false},
-    {"width", "integer", "Only with action=set_size: viewport width in pixels (default: 640)", false},
-    {"height", "integer", "Only with action=set_size: viewport height in pixels (default: 480)", false},
+    {"width", "integer", "Only with action=set_size: viewport width in pixels (default: 640); each dimension is capped at 8192 and the pixel area at 16777216, rejected before any RenderingServer allocation", false},
+    {"height", "integer", "Only with action=set_size: viewport height in pixels (default: 480); each dimension is capped at 8192 and the pixel area at 16777216, rejected before any RenderingServer allocation", false},
     {"clear_mode", "number", "Only with action=set_clear_mode: 0=always, 1=never, 2=only_next_frame (default: 0)", false},
 };
 
@@ -333,7 +334,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       })));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "render_instance",
-      "Create and control a RenderingServer instance that makes a mesh or another RID renderable (None side effect). action selects the operation: 'create' calls instance_create2(base_rid, scenario_rid) and returns result.rid, with scenario_rid optional; 'attach' moves the instance to scenario_rid; 'set_transform' builds a Transform3D from optional transform/origin/basis objects or rotation/origin_x/y/z with Euler degrees; 'set_visible' toggles visibility; 'set_layer_mask' sets the mask bitfield; 'free' calls free_rid and invalidates the RID in the store. Example: {\"action\": \"create\", \"base_rid\": 12, \"scenario_rid\": 3} or {\"action\": \"set_transform\", \"instance_rid\": 9, \"origin\": {\"x\": 0, \"y\": 1, \"z\": -4}, \"rotation\": {\"x\": 0, \"y\": 180, \"z\": 0}}.",
+      "Create and control a RenderingServer instance that makes a mesh or another RID renderable (None side effect). action selects the operation: 'create' calls instance_create2(base_rid, scenario_rid) and returns result.rid, with scenario_rid optional; 'attach' moves the instance to scenario_rid; 'set_transform' builds a Transform3D from optional transform/origin/basis objects or rotation/origin_x/y/z with Euler degrees; 'set_visible' toggles visibility; 'set_layer_mask' sets the mask bitfield; 'free' is destructive and requires confirm=true; instance_rid must be owned by the GDA render RID store (external RIDs must use render_rid_free, which is Destructive); it then calls free_rid and invalidates the RID in the store. Example: {\"action\": \"create\", \"base_rid\": 12, \"scenario_rid\": 3} or {\"action\": \"set_transform\", \"instance_rid\": 9, \"origin\": {\"x\": 0, \"y\": 1, \"z\": -4}, \"rotation\": {\"x\": 0, \"y\": 180, \"z\": 0}}.",
       "Render", {"render", "instance", "set_render_instance_visible", "set_render_instance_layer_mask"},
       SideEffect::None, tool_flags::kNone,
       kRenderInstanceParams, render_ops::handle_instance_action,
@@ -343,7 +344,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {},
       {"render_instance action=create base_rid=12 scenario_rid=3",
        "render_instance action=set_transform instance_rid=9 origin={\"x\":0,\"y\":1,\"z\":-4} rotation={\"x\":0,\"y\":180,\"z\":0}}",
-       "render_instance action=free instance_rid=9"}},
+       "render_instance action=free instance_rid=9 confirm=true"}},
       {
           render_alias("set_render_instance_visible", "render_instance",
                        "set_visible"),

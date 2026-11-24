@@ -1,4 +1,5 @@
 #include "tools/domains/render/render_ops.hpp"
+#include "tools/domains/render/render_budget.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
@@ -1079,10 +1080,37 @@ JV handle_viewport_set_size(const JV &args) {
   godot::RID vp = util::rid_from_json(*it_vp);
   auto *w = args.Find("width");
   auto *h = args.Find("height");
-  int32_t width = static_cast<int32_t>(w ? w->GetInt() : 640);
-  int32_t height = static_cast<int32_t>(h ? h->GetInt() : 480);
+  if ((w != nullptr && !w->IsNumber()) ||
+      (h != nullptr && !h->IsNumber())) {
+    JV r(JV::object_tag);
+    r["error"] = JV("width and height must be integers");
+    r["code"] = JV("invalid_dimension");
+    return r;
+  }
+  const int64_t raw_width = w != nullptr ? w->GetInt() : 640;
+  const int64_t raw_height = h != nullptr ? h->GetInt() : 480;
+  const render_budget::ViewportSizeVerdict verdict =
+      render_budget::validate_viewport_size(raw_width, raw_height);
+  if (verdict.failure != render_budget::ViewportSizeFailure::kNone) {
+    JV r(JV::object_tag);
+    r["error"] = JV("viewport size rejected by budget: width=" +
+                    std::to_string(raw_width) +
+                    " height=" + std::to_string(raw_height));
+    r["code"] = JV(verdict.failure ==
+                           render_budget::ViewportSizeFailure::kInvalidDimension
+                       ? "invalid_dimension"
+                       : verdict.failure ==
+                                 render_budget::ViewportSizeFailure::kDimensionLimit
+                             ? "dimension_limit"
+                             : "pixel_limit");
+    r["max_dimension"] =
+        JV(static_cast<int64_t>(render_budget::kMaxViewportDimension));
+    r["max_pixels"] =
+        JV(static_cast<int64_t>(render_budget::kMaxViewportPixels));
+    return r;
+  }
 
-  rs->viewport_set_size(vp, width, height);
+  rs->viewport_set_size(vp, verdict.width, verdict.height);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "set_render_viewport_size completed");
   JV r(JV::object_tag);
@@ -1977,9 +2005,30 @@ JV handle_instance_action(const JV &args) {
     return handle_instance_set_layer_mask(args);
   }
   if (action == "free") {
+    const int64_t instance_id = static_cast<int64_t>(instance.get_id());
+    if (!util::rid_store<RenderRidDomain>().contains(instance_id)) {
+      JV e(JV::object_tag);
+      e["error"] = JV(
+          "instance_rid is not owned by the GDA render RID store; use "
+          "render_rid_free with confirm=true to free an external RID");
+      e["code"] = JV("rid_not_owned");
+      return e;
+    }
+    const JV *confirm_p = args.Find("confirm");
+    if (confirm_p == nullptr || !confirm_p->IsBool() ||
+        !confirm_p->GetBool()) {
+      JV e(JV::object_tag);
+      e["error"] = JV(
+          "render_instance action=free is destructive; pass confirm=true to "
+          "free instance_rid " +
+          std::to_string(instance_id));
+      e["code"] = JV("confirmation_required");
+      e["confirm_required"] = JV(true);
+      e["side_effect"] = JV("destructive");
+      return e;
+    }
     rs->free_rid(instance);
-    util::rid_store<RenderRidDomain>().erase(
-        static_cast<int64_t>(instance.get_id()));
+    util::rid_store<RenderRidDomain>().erase(instance_id);
     return ok_result();
   }
   return unknown_action_error("render_instance", action);
