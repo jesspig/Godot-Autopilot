@@ -10,6 +10,8 @@
 4. `editor_scene_control` 的 action=open / action=close 切换场景；action=reload 从磁盘恢复。
 5. `editor_config` 的 action=main_scene 把 `path` 设为项目启动场景。
 
+- 场景写工具返回 `disk_persisted=false`：只改编辑器内存中的场景。`save_editor_scene` 返回 `disk_persisted=true`。`editor_scene_control` 的 action=play 返回 `autosaved` 与 `disk_changed`，因为 Godot 默认在运行前保存脏场景；临时探针必须删除后再次保存才能保持磁盘干净。
+
 - action=create 只接受原生 Node 子类，不能创建继承场景；要继承现有场景，复制文件或打开后用 action=save_as。
 - 当前场景有未保存改动时，替换会被拒绝；先保存，再用 `close_current` 重试。非 Node 子类会明确报错。
 - action=open 同样拒绝未保存场景；错误会列出未保存路径，并建议保存或用 action=reload 丢弃。

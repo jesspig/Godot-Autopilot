@@ -164,7 +164,7 @@ resource: src/tools/domains/
 | `get_engine_state` | version / fps / frames_drawn / time_scale | 读引擎版本、FPS、累计帧、时间缩放 | None | `get_engine_version`、`get_engine_fps`、`get_engine_frames_drawn`、`get_engine_time_scale` |
 | `update_engine_state` | time_scale / max_fps | 改时间缩放与帧率上限；time_scale 限有限数且 0..上限、max_fps 限合法区间 | ModifiesWindow | `set_engine_time_scale`、`set_engine_max_fps` |
 | `get_autoloads` | list | 按加载序列出自启动单例 | None | `get_autoload_list` |
-| `update_autoloads` | add / remove / move | 增删/排序自启动单例并即时保存 | WritesConfig | `add_autoload`、`remove_autoload`、`move_autoload` |
+| `update_autoloads` | add / remove / move | 增删/排序自启动单例并即时保存；add 使用共享脚本能力判定，接受非 Tool 的 C# 脚本，返回 `runtime_mountable` / `editor_runnable` / `code`，已存在同路径返回 `already_present` | WritesConfig | `add_autoload`、`remove_autoload`、`move_autoload` |
 
 ## Docs（1）
 
@@ -179,7 +179,7 @@ resource: src/tools/domains/
 | `get_editor_state` | selection / root / open / unsaved / playing / info | 读选择、编辑根、打开/未保存场景、播放状态 | None | `get_editor_selection`、`get_editor_edited_scene_root` |
 | `get_editor_ui` | elements / hit / geometry / scene_tree_items | 枚举编辑器控件、命中链、视口几何、Scene 树行 | None | `get_editor_ui_elements`、`hit_test_editor_point`、`get_editor_viewport_geometry`、`scene_tree_items` |
 | `get_editor_files` | tree / status / scan | 编辑器文件系统树、状态与扫描 | None | `get_editor_file_system_tree`、`get_editor_file_system_status`、`scan_editor_file_system` |
-| `editor_scene_control` | create / open / close / reload / play / stop | 场景新建、打开、关闭、重载、播放、停止 | ModifiesWindow | `create_editor_scene`、`open_editor_scene`、`close_editor_scene`、`reload_editor_scene`、`play_editor_current_scene`、`stop_editor_playing` |
+| `editor_scene_control` | create / open / close / reload / play / stop | 场景新建、打开、关闭、重载、播放、停止；play 返回 `autosaved` / `disk_changed` / `autosave_setting`，显式说明 Godot 默认的运行前保存；场景写工具返回 `disk_persisted=false`，save 返回 `disk_persisted=true` | ModifiesWindow | `create_editor_scene`、`open_editor_scene`、`close_editor_scene`、`reload_editor_scene`、`play_editor_current_scene`、`stop_editor_playing` |
 | `save_editor_scene` | save / save_as / save_all | 保存当前/另存/全部保存，附落盘回执；另存为文件未变化或不可读时不再报成功 | WritesFile | `save_editor_scene_as`、`save_editor_scenes` |
 | `editor_selection_set` | set / select_tree | 设置选择或按场景树行选中 | ModifiesWindow | `set_editor_selection`、`select_scene_tree_node` |
 | `editor_undo` | create / add_do / add_undo / commit / undo / redo / history / clear | 撤销栈四件套与全局 undo/redo/历史 | ModifiesWindow | `create_editor_undo_redo_action`、`add_editor_undo_redo_do`、`add_editor_undo_redo_undo`、`commit_editor_undo_redo` |

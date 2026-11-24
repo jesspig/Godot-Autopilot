@@ -4,6 +4,10 @@
 >
 > changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
 
+## 2026-11-25
+
+- **根因修复批次**：脚本能力模型统一编辑器可运行性与运行时可挂载性，`update_autoloads` 接受非 Tool C# 脚本；call_tool 确认协议归一；`gda:hello` 握手替代 fire-and-forget ready 并提供 `ready_diagnosis`；C# autoload 显式供给与缺桥诊断；play 响应显式报告 Godot 运行前 autosave。详见 `.handoff/evidence/ST-01/summary.txt` 与 `.handoff/STATE.md`。
+
 ## 2026-11-24
 
 - **游戏运行时监视器**：编辑器启动的游戏运行逐帧记录 59 项引擎监视器与自动发现的标准 API 自定义监控，JSONL 落盘；新增 `game_monitor` MCP 工具与 `gda monitor` CLI，支持按会话调取与离线分析。工具面 252→253、ctest 1101 全绿。详见 [changelog/2026-11-24-log.md](changelog/2026-11-24-log.md) 与 [modules/game_monitor.md](modules/game_monitor.md)。
