@@ -115,6 +115,9 @@ mcp::JsonValue invoke_dynamic_target(
 
 mcp::JsonValue run_dynamic_handler(
     const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
+  if (ExportGuard::is_exporting()) {
+    return dispatch::export_blocked_json_result();
+  }
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
     const tools::TraceContext ctx = tools::capture_trace_context();
@@ -124,6 +127,10 @@ mcp::JsonValue run_dynamic_handler(
             get_editor_queue(), "user tool dispatch", state,
             [target, args, ctx](mcp::JsonValue &result) {
               tools::ScopedTraceContext restore(ctx);
+              if (ExportGuard::is_exporting()) {
+                result = dispatch::export_blocked_json_result();
+                return;
+              }
               result = invoke_dynamic_target(target, args);
             },
             GDA_DISPATCH_WAIT_DEFAULT_MS);

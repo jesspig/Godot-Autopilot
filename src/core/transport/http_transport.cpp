@@ -40,10 +40,13 @@ namespace {
 constexpr const char *kTransportContentType = "application/json";
 constexpr const char *kTransportEventStreamType = "text/event-stream";
 
+HttpPendingBudget g_http_pending_budget;
+
 struct PendingJob {
   HttpRequest request;
   HttpRouteHandler handler;
   HttpResponse preset;
+  size_t pending_bytes{0};
   bool use_preset{false};
   bool keep_alive{true};
   bool is_head{false};
@@ -51,6 +54,7 @@ struct PendingJob {
 
 struct CompletedReply {
   HttpResponse response;
+  size_t pending_bytes{0};
   bool keep_alive{true};
   bool is_head{false};
 };
@@ -60,6 +64,7 @@ struct ConnectionChannel {
   std::condition_variable cv;
   std::deque<PendingJob> jobs;
   std::deque<CompletedReply> replies;
+  HttpPendingBudget pending;
   bool closed{false};
   bool finished{false};
   bool executing{false};
@@ -214,6 +219,21 @@ HttpResponse transport_error_response(int status_code,
   return response;
 }
 
+size_t transport_pending_bytes(const PendingJob &job) {
+  size_t bytes = job.request.method.size() + job.request.path.size() +
+                 job.request.body.size();
+  for (const auto &entry : job.request.headers) {
+    bytes += entry.first.size() + entry.second.size();
+  }
+  if (job.use_preset) {
+    bytes += job.preset.body.size();
+    for (const auto &entry : job.preset.headers) {
+      bytes += entry.first.size() + entry.second.size();
+    }
+  }
+  return bytes;
+}
+
 void transport_execute_job(const PendingJob &job, HttpResponse &response) {
   if (job.use_preset) {
     response = job.preset;
@@ -261,26 +281,38 @@ void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
       job = std::move(channel->jobs.front());
       channel->jobs.pop_front();
     }
+    bool closed = false;
     {
       std::lock_guard<std::mutex> lock(channel->mutex);
-      if (channel->closed) {
-        return;
+      closed = channel->closed;
+      if (!closed) {
+        channel->executing = true;
       }
-      channel->executing = true;
+    }
+    if (closed) {
+      channel->pending.release(job.pending_bytes);
+      g_http_pending_budget.release(job.pending_bytes);
+      return;
     }
     HttpResponse response;
     transport_execute_job(job, response);
     {
       std::lock_guard<std::mutex> lock(channel->mutex);
       channel->executing = false;
-      if (channel->closed) {
-        return;
+      closed = channel->closed;
+      if (!closed) {
+        CompletedReply reply;
+        reply.response = std::move(response);
+        reply.pending_bytes = job.pending_bytes;
+        reply.keep_alive = job.keep_alive;
+        reply.is_head = job.is_head;
+        channel->replies.push_back(std::move(reply));
       }
-      CompletedReply reply;
-      reply.response = std::move(response);
-      reply.keep_alive = job.keep_alive;
-      reply.is_head = job.is_head;
-      channel->replies.push_back(std::move(reply));
+    }
+    if (closed) {
+      channel->pending.release(job.pending_bytes);
+      g_http_pending_budget.release(job.pending_bytes);
+      return;
     }
   }
 }
@@ -294,15 +326,50 @@ void transport_worker_main(const std::shared_ptr<ConnectionChannel> &channel) {
   channel->cv.notify_all();
 }
 
-void transport_enqueue_job(TransportConnection &connection, PendingJob job) {
+bool transport_enqueue_job(TransportConnection &connection, PendingJob job) {
+  const HttpPumpLimits &limits = http_pump_limits();
+  job.pending_bytes = transport_pending_bytes(job);
+  if (!connection.channel->pending.try_acquire(
+          limits.max_pending_jobs_per_connection,
+          limits.max_pending_job_bytes_per_connection, job.pending_bytes)) {
+    return false;
+  }
+  if (!g_http_pending_budget.try_acquire(
+          limits.max_pending_jobs_global,
+          limits.max_pending_job_bytes_global, job.pending_bytes)) {
+    connection.channel->pending.release(job.pending_bytes);
+    return false;
+  }
   {
     std::lock_guard<std::mutex> lock(connection.channel->mutex);
     if (connection.channel->closed) {
-      return;
+      connection.channel->pending.release(job.pending_bytes);
+      g_http_pending_budget.release(job.pending_bytes);
+      return false;
     }
     connection.channel->jobs.push_back(std::move(job));
   }
   connection.channel->cv.notify_one();
+  return true;
+}
+
+void transport_release_channel_pending(
+    const std::shared_ptr<ConnectionChannel> &channel) {
+  std::deque<PendingJob> jobs;
+  std::deque<CompletedReply> replies;
+  {
+    std::lock_guard<std::mutex> lock(channel->mutex);
+    jobs.swap(channel->jobs);
+    replies.swap(channel->replies);
+  }
+  for (const PendingJob &job : jobs) {
+    channel->pending.release(job.pending_bytes);
+    g_http_pending_budget.release(job.pending_bytes);
+  }
+  for (const CompletedReply &reply : replies) {
+    channel->pending.release(reply.pending_bytes);
+    g_http_pending_budget.release(reply.pending_bytes);
+  }
 }
 
 void transport_wait_worker(const std::shared_ptr<ConnectionChannel> &channel,
@@ -343,6 +410,7 @@ void transport_reap_parked_workers() {
       if (entry.thread.joinable()) {
         entry.thread.join();
       }
+      transport_release_channel_pending(entry.channel);
       continue;
     }
     pending.push_back(std::move(entry));
@@ -404,6 +472,7 @@ size_t transport_drain_parked_workers(
     }
     entry.thread.join();
     ++joined;
+    transport_release_channel_pending(entry.channel);
   }
   parked.clear();
   if (forced > 0) {
@@ -444,7 +513,13 @@ void transport_retire_connections(
                                                                   now));
       }
     }
+    const bool worker_parked =
+        !connection->worker.joinable() &&
+        !transport_channel_finished(connection->channel);
     transport_join_worker(*connection);
+    if (!worker_parked) {
+      transport_release_channel_pending(connection->channel);
+    }
     http_stream::release(std::to_string(connection->id));
     if (connection->peer.is_valid()) {
       connection->peer->disconnect_from_host();
@@ -485,7 +560,7 @@ void transport_read(TransportConnection &connection) {
   connection.last_activity = std::chrono::steady_clock::now();
 }
 
-void transport_enqueue_error_job(TransportConnection &connection,
+bool transport_enqueue_error_job(TransportConnection &connection,
                                   int status_code,
                                   const std::string &status_text,
                                   const std::string &message) {
@@ -493,7 +568,12 @@ void transport_enqueue_error_job(TransportConnection &connection,
   job.use_preset = true;
   job.preset = transport_error_response(status_code, status_text, message);
   job.keep_alive = false;
-  transport_enqueue_job(connection, std::move(job));
+  if (!transport_enqueue_job(connection, std::move(job))) {
+    connection.dead = true;
+    connection.inbox.clear();
+    return false;
+  }
+  return true;
 }
 
 void transport_dispatch(TransportState &state, TransportConnection &connection) {
@@ -599,7 +679,11 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
     if (handler != nullptr) {
       job.handler = *handler;
     }
-    transport_enqueue_job(connection, std::move(job));
+    if (!transport_enqueue_job(connection, std::move(job))) {
+      connection.dead = true;
+      connection.inbox.clear();
+      return;
+    }
     if (!keep_alive) {
       return;
     }
@@ -611,6 +695,10 @@ void transport_collect_replies(TransportConnection &connection) {
   {
     std::lock_guard<std::mutex> lock(connection.channel->mutex);
     replies.swap(connection.channel->replies);
+  }
+  for (const CompletedReply &reply : replies) {
+    connection.channel->pending.release(reply.pending_bytes);
+    g_http_pending_budget.release(reply.pending_bytes);
   }
   const size_t cap = http_pump_limits().max_outbox_bytes_per_connection;
   for (CompletedReply &reply : replies) {

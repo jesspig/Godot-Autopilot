@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -15,6 +17,8 @@ using godot_autopilot::TraceRecorder;
 
 namespace {
 
+constexpr int64_t kThirtyOneMinutesNs = 31LL * 60 * 1000000000LL;
+
 template <typename ScopeT, typename = void>
 struct HasDisarmInterface : std::false_type {};
 
@@ -27,12 +31,13 @@ struct HasDisarmInterface<
 
 } // namespace
 
-TEST(ExportStateTest, BeginAndEndToggleExportingFlag) {
+TEST(ExportStateTest, ScopeTogglesExportingFlag) {
   ExportState state;
   EXPECT_FALSE(state.exporting());
-  state.begin();
-  EXPECT_TRUE(state.exporting());
-  state.end();
+  {
+    ExportState::Scope scope(state);
+    EXPECT_TRUE(state.exporting());
+  }
   EXPECT_FALSE(state.exporting());
 }
 
@@ -57,103 +62,95 @@ TEST(ExportStateTest, ScopeDestructionAlwaysClearsExportingFlag) {
     EXPECT_TRUE(state.exporting());
   }
   EXPECT_FALSE(state.exporting());
-  EXPECT_FALSE(state.claim_stale_reset(TraceRecorder::monotonic_now_ns()));
+}
+
+TEST(ExportStateTest, OverlappingScopesRemainActiveUntilEveryOwnerReleases) {
+  ExportState state;
+  auto first = std::make_unique<ExportState::Scope>(state);
+  auto second = std::make_unique<ExportState::Scope>(state);
+  EXPECT_TRUE(state.exporting());
+
+  second.reset();
+  EXPECT_TRUE(state.exporting());
+  first.reset();
+  EXPECT_FALSE(state.exporting());
 }
 
 TEST(ExportStateTest, InstancesAreIsolated) {
   ExportState first;
   ExportState second;
-  first.begin();
-  EXPECT_TRUE(first.exporting());
-  EXPECT_FALSE(second.exporting());
-  first.end();
+  {
+    ExportState::Scope scope(first);
+    EXPECT_TRUE(first.exporting());
+    EXPECT_FALSE(second.exporting());
+  }
   EXPECT_FALSE(first.exporting());
   EXPECT_FALSE(second.exporting());
-}
-
-TEST(ExportStateTest, ClaimStaleResetRejectsWithinBudget) {
-  ExportState state;
-  const int64_t before = TraceRecorder::monotonic_now_ns();
-  state.begin();
-  const int64_t after = TraceRecorder::monotonic_now_ns();
-
-  EXPECT_FALSE(state.claim_stale_reset(after));
-  EXPECT_TRUE(state.exporting());
-  EXPECT_FALSE(state.claim_stale_reset(before + ExportState::kHoldBudgetNs));
-  EXPECT_TRUE(state.exporting());
-}
-
-TEST(ExportStateTest, ClaimStaleResetSucceedsExactlyOnceBeyondBudget) {
-  ExportState state;
-  state.begin();
-  const int64_t after = TraceRecorder::monotonic_now_ns();
-  const int64_t stale_now = after + ExportState::kHoldBudgetNs + 1;
-
-  EXPECT_TRUE(state.claim_stale_reset(stale_now));
-  EXPECT_FALSE(state.exporting());
-  EXPECT_FALSE(state.claim_stale_reset(stale_now + 1));
-  EXPECT_FALSE(state.exporting());
 }
 
 TEST(ExportStateTest, HeldMsNeverNegativeAndNeverBeforeStamp) {
   ExportState state;
-  EXPECT_EQ(0, state.held_ms(-1));
-  EXPECT_EQ(0, state.held_ms(0));
-  EXPECT_EQ(ExportState::kHoldBudgetMs,
-            state.held_ms(ExportState::kHoldBudgetNs));
-  EXPECT_EQ(ExportState::kHoldBudgetMs - 1,
-            state.held_ms(ExportState::kHoldBudgetNs - 1000000LL));
-
-  const int64_t before = TraceRecorder::monotonic_now_ns();
-  state.begin();
-  const int64_t after = TraceRecorder::monotonic_now_ns();
-  EXPECT_EQ(0, state.held_ms(before));
-  EXPECT_GE(state.held_ms(after), state.held_ms(before));
+  EXPECT_EQ(state.held_ms(-1), 0);
+  EXPECT_EQ(state.held_ms(0), 0);
+  {
+    ExportState::Scope scope(state);
+    const int64_t now = TraceRecorder::monotonic_now_ns();
+    EXPECT_EQ(state.held_ms(0), 0);
+    EXPECT_GE(state.held_ms(now), 0);
+  }
+  EXPECT_EQ(state.held_ms(TraceRecorder::monotonic_now_ns()), 0);
 }
 
-TEST(ExportGuardScanTest, ScanResetsEveryStaleInstanceExactlyOnce) {
+TEST(ExportGuardScanTest, ScanDoesNotResetLongRunningExport) {
+  ExportState state;
+  const int64_t before = TraceRecorder::monotonic_now_ns();
+  {
+    ExportState::Scope scope(state);
+    const int64_t long_now = before + kThirtyOneMinutesNs;
+    const std::vector<ExportState *> states = {nullptr, &state};
+
+    const ExportGuard::ScanResult result =
+        ExportGuard::scan_states(states, long_now);
+    EXPECT_TRUE(result.exporting);
+    EXPECT_EQ(result.active_states, 1u);
+    EXPECT_GE(result.max_held_ms, 30LL * 60 * 1000 + 1000);
+    EXPECT_TRUE(state.exporting());
+
+    const ExportGuard::ScanResult again =
+        ExportGuard::scan_states(states, long_now + kThirtyOneMinutesNs);
+    EXPECT_TRUE(again.exporting);
+    EXPECT_EQ(again.active_states, 1u);
+    EXPECT_TRUE(state.exporting());
+  }
+  EXPECT_FALSE(state.exporting());
+}
+
+TEST(ExportGuardScanTest, ScanReportsEveryActiveInstanceWithoutMutation) {
   ExportState idle;
   ExportState first;
-  first.begin();
   ExportState second;
-  second.begin();
-  const int64_t after = TraceRecorder::monotonic_now_ns();
-  const int64_t stale_now = after + ExportState::kHoldBudgetNs + 1;
-  const std::vector<ExportState *> states = {&idle, nullptr, &first, &second};
+  const int64_t before = TraceRecorder::monotonic_now_ns();
+  ExportState::Scope first_scope(first);
+  ExportState::Scope second_scope(second);
 
-  const ExportGuard::ScanResult result =
-      ExportGuard::scan_states(states, stale_now);
-  EXPECT_EQ(2, result.stale_resets);
-  EXPECT_FALSE(result.exporting);
-  EXPECT_GE(result.max_held_ms, ExportState::kHoldBudgetMs);
-  EXPECT_FALSE(idle.exporting());
-  EXPECT_FALSE(first.exporting());
-  EXPECT_FALSE(second.exporting());
-
-  const ExportGuard::ScanResult again =
-      ExportGuard::scan_states(states, stale_now);
-  EXPECT_EQ(0, again.stale_resets);
-  EXPECT_FALSE(again.exporting);
-  EXPECT_EQ(0, again.max_held_ms);
+  const ExportGuard::ScanResult result = ExportGuard::scan_states(
+      {&idle, nullptr, &first, &second}, before + kThirtyOneMinutesNs);
+  EXPECT_TRUE(result.exporting);
+  EXPECT_EQ(result.active_states, 2u);
+  EXPECT_GE(result.max_held_ms, 30LL * 60 * 1000 + 1000);
+  EXPECT_TRUE(first.exporting());
+  EXPECT_TRUE(second.exporting());
 }
 
-TEST(ExportGuardScanTest, ScanResetsStaleInstanceAndKeepsFreshOneExporting) {
-  ExportState stale;
-  stale.begin();
-  const int64_t origin = TraceRecorder::monotonic_now_ns();
-  int64_t boundary = TraceRecorder::monotonic_now_ns();
-  while (boundary == origin) {
-    boundary = TraceRecorder::monotonic_now_ns();
-  }
-  ExportState fresh;
-  fresh.begin();
-
-  const std::vector<ExportState *> states = {&stale, &fresh};
-  const ExportGuard::ScanResult result = ExportGuard::scan_states(
-      states, boundary + ExportState::kHoldBudgetNs);
-  EXPECT_EQ(1, result.stale_resets);
-  EXPECT_TRUE(result.exporting);
-  EXPECT_GE(result.max_held_ms, ExportState::kHoldBudgetMs);
-  EXPECT_FALSE(stale.exporting());
-  EXPECT_TRUE(fresh.exporting());
+TEST(ExportStateRegistryTest, NestedScopesRemainActiveUntilEveryEnd) {
+  ExportState state;
+  EXPECT_FALSE(ExportGuard::is_exporting());
+  auto first = std::make_unique<ExportState::Scope>(state);
+  EXPECT_TRUE(ExportGuard::is_exporting());
+  auto second = std::make_unique<ExportState::Scope>(state);
+  EXPECT_TRUE(ExportGuard::is_exporting());
+  second.reset();
+  EXPECT_TRUE(ExportGuard::is_exporting());
+  first.reset();
+  EXPECT_FALSE(ExportGuard::is_exporting());
 }

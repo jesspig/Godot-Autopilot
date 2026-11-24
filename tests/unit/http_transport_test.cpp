@@ -440,6 +440,31 @@ TEST(HttpPumpLimitsTest, BudgetZeroCount) {
       0u);
 }
 
+TEST(HttpPendingBudgetTest, EnforcesJobCountAndReleases) {
+  godot_autopilot::HttpPendingBudget budget;
+  EXPECT_TRUE(budget.try_acquire(2, 100, 10));
+  EXPECT_TRUE(budget.try_acquire(2, 100, 20));
+  EXPECT_FALSE(budget.try_acquire(2, 100, 0));
+  EXPECT_EQ(budget.count(), 2u);
+  EXPECT_EQ(budget.bytes(), 30u);
+  budget.release(10);
+  EXPECT_TRUE(budget.try_acquire(2, 100, 5));
+  EXPECT_EQ(budget.count(), 2u);
+  EXPECT_EQ(budget.bytes(), 25u);
+}
+
+TEST(HttpPendingBudgetTest, EnforcesByteCapWithoutOverflow) {
+  godot_autopilot::HttpPendingBudget budget;
+  EXPECT_TRUE(budget.try_acquire(4, 100, 60));
+  EXPECT_FALSE(budget.try_acquire(4, 100, 41));
+  EXPECT_TRUE(budget.try_acquire(4, 100, 40));
+  EXPECT_FALSE(budget.try_acquire(4, 100, 1));
+  EXPECT_EQ(budget.bytes(), 100u);
+  budget.release(1000);
+  EXPECT_EQ(budget.count(), 1u);
+  EXPECT_EQ(budget.bytes(), 0u);
+}
+
 TEST(HttpTransportStreamingTest, FinalChunkIsZeroLengthBlock) {
   EXPECT_EQ(godot_autopilot::transport_final_chunk(), "0\r\n\r\n");
   EXPECT_EQ(godot_autopilot::mcp_wire::build_close_event_frame(),

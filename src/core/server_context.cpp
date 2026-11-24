@@ -35,6 +35,7 @@
 #include "core/transport/http_transport_ext.hpp"
 #include "core/transport/ipc_endpoint.hpp"
 #include "core/transport/ipc_transport.hpp"
+#include "core/transport/ipc_waiters.hpp"
 #include "core/storage/project_store.hpp"
 #include "core/storage/storage_paths.hpp"
 #include <cstdlib>
@@ -95,7 +96,8 @@ ServerContext::ServerContext(CommandQueue &queue)
       catalog_(std::make_unique<ToolCatalog>()),
       bm25_index_(std::make_unique<Bm25Index>()) {
   const int explicit_port = resolve_explicit_port();
-  const int preferred_port = resolve_preferred_port();
+  const int preferred_port =
+      explicit_port > 0 ? 0 : resolve_preferred_port();
   port_ = explicit_port > 0 ? explicit_port : preferred_port;
   host_ = resolve_host();
   g_server_context_instance = this;
@@ -205,6 +207,12 @@ bool ServerContext::bind_transport() {
   return true;
 }
 
+std::unique_ptr<mcp::McpServer>
+ServerContext::create_server(const std::shared_ptr<GodotTransport> &transport,
+                             const mcp::ServerOptions &options) {
+  return mcp::McpServer::Create(transport, options);
+}
+
 bool ServerContext::start() {
   std::string endpoint = host_ + ":" + std::to_string(port_);
   last_error_.clear();
@@ -305,6 +313,7 @@ bool ServerContext::start() {
     }
 
     transport_ = godot_transport_reset();
+    ipc_waiters_.open();
     transport_->set_inbound_rewrite([](mcp::JsonRpcMessage &message) {
       auto *request = std::get_if<mcp::JsonRpcRequest>(&message);
       if (request == nullptr || request->method != "tools/call" ||
@@ -338,7 +347,7 @@ bool ServerContext::start() {
     });
 
     ipc_transport::ipc_transport_instance().set_line_handler(
-        [transport = transport_](std::uint64_t connection_id,
+        [this, transport = transport_](std::uint64_t connection_id,
                                  const std::string &line) {
           auto &ipc = ipc_transport::ipc_transport_instance();
           if (!ipc.acquire_in_flight()) {
@@ -369,16 +378,44 @@ bool ServerContext::start() {
             return;
           }
           const std::string request_id = parsed.request_id;
-          std::thread([transport, connection, request_id, connection_id]() {
-            std::string response;
-            if (transport->await_response(
-                    connection, request_id, response,
-                    std::chrono::milliseconds(60000))) {
-              ipc_transport::ipc_transport_instance().queue_line(
-                  connection_id, std::move(response));
-            }
-            ipc_transport::ipc_transport_instance().release_in_flight();
-          }).detach();
+          mcp::RequestId client_id{int64_t{0}};
+          if (const auto *request = mcp::AsRequest(parsed.message)) {
+            client_id = request->id;
+          }
+          bool accepted = false;
+          try {
+            accepted = ipc_waiters_.spawn(
+                [transport, connection, request_id, connection_id,
+                 method = parsed.method, client_id](const auto &cancelled) {
+                  std::string response;
+                  bool cancellation_sent = false;
+                  const bool ready = transport->await_response(
+                      connection, request_id, response,
+                      std::chrono::milliseconds(60000), &cancellation_sent);
+                  if (cancelled->load(std::memory_order_acquire)) {
+                    ipc_transport::ipc_transport_instance().release_in_flight();
+                    return;
+                  }
+                  if (ready) {
+                    ipc_transport::ipc_transport_instance().queue_line(
+                        connection_id, std::move(response));
+                  } else {
+                    ipc_transport::ipc_transport_instance().queue_line(
+                        connection_id,
+                        mcp_wire::build_timeout_response_text(
+                            client_id, method, cancellation_sent));
+                  }
+                  ipc_transport::ipc_transport_instance().release_in_flight();
+                });
+          } catch (...) {
+            accepted = false;
+          }
+          if (!accepted) {
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(
+                               -32003, "too many IPC waiters"));
+            ipc.release_in_flight();
+          }
         });
 
     mcp::ServerOptions opts;
@@ -513,7 +550,7 @@ bool ServerContext::start() {
       monitor::note_notification(
           notif.method, notif.params ? notif.params->Dump() : std::string());
     };
-    server_ = mcp::McpServer::Create(transport_, opts);
+    server_ = create_server(transport_, opts);
     if (!server_) {
       last_error_ = "McpServer::Create returned null";
       LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
@@ -521,9 +558,7 @@ bool ServerContext::start() {
       LogSystem::instance().log_detailed(
           LogLevel::Error, LogCategory::Transport, "MCP server start failed",
           "endpoint=" + endpoint + " msg=" + last_error_);
-      transport_.reset();
-      dispatch::clear_handlers();
-      clear_active_registry();
+      rollback_start();
       monitor::error_event("server_start_failed", "server", last_error_);
       return false;
     }
@@ -565,11 +600,7 @@ bool ServerContext::start() {
     LogSystem::instance().log_detailed(
         LogLevel::Error, LogCategory::Transport, "MCP server start failed",
         "endpoint=" + endpoint + " msg=" + last_error_);
-    if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
-    if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
-    http_transport_instance().stop();
-    dispatch::clear_handlers();
-    clear_active_registry();
+    rollback_start();
     monitor::error_event("server_start_failed", "server", last_error_);
     return false;
   } catch (...) {
@@ -586,14 +617,36 @@ bool ServerContext::start() {
     LogSystem::instance().log_detailed(
         LogLevel::Error, LogCategory::Transport, "MCP server start failed",
         "endpoint=" + endpoint + " msg=" + last_error_);
-    if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
-    if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
-    http_transport_instance().stop();
-    dispatch::clear_handlers();
-    clear_active_registry();
+    rollback_start();
     monitor::error_event("server_start_failed", "server", last_error_);
     return false;
   }
+}
+
+void ServerContext::rollback_start() {
+  running_ = false;
+  ipc_waiters_.cancel();
+  ipc_transport::ipc_transport_instance().stop();
+  if (server_) {
+    try {
+      server_->Close();
+    } catch (...) {
+    }
+    server_.reset();
+  }
+  if (transport_) {
+    try {
+      transport_->Close();
+    } catch (...) {
+    }
+    transport_.reset();
+  }
+  ipc_waiters_.join();
+  http_transport_instance().stop();
+  dispatch::clear_handlers();
+  clear_active_registry();
+  remove_instance_record();
+  ipc_token_.clear();
 }
 
 void ServerContext::write_instance_record() {
@@ -648,9 +701,12 @@ void ServerContext::remove_instance_record() {
 }
 
 void ServerContext::stop() {
+  ipc_waiters_.cancel();
   ipc_transport::ipc_transport_instance().stop();
   if (!running_ && !server_ && !transport_) {
+    ipc_waiters_.join();
     http_transport_instance().stop();
+    ipc_token_.clear();
     return;
   }
   running_ = false;
@@ -664,12 +720,14 @@ void ServerContext::stop() {
     transport_->Close();
   server_.reset();
   transport_.reset();
+  ipc_waiters_.join();
   if (http_transport_is_listening()) {
     http_transport_instance().stop();
   }
   dispatch::clear_handlers();
   clear_active_registry();
   remove_instance_record();
+  ipc_token_.clear();
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "MCP server stopped");

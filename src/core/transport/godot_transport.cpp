@@ -72,6 +72,25 @@ std::string build_error_response_text(int code, const std::string &message) {
   return root.Dump();
 }
 
+std::string build_timeout_response_text(const mcp::RequestId &id,
+                                        const std::string &method,
+                                        bool cancellation_sent) {
+  mcp::JsonValue root(mcp::JsonValue::object_tag);
+  root["jsonrpc"] = mcp::JsonValue("2.0");
+  root["id"] = mcp::RequestIdToJson(id);
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["code"] = mcp::JsonValue(static_cast<int64_t>(-32000));
+  error["message"] =
+      mcp::JsonValue("mcp request timed out: " + method +
+                     "; the task may still be running");
+  mcp::JsonValue data(mcp::JsonValue::object_tag);
+  data["still_running"] = mcp::JsonValue(true);
+  data["cancellation_sent"] = mcp::JsonValue(cancellation_sent);
+  error["data"] = std::move(data);
+  root["error"] = std::move(error);
+  return root.Dump();
+}
+
 std::string build_event_frame(const std::string &event,
                                const std::string &data) {
   std::string escaped;
@@ -355,7 +374,8 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
 bool GodotTransport::await_response(const std::string &connection_id,
                                     const std::string &request_id,
                                     mcp::JsonRpcMessage &message,
-                                    std::chrono::milliseconds timeout) {
+                                    std::chrono::milliseconds timeout,
+                                     bool *cancellation_sent) {
   expire_stale_pending();
   const std::string key =
       mcp_wire::make_pending_key(connection_id, request_id);
@@ -369,11 +389,21 @@ bool GodotTransport::await_response(const std::string &connection_id,
     future = it->second.future;
   }
   if (future.wait_for(timeout) != std::future_status::ready) {
-    std::lock_guard<std::mutex> lock(pending_mutex_);
-    auto it = pending_.find(key);
-    if (it != pending_.end()) {
-      it->second.expired = true;
-      it->second.expired_at = std::chrono::steady_clock::now();
+    mcp::RequestId internal_id{int64_t{0}};
+    bool found = false;
+    {
+      std::lock_guard<std::mutex> lock(pending_mutex_);
+      auto it = pending_.find(key);
+      if (it != pending_.end()) {
+        it->second.expired = true;
+        it->second.expired_at = std::chrono::steady_clock::now();
+        internal_id = it->second.internal_id;
+        found = true;
+      }
+    }
+    const bool sent = found && send_cancel_notification(internal_id);
+    if (cancellation_sent != nullptr) {
+      *cancellation_sent = sent;
     }
     return false;
   }
@@ -392,13 +422,27 @@ bool GodotTransport::await_response(const std::string &connection_id,
 bool GodotTransport::await_response(const std::string &connection_id,
                                     const std::string &request_id,
                                     std::string &response_text,
-                                    std::chrono::milliseconds timeout) {
+                                    std::chrono::milliseconds timeout,
+                                     bool *cancellation_sent) {
   mcp::JsonRpcMessage message;
-  if (!await_response(connection_id, request_id, message, timeout)) {
+  if (!await_response(connection_id, request_id, message, timeout,
+                      cancellation_sent)) {
     return false;
   }
   response_text = mcp_wire::build_response_text(message);
   return true;
+}
+
+bool GodotTransport::send_cancel_notification(
+    const mcp::RequestId &internal_id) {
+  mcp::JsonValue params(mcp::JsonValue::object_tag);
+  params[kRequestIdParam] = mcp::RequestIdToJson(internal_id);
+  params["reason"] = mcp::JsonValue("timeout");
+  mcp::JsonRpcNotification notification;
+  notification.method = kCancelledNotificationMethod;
+  notification.params = std::move(params);
+  return GetMessageChannel().TrySend(
+      mcp::JsonRpcMessage(std::move(notification)));
 }
 
 std::shared_ptr<GodotTransport> godot_transport_instance() {
