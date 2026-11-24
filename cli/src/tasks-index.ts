@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { gdaRoot, joinPath } from "./platform";
+import { isSafeTaskId } from "./security-policy";
 
 export interface TaskRecord {
   task_id: string;
@@ -26,10 +27,15 @@ export function argsHash(args: unknown): string {
   return createHash("sha256").update(JSON.stringify(args)).digest("hex").slice(0, 16);
 }
 
+export function safeTaskFileName(taskId: string): string {
+  if (isSafeTaskId(taskId)) return `${taskId}.json`;
+  return `${createHash("sha256").update(taskId).digest("hex").slice(0, 32)}.json`;
+}
+
 export function recordTask(record: TaskRecord): void {
   const dir = tasksDir();
   fs.mkdirSync(dir, { recursive: true });
-  const target = joinPath(dir, `${record.task_id}.json`);
+  const target = joinPath(dir, safeTaskFileName(record.task_id));
   const tmp = `${target}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   fs.renameSync(tmp, target);
@@ -56,7 +62,7 @@ export function listTasks(): TaskIndexEntry[] {
 }
 
 export function removeTask(taskId: string): boolean {
-  const target = joinPath(tasksDir(), `${taskId}.json`);
+  const target = joinPath(tasksDir(), safeTaskFileName(taskId));
   try {
     fs.rmSync(target, { force: true });
     return true;
