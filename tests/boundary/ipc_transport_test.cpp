@@ -83,6 +83,31 @@ test_socket connect_tcp(int port) {
   return socket;
 }
 
+bool bind_tcp_with_reuse(int port) {
+  const test_socket socket = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (socket == kInvalidTestSocket) {
+    return false;
+  }
+  int reuse = 1;
+#ifdef _WIN32
+  const bool reuse_set = ::setsockopt(
+      socket, SOL_SOCKET, SO_REUSEADDR,
+      reinterpret_cast<const char *>(&reuse), sizeof(reuse)) == 0;
+#else
+  const bool reuse_set = ::setsockopt(socket, SOL_SOCKET, SO_REUSEADDR,
+                                      &reuse, sizeof(reuse)) == 0;
+#endif
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_port = htons(static_cast<unsigned short>(port));
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  const bool bound =
+      reuse_set &&
+      ::bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == 0;
+  close_test_socket(socket);
+  return bound;
+}
+
 bool send_all(test_socket socket, const std::string &data) {
   std::size_t offset = 0;
   while (offset < data.size()) {
@@ -196,6 +221,15 @@ TEST(IpcTransportTest, TcpListenAssignsRandomPort) {
   transport.stop();
   EXPECT_FALSE(transport.is_listening());
   EXPECT_EQ(transport.port(), 0);
+}
+
+TEST(IpcTransportTest, TcpListenRejectsPortHijackWithReuse) {
+  godot_autopilot::ipc_transport::IpcTransport transport;
+  std::string error;
+  ASSERT_TRUE(transport.listen_tcp("127.0.0.1", 0, "test-token", error))
+      << error;
+  EXPECT_FALSE(bind_tcp_with_reuse(transport.port()));
+  transport.stop();
 }
 
 TEST(IpcTransportTest, TcpListenRejectsNonLoopbackHost) {

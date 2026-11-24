@@ -5,6 +5,10 @@
 # 不改 tests/CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_UNIT_CONTRACT_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/core/server_context.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/plugin_config.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/transport/http_transport.cpp
+    ${CMAKE_SOURCE_DIR}/src/prompts/debugger_prompts.cpp
     ${CMAKE_SOURCE_DIR}/src/resources/resource_handlers.cpp
     ${CMAKE_SOURCE_DIR}/src/resources/debugger_resources.cpp
     ${CMAKE_SOURCE_DIR}/src/prompts/prompt_handlers.cpp
