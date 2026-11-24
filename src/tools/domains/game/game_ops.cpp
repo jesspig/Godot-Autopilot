@@ -7,6 +7,7 @@
 #include "tools/base/debugger_access.hpp"
 #include "tools/base/ready_policy.hpp"
 #include "tools/base/tool_base.hpp"
+#include "tools/domains/debugger/debugger_ops.hpp"
 #include "util/error_util.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/translation_server.hpp>
@@ -1496,6 +1497,14 @@ mcp::JsonValue game_session_result(const JV &forwarded) {
       debugger_ready_session_count()));
   session["scene_ready_sessions"] = JV(static_cast<int64_t>(
       debugger_scene_ready_session_count()));
+  debugger_ops::SessionReadiness state;
+  const auto ids = debugger_active_session_ids();
+  if (!ids.empty())
+    state = debugger_ops::session_readiness(ids.front());
+  session["ready_diagnosis"] = JV(debugger_ops::ready_diagnosis(state));
+  session["hello_attempts"] = JV(static_cast<int64_t>(state.hello_attempts));
+  session["extension_responded"] = JV(state.extension_responded);
+  session["csharp_bridge"] = JV(state.csharp_bridge);
   JV breaked(JV::array_tag);
   for (int32_t session_id : debugger_breaked_session_ids()) {
     breaked.PushBack(JV(static_cast<int64_t>(session_id)));

@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/editor_debugger_session.hpp>
 #include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
+#include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -14,6 +15,7 @@
 #include <mcp/JsonValue.hpp>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace godot_autopilot {
@@ -35,10 +37,19 @@ public:
   void _log_message(const godot::String &p_message, bool p_error) override;
 };
 
+struct SessionReadiness {
+  bool extension_responded = false;
+  bool ready = false;
+  bool scene_ready = false;
+  int hello_attempts = 0;
+  int64_t last_hello_ms = 0;
+  std::string csharp_bridge = "unknown";
+};
+
 class DebugCapturePlugin : public godot::EditorDebuggerPlugin {
   GDCLASS(DebugCapturePlugin, EditorDebuggerPlugin)
 protected:
-  static void _bind_methods() {}
+  static void _bind_methods();
   godot::Ref<godot::EditorDebuggerSession> session_;
 
 public:
@@ -84,14 +95,31 @@ public:
     return true;
   }
   void forget_ready_session(int32_t session_id);
+  SessionReadiness readiness(int32_t id) const;
+  void start_hello_retry(int32_t id);
+  void stop_hello_retry(int32_t id);
+  void send_hello(int32_t id);
+  void _on_hello_timer(int32_t session_id);
 
 private:
   std::vector<int32_t> session_ids_;
   std::vector<int32_t> ready_session_ids_;
   std::vector<int32_t> scene_ready_session_ids_;
+  std::unordered_map<int32_t, SessionReadiness> readiness_;
+  std::unordered_map<int32_t, godot::Ref<godot::SceneTreeTimer>> hello_timers_;
   mutable std::mutex session_mtx_;
 };
 
+SessionReadiness session_readiness(int32_t id);
+inline const char *ready_diagnosis(const SessionReadiness &state) {
+  if (state.ready && state.scene_ready)
+    return "ready";
+  if (state.ready && !state.scene_ready)
+    return "scene_not_ready";
+  if (!state.extension_responded)
+    return "extension_not_loaded";
+  return "ready_lost";
+}
 void capture_add_log_entry(const std::string &text, bool is_error);
 std::string capture_get_log_text(size_t limit);
 std::string capture_get_errors_text(size_t limit);

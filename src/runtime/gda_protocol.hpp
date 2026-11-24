@@ -6,6 +6,7 @@ namespace godot_autopilot {
 
 inline constexpr std::string_view GDA_PREFIX = "gda";
 inline constexpr std::string_view GDA_MSG_READY = "gda:ready";
+inline constexpr std::string_view GDA_MSG_HELLO = "gda:hello";
 inline constexpr std::string_view GDA_MSG_RESPONSE = "gda:response";
 inline constexpr std::string_view GDA_MSG_REQUEST = "gda:request";
 
