@@ -1,4 +1,5 @@
 #include "tools/base/runtime_ops.hpp"
+#include "tools/domains/debugger/debugger_ops.hpp"
 
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
@@ -662,6 +663,17 @@ mcp::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input) 
     details["code"] = JV("game_ready_timeout");
     details["retryable"] = JV(true);
     details["timeout_ms"] = JV(input.timeout_ms);
+    debugger_ops::SessionReadiness state;
+    const auto ids = debugger_active_session_ids();
+    if (!ids.empty())
+      state = debugger_ops::session_readiness(ids.front());
+    const char *diagnosis = debugger_ops::ready_diagnosis(state);
+    details["ready_diagnosis"] = JV(diagnosis);
+    details["hello_attempts"] = JV(static_cast<int64_t>(state.hello_attempts));
+    details["next_action"] = JV(
+        std::string(diagnosis) == "extension_not_loaded"
+            ? "verify the game project loads the godot-autopilot extension"
+            : "wait for scene-ready, then retry; use get_game_state session for details");
     error["structured_error"] = std::move(details);
   } else {
     error = error_json(

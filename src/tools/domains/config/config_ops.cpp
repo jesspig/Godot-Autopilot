@@ -3,6 +3,7 @@
 #include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/input_guards.hpp"
+#include "util/script_capability.hpp"
 #include "util/project_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
@@ -716,8 +717,26 @@ mcp::JsonValue handle_autoload_add(const mcp::JsonValue &args) {
   }
   const std::string key = std::string(kAutoloadSettingPrefix) + name;
   if (ps->has_setting(godot::String(key.c_str()))) {
+    const godot::Variant old_value =
+        ps->get_setting(godot::String(key.c_str()));
+    const std::string existing =
+        old_value.get_type() == godot::Variant::STRING
+            ? util::to_std(old_value.operator godot::String())
+            : std::string();
+    const std::string existing_path =
+        !existing.empty() && existing[0] == '*' ? existing.substr(1) : existing;
+    if (existing_path == pp->GetString()) {
+      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      r["result"] = mcp::JsonValue("ok");
+      r["name"] = mcp::JsonValue(name);
+      r["path"] = mcp::JsonValue(existing_path);
+      r["already_present"] = mcp::JsonValue(true);
+      r["enabled"] = mcp::JsonValue(!existing.empty() && existing[0] == '*');
+      return r;
+    }
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("autoload already exists: " + name);
+    e["error"] = mcp::JsonValue("autoload name conflicts with an existing entry: " + name);
+    e["code"] = mcp::JsonValue("autoload_name_conflict");
     return e;
   }
   const util::ProjectPath checked =
@@ -747,22 +766,17 @@ mcp::JsonValue handle_autoload_add(const mcp::JsonValue &args) {
         "autoload file does not exist or cannot be loaded: " + checked.value);
     return e;
   }
-  godot::Ref<godot::Resource> res = loader->load(target);
-  bool instantiable = false;
-  if (!res.is_null()) {
-    auto *packed = godot::Object::cast_to<godot::PackedScene>(res.ptr());
-    auto *script = godot::Object::cast_to<godot::Script>(res.ptr());
-    if (packed) {
-      instantiable = packed->can_instantiate();
-    } else if (script) {
-      instantiable = script->can_instantiate();
-    }
-  }
-  if (!instantiable) {
+  const script_capability::Result capability =
+      script_capability::inspect(checked.value, true);
+  if (!capability.runtime_mountable) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(
-        "autoload path must be a scene or script that can be instantiated: " +
-        checked.value);
+        "autoload path must be a scene or script that can be mounted: " +
+        checked.value + " (" +
+        script_capability::code_name(capability.code) + ")");
+    e["code"] = mcp::JsonValue(script_capability::code_name(capability.code));
+    e["structured_error"] =
+        script_capability::detail_json(capability, checked.value);
     return e;
   }
   bool enabled = true;
@@ -793,6 +807,16 @@ mcp::JsonValue handle_autoload_add(const mcp::JsonValue &args) {
   r["path"] = mcp::JsonValue(checked.value);
   r["enabled"] = mcp::JsonValue(enabled);
   r["order"] = mcp::JsonValue(static_cast<int64_t>(order));
+  r["runtime_mountable"] = mcp::JsonValue(capability.runtime_mountable);
+  r["editor_runnable"] = mcp::JsonValue(capability.editor_runnable);
+  r["resource_class"] = mcp::JsonValue(capability.resource_class);
+  r["base_class"] = mcp::JsonValue(capability.base_class);
+  r["code"] = mcp::JsonValue(script_capability::code_name(capability.code));
+  r["restart_required"] = mcp::JsonValue(true);
+  if (!capability.editor_runnable) {
+    r["note"] = mcp::JsonValue(
+        "runtime-only script: it runs in the game, not in the editor");
+  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_autoload completed");
   return r;

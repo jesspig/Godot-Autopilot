@@ -14,7 +14,9 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -538,6 +540,93 @@ void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
     godot_autopilot::debugger_ops::capture_add_log_entry(
         "Debug session started", false);
   }
+  start_hello_retry(p_session_id);
+}
+
+void DebugCapturePlugin::_bind_methods() {
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("_on_hello_timer", "session_id"),
+      &DebugCapturePlugin::_on_hello_timer);
+}
+
+SessionReadiness DebugCapturePlugin::readiness(int32_t id) const {
+  std::lock_guard<std::mutex> lock(session_mtx_);
+  auto it = readiness_.find(id);
+  return it == readiness_.end() ? SessionReadiness{} : it->second;
+}
+
+void DebugCapturePlugin::send_hello(int32_t id) {
+  godot::Ref<godot::EditorDebuggerSession> session;
+  {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    if (std::find(session_ids_.begin(), session_ids_.end(), id) ==
+        session_ids_.end())
+      return;
+  }
+  session = get_session(id);
+  if (session.is_null())
+    return;
+  godot::Array payload;
+  session->send_message(
+      godot::StringName(godot_autopilot::GDA_MSG_HELLO.data()), payload);
+}
+
+void DebugCapturePlugin::_on_hello_timer(int32_t session_id) {
+  const SessionReadiness state = readiness(session_id);
+  if (state.ready || !has_session(session_id)) {
+    stop_hello_retry(session_id);
+    return;
+  }
+  if (state.hello_attempts >= 32) {
+    stop_hello_retry(session_id);
+    return;
+  }
+  send_hello(session_id);
+  {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    SessionReadiness &entry = readiness_[session_id];
+    entry.hello_attempts += 1;
+    entry.last_hello_ms = godot::Time::get_singleton()
+                              ? godot::Time::get_singleton()->get_ticks_msec()
+                              : 0;
+  }
+  auto *tree = godot::Engine::get_singleton()
+                   ? godot::Engine::get_singleton()->get_main_loop()
+                   : nullptr;
+  auto *scene_tree = godot::Object::cast_to<godot::SceneTree>(tree);
+  if (scene_tree == nullptr)
+    return;
+  godot::Ref<godot::SceneTreeTimer> timer =
+      scene_tree->create_timer(0.25, true, false, true);
+  if (timer.is_null())
+    return;
+  timer->connect("timeout",
+                 godot::Callable(this, godot::StringName("_on_hello_timer"))
+                     .bind(session_id));
+  std::lock_guard<std::mutex> lock(session_mtx_);
+  hello_timers_[session_id] = timer;
+}
+
+void DebugCapturePlugin::start_hello_retry(int32_t id) {
+  {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    SessionReadiness &entry = readiness_[id];
+    entry = SessionReadiness{};
+  }
+  _on_hello_timer(id);
+}
+
+void DebugCapturePlugin::stop_hello_retry(int32_t id) {
+  godot::Ref<godot::SceneTreeTimer> timer;
+  {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    auto it = hello_timers_.find(id);
+    if (it != hello_timers_.end()) {
+      timer = it->second;
+      hello_timers_.erase(it);
+    }
+  }
+  timer.unref();
 }
 
 void DebugCapturePlugin::forget_ready_session(int32_t session_id) {
@@ -549,6 +638,8 @@ void DebugCapturePlugin::forget_ready_session(int32_t session_id) {
       std::remove(scene_ready_session_ids_.begin(),
                   scene_ready_session_ids_.end(), session_id),
       scene_ready_session_ids_.end());
+  readiness_.erase(session_id);
+  hello_timers_.erase(session_id);
 }
 
 bool DebugCapturePlugin::_capture(const godot::String &p_message,
@@ -577,7 +668,21 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
         ready_session_ids_.push_back(p_session_id);
         newly_ready = true;
       }
+      SessionReadiness &entry = readiness_[p_session_id];
+      entry.extension_responded = true;
+      entry.ready = true;
+      entry.scene_ready = scene_ready;
+      if (p_data.size() >= 1) {
+        const mcp::JsonValue ready_body =
+            mcp::JsonValue::Parse(util::to_std(godot::String(p_data[0])));
+        if (const mcp::JsonValue *bridge =
+                ready_body.Find(std::string("csharp_bridge"))) {
+          if (bridge->IsString())
+            entry.csharp_bridge = bridge->GetString();
+        }
+      }
     }
+    stop_hello_retry(p_session_id);
     if (newly_ready) {
       godot_autopilot::runtime_ops::run_channel_self_check(p_session_id);
     }
@@ -1067,6 +1172,11 @@ mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args) {
                             "debugger_breakpoints " + action + " completed: " +
                                 path + ":" + std::to_string(line));
   return result;
+}
+
+SessionReadiness session_readiness(int32_t id) {
+  auto *plugin = DebugCapturePlugin::get_instance();
+  return plugin == nullptr ? SessionReadiness{} : plugin->readiness(id);
 }
 
 void register_classes() {

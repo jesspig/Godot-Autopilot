@@ -202,6 +202,7 @@ describe("请求形状", () => {
     expect(requests[0].params).toEqual({
       name: "call_tool",
       arguments: { name: "delete_scene_node", arguments: { confirm: true } },
+      inputResponses: { confirm: { action: "accept" } },
     });
   });
 
