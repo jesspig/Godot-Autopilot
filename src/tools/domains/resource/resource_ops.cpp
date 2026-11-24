@@ -1016,7 +1016,17 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
       }
     }
   }
-  if (err == godot::OK && has_oid) {
+  if (err == godot::OK && !verified) {
+    mcp::JsonValue e = util::error_json(
+        "resource write verification failed for " + dest_path);
+    mcp::JsonValue details(mcp::JsonValue::object_tag);
+    details["code"] = mcp::JsonValue("resource_write_verification_failed");
+    details["path"] = mcp::JsonValue(dest_path);
+    details["io_error"] = mcp::JsonValue(static_cast<int64_t>(err));
+    e["structured_error"] = std::move(details);
+    return e;
+  }
+  if (err == godot::OK && verified && has_oid) {
     const std::vector<std::string> preserved_names =
         resource_registry::erase_oid_and_extract_names(obj_id);
     resource_registry::register_resource(res, name);
@@ -2014,18 +2024,12 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     if (!needs_write) {
       continue;
     }
-    godot::Ref<godot::FileAccess> writer = godot::FileAccess::open(
-        godot::String(fp.c_str()), godot::FileAccess::WRITE);
-    if (writer.is_null() || !writer->store_string(content)) {
-      stale.push_back({fp, "path=\"" + from + "\""});
-      continue;
-    }
-    writer->flush();
-    writer->close();
-    godot::Ref<godot::FileAccess> checker = godot::FileAccess::open(
-        godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (checker.is_null() ||
-        !checker->get_as_text().contains(make_token("path=\"", to))) {
+    resource_fs::GodotTextWriteFs file_system;
+    const resource_fs::TextWriteResult written =
+        resource_fs::write_text_verified(
+            fp, util::to_std(content), resource_fs::TextWriteMode::kWrite,
+            file_system);
+    if (!written.ok) {
       stale.push_back({fp, "path=\"" + from + "\""});
       continue;
     }

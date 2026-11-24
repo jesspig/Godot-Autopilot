@@ -3,6 +3,7 @@
 #include "tools/domains/script/script_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
+#include "util/resource_fs.hpp"
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -78,19 +79,12 @@ bool read_disk_text(const std::string &path, std::string &out_text,
 
 bool restore_disk_text(const std::string &path, const std::string &original,
                        std::string &error_out) {
-  auto writer = godot::FileAccess::open(godot::String(path.c_str()),
-                                        godot::FileAccess::WRITE);
-  if (writer.is_null() || !writer->is_open()) {
-    error_out = "rollback failed: cannot reopen file for writing: " + path;
-    return false;
-  }
-  if (!writer->store_string(godot::String::utf8(original.c_str()))) {
-    error_out = "rollback failed: could not restore original content: " + path;
-    return false;
-  }
-  writer->close();
-  if (writer->get_error() != godot::OK) {
-    error_out = "rollback failed: error after restoring content: " + path;
+  resource_fs::GodotTextWriteFs file_system;
+  const resource_fs::TextWriteResult restored =
+      resource_fs::write_text_verified(
+          path, original, resource_fs::TextWriteMode::kWrite, file_system);
+  if (!restored.ok) {
+    error_out = "rollback failed: " + restored.message;
     return false;
   }
   return true;
@@ -119,6 +113,13 @@ bool save_patched_script(const std::string &path, const std::string &patched,
   if (err != godot::OK) {
     error_out = "failed to save script, error code: " +
                 std::to_string(static_cast<int>(err));
+    return false;
+  }
+  resource_fs::GodotTextWriteFs file_system;
+  const resource_fs::TextWriteResult verified =
+      resource_fs::verify_text_file(path, patched, file_system);
+  if (!verified.ok) {
+    error_out = "script write verification failed: " + verified.message;
     return false;
   }
   return true;
@@ -280,41 +281,21 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
     e["error"] = mcp::JsonValue(message);
     e["disk_write"] = mcp::JsonValue(true);
     e["rolled_back"] = mcp::JsonValue(rolled_back);
+    mcp::JsonValue details(mcp::JsonValue::object_tag);
+    details["code"] = mcp::JsonValue("script_write_failed");
+    details["path"] = mcp::JsonValue(path);
+    details["rolled_back"] = mcp::JsonValue(rolled_back);
+    if (!rolled_back) {
+      details["rollback_error"] = mcp::JsonValue(rollback_error);
+    }
+    e["structured_error"] = std::move(details);
     return e;
   }
 
-  bool verified = false;
-  bool readback = false;
-  std::string read_back;
-  std::string write_issue;
-  std::string write_warning;
-  auto readback_file = godot::FileAccess::open(
-      godot::String(path.c_str()), godot::FileAccess::READ);
-  if (readback_file.is_valid() && readback_file->is_open()) {
-    readback = true;
-    read_back = util::to_std(readback_file->get_as_text());
-    godot::Error read_err = readback_file->get_error();
-    if (read_err != godot::OK && read_err != godot::ERR_FILE_EOF) {
-      write_issue = "readback read error";
-    } else if (read_back == patched) {
-      verified = true;
-    } else {
-      write_issue = "readback mismatch (patched " +
-                    std::to_string(patched.size()) + " bytes, read back " +
-                    std::to_string(read_back.size()) + " bytes)";
-      write_warning =
-          "file may not have been updated on disk; retry or check file locks "
-          "(e.g. the running game or antivirus)";
-    }
-  } else {
-    write_issue = "readback open failed";
-  }
-
-  bool rolled_back = false;
-  std::string rollback_error;
-  if (!verified) {
-    rolled_back = restore_disk_text(path, original, rollback_error);
-  }
+  const bool verified = true;
+  const bool readback = true;
+  const std::string read_back = patched;
+  const bool rolled_back = false;
 
   notify_editors(path);
   std::string cache_refresh_error;
@@ -336,16 +317,7 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
     j["content_hash_algo"] =
         mcp::JsonValue(script_ops::content_hash_algo_name());
   }
-  if (!write_issue.empty()) {
-    j["write_issue"] = mcp::JsonValue(write_issue);
-  }
-  if (!write_warning.empty()) {
-    j["warning"] = mcp::JsonValue(write_warning);
-  }
   j["rolled_back"] = mcp::JsonValue(rolled_back);
-  if (!verified && !rolled_back && !rollback_error.empty()) {
-    j["rollback_error"] = mcp::JsonValue(rollback_error);
-  }
   j["cache_refreshed"] = mcp::JsonValue(cache_refreshed);
   if (!cache_refreshed) {
     j["cache_refresh_error"] = mcp::JsonValue(cache_refresh_error);
