@@ -34,8 +34,12 @@ describe("artifact selection", () => {
     expect(selectUniqueArtifact([path.join("build", "Debug", LIB)], LIB, "debug").failure).toBe("none");
   });
 
-  test("rejects symbol files", () => {
+  test("ignores symbol files so they are never packaged", () => {
     const pdb = path.join("build", "release", "godot-autopilot.pdb");
-    expect(selectUniqueArtifact([pdb, path.join("build", "release", LIB)], LIB, "release").failure).toBe("symbol_file");
+    const dll = path.join("build", "release", LIB);
+    expect(selectUniqueArtifact([pdb, dll], LIB, "release")).toEqual({
+      failure: "none",
+      selected: dll,
+    });
   });
 });
