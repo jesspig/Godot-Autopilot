@@ -6,6 +6,7 @@
 #include "core/observability/monitor.hpp"
 #include "core/observability/sanitize_policy.hpp"
 #include "core/observability/trace_recorder.hpp"
+#include "core/export_guard.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/domains/editor/editor_ops.hpp"
 #include "tools/domains/os/os_ops.hpp"
@@ -114,6 +115,9 @@ std::optional<ToolAlias> resolve_tool_alias(const std::string &name) {
 
 mcp::JsonValue call_handler_impl(const std::string &name,
                                  const mcp::JsonValue &args) {
+  if (godot_autopilot::ExportGuard::is_exporting()) {
+    return export_blocked_json_result();
+  }
   mcp::JsonValue result(mcp::JsonValue::object_tag);
   std::optional<ToolAlias> alias;
   if (auto registry = get_active_registry()) {
@@ -652,6 +656,9 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
 
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args) {
+  if (godot_autopilot::ExportGuard::is_exporting()) {
+    return export_blocked_json_result();
+  }
   if (!godot_autopilot::runtime_ops::has_editor_queue()) {
     return queue_unavailable_result(
         name, "the plugin has not attached the editor main thread queue yet "
@@ -691,10 +698,17 @@ mcp::JsonValue call_handler(const std::string &name,
 mcp::CallToolResult export_blocked_result() {
   mcp::CallToolResult err;
   err.is_error = true;
+  err.content.push_back(
+      mcp::TextContent{"text", export_blocked_json_result().Dump()});
+  return err;
+}
+
+mcp::JsonValue export_blocked_json_result() {
   mcp::JsonValue body(mcp::JsonValue::object_tag);
   body["error"] = mcp::JsonValue(export_blocked_error_text());
-  err.content.push_back(mcp::TextContent{"text", body.Dump()});
-  return err;
+  body["code"] = mcp::JsonValue("export_in_progress");
+  body["retryable"] = mcp::JsonValue(true);
+  return body;
 }
 
 std::string export_blocked_error_text() {

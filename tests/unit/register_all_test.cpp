@@ -16,8 +16,11 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <future>
+#include <memory>
 
 #include "core/command_queue.hpp"
+#include "core/export_guard.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/dynamic_spec_store.hpp"
 #include "tools/base/register_all.hpp"
@@ -306,6 +309,48 @@ TEST_F(RegisteredServerFixture, BatchExecuteSchemaDeclaresRollbackOnError) {
     ASSERT_TRUE(entry.IsString());
     EXPECT_NE(entry.GetString(), "rollback_on_error");
   }
+}
+
+TEST_F(RegisteredServerFixture,
+       ExportStartingAfterSubmissionBlocksFinalToolExecution) {
+  godot_autopilot::ExportState export_state;
+  std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
+  mcp::JsonValue params(mcp::JsonValue::object_tag);
+  params["name"] = mcp::JsonValue("search_tools");
+  params["arguments"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+  std::promise<mcp::JsonValue> completed;
+  auto completed_future = completed.get_future();
+  std::thread worker([&] {
+    try {
+      completed.set_value(client->SendRequest("tools/call", params).get());
+    } catch (...) {
+      completed.set_exception(std::current_exception());
+    }
+  });
+
+  const auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::seconds(2);
+  while (queue.stats().pending == 0 &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  const bool queued = queue.stats().pending == 1u;
+  export_scope =
+      std::make_unique<godot_autopilot::ExportState::Scope>(export_state);
+  queue.drain();
+  export_scope.reset();
+
+  std::string response;
+  try {
+    response = completed_future.get().Dump();
+  } catch (const std::exception &error) {
+    response = error.what();
+  }
+  worker.join();
+
+  ASSERT_TRUE(queued);
+  EXPECT_NE(response.find(godot_autopilot::dispatch::export_blocked_error_text()),
+            std::string::npos);
 }
 
 TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {

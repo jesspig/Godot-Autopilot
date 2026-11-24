@@ -76,7 +76,16 @@ ResourceTaskResult run_resource_task(
     CommandQueue &queue, const std::string &uri,
     const std::shared_ptr<ResourceTaskState> &state, Fn task) {
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
-      queue, uri, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+      queue, uri, state,
+      [task = std::move(task)](ResourceTaskState &st) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          set_error(st, dispatch::export_blocked_error_text());
+          st.error_code = "export_in_progress";
+          return;
+        }
+        task(st);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
     monitor::error_event("main_thread_timeout", "resource", uri);
     throw mcp::McpError(
@@ -92,6 +101,10 @@ ResourceTaskResult run_resource_task(
   }
   if (!state->error_code.empty()) {
     monitor::error_event(state->error_code, "resource", uri);
+    if (state->error_code == "export_in_progress") {
+      throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+                          state->error_text);
+    }
     mcp::JsonValue data(mcp::JsonValue::object_tag);
     data["uri"] = mcp::JsonValue(uri);
     throw mcp::McpError(resource_error_code(state->error_code),

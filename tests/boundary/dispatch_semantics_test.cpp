@@ -5,14 +5,19 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <memory>
 #include <string>
+#include <thread>
 
 #include "util/console_encoding.hpp"
 
 using godot_autopilot::CommandQueue;
+using godot_autopilot::dispatch::BoundedWaitOutcome;
 using godot_autopilot::dispatch::dispatch_exception_message;
 using godot_autopilot::dispatch::dispatch_timeout_result;
 using godot_autopilot::dispatch::queue_unavailable_result;
+using godot_autopilot::dispatch::run_bounded_on_main_thread;
 using godot_autopilot::dispatch::run_main_thread_slice;
 using godot_autopilot::dispatch::run_on_main_thread_with_budget;
 using godot_autopilot::tool_flags::kHealthProbe;
@@ -85,6 +90,49 @@ TEST(DispatchSemanticsTest, QueueRejectionCarriesTheDedicatedExceptionType) {
 
   auto submission = queue.submit_tracked([] { return 1; });
   EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
+}
+
+TEST(DispatchSemanticsTest, BoundedHelperRunsInlineOnMainThreadWithinBudget) {
+  CommandQueue queue;
+  queue.drain();
+  auto state = std::make_shared<int>(0);
+  const CommandQueue::Stats before = queue.stats();
+
+  const BoundedWaitOutcome outcome = run_bounded_on_main_thread(
+      queue, "gda_inline_probe", state,
+      [](int &value) { value = 7; }, 1000);
+
+  EXPECT_TRUE(outcome.ok);
+  EXPECT_FALSE(outcome.timed_out);
+  EXPECT_FALSE(outcome.cancelled);
+  EXPECT_GE(outcome.waited_ms, 0);
+  EXPECT_LE(outcome.waited_ms, 1000);
+  EXPECT_TRUE(outcome.error.empty());
+  EXPECT_EQ(*state, 7);
+  EXPECT_EQ(queue.stats().submitted, before.submitted);
+  EXPECT_EQ(queue.stats().executed, before.executed);
+}
+
+TEST(DispatchSemanticsTest, BoundedHelperInlineTimeoutReportsUnpreemptableTask) {
+  CommandQueue queue;
+  queue.drain();
+  auto state = std::make_shared<bool>(false);
+
+  const BoundedWaitOutcome outcome = run_bounded_on_main_thread(
+      queue, "gda_inline_probe", state,
+      [](bool &ran) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        ran = true;
+      },
+      1);
+
+  EXPECT_FALSE(outcome.ok);
+  EXPECT_TRUE(outcome.timed_out);
+  EXPECT_FALSE(outcome.cancelled);
+  EXPECT_GE(outcome.waited_ms, 10);
+  EXPECT_TRUE(*state);
+  EXPECT_NE(outcome.error.find("gda_inline_probe"), std::string::npos);
+  EXPECT_NE(outcome.error.find("could not be preempted"), std::string::npos);
 }
 
 TEST(DispatchSemanticsTest, QueueUnavailableResultCarriesDiagnosticFields) {

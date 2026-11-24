@@ -30,13 +30,26 @@ mcp::GetPromptResult make_result(const std::string &content) {
   return r;
 }
 
+struct PromptTaskState {
+  std::string content;
+  bool export_blocked = false;
+};
+
 template <typename Fn>
 mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
                                      const std::string &label, Fn task) {
   prompts_detail::reject_if_exporting();
-  auto state = std::make_shared<std::string>();
+  auto state = std::make_shared<PromptTaskState>();
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
-      queue, label, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+      queue, label, state,
+      [task = std::move(task)](PromptTaskState &st) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          st.export_blocked = true;
+          return;
+        }
+        task(st.content);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
     throw mcp::McpError(
         mcp::McpErrorCode::RequestTimeout,
@@ -46,7 +59,11 @@ mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
   if (!outcome.ok) {
     throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
   }
-  return make_result(*state);
+  if (state->export_blocked) {
+    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+                        dispatch::export_blocked_error_text());
+  }
+  return make_result(state->content);
 }
 
 } // namespace

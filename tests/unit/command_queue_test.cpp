@@ -165,12 +165,13 @@ TEST(CommandQueueTest, BoundedSubmitCompletesWithinBudget) {
     EXPECT_NE(executed_on, std::this_thread::get_id());
 }
 
-TEST(CommandQueueTest, BoundedSubmitOwnerThreadExecutesInline) {
+TEST(CommandQueueTest, BoundedSubmitOwnerThreadRejectsWithoutRunning) {
     constexpr int64_t kBudgetMs = 1000;
     CommandQueue q;
     q.drain();
     ASSERT_TRUE(q.is_main_thread());
     bool ran = false;
+    const CommandQueue::Stats before = q.stats();
     auto submission = q.submit_tracked_bounded(
         [&ran] {
           ran = true;
@@ -179,11 +180,12 @@ TEST(CommandQueueTest, BoundedSubmitOwnerThreadExecutesInline) {
         kBudgetMs);
     EXPECT_FALSE(submission.timed_out);
     EXPECT_FALSE(submission.cancelled);
-    EXPECT_TRUE(ran);
+    EXPECT_FALSE(ran);
     EXPECT_GE(submission.waited_ms, 0);
-    EXPECT_LE(submission.waited_ms, kBudgetMs);
-    EXPECT_EQ(submission.future.get(), 7);
+    EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
     EXPECT_EQ(q.stats().pending, 0u);
+    EXPECT_EQ(q.stats().submitted, before.submitted);
+    EXPECT_EQ(q.stats().executed, before.executed);
 }
 
 TEST(CommandQueueTest, BoundedSubmitNonPositiveBudgetRejectsImmediately) {
@@ -222,4 +224,103 @@ TEST(CommandQueueTest, BoundedSubmitTimeoutIncrementsCancelledCounter) {
     auto submission = q.submit_tracked_bounded([] { return 7; }, 30);
     EXPECT_TRUE(submission.timed_out);
     EXPECT_EQ(q.stats().cancelled, cancelled_before + 1);
+}
+
+TEST(CommandQueueTest, CloseClearsMainThreadBinding) {
+    CommandQueue q;
+    q.drain();
+    ASSERT_TRUE(q.is_main_thread());
+    q.close();
+    EXPECT_TRUE(q.is_closed());
+    EXPECT_FALSE(q.is_main_thread());
+    EXPECT_FALSE(q.drain());
+    EXPECT_FALSE(q.is_main_thread());
+}
+
+TEST(CommandQueueTest, ClosedQueueRejectsSubmitOnFormerMainThread) {
+    CommandQueue q;
+    q.drain();
+    q.close();
+    bool ran = false;
+    auto future = q.submit([&ran] { ran = true; });
+    EXPECT_FALSE(ran);
+    EXPECT_THROW(future.get(), CommandQueue::Rejected);
+    EXPECT_EQ(q.stats().rejected_closed, 1u);
+}
+
+TEST(CommandQueueTest, ClosedQueueRejectsBoundedSubmitOnFormerMainThread) {
+    CommandQueue q;
+    q.drain();
+    q.close();
+    bool ran = false;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, 1000);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_FALSE(ran);
+    EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
+    EXPECT_EQ(q.stats().rejected_closed, 1u);
+}
+
+TEST(CommandQueueTest, ClosedQueueRejectsZeroBudgetBoundedSubmit) {
+    CommandQueue q;
+    q.drain();
+    q.close();
+    bool ran = false;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, 0);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_FALSE(ran);
+    EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
+    EXPECT_EQ(q.stats().rejected_closed, 1u);
+}
+
+TEST(CommandQueueTest, MainThreadZeroBudgetBoundedSubmitRejectsWithoutRunning) {
+    CommandQueue q;
+    q.drain();
+    bool ran = false;
+    const uint64_t cancelled_before = q.stats().cancelled;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, 0);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_FALSE(ran);
+    EXPECT_EQ(q.stats().cancelled, cancelled_before);
+    EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
+}
+
+TEST(CommandQueueTest, MainThreadNegativeBudgetBoundedSubmitRejectsWithoutRunning) {
+    CommandQueue q;
+    q.drain();
+    bool ran = false;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, -1);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_FALSE(ran);
+    EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
+}
+
+TEST(CommandQueueTest, FullQueueDoesNotChangeOwnerThreadBoundedRejection) {
+    CommandQueue q(1);
+    q.drain();
+    auto pending = q.submit([] { return 11; });
+    bool ran = false;
+    const uint64_t rejected_before = q.stats().rejected_full;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, 1000);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_FALSE(ran);
+    EXPECT_EQ(q.stats().rejected_full, rejected_before);
+    EXPECT_THROW(submission.future.get(), CommandQueue::Rejected);
+    EXPECT_EQ(q.stats().pending, 1u);
+    q.drain();
+    EXPECT_EQ(pending.get(), 11);
+}
+
+TEST(CommandQueueTest, CloseRejectsPendingTasksAndClearsBinding) {
+    CommandQueue q;
+    auto pending = q.submit([] { return 13; });
+    q.close();
+    EXPECT_FALSE(q.is_main_thread());
+    EXPECT_EQ(q.stats().pending, 0u);
+    EXPECT_EQ(q.stats().dropped_on_close, 1u);
+    EXPECT_THROW(pending.get(), CommandQueue::Rejected);
 }

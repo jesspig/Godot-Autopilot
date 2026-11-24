@@ -972,6 +972,9 @@ static void register_surface_tool(
                     queue, tool_name, surface_tool->tool_flags(),
                     [surface_tool, args, trace_context] {
                         tools::ScopedTraceContext restore(trace_context);
+                        if (godot_autopilot::ExportGuard::is_exporting()) {
+                            return dispatch::export_blocked_json_result();
+                        }
                         return surface_tool->execute(args);
                     });
             }
