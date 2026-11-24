@@ -1,4 +1,5 @@
 #include "resources/resource_handlers.hpp"
+#include "resources/resource_sanitization.hpp"
 #include "core/config.hpp"
 #include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
@@ -163,6 +164,38 @@ void node_to_json(godot::Node *node, const std::string &root_prefix,
   }
 }
 
+std::string property_metadata_text(const godot::Variant &value) {
+  switch (value.get_type()) {
+  case godot::Variant::BOOL:
+    return value.operator bool() ? "true" : "false";
+  case godot::Variant::STRING:
+    return util::to_std(value.operator godot::String());
+  case godot::Variant::STRING_NAME:
+    return util::to_std(godot::String(value.operator godot::StringName()));
+  case godot::Variant::INT:
+    return std::to_string(value.operator int64_t());
+  case godot::Variant::FLOAT:
+    return std::to_string(value.operator double());
+  default:
+    return {};
+  }
+}
+
+std::map<std::string, std::string> property_metadata(
+    const godot::Dictionary &property) {
+  std::map<std::string, std::string> metadata;
+  const godot::Array keys = property.keys();
+  for (int64_t i = 0; i < keys.size(); ++i) {
+    const godot::String key = keys[i].operator godot::String();
+    const std::string name = util::to_std(key);
+    const std::string value = property_metadata_text(property[key]);
+    if (!value.empty()) {
+      metadata[name] = value;
+    }
+  }
+  return metadata;
+}
+
 mcp::JsonValue node_detail_to_json(godot::Node *node,
                                           const std::string &root_prefix) {
   mcp::JsonValue j(mcp::JsonValue::object_tag);
@@ -171,25 +204,41 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
   j["path"] = mcp::JsonValue(compute_relative_path(node, root_prefix));
 
   mcp::JsonValue props(mcp::JsonValue::object_tag);
+  mcp::JsonValue redacted_properties(mcp::JsonValue::array_tag);
   auto prop_list = node->get_property_list();
   for (int i = 0; i < prop_list.size(); i++) {
     godot::Dictionary prop = prop_list[i];
     godot::String prop_name = prop["name"];
-    int usage = static_cast<int>(prop["usage"]);
+    uint64_t usage = static_cast<uint64_t>(prop["usage"].operator int64_t());
 
-    int skip_mask = godot::PROPERTY_USAGE_INTERNAL | godot::PROPERTY_USAGE_GROUP |
-                    godot::PROPERTY_USAGE_CATEGORY | godot::PROPERTY_USAGE_SUBGROUP;
-    if (usage & skip_mask)
+    if (!resources::node_property_is_exported(usage))
       continue;
 
     std::string name_str = util::to_std(prop_name);
     if (name_str.empty())
       continue;
 
+    const std::map<std::string, std::string> metadata = property_metadata(prop);
+    if (resources::resource_value_is_sensitive(name_str, metadata)) {
+      props[name_str] =
+          mcp::JsonValue(godot_autopilot::sanitize_policy::kRedactedValue);
+      redacted_properties.PushBack(mcp::JsonValue(name_str));
+      continue;
+    }
+
     godot::Variant val = node->get(prop_name);
-    props[name_str] = godot_autopilot::VariantJson::serialize(val);
+    const resources::ResourceValueRedaction redacted =
+        resources::redact_resource_value(
+            name_str, godot_autopilot::VariantJson::serialize(val), metadata);
+    props[name_str] = redacted.value;
+    if (redacted.redacted) {
+      redacted_properties.PushBack(mcp::JsonValue(name_str));
+    }
   }
   j["properties"] = std::move(props);
+  if (!redacted_properties.Empty()) {
+    j["redacted_properties"] = std::move(redacted_properties);
+  }
 
   j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
   auto children = node->get_children();
@@ -687,9 +736,32 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 return;
               }
 
-              godot::Variant val = settings->get_setting(gd_key);
-              auto jv = VariantJson::serialize(val);
-              st.json_str = jv.Dump(-1);
+              godot::Dictionary setting_property;
+              const godot::TypedArray<godot::Dictionary> setting_properties =
+                  settings->get_property_list();
+              for (int64_t i = 0; i < setting_properties.size(); ++i) {
+                const godot::Dictionary candidate = setting_properties[i];
+                if (!candidate.has("name")) {
+                  continue;
+                }
+                if (util::to_std(candidate["name"].operator godot::String()) ==
+                    key) {
+                  setting_property = candidate;
+                  break;
+                }
+              }
+              const std::map<std::string, std::string> metadata =
+                  property_metadata(setting_property);
+              if (resources::resource_value_is_sensitive(key, metadata)) {
+                st.json_str = resources::redacted_resource_response().Dump(-1);
+              } else {
+                const godot::Variant val = settings->get_setting(gd_key);
+                const resources::ResourceValueRedaction redacted =
+                    resources::redact_resource_value(
+                        key, VariantJson::serialize(val), metadata);
+                st.json_str =
+                    resources::resource_value_response(redacted).Dump(-1);
+              }
             });
         monitor::data_flow(
             "resource_read", static_cast<int64_t>(result.json_str.size()),
