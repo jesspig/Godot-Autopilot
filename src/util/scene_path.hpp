@@ -100,6 +100,7 @@ inline void add_scene_info_fields(mcp::JsonValue &target,
                                   const EditedSceneInfo &info) {
   target["scene_path"] = mcp::JsonValue(info.scene_path);
   target["scene_unsaved"] = mcp::JsonValue(info.unsaved);
+  target["disk_persisted"] = mcp::JsonValue(false);
 }
 
 } // namespace util
