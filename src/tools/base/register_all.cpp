@@ -1,5 +1,4 @@
 #include "tools/base/register_all.hpp"
-#include "tools/base/call_depth_guard.hpp"
 #include "tools/base/call_tool_elicitation.hpp"
 #include "core/command_queue.hpp"
 #include "core/error_watermark.hpp"
@@ -305,25 +304,7 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     return result;
 }
 
-namespace {
-int64_t &call_tool_thread_depth() {
-    static thread_local int64_t depth = 0;
-    return depth;
-}
-struct CallToolDepthGuard {
-    CallToolDepthGuard() { ++call_tool_thread_depth(); }
-    ~CallToolDepthGuard() { --call_tool_thread_depth(); }
-};
-constexpr int64_t kMaxCallToolDepth = 8;
-} // namespace
-
 static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
-    if (meta_detail::call_depth_exceeds(call_tool_thread_depth(), kMaxCallToolDepth)) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("call_tool recursion depth exceeded");
-        return e;
-    }
-    CallToolDepthGuard depth_guard;
     auto *name_p = args.Find("name");
     if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
@@ -358,7 +339,8 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
     }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
-    return dispatch::call_handler(name, tool_args);
+    return dispatch::call_handler(name, tool_args,
+                                  dispatch::capture_depth_context());
 }
 
 static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
@@ -714,18 +696,25 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 
     {
         std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
-        for (const auto& spec : dynamic_specs::store()) {
-            if (registry->find_any(spec.name) != nullptr) {
-                LogSystem::instance().log_detailed(
-                    LogLevel::Warning, LogCategory::Tools,
-                    "user tool '" + spec.name +
-                        "' skipped: name collides with a built-in MCP tool",
-                    "tool=" + spec.name +
-                        " params=" + std::to_string(spec.params.size()) +
-                        " reason=collision");
-                continue;
+        if (!dynamic_specs::enabled().load()) {
+            LogSystem::instance().log_detailed(
+                LogLevel::Info, LogCategory::Tools,
+                "dynamic tools skipped while disabled",
+                "reason=disabled");
+        } else {
+            for (const auto& spec : dynamic_specs::store()) {
+                if (registry->find_any(spec.name) != nullptr) {
+                    LogSystem::instance().log_detailed(
+                        LogLevel::Warning, LogCategory::Tools,
+                        "user tool '" + spec.name +
+                            "' skipped: name collides with a built-in MCP tool",
+                        "tool=" + spec.name +
+                            " params=" + std::to_string(spec.params.size()) +
+                            " reason=collision");
+                    continue;
+                }
+                registry->add(make_spec_tool(spec));
             }
-            registry->add(make_spec_tool(spec));
         }
     }
 
@@ -796,8 +785,7 @@ void refresh_dynamic_tools() {
 }
 
 static void register_surface_tool(
-    mcp::McpServer& server, CommandQueue& queue,
-    const std::shared_ptr<ToolRegistry>& registry,
+    mcp::McpServer& server, const std::shared_ptr<ToolRegistry>& registry,
     const std::shared_ptr<ToolBase>& surface_tool) {
     const std::string tool_name = surface_tool->meta().name;
     mcp::ToolOptions opts;
@@ -821,7 +809,7 @@ static void register_surface_tool(
     }
     server.RegisterTool(
         tool_name, opts,
-        [tool_name, registry, &queue, surface_tool](
+        [tool_name, registry, surface_tool](
             const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
             -> mcp::CallToolResult {
             const std::string gda_request_key =
@@ -964,19 +952,13 @@ static void register_surface_tool(
             }
             mcp::JsonValue res;
             if (run_on_transport_thread) {
-                res = surface_tool->execute(args);
+                dispatch::DepthContext depth_ctx =
+                    dispatch::capture_depth_context();
+                depth_ctx.run_on_calling_thread = true;
+                res = dispatch::call_handler(tool_name, args, depth_ctx);
             } else {
-                const tools::TraceContext trace_context =
-                    tools::capture_trace_context();
-                res = dispatch::run_on_main_thread_with_budget(
-                    queue, tool_name, surface_tool->tool_flags(),
-                    [surface_tool, args, trace_context] {
-                        tools::ScopedTraceContext restore(trace_context);
-                        if (godot_autopilot::ExportGuard::is_exporting()) {
-                            return dispatch::export_blocked_json_result();
-                        }
-                        return surface_tool->execute(args);
-                    });
+                res = dispatch::call_handler(
+                    tool_name, args, dispatch::capture_depth_context());
             }
             if (!run_on_transport_thread &&
                 dispatch::has_deferred_marker(res)) {
@@ -1046,7 +1028,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         surface == ToolSurface::Full ? registry->all_any()
                                      : registry->all_meta();
     for (const auto& surface_tool : surfaced) {
-        register_surface_tool(server, queue, registry, surface_tool);
+        register_surface_tool(server, registry, surface_tool);
     }
 
     refresh_derived(registry, catalog, index);

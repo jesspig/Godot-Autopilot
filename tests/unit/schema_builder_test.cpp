@@ -7,7 +7,9 @@
 using godot_autopilot::schema::add_required_flag;
 using godot_autopilot::schema::build_action_schema;
 using godot_autopilot::schema::build_schema;
+using godot_autopilot::schema::is_supported_param_type;
 using godot_autopilot::schema::ParamDef;
+using godot_autopilot::schema::validate_param_defs;
 
 namespace {
 
@@ -106,4 +108,41 @@ TEST(SchemaBuilderTest, AddRequiredFlagIsIdempotent) {
   ASSERT_NE(schema.Find("required"), nullptr);
   EXPECT_TRUE(schema.Find("required")->IsArray());
   EXPECT_EQ(schema.Find("required")->Size(), 2u);
+}
+
+TEST(SchemaBuilderTest, DynamicParamWhitelistAcceptsSupportedTypes) {
+  for (const char *type : {"string", "integer", "number", "boolean", "object",
+                           "array", "json"}) {
+    EXPECT_TRUE(is_supported_param_type(type)) << type;
+  }
+  EXPECT_FALSE(is_supported_param_type("unknown_kind"));
+  EXPECT_FALSE(is_supported_param_type(""));
+}
+
+TEST(SchemaBuilderTest, ValidateParamDefsRejectsDuplicateNames) {
+  const std::vector<ParamDef> params = {
+      {"value", "string", "", false},
+      {"value", "integer", "", false},
+  };
+  std::string error;
+  EXPECT_FALSE(validate_param_defs(params, error));
+  EXPECT_NE(error.find("duplicate parameter name: value"), std::string::npos);
+}
+
+TEST(SchemaBuilderTest, ValidateParamDefsRejectsUnsupportedTypes) {
+  const std::vector<ParamDef> params = {
+      {"value", "unknown_kind", "", false},
+  };
+  std::string error;
+  EXPECT_FALSE(validate_param_defs(params, error));
+  EXPECT_NE(error.find("unsupported parameter type: unknown_kind"),
+            std::string::npos);
+}
+
+TEST(SchemaBuilderTest, ValidateParamDefsAcceptsEmptyAndValidDefinitions) {
+  std::string error;
+  EXPECT_TRUE(validate_param_defs({}, error));
+  EXPECT_TRUE(error.empty());
+  EXPECT_TRUE(validate_param_defs({{"payload", "json", "", true}}, error));
+  EXPECT_TRUE(error.empty());
 }

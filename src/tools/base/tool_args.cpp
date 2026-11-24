@@ -200,6 +200,8 @@ void Args::validate_declared() const {
     } else if (param.type == "array") {
       if (!value->IsArray())
         throw_invalid(param.name, "array");
+    } else if (param.type != "json") {
+      throw ToolArgError("unsupported parameter type: " + param.type);
     }
   }
 }

@@ -13,6 +13,7 @@
 #include <utility>
 #include <mcp/JsonValue.hpp>
 #include <mcp/McpTypes.hpp>
+#include <tools/base/tool_invoke.hpp>
 
 namespace godot_autopilot {
 namespace dispatch {
@@ -143,8 +144,32 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
 
 bool has_deferred_marker(const mcp::JsonValue &result);
 
+struct DepthContext {
+  int depth = 0;
+  std::string trace_id;
+  std::string span_id;
+  std::string request_id;
+  bool run_on_calling_thread = false;
+};
+
+DepthContext capture_depth_context();
+int current_depth();
+
+class ScopedDepthContext {
+public:
+  explicit ScopedDepthContext(const DepthContext &ctx);
+  ~ScopedDepthContext();
+  ScopedDepthContext(const ScopedDepthContext &) = delete;
+  ScopedDepthContext &operator=(const ScopedDepthContext &) = delete;
+
+private:
+  int saved_depth_ = 0;
+  std::optional<tools::ScopedTraceContext> trace_scope_;
+};
+
 mcp::JsonValue call_handler(const std::string &name,
-                            const mcp::JsonValue &args);
+                            const mcp::JsonValue &args,
+                            const DepthContext &depth_ctx = {});
 
 mcp::CallToolResult export_blocked_result();
 
