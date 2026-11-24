@@ -780,6 +780,30 @@ JV build_script_diagnostics(const godot::String &gs_path,
 
 } // namespace
 
+mcp::JsonValue file_write_failure_json(
+    const std::string &path, const std::string &mode,
+    const resource_fs::TextWriteResult &result) {
+  mcp::JsonValue error = util::error_json(
+      "file write failed for " + path + ": " + result.message);
+  mcp::JsonValue details(mcp::JsonValue::object_tag);
+  details["code"] =
+      mcp::JsonValue(resource_fs::text_write_failure_code(result.failure));
+  details["path"] = mcp::JsonValue(path);
+  details["mode"] = mcp::JsonValue(mode);
+  details["io_error"] =
+      mcp::JsonValue(static_cast<int64_t>(result.io_error));
+  details["expected_bytes"] =
+      mcp::JsonValue(static_cast<int64_t>(result.expected_bytes));
+  details["created"] = mcp::JsonValue(result.created);
+  details["append_created"] = mcp::JsonValue(result.append_created);
+  if (result.actual_bytes >= 0) {
+    details["actual_bytes"] =
+        mcp::JsonValue(static_cast<int64_t>(result.actual_bytes));
+  }
+  error["structured_error"] = std::move(details);
+  return error;
+}
+
 JV handle_file_write(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "write_file called");
@@ -803,33 +827,25 @@ JV handle_file_write(const JV &args) {
                               "'WRITE' or 'APPEND' (exact case)",
                               "use 'WRITE' to overwrite or 'APPEND' to append; "
                               "no file was opened or written");
-  godot::FileAccess::ModeFlags flag = godot::FileAccess::WRITE;
-  if (mode == "APPEND")
-    flag = godot::FileAccess::READ_WRITE;
+  const resource_fs::TextWriteMode write_mode =
+      mode == "APPEND" ? resource_fs::TextWriteMode::kAppend
+                       : resource_fs::TextWriteMode::kWrite;
   const auto checked = util::normalize_project_path(pp->GetString(), true,
                                                     false);
   if (!checked.valid())
     return util::error_detail("path rejected", "path", checked.error,
                               "write only inside the project namespaces");
   const std::string normalized_path = checked.value;
-  godot::String gs_path(normalized_path.c_str());
-  auto file = godot::FileAccess::open(gs_path, flag);
-  if (file.is_null() && mode == "APPEND")
-    file = godot::FileAccess::open(gs_path, godot::FileAccess::WRITE);
-  if (file.is_null())
-    return util::error_json("failed to open file: " + normalized_path);
-  if (mode == "APPEND")
-    file->seek_end();
-  file->store_string(godot::String::utf8(cp->GetString().c_str()));
-  file->close();
+  const godot::String gs_path(normalized_path.c_str());
+  resource_fs::GodotTextWriteFs file_system;
+  const resource_fs::TextWriteResult written =
+      resource_fs::write_text_verified(normalized_path, cp->GetString(),
+                                       write_mode, file_system);
+  if (!written.ok)
+    return file_write_failure_json(normalized_path, mode, written);
   std::string written_content = cp->GetString();
-  if (mode == "APPEND") {
-    auto full_file = godot::FileAccess::open(gs_path, godot::FileAccess::READ);
-    if (full_file.is_valid()) {
-      written_content = util::to_std(full_file->get_as_text());
-      full_file->close();
-    }
-  }
+  if (mode == "APPEND")
+    written_content = written.readback_content;
 
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -959,29 +975,15 @@ JV handle_create_csharp_script(const JV &args) {
   if (!resource_fs::ensure_parent_directory(normalized_path, dir_created,
                                             dir_error))
     return util::error_json(dir_error);
-  auto file = godot::FileAccess::open(
-      godot::String::utf8(normalized_path.c_str()), godot::FileAccess::WRITE);
-  if (file.is_null())
-    return util::error_json("failed to open file: " + normalized_path);
-  file->store_string(godot::String::utf8(source_code.c_str()));
-  file->close();
-  bool verified = false;
-  bool readback = false;
-  auto check = godot::FileAccess::open(
-      godot::String::utf8(normalized_path.c_str()), godot::FileAccess::READ);
-  if (check.is_valid() && check->is_open()) {
-    readback = true;
-    std::string back = util::to_std(check->get_as_text());
-    godot::Error read_err = check->get_error();
-    if ((read_err == godot::OK || read_err == godot::ERR_FILE_EOF) &&
-        back == source_code)
-      verified = true;
-    check->close();
-  }
-  if (!verified)
-    return util::error_json("write verification failed for " +
-                            normalized_path +
-                            " — retry or check file locks");
+  resource_fs::GodotTextWriteFs file_system;
+  const resource_fs::TextWriteResult written =
+      resource_fs::write_text_verified(
+          normalized_path, source_code, resource_fs::TextWriteMode::kWrite,
+          file_system);
+  if (!written.ok)
+    return file_write_failure_json(normalized_path, "WRITE", written);
+  const bool verified = true;
+  const bool readback = true;
   bool is_dotnet_editor = false;
   bool assembly_loaded = false;
   probe_dotnet_editor_state(is_dotnet_editor, assembly_loaded);
