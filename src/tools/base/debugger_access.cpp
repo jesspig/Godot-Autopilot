@@ -7,89 +7,125 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <mcp/JsonValue.hpp>
+#include <mutex>
 #include <string>
 #include <vector>
 
 namespace godot_autopilot {
 
-bool debugger_capture_initialized() {
-  return debugger_ops::DebugCapturePlugin::get_instance() != nullptr;
+namespace {
+
+std::mutex g_request_backend_mtx;
+std::shared_ptr<const DebuggerRequestBackend> g_request_backend;
+
+std::shared_ptr<const DebuggerRequestBackend> request_backend() {
+  std::lock_guard<std::mutex> lock(g_request_backend_mtx);
+  return g_request_backend;
 }
 
-bool debugger_broadcast_request(const std::string &payload,
-                                int32_t *out_first_session_id,
-                                int32_t *out_session_count) {
+std::vector<DebuggerSessionSnapshot> engine_sessions() {
+  std::vector<DebuggerSessionSnapshot> snapshots;
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
-  if (!plugin)
-    return false;
-  int32_t first_id = -1;
-  std::vector<godot::Ref<godot::EditorDebuggerSession>> sessions;
+  if (!plugin) {
+    return snapshots;
+  }
   for (int32_t id : plugin->get_session_ids()) {
     auto session = plugin->get_session(id);
-    if (!(session.is_valid() && session->is_active())) {
-      if (session.is_valid())
-        plugin->forget_ready_session(id);
+    if (!session.is_valid()) {
       continue;
     }
-    if (!is_broadcast_eligible(plugin->is_session_ready(id),
-                               plugin->is_session_scene_ready(id)))
-      continue;
-    sessions.push_back(session);
-    if (first_id < 0)
-      first_id = id;
+    snapshots.push_back({id, session->is_active(), plugin->is_session_ready(id),
+                         plugin->is_session_scene_ready(id)});
   }
-  if (sessions.empty())
+  return snapshots;
+}
+
+} // namespace
+
+void set_debugger_request_backend(
+    std::shared_ptr<const DebuggerRequestBackend> backend) {
+  std::lock_guard<std::mutex> lock(g_request_backend_mtx);
+  g_request_backend = std::move(backend);
+}
+
+void clear_debugger_request_backend() {
+  std::lock_guard<std::mutex> lock(g_request_backend_mtx);
+  g_request_backend.reset();
+}
+
+bool debugger_capture_initialized() {
+  return request_backend() != nullptr ||
+         debugger_ops::DebugCapturePlugin::get_instance() != nullptr;
+}
+
+bool debugger_send_request(const std::string &payload, int32_t session_id) {
+  if (auto backend = request_backend()) {
+    return backend->send_request(session_id, payload);
+  }
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin) {
     return false;
+  }
+  auto session = plugin->get_session(session_id);
+  if (!(session.is_valid() && session->is_active())) {
+    return false;
+  }
   godot::Array arr;
   arr.push_back(godot::String::utf8(payload.c_str()));
-  for (auto &session : sessions) {
-    session->send_message(
-        godot::String(std::string(GDA_MSG_REQUEST).c_str()), arr);
-  }
-  if (out_first_session_id)
-    *out_first_session_id = first_id;
-  if (out_session_count)
-    *out_session_count = static_cast<int32_t>(sessions.size());
+  session->send_message(godot::String(std::string(GDA_MSG_REQUEST).c_str()),
+                        arr);
   return true;
 }
 
-int32_t debugger_active_session_count() {
-  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
-  if (!plugin)
-    return 0;
-  int32_t count = 0;
-  for (int32_t id : plugin->get_session_ids()) {
-    auto session = plugin->get_session(id);
-    if (session.is_valid() && session->is_active())
-      ++count;
+std::vector<int32_t> debugger_active_session_ids() {
+  auto backend = request_backend();
+  const auto snapshots = backend ? backend->sessions() : engine_sessions();
+  std::vector<int32_t> ids;
+  for (const auto &snapshot : snapshots) {
+    if (snapshot.active) {
+      ids.push_back(snapshot.id);
+    }
   }
-  return count;
+  return ids;
+}
+
+std::vector<int32_t> debugger_request_ready_session_ids() {
+  auto backend = request_backend();
+  const auto snapshots = backend ? backend->sessions() : engine_sessions();
+  std::vector<int32_t> ids;
+  for (const auto &snapshot : snapshots) {
+    if (snapshot.active &&
+        is_broadcast_eligible(snapshot.ready, snapshot.scene_ready)) {
+      ids.push_back(snapshot.id);
+    }
+  }
+  return ids;
+}
+
+int32_t debugger_active_session_count() {
+  return static_cast<int32_t>(debugger_active_session_ids().size());
 }
 
 int32_t debugger_ready_session_count() {
-  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
-  if (!plugin)
-    return 0;
+  auto backend = request_backend();
+  const auto snapshots = backend ? backend->sessions() : engine_sessions();
   int32_t count = 0;
-  for (int32_t id : plugin->get_session_ids()) {
-    auto session = plugin->get_session(id);
-    if (session.is_valid() && session->is_active() &&
-        plugin->is_session_ready(id))
+  for (const auto &snapshot : snapshots) {
+    if (snapshot.active && snapshot.ready) {
       ++count;
+    }
   }
   return count;
 }
 
 int32_t debugger_scene_ready_session_count() {
-  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
-  if (!plugin)
-    return 0;
+  auto backend = request_backend();
+  const auto snapshots = backend ? backend->sessions() : engine_sessions();
   int32_t count = 0;
-  for (int32_t id : plugin->get_session_ids()) {
-    auto session = plugin->get_session(id);
-    if (session.is_valid() && session->is_active() &&
-        plugin->is_session_scene_ready(id))
+  for (const auto &snapshot : snapshots) {
+    if (snapshot.active && snapshot.scene_ready) {
       ++count;
+    }
   }
   return count;
 }
@@ -126,6 +162,10 @@ mcp::JsonValue build_cancel_request_body(int64_t request_id) {
 }
 
 void debugger_send_cancel(int32_t session_id, int64_t request_id) {
+  if (auto backend = request_backend()) {
+    backend->send_cancel(session_id, request_id);
+    return;
+  }
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)
     return;
@@ -162,38 +202,25 @@ void debugger_continue_session(int32_t session_id) {
   session->send_message(godot::String("continue"), godot::Array());
 }
 
-int32_t debugger_broadcast_reload_scripts(const std::vector<std::string> &script_paths) {
+bool debugger_reload_scripts(int32_t session_id,
+                              const std::vector<std::string> &script_paths) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)
-    return 0;
-  std::vector<godot::Ref<godot::EditorDebuggerSession>> sessions;
-  for (int32_t id : plugin->get_session_ids()) {
-    auto session = plugin->get_session(id);
-    if (!(session.is_valid() && session->is_active())) {
-      if (session.is_valid())
-        plugin->forget_ready_session(id);
-      continue;
-    }
-    if (!plugin->is_session_ready(id))
-      continue;
-    sessions.push_back(session);
-  }
-  if (sessions.empty())
-    return 0;
+    return false;
+  auto session = plugin->get_session(session_id);
+  if (!(session.is_valid() && session->is_active() &&
+        plugin->is_session_ready(session_id)))
+    return false;
   godot::Array arr;
   if (script_paths.empty()) {
-    for (auto &session : sessions) {
-      session->send_message(godot::String("reload_all_scripts"), godot::Array());
-    }
-    return static_cast<int32_t>(sessions.size());
+    session->send_message(godot::String("reload_all_scripts"), godot::Array());
+    return true;
   }
   for (const auto &path : script_paths) {
     arr.push_back(godot::String::utf8(path.c_str()));
   }
-  for (auto &session : sessions) {
-    session->send_message(godot::String("reload_scripts"), arr);
-  }
-  return static_cast<int32_t>(sessions.size());
+  session->send_message(godot::String("reload_scripts"), arr);
+  return true;
 }
 
 } // namespace godot_autopilot

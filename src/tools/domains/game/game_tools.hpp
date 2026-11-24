@@ -32,6 +32,7 @@ const std::vector<std::string> kGetGameStateActions = {"status", "session",
                                                         "input", "job"};
 
 const std::vector<ParamSpec> kGetGameStateParams = {
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"input_action", "string", "action=input: InputMap action name to query; the response includes pressed, just_pressed, just_released, paused and physics_frame", false},
     {"job_id", "integer", "action=job: job id returned by game_script action=start_job", false},
     {"cancel", "boolean", "action=job: cancel the job instead of collecting it (default: false); an idempotent cancel reaches the game, the job record is dropped and the response reports status cancelled", false},
@@ -42,6 +43,7 @@ const std::vector<ParamSpec> kGetGameStateParams = {
 const std::vector<std::string> kGetGameUiActions = {"elements"};
 
 const std::vector<ParamSpec> kGetGameUiParams = {
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"max_elements", "integer", "Maximum number of Control-derived elements returned after filtering, in tree order (default: 100, max: 1000); truncated=true signals more filtered matches remain", false},
     {"filter", "string", "Case-insensitive substring matched against each element's path, type and text (default: absent/empty = no filter); only matching elements count toward max_elements and truncated", false},
     {"types", "array", "Array of 1-32 class names (exact match, e.g. \"Button\", \"Label\") used as a type allow-list; only matching elements count toward max_elements and truncated", false},
@@ -54,6 +56,7 @@ const std::vector<std::string> kGetGameEvidenceActions = {"sample", "collect",
                                                            "validate"};
 
 const std::vector<ParamSpec> kGetGameEvidenceParams = {
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"node_path", "string", "sample: node path in the running game process, e.g. /root/Main/Player", false},
     {"property", "string", "sample: property name to sample; must exist on the node — missing names fail fast instead of collecting nulls", false},
     {"frames", "integer", "sample: how many samples to collect, an integer from 1 to 120", false},
@@ -78,6 +81,7 @@ const std::vector<ParamSpec> kGetGameEvidenceParams = {
 const std::vector<std::string> kGameScriptActions = {"execute", "start_job"};
 
 const std::vector<ParamSpec> kGameScriptParams = {
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"script_action", "string", "execute: inner operation to run in the game process: 'script' (execute arbitrary GDScript), 'get_property', 'set_property' or 'call_method'", false},
     {"node_path", "string", "execute: node path for get_property/set_property/call_method (omit to use the current scene root)", false},
     {"property", "string", "execute: property name for get_property/set_property", false},
@@ -98,6 +102,7 @@ const std::vector<std::string> kGameInputActions = {"queue", "wait",
                                                      "sequence"};
 
 const std::vector<ParamSpec> kGameInputParams = {
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"type", "string", "queue: input event type: 'key', 'mouse_button', 'wheel', 'mouse_motion' or 'action'", false},
     {"keycode", "string", "queue: key for type='key': numeric key code (e.g. 65) or key name (e.g. 'A', 'space', 'KEY_LEFT')", false},
     {"pressed", "boolean", "queue: pressed state (default: true)", false},
@@ -127,6 +132,7 @@ const std::vector<ParamSpec> kGetGameLocalizationParams = {
 };
 
 const std::vector<ParamSpec> kClickGameUiElementParams = {
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
     {"path", "string", "Node path of the UI element to click, as returned by get_game_ui action=elements (e.g. '/root/Main/Menu/StartButton'); an exact match wins, otherwise a path ending with '/'+path is used. Alternatively pass text/text_index instead — path wins when both are given; the annotate id from capture_editor_viewport is a per-capture sequence number and is not clickable", false},
     {"text", "string", "Visible text of the UI element to click (exact match over visible elements first, then substring); alternative to path — path wins when both are given", false},
     {"text_index", "integer", "Selects the nth visible text match (0-based, default: 0); without it an ambiguous text fails listing candidates", false},
@@ -140,6 +146,7 @@ const std::vector<ParamSpec> kClickGameUiElementParams = {
 
 const std::vector<ParamSpec> kReloadGameScriptsParams = {
     {"paths", "array", "Non-empty array of res:// GDScript file paths to reload in the running game", true},
+    {"session_id", "integer", "Target game debugger session ID; required when multiple sessions are ready; omitted selects the only ready session", false},
 };
 
 const std::vector<ParamSpec> kSetGameLocaleParams = {
