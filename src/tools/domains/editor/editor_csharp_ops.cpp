@@ -15,6 +15,7 @@
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/input_guards.hpp"
+#include "util/script_capability.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -125,6 +126,9 @@ mcp::JsonValue probe_editor_assembly(const std::string &probe_script) {
   const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(env);
   probe["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
   bool can_instantiate = false;
+  bool runtime_mountable = false;
+  std::string probe_code = script_capability::code_name(
+      script_capability::Code::kNotLoadable);
   std::string base_class;
   std::string state = "unavailable";
   std::string hint;
@@ -147,20 +151,32 @@ mcp::JsonValue probe_editor_assembly(const std::string &probe_script) {
         hint = "the script resource did not load in the editor; re-run "
                "build_csharp_assembly and read get_debugger_log for C# errors";
       } else {
-        can_instantiate = script->can_instantiate();
-        base_class =
-            util::to_std(godot::String(script->get_instance_base_type()));
+        const script_capability::Result capability =
+            script_capability::inspect_loaded(loaded);
+        can_instantiate = capability.editor_runnable;
+        runtime_mountable = capability.runtime_mountable;
+        probe_code = script_capability::code_name(capability.code);
+        base_class = capability.base_class;
         state = "available";
-        if (!can_instantiate) {
+        if (capability.code == script_capability::Code::kClassMissing) {
           hint = "the loaded editor assembly does not expose this class yet; "
                  "click Build in the editor toolbar or restart the editor, "
                  "then probe again";
+        } else if (capability.code == script_capability::Code::kRuntimeOnly) {
+          hint = "non-tool C# script: runtime-mountable but not runnable in "
+                 "the editor";
+        } else if (!capability.runtime_mountable) {
+          hint = std::string("script is not mountable: ") +
+                 script_capability::code_name(capability.code);
         }
       }
     }
   }
   probe["state"] = mcp::JsonValue(state);
   probe["can_instantiate"] = mcp::JsonValue(can_instantiate);
+  probe["editor_runnable"] = mcp::JsonValue(can_instantiate);
+  probe["runtime_mountable"] = mcp::JsonValue(runtime_mountable);
+  probe["code"] = mcp::JsonValue(probe_code);
   probe["base_class"] = mcp::JsonValue(base_class);
   if (!hint.empty())
     probe["hint"] = mcp::JsonValue(hint);

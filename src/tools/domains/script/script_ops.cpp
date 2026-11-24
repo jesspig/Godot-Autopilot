@@ -9,6 +9,7 @@
 #include "util/hash_util.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
+#include "util/script_capability.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
@@ -551,15 +552,21 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("script attached to " + node_path);
-  bool instantiable = script->can_instantiate();
-  r["instantiated"] = mcp::JsonValue(instantiable);
+  const script_capability::Result capability =
+      script_capability::inspect_loaded(script);
+  r["instantiated"] = mcp::JsonValue(capability.editor_runnable);
+  r["editor_runnable"] = mcp::JsonValue(capability.editor_runnable);
+  r["runtime_mountable"] = mcp::JsonValue(capability.runtime_mountable);
+  r["code"] = mcp::JsonValue(script_capability::code_name(capability.code));
   scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
-  if (!instantiable) {
-    r["note"] =
-        mcp::JsonValue("script is not instantiable in the editor: method calls "
-                       "will fail until the game is run — mark the script with "
-                       "@tool to run in the editor");
+  if (!capability.editor_runnable && capability.runtime_mountable) {
+    r["note"] = mcp::JsonValue(
+        "runtime-only script: it runs in the game, not in the editor");
+  } else if (!capability.runtime_mountable) {
+    r["note"] = mcp::JsonValue(
+        "script is not mountable: " +
+        std::string(script_capability::code_name(capability.code)));
   }
   return r;
 }

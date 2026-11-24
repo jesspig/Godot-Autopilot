@@ -10,6 +10,7 @@
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
 #include "util/rid_registry.hpp"
+#include "util/script_capability.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -723,7 +724,12 @@ JV gdscript_compile_diagnostics(const std::string &content,
   auto *script =
       loaded.is_valid() ? godot::Object::cast_to<godot::Script>(loaded.ptr())
                         : nullptr;
-  JV diag = script_load_diagnostics(true, script && script->can_instantiate());
+  const script_capability::Result capability =
+      script_capability::inspect_loaded(script);
+  JV diag = script_load_diagnostics(true, capability.editor_runnable);
+  diag["editor_runnable"] = JV(capability.editor_runnable);
+  diag["runtime_mountable"] = JV(capability.runtime_mountable);
+  diag["code"] = JV(script_capability::code_name(capability.code));
   diag["diagnostic_scope"] = JV("compile");
   diag["compilable"] = JV("true");
   return diag;
@@ -749,7 +755,12 @@ JV build_script_diagnostics(const godot::String &gs_path,
   JV diag = script_load_diagnostics(false, false);
   if (loaded.is_valid()) {
     auto *script = godot::Object::cast_to<godot::Script>(loaded.ptr());
-    diag = script_load_diagnostics(true, script && script->can_instantiate());
+    const script_capability::Result capability =
+        script_capability::inspect_loaded(script);
+    diag = script_load_diagnostics(true, capability.editor_runnable);
+    diag["editor_runnable"] = JV(capability.editor_runnable);
+    diag["runtime_mountable"] = JV(capability.runtime_mountable);
+    diag["code"] = JV(script_capability::code_name(capability.code));
   }
   if (ext == "cs") {
     bool is_dotnet_editor = false;
