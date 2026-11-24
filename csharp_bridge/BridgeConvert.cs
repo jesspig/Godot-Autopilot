@@ -6,6 +6,17 @@ using Godot.Collections;
 public partial class GdaCSharpBridge : RefCounted
 {
 
+    private static string _lastConversionError = string.Empty;
+
+    public Godot.Collections.Dictionary lastConversionError()
+    {
+        return new Godot.Collections.Dictionary
+        {
+            { "ok", _lastConversionError.Length == 0 },
+            { "error", _lastConversionError }
+        };
+    }
+
     private static bool TryConvertArg(Variant v, Type t, out object result)
     {
         int cost;
@@ -67,30 +78,48 @@ public partial class GdaCSharpBridge : RefCounted
         }
         if (t == typeof(string))
         {
-            if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.StringName)
+            if (v.VariantType == Variant.Type.String)
             {
                 result = v.ToString();
                 cost = 0;
+                return true;
+            }
+            if (v.VariantType == Variant.Type.StringName)
+            {
+                result = v.ToString();
+                cost = 2;
                 return true;
             }
             return false;
         }
         if (t == typeof(StringName))
         {
-            if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.StringName)
+            if (v.VariantType == Variant.Type.StringName)
             {
                 result = new StringName(v.ToString());
                 cost = 0;
+                return true;
+            }
+            if (v.VariantType == Variant.Type.String)
+            {
+                result = new StringName(v.ToString());
+                cost = 2;
                 return true;
             }
             return false;
         }
         if (t == typeof(NodePath))
         {
-            if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.NodePath)
+            if (v.VariantType == Variant.Type.NodePath)
             {
                 result = new NodePath(v.ToString());
                 cost = 0;
+                return true;
+            }
+            if (v.VariantType == Variant.Type.String)
+            {
+                result = new NodePath(v.ToString());
+                cost = 2;
                 return true;
             }
             return false;
@@ -133,7 +162,7 @@ public partial class GdaCSharpBridge : RefCounted
             {
                 if (AssignNumber(System.Convert.ToDouble(v.AsInt64()), t, out result))
                 {
-                    cost = t == typeof(double) ? 0 : 1;
+                    cost = 1;
                     return true;
                 }
                 return false;
@@ -412,6 +441,7 @@ public partial class GdaCSharpBridge : RefCounted
             }
             return true;
         }
+        _lastConversionError = "unsupported packed array variant type: " + v.VariantType;
         return false;
     }
 
@@ -423,6 +453,42 @@ public partial class GdaCSharpBridge : RefCounted
         if (!TryGetVariantItems(v, out items))
         {
             return false;
+        }
+        int stride = 0;
+        if (element == typeof(Vector2I)) stride = 2;
+        else if (element == typeof(Vector3I)) stride = 3;
+        else if (element == typeof(Vector4I)) stride = 4;
+        if (stride > 0)
+        {
+            if (items.Length % stride != 0)
+            {
+                _lastConversionError = "packed integer vector length is not a multiple of " + stride;
+                return false;
+            }
+            int[] flat = new int[items.Length];
+            for (int i = 0; i < items.Length; i++)
+            {
+                object one;
+                int oneCost;
+                if (!TryConvertScored(items[i], typeof(int), out one, out oneCost))
+                {
+                    return false;
+                }
+                flat[i] = (int)one;
+            }
+            System.Array vectors = System.Array.CreateInstance(element, items.Length / stride);
+            for (int i = 0; i < vectors.Length; i++)
+            {
+                int b = i * stride;
+                object vector;
+                if (stride == 2) vector = new Vector2I(flat[b], flat[b + 1]);
+                else if (stride == 3) vector = new Vector3I(flat[b], flat[b + 1], flat[b + 2]);
+                else vector = new Vector4I(flat[b], flat[b + 1], flat[b + 2], flat[b + 3]);
+                vectors.SetValue(vector, i);
+            }
+            result = vectors;
+            cost = 3;
+            return true;
         }
         if (t.IsArray)
         {
@@ -831,7 +897,7 @@ public partial class GdaCSharpBridge : RefCounted
             return false;
         }
         Type element = t.GetElementType();
-        return element == typeof(byte) || element == typeof(int) || element == typeof(long) || element == typeof(float) || element == typeof(double) || element == typeof(string) || element == typeof(Vector2) || element == typeof(Vector3) || element == typeof(Color) || element == typeof(Vector4);
+        return element == typeof(byte) || element == typeof(int) || element == typeof(long) || element == typeof(float) || element == typeof(double) || element == typeof(string) || element == typeof(Vector2) || element == typeof(Vector3) || element == typeof(Color) || element == typeof(Vector4) || element == typeof(Vector2I) || element == typeof(Vector3I) || element == typeof(Vector4I);
     }
 
     private static bool IsDictionaryLike(Type t)
@@ -1087,6 +1153,40 @@ public partial class GdaCSharpBridge : RefCounted
         {
             return (Vector4[])raw;
         }
+        if (raw is Vector2I[] packed2i)
+        {
+            int[] flat = new int[packed2i.Length * 2];
+            for (int i = 0; i < packed2i.Length; i++)
+            {
+                flat[i * 2] = packed2i[i].X;
+                flat[i * 2 + 1] = packed2i[i].Y;
+            }
+            return flat;
+        }
+        if (raw is Vector3I[] packed3i)
+        {
+            int[] flat = new int[packed3i.Length * 3];
+            for (int i = 0; i < packed3i.Length; i++)
+            {
+                flat[i * 3] = packed3i[i].X;
+                flat[i * 3 + 1] = packed3i[i].Y;
+                flat[i * 3 + 2] = packed3i[i].Z;
+            }
+            return flat;
+        }
+        if (raw is Vector4I[] packed4i)
+        {
+            int[] flat = new int[packed4i.Length * 4];
+            for (int i = 0; i < packed4i.Length; i++)
+            {
+                flat[i * 4] = packed4i[i].X;
+                flat[i * 4 + 1] = packed4i[i].Y;
+                flat[i * 4 + 2] = packed4i[i].Z;
+                flat[i * 4 + 3] = packed4i[i].W;
+            }
+            return flat;
+        }
+        _lastConversionError = "unsupported return value type: " + t.FullName;
         return raw.ToString();
     }
 
