@@ -96,8 +96,11 @@ class CommandQueue {
             .count());
   }
 
-  uint64_t enqueue(std::unique_ptr<TaskBase> task) {
+  bool enqueue(std::unique_ptr<TaskBase> task, uint64_t *assigned_id = nullptr) {
     const uint64_t id = next_task_id_.fetch_add(1, std::memory_order_relaxed);
+    if (assigned_id != nullptr) {
+      *assigned_id = id;
+    }
     task->task_id = id;
     task->enqueued_ns = now_ns();
     const auto lock_start = std::chrono::steady_clock::now();
@@ -107,15 +110,17 @@ class CommandQueue {
       rejected_closed_.fetch_add(1, std::memory_order_relaxed);
       task->reject(std::make_exception_ptr(
           Rejected("CommandQueue is closed; task was not submitted")));
-    } else if (tasks_.size() >= capacity_) {
+      return false;
+    }
+    if (tasks_.size() >= capacity_) {
       rejected_full_.fetch_add(1, std::memory_order_relaxed);
       task->reject(std::make_exception_ptr(
           Rejected("CommandQueue is full; task was not submitted")));
-    } else {
-      submitted_.fetch_add(1, std::memory_order_relaxed);
-      tasks_.push_back(std::move(task));
+      return false;
     }
-    return id;
+    submitted_.fetch_add(1, std::memory_order_relaxed);
+    tasks_.push_back(std::move(task));
+    return true;
   }
 
  public:
@@ -141,6 +146,8 @@ class CommandQueue {
 
   static constexpr const char *kTaskCancelledMessage =
       "CommandQueue task cancelled before execution";
+  static constexpr const char *kBoundedSubmitMainThreadMessage =
+      "CommandQueue bounded submission cannot run on the main thread";
 
   explicit CommandQueue(size_t capacity = DEFAULT_CAPACITY) : capacity_(capacity) {
     if (capacity == 0) {
@@ -162,10 +169,11 @@ class CommandQueue {
     std::deque<std::unique_ptr<TaskBase>> pending;
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (closed_ && tasks_.empty()) {
+      closed_ = true;
+      main_thread_id_ = std::thread::id();
+      if (tasks_.empty()) {
         return;
       }
-      closed_ = true;
       dropped_on_close_.fetch_add(static_cast<uint64_t>(tasks_.size()),
                                   std::memory_order_relaxed);
       pending.swap(tasks_);
@@ -186,7 +194,7 @@ class CommandQueue {
 
   bool is_main_thread() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return main_thread_id_ == std::this_thread::get_id();
+    return !closed_ && main_thread_id_ == std::this_thread::get_id();
   }
 
   Stats stats() const {
@@ -236,7 +244,7 @@ class CommandQueue {
     auto task = std::make_unique<Task<Fn>>(std::forward<Fn>(fn));
     TrackedSubmission<std::invoke_result_t<Fn>> out;
     out.future = task->promise.get_future();
-    out.id = enqueue(std::move(task));
+    enqueue(std::move(task), &out.id);
     return out;
   }
 
@@ -268,18 +276,28 @@ class CommandQueue {
       -> TrackedSubmission<std::invoke_result_t<Fn>> {
     using Result = std::invoke_result_t<Fn>;
     TrackedSubmission<Result> out;
+    auto task = std::make_unique<Task<Fn>>(std::forward<Fn>(fn));
+    out.future = task->promise.get_future();
     const auto start = std::chrono::steady_clock::now();
-    if (is_main_thread()) {
-      auto inline_task = std::make_unique<Task<Fn>>(std::forward<Fn>(fn));
-      std::future<Result> inline_future = inline_task->promise.get_future();
-      inline_task->execute();
-      out.future = std::move(inline_future);
+    bool rejected_on_main_thread = false;
+    {
+      const auto lock_start = std::chrono::steady_clock::now();
+      std::lock_guard<std::mutex> lock(mutex_);
+      lock_wait_ns_.fetch_add(elapsed_ns(lock_start), std::memory_order_relaxed);
+      if (!closed_ && main_thread_id_ == std::this_thread::get_id()) {
+        rejected_on_main_thread = true;
+        task->reject(std::make_exception_ptr(
+            Rejected(kBoundedSubmitMainThreadMessage)));
+      }
+    }
+    if (rejected_on_main_thread) {
       out.waited_ms = elapsed_ms_since(start);
       return out;
     }
-    auto task = std::make_unique<Task<Fn>>(std::forward<Fn>(fn));
-    out.future = task->promise.get_future();
-    out.id = enqueue(std::move(task));
+    if (!enqueue(std::move(task), &out.id)) {
+      out.waited_ms = elapsed_ms_since(start);
+      return out;
+    }
     if (budget_ms <= 0) {
       out.timed_out = true;
       out.cancelled = cancel(out.id);

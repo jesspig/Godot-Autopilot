@@ -372,15 +372,23 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
   }
 
   mcp::JsonRpcMessage message;
+  bool cancellation_sent = false;
   if (!transport->await_response(connection_id, parsed.request_id, message,
-                                 kDispatchTimeout)) {
+                                 kDispatchTimeout, &cancellation_sent)) {
     const std::string timeout_message =
         "mcp request timed out: " + parsed.method;
     log_http_error_path(parsed, connection_id, kServerErrorCode,
                         timeout_message);
-    fill_json_response(resp, 504, "Gateway Timeout",
-                       mcp_http::build_error_body(kServerErrorCode,
-                                                  timeout_message));
+    const mcp::RequestId *client_id = nullptr;
+    if (const auto *request = mcp::AsRequest(parsed.message)) {
+      client_id = &request->id;
+    }
+    fill_json_response(
+        resp, 504, "Gateway Timeout",
+        client_id == nullptr
+            ? mcp_http::build_error_body(kServerErrorCode, timeout_message)
+            : mcp_wire::build_timeout_response_text(*client_id, parsed.method,
+                                                    cancellation_sent));
     return false;
   }
 

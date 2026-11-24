@@ -1,10 +1,15 @@
 #include "core/command_queue.hpp"
+#include "core/export_guard.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/runtime_ops.hpp"
 
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <future>
+#include <memory>
 #include <string>
+#include <thread>
 
 namespace {
 
@@ -80,4 +85,73 @@ TEST_F(DispatchQueueUnavailableTest, MainThreadExecutesHandlerInPlace) {
   EXPECT_EQ(result.Find("error"), nullptr);
   ASSERT_NE(result.Find("result"), nullptr);
   EXPECT_EQ(result["result"].GetInt(), 7);
+}
+
+TEST_F(DispatchQueueUnavailableTest, ClosedFormerMainQueueRejectsHandler) {
+  bool handler_called = false;
+  godot_autopilot::dispatch::replace_handlers(
+      {{"gda_queue_probe",
+        [&handler_called](const mcp::JsonValue &) {
+          handler_called = true;
+          return mcp::JsonValue::Parse(R"({"result": 7})");
+        }}},
+      {});
+
+  queue.drain();
+  queue.close();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+
+  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "gda_queue_probe", mcp::JsonValue::Parse("{}"));
+
+  EXPECT_FALSE(handler_called);
+  EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
+}
+
+TEST_F(DispatchQueueUnavailableTest,
+       ExportStartingAfterSubmissionBlocksFinalMainThreadExecution) {
+  bool handler_called = false;
+  godot_autopilot::dispatch::replace_handlers(
+      {{"gda_queue_probe",
+        [&handler_called](const mcp::JsonValue &) {
+          handler_called = true;
+          return mcp::JsonValue::Parse(R"({"result": 7})");
+        }}},
+      {});
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  godot_autopilot::ExportState export_state;
+  std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
+
+  std::promise<mcp::JsonValue> completed;
+  auto completed_future = completed.get_future();
+  std::thread worker([&] {
+    completed.set_value(godot_autopilot::dispatch::call_handler(
+        "gda_queue_probe", mcp::JsonValue::Parse("{}")));
+  });
+
+  const auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::seconds(2);
+  while (queue.stats().pending == 0 &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  const bool queued = queue.stats().pending == 1u;
+  export_scope =
+      std::make_unique<godot_autopilot::ExportState::Scope>(export_state);
+  queue.drain();
+  export_scope.reset();
+
+  const auto completed_status =
+      completed_future.wait_for(std::chrono::seconds(2));
+  mcp::JsonValue result;
+  if (completed_status == std::future_status::ready) {
+    result = completed_future.get();
+  }
+  worker.join();
+  ASSERT_EQ(completed_status, std::future_status::ready);
+  ASSERT_TRUE(queued);
+  EXPECT_FALSE(handler_called);
+  EXPECT_EQ(result["code"].GetString(), "export_in_progress");
+  EXPECT_TRUE(result["retryable"].GetBool());
 }

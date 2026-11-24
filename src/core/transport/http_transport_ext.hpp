@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -16,6 +17,46 @@ namespace godot_autopilot {
 constexpr const char *kStreamIdHeader = "x-gda-stream-id";
 constexpr const char *kRequestIdHeader = "x-gda-request-id";
 
+class HttpPendingBudget {
+public:
+  bool try_acquire(size_t max_jobs, size_t max_bytes, size_t bytes) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (count_ >= max_jobs || bytes > max_bytes_remaining(max_bytes)) {
+      return false;
+    }
+    ++count_;
+    bytes_ += bytes;
+    return true;
+  }
+
+  void release(size_t bytes) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (count_ > 0) {
+      --count_;
+    }
+    bytes_ = bytes_ >= bytes ? bytes_ - bytes : 0;
+  }
+
+  size_t count() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return count_;
+  }
+
+  size_t bytes() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return bytes_;
+  }
+
+private:
+  size_t max_bytes_remaining(size_t max_bytes) const {
+    return bytes_ < max_bytes ? max_bytes - bytes_ : 0;
+  }
+
+  mutable std::mutex mutex_;
+  size_t count_{0};
+  size_t bytes_{0};
+};
+
 struct HttpPumpLimits {
   size_t max_accepts_per_frame{8};
   size_t max_connections_per_frame{8};
@@ -23,6 +64,10 @@ struct HttpPumpLimits {
   size_t max_write_bytes_per_frame{262144};
   size_t max_open_connections{64};
   size_t max_outbox_bytes_per_connection{1024 * 1024};
+  size_t max_pending_jobs_per_connection{64};
+  size_t max_pending_job_bytes_per_connection{1024 * 1024};
+  size_t max_pending_jobs_global{256};
+  size_t max_pending_job_bytes_global{4 * 1024 * 1024};
 };
 
 inline const HttpPumpLimits &http_pump_limits() {

@@ -31,6 +31,9 @@ struct ParsedRequest {
 ParsedRequest parse_request(const std::string &body);
 std::string build_response_text(const mcp::JsonRpcMessage &message);
 std::string build_error_response_text(int code, const std::string &message);
+std::string build_timeout_response_text(const mcp::RequestId &id,
+                                        const std::string &method,
+                                        bool cancellation_sent);
 std::string build_event_frame(const std::string &event, const std::string &data);
 std::string build_close_event_frame();
 bool is_supported_protocol_version(const std::string &version);
@@ -58,11 +61,13 @@ public:
   bool await_response(const std::string &connection_id,
                       const std::string &request_id,
                       std::string &response_text,
-                      std::chrono::milliseconds timeout);
+                      std::chrono::milliseconds timeout,
+                       bool *cancellation_sent = nullptr);
   bool await_response(const std::string &connection_id,
                       const std::string &request_id,
                       mcp::JsonRpcMessage &message,
-                      std::chrono::milliseconds timeout);
+                      std::chrono::milliseconds timeout,
+                       bool *cancellation_sent = nullptr);
 
   bool pending_request_meta(const std::string &request_key,
                             std::string &method,
@@ -92,6 +97,7 @@ private:
 
   void expire_stale_pending();
   void fail_pending_exchanges();
+  bool send_cancel_notification(const mcp::RequestId &internal_id);
 };
 
 std::shared_ptr<GodotTransport> godot_transport_instance();

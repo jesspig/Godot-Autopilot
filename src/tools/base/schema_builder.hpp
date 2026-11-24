@@ -18,6 +18,11 @@ struct ParamDef {
 
 void add_required_flag(mcp::JsonValue &schema, const std::string &name);
 
+bool is_supported_param_type(const std::string &type);
+
+bool validate_param_defs(const std::vector<ParamDef> &params,
+                         std::string &error);
+
 mcp::JsonValue build_schema(std::initializer_list<ParamDef> params);
 
 mcp::JsonValue build_schema(const std::vector<ParamDef> &params);

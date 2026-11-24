@@ -153,6 +153,22 @@ TEST(RuntimeOpsTest, GameJobTableRegisterCapacity) {
     EXPECT_EQ(table.register_job(999, "status", 1000, 0), -1);
 }
 
+TEST(RuntimeOpsTest, GameJobReservationBindsAndReleases) {
+  GameJobTable table;
+  const int64_t job_id = table.register_job(0, "eval", 1000, 100);
+  EXPECT_TRUE(table.contains(job_id));
+  EXPECT_TRUE(table.bind_request(job_id, 42));
+  GameJobTable::CollectOutcome outcome = table.collect(job_id, 200);
+  EXPECT_TRUE(outcome.found);
+  EXPECT_EQ(outcome.request_id, 42);
+
+  const int64_t released = table.register_job(0, "eval", 1000, 100);
+  EXPECT_TRUE(table.release_job(released));
+  EXPECT_FALSE(table.contains(released));
+  EXPECT_FALSE(table.release_job(released));
+  EXPECT_FALSE(table.bind_request(released, 43));
+}
+
 TEST(RuntimeOpsTest, GameJobTableCollectRemoves) {
     GameJobTable table;
     int64_t first = table.register_job(42, "eval", 1000, 100);

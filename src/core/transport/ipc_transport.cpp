@@ -267,9 +267,17 @@ bool IpcTransport::listen_tcp(const std::string &host, int requested_port,
     error = "socket() failed (" + std::to_string(last_socket_error()) + ")";
     return false;
   }
-  int reuse = 1;
-  ::setsockopt(to_native(handle), SOL_SOCKET, SO_REUSEADDR,
-               reinterpret_cast<const char *>(&reuse), sizeof(reuse));
+#ifdef _WIN32
+  int exclusive = 1;
+  if (::setsockopt(to_native(handle), SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                   reinterpret_cast<const char *>(&exclusive),
+                   sizeof(exclusive)) != 0) {
+    close_socket(handle);
+    error = "failed to enable exclusive IPC TCP binding (" +
+            std::to_string(last_socket_error()) + ")";
+    return false;
+  }
+#endif
   if (!set_nonblocking(handle)) {
     close_socket(handle);
     error = "failed to switch the socket to non-blocking mode";
@@ -319,6 +327,11 @@ void IpcTransport::stop() {
   host_.clear();
   bound_port_ = 0;
   token_.clear();
+  line_handler_ = {};
+  {
+    std::lock_guard<std::mutex> lock(outbox_mutex_);
+    outbox_.clear();
+  }
 }
 
 void IpcTransport::pump() {

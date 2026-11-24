@@ -5,6 +5,8 @@
 using godot_autopilot::decide_game_request;
 using godot_autopilot::is_broadcast_eligible;
 using godot_autopilot::ReadyDecision;
+using godot_autopilot::select_game_session;
+using godot_autopilot::SessionSelection;
 using godot_autopilot::should_queue_for_ready;
 
 TEST(ReadyPolicyTest, SceneReadySessionSendsNow) {
@@ -95,4 +97,37 @@ TEST(ReadyPolicyTest, BroadcastFilterMatchesSendNowCriterion) {
                 << "ready=" << ready << " scene=" << scene;
         }
     }
+}
+
+TEST(ReadyPolicyTest, SingleReadySessionIsSelectedAutomatically) {
+    const auto result = select_game_session({7}, {7, 8}, std::nullopt);
+    EXPECT_EQ(result.kind, SessionSelection::Selected);
+    EXPECT_EQ(result.session_id, 7);
+}
+
+TEST(ReadyPolicyTest, MultipleReadySessionsAreAmbiguousWithoutTarget) {
+    const auto result = select_game_session({7, 8}, {7, 8, 9}, std::nullopt);
+    EXPECT_EQ(result.kind, SessionSelection::Ambiguous);
+    EXPECT_EQ(result.session_id, -1);
+}
+
+TEST(ReadyPolicyTest, ExplicitSessionSelectsOnlyThatReadySession) {
+    const auto result = select_game_session({7, 8}, {7, 8, 9}, 8);
+    EXPECT_EQ(result.kind, SessionSelection::Selected);
+    EXPECT_EQ(result.session_id, 8);
+}
+
+TEST(ReadyPolicyTest, ActiveButNotReadySessionIsNotSent) {
+    const auto result = select_game_session({7}, {7, 8}, 8);
+    EXPECT_EQ(result.kind, SessionSelection::NotReady);
+}
+
+TEST(ReadyPolicyTest, UnknownSessionIsRejected) {
+    const auto result = select_game_session({7}, {7, 8}, 99);
+    EXPECT_EQ(result.kind, SessionSelection::InvalidSession);
+}
+
+TEST(ReadyPolicyTest, NoReadySessionIsNotAutoSelected) {
+    const auto result = select_game_session({}, {7, 8}, std::nullopt);
+    EXPECT_EQ(result.kind, SessionSelection::NoneReady);
 }

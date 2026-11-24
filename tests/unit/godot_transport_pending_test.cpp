@@ -192,6 +192,9 @@ TEST(GodotTransportPendingTest, LateResponseForExpiredRequestDropped) {
                                         expired_message,
                                         std::chrono::milliseconds(0)));
 
+  const auto cancellation = take_channel_message(transport);
+  ASSERT_TRUE(std::holds_alternative<mcp::JsonRpcNotification>(cancellation));
+
   ASSERT_TRUE(transport.submit(parsed, "conn-2", error));
   const auto second = take_channel_message(transport);
   const auto *second_request = std::get_if<mcp::JsonRpcRequest>(&second);
@@ -278,6 +281,40 @@ TEST(GodotTransportPendingTest, CancelNotificationWithoutPendingPassesThrough) {
   ASSERT_NE(target, nullptr);
   ASSERT_TRUE(target->IsInt());
   EXPECT_EQ(target->GetInt(), int64_t{2});
+}
+
+TEST(GodotTransportPendingTest, TimeoutSendsCancellationWithInternalRequestId) {
+  GodotTransport transport;
+  const auto parsed =
+      parse_request(R"({"jsonrpc":"2.0","id":"client-7","method":"tools/list"})");
+  ASSERT_TRUE(parsed.ok);
+
+  std::string error;
+  ASSERT_TRUE(transport.submit(parsed, "conn-1", error));
+  const auto request_message = take_channel_message(transport);
+  const auto *request = std::get_if<mcp::JsonRpcRequest>(&request_message);
+  ASSERT_NE(request, nullptr);
+  const auto internal_id = std::get<int64_t>(request->id);
+
+  mcp::JsonRpcMessage response;
+  bool cancellation_sent = false;
+  EXPECT_FALSE(transport.await_response(
+      "conn-1", parsed.request_id, response,
+      std::chrono::milliseconds(0), &cancellation_sent));
+  EXPECT_TRUE(cancellation_sent);
+
+  const auto cancel_message = take_channel_message(transport);
+  const auto *notification =
+      std::get_if<mcp::JsonRpcNotification>(&cancel_message);
+  ASSERT_NE(notification, nullptr);
+  EXPECT_EQ(notification->method, "notifications/cancelled");
+  ASSERT_TRUE(notification->params.has_value());
+  const mcp::JsonValue *target = notification->params->Find("requestId");
+  ASSERT_NE(target, nullptr);
+  EXPECT_EQ(target->GetInt(), internal_id);
+  const mcp::JsonValue *reason = notification->params->Find("reason");
+  ASSERT_NE(reason, nullptr);
+  EXPECT_EQ(reason->GetString(), "timeout");
 }
 
 TEST(GodotTransportPendingTest, ClientRequestIdTextMapsInternalKey) {

@@ -5,13 +5,16 @@
 #include "runtime/gda_protocol.hpp"
 #include "tools/domains/capture/capture_ops.hpp"
 #include "tools/base/debugger_access.hpp"
+#include "tools/base/ready_policy.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/translation_server.hpp>
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -50,6 +53,19 @@ bool extract_wait_ready(const JV &args, bool *out_wait_ready) {
   return true;
 }
 
+bool extract_session_id(const JV &args, std::optional<int32_t> *out_session_id) {
+  *out_session_id = std::nullopt;
+  auto *session_p = args.Find("session_id");
+  if (!session_p)
+    return true;
+  if (!session_p->IsInt() ||
+      session_p->GetInt() < std::numeric_limits<int32_t>::min() ||
+      session_p->GetInt() > std::numeric_limits<int32_t>::max())
+    return false;
+  *out_session_id = static_cast<int32_t>(session_p->GetInt());
+  return true;
+}
+
 std::string game_op_timeout_error() {
   return "timeout_ms must be an integer between 1 and " +
          std::to_string(GDA_MAX_GAME_OP_TIMEOUT_MS);
@@ -64,7 +80,7 @@ constexpr const char *INPUT_PARAM_WHITELIST[] = {
     "type",      "keycode",    "pressed",   "button_index", "position",
     "action",    "duration_ms", "mode",     "timeout_ms",   "direction",
     "amount",    "relative",   "click",     "double_click", "wait_ready",
-    "coord_space",
+    "coord_space", "session_id",
 };
 
 bool has_only_fields(const JV &value, const char *const *allowed,
@@ -91,7 +107,7 @@ bool is_eval_param_allowed(const std::string &key) {
   static constexpr const char *allowed[] = {
       "action", "node_path", "property", "value", "method", "args",
       "source_code", "persist", "persist_name", "timeout_ms", "assert",
-      "wait_ready"};
+      "wait_ready", "session_id"};
   for (const char *candidate : allowed)
     if (key == candidate)
       return true;
@@ -206,17 +222,20 @@ mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("get_game_status parameters must be an object");
   for (const auto &entry : args.GetObject()) {
-    if (entry.first != "wait_ready")
+    if (entry.first != "wait_ready" && entry.first != "session_id")
       return error_json("get_game_status accepts no parameters");
   }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_status called");
   JV params(JV::object_tag);
   return handle_gda_send("status", params, extract_timeout(args), false,
-                         wait_ready);
+                         wait_ready, session_id);
 }
 
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
@@ -276,6 +295,9 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   params["action"] = *action_p;
   copy_optional(args, params, "node_path");
@@ -293,7 +315,7 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
   return handle_gda_send(op, params, extract_timeout(args),
                          needs_error_break_suppression(std::string(GDA_OP_EVAL),
                                                        action),
-                         wait_ready);
+                         wait_ready, session_id);
 }
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
@@ -349,6 +371,9 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   params["type"] = JV(type);
   copy_optional(args, params, "keycode");
@@ -366,7 +391,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "coord_space");
 
   JV result =
-      handle_gda_send("input", params, extract_timeout(args), false, wait_ready);
+      handle_gda_send("input", params, extract_timeout(args), false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -375,7 +400,8 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "wait_game_input called");
   static constexpr const char *allowed[] = {"action", "state", "inject",
-                                             "timeout_ms", "wait_ready"};
+                                             "timeout_ms", "wait_ready",
+                                             "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for wait_game_input: " + unknown);
@@ -394,6 +420,9 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   params["action"] = *action_p;
   copy_optional(args, params, "state");
@@ -401,7 +430,7 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   copy_optional(args, params, "timeout_ms");
   JV result =
       handle_gda_send("input_wait", params, extract_timeout(args), false,
-                      wait_ready);
+                      wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -412,7 +441,7 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("get_game_input_status parameters must be an object");
   static constexpr const char *allowed[] = {"action", "timeout_ms",
-                                             "wait_ready"};
+                                             "wait_ready", "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for get_game_input_status: " + unknown);
@@ -423,10 +452,13 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   params["action"] = *action_p;
   JV result = handle_gda_send("input_status", params, extract_timeout(args),
-                              false, wait_ready);
+                              false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   if (!result.Contains("error")) {
     std::string recent_errors = debugger_ops::capture_get_errors_text(5);
@@ -441,7 +473,8 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sequence_game_inputs called");
   static constexpr const char *allowed[] = {"inputs", "timeout_ms",
-                                             "wait_ready", "coord_space"};
+                                             "wait_ready", "coord_space",
+                                             "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for sequence_game_inputs: " + unknown);
@@ -504,8 +537,11 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV result = handle_gda_send(std::string(GDA_OP_INPUT_SEQUENCE), params,
-                              timeout, false, wait_ready);
+                              timeout, false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -515,7 +551,7 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
                             "get_game_ui_elements called");
   static constexpr const char *allowed[] = {
       "max_elements", "timeout_ms", "wait_ready", "filter", "types",
-      "visible_only"};
+      "visible_only", "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for get_game_ui_elements: " + unknown);
@@ -543,6 +579,9 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   copy_optional(args, params, "max_elements");
   copy_optional(args, params, "filter");
@@ -550,7 +589,7 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
   if (visible_only)
     params["visible_only"] = JV(true);
   JV result = handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
-                              extract_timeout(args), false, wait_ready);
+                              extract_timeout(args), false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -560,7 +599,8 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
     return error_json("click_game_ui_element parameters must be an object");
   static constexpr const char *allowed[] = {"path", "text", "text_index", "button_index",
                                              "double_click", "strict_hit", "max_elements",
-                                             "timeout_ms", "wait_ready"};
+                                             "timeout_ms", "wait_ready",
+                                             "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for click_game_ui_element: " + unknown + " — annotate id is a per-capture sequence number and is not clickable; use path from the same get_game_ui_elements row (path takes priority) or text/text_index");
@@ -623,6 +663,9 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   LogSystem::instance().log(
       LogLevel::Debug, LogCategory::Tools,
       "click_game_ui_element dispatch: path=" + path + ", text=" + text + ", button_index=" +
@@ -645,7 +688,7 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   params["max_elements"] = JV(max_elements);
   params["click"] = std::move(click);
   JV result = handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
-                              extract_timeout(args), false, wait_ready);
+                              extract_timeout(args), false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -658,8 +701,8 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   static constexpr const char *allowed[] = {
       "timeout_ms", "region",   "max_dimension", "annotate",
       "after_frames", "when",   "scale",         "annotate_nodes",
-      "annotate_nodes_max",     "wait_ready",    "save",
-      "save_dir"};
+      "annotate_nodes_max",     "wait_ready",    "session_id",
+      "save",      "save_dir"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for capture_game_viewport: " + unknown);
@@ -721,6 +764,9 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   copy_optional(args, params, "region");
   copy_optional(args, params, "max_dimension");
@@ -732,7 +778,7 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   copy_optional(args, params, "scale");
   const int64_t timeout_ms = extract_timeout(args);
   params["timeout_ms"] = JV(timeout_ms);
-  JV result = handle_gda_send("capture", params, timeout_ms, false, wait_ready);
+  JV result = handle_gda_send("capture", params, timeout_ms, false, wait_ready, session_id);
   result = capture_ops::with_capture_save_options(std::move(result),
                                                   save_options);
   append_runtime_degradation_hint(result);
@@ -742,7 +788,7 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
 mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_game_scripts called");
-  static constexpr const char *allowed[] = {"paths"};
+  static constexpr const char *allowed[] = {"paths", "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for reload_game_scripts: " + unknown);
@@ -759,8 +805,30 @@ mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
     }
     paths_vec.push_back(item.GetString());
   }
-  int32_t sent = debugger_broadcast_reload_scripts(paths_vec);
-  if (sent <= 0) {
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
+  const auto active_sessions = debugger_active_session_ids();
+  const auto ready_sessions = debugger_request_ready_session_ids();
+  const auto selection =
+      select_game_session(ready_sessions, active_sessions, session_id);
+  if (selection.kind == SessionSelection::Ambiguous) {
+    JV error = error_json(
+        "multiple game sessions are ready; pass session_id to select one");
+    error["code"] = JV("ambiguous_session");
+    return error;
+  }
+  if (selection.kind == SessionSelection::InvalidSession) {
+    JV error = error_json("game session_id " +
+                          std::to_string(*session_id) + " is not active");
+    error["code"] = JV("invalid_session");
+    return error;
+  }
+  if (selection.kind != SessionSelection::Selected) {
+    return error_json(
+        "game not ready: no ready game session — start the game from the editor first");
+  }
+  if (!debugger_reload_scripts(selection.session_id, paths_vec)) {
     return error_json(
         "game not running: no active debug session — start the game from the editor first");
   }
@@ -768,7 +836,7 @@ mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
   for (const auto &path : paths_vec)
     paths_arr.PushBack(JV(path));
   JV inner(JV::object_tag);
-  inner["sent_sessions"] = JV(static_cast<int64_t>(sent));
+  inner["sent_sessions"] = JV(static_cast<int64_t>(1));
   inner["paths"] = std::move(paths_arr);
   JV result(JV::object_tag);
   result["result"] = std::move(inner);
@@ -783,7 +851,7 @@ mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("start_game_job parameters must be an object");
   static constexpr const char *allowed[] = {"op", "params", "timeout_ms",
-                                             "wait_ready"};
+                                             "wait_ready", "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
                        unknown))
@@ -807,6 +875,9 @@ mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   const int64_t timeout_ms = extract_timeout(args);
 
   std::string action;
@@ -818,27 +889,17 @@ mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
   const int64_t now_ms = steady_game_now_ms();
   expire_stale_game_jobs(now_ms);
 
-  int64_t request_id = 0;
-  JV sent = start_pending_op(op, *params_p, suppress, &request_id, wait_ready);
-  if (sent.Contains("error")) {
-    append_runtime_degradation_hint(sent);
-    return sent;
-  }
-
-  int64_t job_id = 0;
+  int64_t job_id = -1;
   {
     std::lock_guard<std::mutex> lock(game_jobs_mutex());
-    job_id = game_jobs().register_job(request_id, op, timeout_ms, now_ms);
+    job_id = game_jobs().register_job(0, op, timeout_ms, now_ms);
   }
   if (job_id < 0) {
-    std::string discard_detail;
-    discard_pending(request_id, discard_detail);
     LogSystem::instance().log_detailed(
         LogLevel::Warning, LogCategory::Tools,
-        "start_game_job rejected: job table full",
+        "start_game_job rejected before send: job table full",
         "jobs=" + std::to_string(GameJobTable::kMaxJobs) + " op=" + op +
-            " timeout_ms=" + std::to_string(timeout_ms) +
-            " request_id=" + std::to_string(request_id));
+            " timeout_ms=" + std::to_string(timeout_ms));
     return util::error_detail(
         "game job table is full (" + std::to_string(GameJobTable::kMaxJobs) +
             " jobs)",
@@ -846,6 +907,41 @@ mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
         "a free job slot in the game job table",
         "collect or cancel earlier jobs with get_game_job first, then retry "
         "start_game_job");
+  }
+
+  int64_t request_id = 0;
+  JV sent;
+  try {
+    sent = start_pending_op(op, *params_p, suppress, &request_id, wait_ready,
+                            session_id);
+  } catch (...) {
+    std::lock_guard<std::mutex> lock(game_jobs_mutex());
+    game_jobs().release_job(job_id);
+    throw;
+  }
+  if (sent.Contains("error")) {
+    {
+      std::lock_guard<std::mutex> lock(game_jobs_mutex());
+      game_jobs().release_job(job_id);
+    }
+    append_runtime_degradation_hint(sent);
+    return sent;
+  }
+
+  bool bound = false;
+  {
+    std::lock_guard<std::mutex> lock(game_jobs_mutex());
+    bound = game_jobs().bind_request(job_id, request_id);
+  }
+  if (!bound) {
+    cancel_game_op_request(request_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    return util::error_detail(
+        "game job reservation expired before the request could be tracked",
+        "start_game_job",
+        "a job reservation that remains valid until dispatch completes",
+        "retry start_game_job while the editor main thread is responsive");
   }
 
   JV job(JV::object_tag);
@@ -1057,7 +1153,7 @@ mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args) {
     return error_json("sample_game_property parameters must be an object");
   static constexpr const char *allowed[] = {"node_path", "property", "frames",
                                             "interval_frames", "timeout_ms",
-                                            "wait_ready"};
+                                            "wait_ready", "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
                        unknown))
@@ -1097,6 +1193,9 @@ mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   params["node_path"] = *path_p;
   params["property"] = *prop_p;
@@ -1105,7 +1204,7 @@ mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args) {
   if (auto *timeout = args.Find("timeout_ms"))
     params["timeout_ms"] = *timeout;
   JV result = handle_gda_send(std::string(GDA_OP_SAMPLE), params,
-                              extract_timeout(args), false, wait_ready);
+                              extract_timeout(args), false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -1117,7 +1216,8 @@ mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args) {
     return error_json("collect_game_evidence parameters must be an object");
   static constexpr const char *allowed[] = {
       "include_status", "include_capture", "include_errors", "limit",
-      "region", "max_dimension", "scale", "timeout_ms", "wait_ready"};
+      "region", "max_dimension", "scale", "timeout_ms", "wait_ready",
+      "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
                        unknown))
@@ -1152,6 +1252,9 @@ mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   copy_optional(args, params, "include_status");
   copy_optional(args, params, "include_capture");
@@ -1161,7 +1264,7 @@ mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args) {
   copy_optional(args, params, "max_dimension");
   copy_optional(args, params, "scale");
   JV result = handle_gda_send(std::string(GDA_OP_COLLECT_EVIDENCE), params,
-                              extract_timeout(args), false, wait_ready);
+                              extract_timeout(args), false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -1173,7 +1276,8 @@ mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
     return error_json("validate_game_ui_layout parameters must be an object");
   static constexpr const char *allowed[] = {
       "max_elements", "ignore_paths", "ignore_classes", "min_area",
-      "bounds_margin", "occlude_ratio", "timeout_ms", "wait_ready"};
+      "bounds_margin", "occlude_ratio", "timeout_ms", "wait_ready",
+      "session_id"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
                        unknown))
@@ -1219,6 +1323,9 @@ mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
+  std::optional<int32_t> session_id;
+  if (!extract_session_id(args, &session_id))
+    return error_json("session_id must be an integer");
   JV params(JV::object_tag);
   copy_optional(args, params, "max_elements");
   copy_optional(args, params, "ignore_paths");
@@ -1227,7 +1334,7 @@ mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
   copy_optional(args, params, "bounds_margin");
   copy_optional(args, params, "occlude_ratio");
   JV result = handle_gda_send(std::string(GDA_OP_VALIDATE_UI_LAYOUT), params,
-                              extract_timeout(args), false, wait_ready);
+                              extract_timeout(args), false, wait_ready, session_id);
   append_runtime_degradation_hint(result);
   return result;
 }

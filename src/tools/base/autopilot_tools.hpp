@@ -10,6 +10,8 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
 
+#include "tools/base/dynamic_spec_store.hpp"
+
 namespace godot_autopilot {
 
 class AutopilotTools : public godot::Object {
@@ -36,6 +38,10 @@ public:
 
 protected:
   static void _bind_methods();
+
+private:
+  void rescan_single_file(const std::string &path, godot::Array &errors);
+  dynamic_specs::NodeOwnerRegistry node_owners_;
 };
 
 } // namespace godot_autopilot

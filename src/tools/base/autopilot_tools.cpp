@@ -14,6 +14,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -25,6 +26,7 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
@@ -47,9 +49,16 @@ namespace godot_autopilot {
 
 namespace {
 
+struct DynamicTarget;
+
 std::vector<int64_t> &handle_store() {
   static std::vector<int64_t> handles;
   return handles;
+}
+
+std::unordered_map<int64_t, std::shared_ptr<DynamicTarget>> &target_store() {
+  static std::unordered_map<int64_t, std::shared_ptr<DynamicTarget>> targets;
+  return targets;
 }
 
 std::atomic<int64_t> &next_handle() {
@@ -60,6 +69,9 @@ std::atomic<int64_t> &next_handle() {
 struct DynamicTarget {
   godot::Callable callable;
   godot::Ref<godot::RefCounted> owner;
+  godot::Node *node_owner = nullptr;
+  uint64_t node_owner_id = 0;
+  std::atomic<bool> active{true};
   std::string name;
 };
 
@@ -82,12 +94,50 @@ int64_t reject_registration(const std::string &message) {
   return -1;
 }
 
+mcp::JsonValue dynamic_error(const std::string &name, const std::string &message,
+                             const std::string &code) {
+  mcp::JsonValue result = util::error_json(message);
+  result["code"] = mcp::JsonValue(code);
+  result["tool"] = mcp::JsonValue(name);
+  result["retryable"] = mcp::JsonValue(false);
+  return result;
+}
+
 mcp::JsonValue invoke_dynamic_target(
     const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
+  if (!target->active.load()) {
+    return dynamic_error(target->name,
+                         "user tool '" + target->name +
+                             "' is no longer registered",
+                         "tool_unregistered");
+  }
+  if (!dynamic_specs::enabled().load()) {
+    return dynamic_error(target->name, "user tools are disabled",
+                         "tools_disabled");
+  }
   if (!target->callable.is_valid() || target->callable.get_object() == nullptr) {
-    return util::error_json("user tool '" + target->name +
-                            "' is no longer valid: its target object was "
-                            "freed — re-register it");
+    return dynamic_error(target->name,
+                         "user tool '" + target->name +
+                             "' is no longer valid: its target object was "
+                             "freed — re-register it",
+                         "invalid_target");
+  }
+  godot::Object *bound = target->callable.get_object();
+  if (godot::ObjectDB::get_instance(bound->get_instance_id()) != bound) {
+    return dynamic_error(target->name,
+                         "user tool '" + target->name +
+                             "' is no longer valid: its target object was "
+                             "freed — re-register it",
+                         "invalid_target");
+  }
+  if (target->node_owner_id != 0 &&
+      godot::ObjectDB::get_instance(target->node_owner_id) !=
+          target->node_owner) {
+    return dynamic_error(target->name,
+                         "user tool '" + target->name +
+                             "' is no longer valid: its target node was "
+                             "freed — re-register it",
+                         "invalid_target");
   }
 
   godot::Dictionary args_dict;
@@ -115,15 +165,27 @@ mcp::JsonValue invoke_dynamic_target(
 
 mcp::JsonValue run_dynamic_handler(
     const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
-  if (runtime_ops::has_editor_queue() &&
-      !get_editor_queue().is_main_thread()) {
-    const tools::TraceContext ctx = tools::capture_trace_context();
+  if (ExportGuard::is_exporting()) {
+    return dispatch::export_blocked_json_result();
+  }
+  if (!runtime_ops::has_editor_queue()) {
+    return dispatch::queue_unavailable_result(
+        target->name,
+        "the plugin has not attached the editor main thread queue yet "
+        "(startup) or has already detached it (shutdown)");
+  }
+  if (!get_editor_queue().is_main_thread()) {
+    const dispatch::DepthContext ctx = dispatch::capture_depth_context();
     auto state = std::make_shared<mcp::JsonValue>();
     dispatch::BoundedWaitOutcome outcome =
         dispatch::run_bounded_on_main_thread(
             get_editor_queue(), "user tool dispatch", state,
             [target, args, ctx](mcp::JsonValue &result) {
-              tools::ScopedTraceContext restore(ctx);
+              dispatch::ScopedDepthContext restore(ctx);
+              if (ExportGuard::is_exporting()) {
+                result = dispatch::export_blocked_json_result();
+                return;
+              }
               result = invoke_dynamic_target(target, args);
             },
             GDA_DISPATCH_WAIT_DEFAULT_MS);
@@ -212,8 +274,18 @@ void record_rescan_error(godot::Array &errors, const std::string &file,
   errors.push_back(item);
 }
 
-void rescan_single_file(AutopilotTools *self, const std::string &path,
-                        godot::Array &errors) {
+void delete_released_node(uint64_t object_id) {
+  auto *object = godot::ObjectDB::get_instance(object_id);
+  auto *node = object ? godot::Object::cast_to<godot::Node>(object) : nullptr;
+  if (node != nullptr && node->get_parent() == nullptr) {
+    memdelete(node);
+  }
+}
+
+} // namespace
+
+void AutopilotTools::rescan_single_file(const std::string &path,
+                                        godot::Array &errors) {
   try {
     auto *loader = godot::ResourceLoader::get_singleton();
     if (loader == nullptr) {
@@ -257,7 +329,7 @@ void rescan_single_file(AutopilotTools *self, const std::string &path,
           "rescan: no register_autopilot_tools(api) method; skipped");
     } else {
       try {
-        obj->call(method, godot::Variant(self));
+        obj->call(method, godot::Variant(this));
       } catch (const std::exception &e) {
         record_rescan_error(errors, path,
                              std::string("rescan: register call failed: ") +
@@ -268,7 +340,8 @@ void rescan_single_file(AutopilotTools *self, const std::string &path,
       }
     }
     if (auto *node = godot::Object::cast_to<godot::Node>(obj)) {
-      if (node->get_parent() == nullptr) {
+      const uint64_t object_id = node->get_instance_id();
+      if (node->get_parent() == nullptr && !node_owners_.owns(object_id)) {
         memdelete(node);
       }
     } else if (godot::Object::cast_to<godot::RefCounted>(obj) == nullptr) {
@@ -281,17 +354,28 @@ void rescan_single_file(AutopilotTools *self, const std::string &path,
   }
 }
 
-} // namespace
-
 AutopilotTools::~AutopilotTools() {
-  std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
-  dynamic_specs::store().clear();
-  handle_store().clear();
+  {
+    std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
+    for (auto &entry : target_store()) {
+      entry.second->active.store(false);
+    }
+    target_store().clear();
+    dynamic_specs::store().clear();
+    handle_store().clear();
+  }
+  refresh_dynamic_tools();
+  for (const uint64_t object_id : node_owners_.release_all()) {
+    delete_released_node(object_id);
+  }
 }
 
 int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
                                       const godot::Callable &callable) {
   const std::string name = string_field(definition, "name", "");
+  if (!dynamic_specs::enabled().load()) {
+    return reject_registration("register_tool: user tools are disabled");
+  }
   if (name.empty()) {
     return reject_registration(
         "register_tool: definition.name must be a non-empty string");
@@ -338,6 +422,10 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
   }
 
   godot::Variant params_variant = definition.get("params", godot::Variant());
+  if (params_variant.get_type() != godot::Variant::NIL &&
+      params_variant.get_type() != godot::Variant::ARRAY) {
+    return reject_registration("register_tool: params must be an array");
+  }
   if (params_variant.get_type() == godot::Variant::ARRAY) {
     const godot::Array params_array = params_variant.operator godot::Array();
     for (int64_t i = 0; i < params_array.size(); ++i) {
@@ -355,6 +443,14 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
                                    std::to_string(i) +
                                    "].name must be a non-empty string");
       }
+      godot::Variant type_variant = item.get("type", godot::Variant());
+      if (type_variant.get_type() != godot::Variant::NIL &&
+          type_variant.get_type() != godot::Variant::STRING &&
+          type_variant.get_type() != godot::Variant::STRING_NAME) {
+        return reject_registration("register_tool: params[" +
+                                   std::to_string(i) +
+                                   "].type must be a string");
+      }
       param.type = string_field(item, "type", "string");
       param.description = string_field(item, "description", "");
       godot::Variant required = item.get("required", godot::Variant());
@@ -363,15 +459,31 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
       spec.params.push_back(std::move(param));
     }
   }
+  std::string params_error;
+  if (!schema::validate_param_defs(spec.params, params_error)) {
+    return reject_registration("register_tool: invalid params: " + params_error);
+  }
 
   spec.flags = tool_flags::kDynamic;
 
   auto target = std::make_shared<DynamicTarget>();
   target->callable = callable;
   target->name = name;
-  if (godot::Object *bound = callable.get_object()) {
-    if (auto *ref_counted = godot::Object::cast_to<godot::RefCounted>(bound)) {
-      target->owner = godot::Ref<godot::RefCounted>(ref_counted);
+  godot::Object *bound = callable.get_object();
+  auto *ref_counted = godot::Object::cast_to<godot::RefCounted>(bound);
+  auto *node = godot::Object::cast_to<godot::Node>(bound);
+  if (ref_counted == nullptr && node == nullptr) {
+    return reject_registration(
+        "register_tool: callable target must be a Node or RefCounted object");
+  }
+  if (ref_counted != nullptr) {
+    target->owner = godot::Ref<godot::RefCounted>(ref_counted);
+  }
+  if (node != nullptr) {
+    target->node_owner = node;
+    target->node_owner_id = node->get_instance_id();
+    if (node->get_parent() == nullptr) {
+      node_owners_.retain(target->node_owner_id);
     }
   }
   spec.handler = [target](const mcp::JsonValue &args) {
@@ -388,6 +500,7 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
     std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
     dynamic_specs::store().push_back(std::move(spec));
     handle_store().push_back(handle);
+    target_store()[handle] = target;
   }
   LogSystem::instance().log_detailed(
       LogLevel::Info, LogCategory::Tools,
@@ -481,6 +594,7 @@ bool AutopilotTools::unregister_tool(int64_t handle) {
   }
   bool removed = false;
   std::string removed_name;
+  std::shared_ptr<DynamicTarget> removed_target;
   {
     std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
     std::vector<int64_t> &handles = handle_store();
@@ -492,10 +606,18 @@ bool AutopilotTools::unregister_tool(int64_t handle) {
       std::vector<ToolSpec> &specs = dynamic_specs::store();
       removed_name = specs[index].name;
       specs.erase(specs.begin() + static_cast<std::ptrdiff_t>(index));
+      auto target_it = target_store().find(handle);
+      if (target_it != target_store().end()) {
+        removed_target = std::move(target_it->second);
+        target_store().erase(target_it);
+      }
       removed = true;
     }
   }
   if (removed) {
+    if (removed_target) {
+      removed_target->active.store(false);
+    }
     LogSystem::instance().log_detailed(
         LogLevel::Info, LogCategory::Tools,
         "user tool handle " + std::to_string(handle) + " unregistered",
@@ -504,6 +626,10 @@ bool AutopilotTools::unregister_tool(int64_t handle) {
         "user_tool_unregister",
         monitor::build_attrs({{"tool", removed_name}, {"enabled", "false"}}));
     refresh_dynamic_tools();
+    if (removed_target && removed_target->node_owner_id != 0 &&
+        node_owners_.release(removed_target->node_owner_id)) {
+      delete_released_node(removed_target->node_owner_id);
+    }
   }
   return removed;
 }
@@ -573,33 +699,17 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
     return blocked;
   }
   const std::string tool_name = util::to_std(name);
-  auto invoke = [tool_name, args]() -> mcp::JsonValue {
-    mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
-    return dispatch::call_handler(tool_name, json_args);
-  };
-
+  if (!dynamic_specs::enabled().load()) {
+    godot::Dictionary disabled;
+    disabled["error"] = godot::String::utf8("user tools are disabled");
+    disabled["code"] = godot::String::utf8("tools_disabled");
+    return disabled;
+  }
   mcp::JsonValue result;
   try {
-    if (runtime_ops::has_editor_queue() &&
-        !get_editor_queue().is_main_thread()) {
-      const tools::TraceContext ctx = tools::capture_trace_context();
-      auto state = std::make_shared<mcp::JsonValue>();
-      dispatch::BoundedWaitOutcome outcome =
-          dispatch::run_bounded_on_main_thread(
-              get_editor_queue(), "call_tool " + tool_name, state,
-              [invoke, ctx](mcp::JsonValue &value) {
-                tools::ScopedTraceContext restore(ctx);
-                value = invoke();
-              },
-              GDA_DISPATCH_WAIT_DEFAULT_MS);
-      if (!outcome.ok) {
-        result = util::error_json(outcome.error);
-      } else {
-        result = *state;
-      }
-    } else {
-      result = invoke();
-    }
+    mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
+    result = dispatch::call_handler(
+        tool_name, json_args, dispatch::capture_depth_context());
   } catch (const std::exception &e) {
     result = util::error_json("call_tool '" + tool_name +
                               "' failed: " + e.what());
@@ -616,14 +726,23 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
 }
 
 bool AutopilotTools::is_enabled() const {
-  return true;
+  return dynamic_specs::enabled().load();
 }
 
 void AutopilotTools::set_enabled(bool enabled) {
+  bool changed = false;
+  bool expected = !enabled;
+  changed = dynamic_specs::enabled().compare_exchange_strong(expected, enabled);
+  if (changed) {
+    refresh_dynamic_tools();
+  }
   LogSystem::instance().log_detailed(
       LogLevel::Info, LogCategory::Tools,
       enabled ? "user tools enabled" : "user tools disabled",
       "enabled=" + std::string(enabled ? "true" : "false"));
+  monitor::lifecycle(
+      enabled ? "user_tools_enabled" : "user_tools_disabled",
+      monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
 }
 
 godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
@@ -657,7 +776,7 @@ godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
   collect_rescan_files(dir, files);
   godot::Array errors;
   for (const std::string &path : files) {
-    rescan_single_file(this, path, errors);
+    rescan_single_file(path, errors);
   }
   godot::Array registered;
   {

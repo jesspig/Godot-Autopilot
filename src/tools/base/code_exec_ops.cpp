@@ -2,6 +2,7 @@
 #include "tools/base/batch_verdict.hpp"
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
+#include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "tools/domains/debugger/debugger_ops.hpp"
@@ -50,6 +51,7 @@ static_assert(GDA_CODE_EXEC_MAX_TIMEOUT_MS <=
 struct UndoHistorySnapshot {
   godot::UndoRedo *history = nullptr;
   uint64_t version_before = 0;
+  bool export_blocked = false;
 };
 
 struct TempNodeGuard {
@@ -505,6 +507,10 @@ void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
           get_editor_queue(), "batch_execute undo snapshot", state,
           [state, ctx](UndoHistorySnapshot &snapshot) {
             tools::ScopedTraceContext restore(ctx);
+            if (ExportGuard::is_exporting()) {
+              snapshot.export_blocked = true;
+              return;
+            }
             auto *editor = godot::EditorInterface::get_singleton();
             auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
             if (manager == nullptr)
@@ -526,6 +532,10 @@ void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
     error = outcome.error;
     return;
   }
+  if (state->export_blocked) {
+    error = dispatch::export_blocked_error_text();
+    return;
+  }
   history = state->history;
   version_before = state->version_before;
 }
@@ -543,6 +553,9 @@ bool batch_rollback_undo(godot::UndoRedo *history, uint64_t version_before,
           get_editor_queue(), "batch_execute undo rollback", state,
           [state, history, version_before, ctx](BatchUndoRollback &result) {
             tools::ScopedTraceContext restore(ctx);
+            if (ExportGuard::is_exporting()) {
+              return;
+            }
             result.actions_created =
                 static_cast<int64_t>(history->get_version() - version_before);
             for (int64_t undo_index = 0;
@@ -564,6 +577,9 @@ bool batch_rollback_undo(godot::UndoRedo *history, uint64_t version_before,
 mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "batch_execute called");
+  if (ExportGuard::is_exporting()) {
+    return dispatch::export_blocked_json_result();
+  }
 
   auto *ops = args.Find("operations");
   if (!ops || !ops->IsArray()) {
@@ -606,6 +622,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   if (stop_on_error && rollback_on_error && runtime_ops::has_editor_queue()) {
     std::string snapshot_error;
     batch_undo_snapshot(history, version_before, snapshot_error);
+    if (snapshot_error == dispatch::export_blocked_error_text()) {
+      return dispatch::export_blocked_json_result();
+    }
   }
 
   mcp::JsonValue results(mcp::JsonValue::array_tag);
@@ -748,6 +767,21 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   for (size_t i = 0; i < arr.size(); ++i) {
     mcp::JsonValue result_item(mcp::JsonValue::object_tag);
     result_item["index"] = mcp::JsonValue(static_cast<int64_t>(i));
+    if (ExportGuard::is_exporting()) {
+      result_item["status"] = mcp::JsonValue("error");
+      result_item["error"] =
+          mcp::JsonValue(dispatch::export_blocked_error_text());
+      result_item["code"] = mcp::JsonValue("export_in_progress");
+      push_payload(result_item);
+      results.PushBack(std::move(result_item));
+      ++failed;
+      if (stop_on_error) {
+        stopped = true;
+        stopped_after = i + 1;
+        break;
+      }
+      continue;
+    }
 
     const auto &op = arr[i];
     if (!op.IsObject()) {
@@ -832,7 +866,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
     }
 
-    mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
+    mcp::JsonValue handler_result = dispatch::call_handler(
+        tool_name, tool_args, dispatch::capture_depth_context());
 
     int64_t pending_id = 0;
     const bool has_pending_marker =

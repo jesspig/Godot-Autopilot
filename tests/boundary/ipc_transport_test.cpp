@@ -17,6 +17,7 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -43,6 +44,17 @@ fs::path short_socket(const char *name) {
   fs::path base = fs::current_path();
   if (base.filename() == "tests") {
     base = base.parent_path().parent_path().parent_path();
+  }
+  const std::wstring wide = base.wstring();
+  const DWORD required = GetShortPathNameW(wide.c_str(), nullptr, 0);
+  if (required > 0) {
+    std::wstring short_path(required, L'\0');
+    const DWORD written = GetShortPathNameW(
+        wide.c_str(), short_path.data(), static_cast<DWORD>(short_path.size()));
+    if (written > 0 && written < short_path.size()) {
+      short_path.resize(written);
+      base = fs::path(short_path);
+    }
   }
 #else
   const fs::path base = fs::temp_directory_path();
@@ -81,6 +93,31 @@ test_socket connect_tcp(int port) {
   setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 #endif
   return socket;
+}
+
+bool bind_tcp_with_reuse(int port) {
+  const test_socket socket = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (socket == kInvalidTestSocket) {
+    return false;
+  }
+  int reuse = 1;
+#ifdef _WIN32
+  const bool reuse_set = ::setsockopt(
+      socket, SOL_SOCKET, SO_REUSEADDR,
+      reinterpret_cast<const char *>(&reuse), sizeof(reuse)) == 0;
+#else
+  const bool reuse_set = ::setsockopt(socket, SOL_SOCKET, SO_REUSEADDR,
+                                      &reuse, sizeof(reuse)) == 0;
+#endif
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_port = htons(static_cast<unsigned short>(port));
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  const bool bound =
+      reuse_set &&
+      ::bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == 0;
+  close_test_socket(socket);
+  return bound;
 }
 
 bool send_all(test_socket socket, const std::string &data) {
@@ -196,6 +233,15 @@ TEST(IpcTransportTest, TcpListenAssignsRandomPort) {
   transport.stop();
   EXPECT_FALSE(transport.is_listening());
   EXPECT_EQ(transport.port(), 0);
+}
+
+TEST(IpcTransportTest, TcpListenRejectsPortHijackWithReuse) {
+  godot_autopilot::ipc_transport::IpcTransport transport;
+  std::string error;
+  ASSERT_TRUE(transport.listen_tcp("127.0.0.1", 0, "test-token", error))
+      << error;
+  EXPECT_FALSE(bind_tcp_with_reuse(transport.port()));
+  transport.stop();
 }
 
 TEST(IpcTransportTest, TcpListenRejectsNonLoopbackHost) {

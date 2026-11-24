@@ -6,6 +6,8 @@
 #include "tools/domains/debugger/debugger_ops.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/tool_invoke.hpp"
+#include "util/error_util.hpp"
+#include <mcp/McpError.hpp>
 #include <memory>
 #include <utility>
 
@@ -15,18 +17,40 @@ namespace {
 
 struct DebuggerTaskState {
   std::string text;
+  bool export_blocked = false;
 };
+
+void reject_debugger_resource_if_exporting() {
+  if (godot_autopilot::ExportGuard::is_exporting()) {
+    util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
+                        dispatch::export_blocked_error_text());
+  }
+}
 
 template <typename Fn>
 dispatch::BoundedWaitOutcome run_debugger_task(
     CommandQueue &queue, const std::string &uri,
     const std::shared_ptr<DebuggerTaskState> &state, Fn task) {
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
-      queue, uri, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+      queue, uri, state,
+      [task = std::move(task)](DebuggerTaskState &st) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          st.export_blocked = true;
+          return;
+        }
+        task(st);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (!outcome.ok) {
     monitor::error_event(outcome.timed_out ? "main_thread_timeout"
                                             : "resource_read_failed",
                          "resource", uri);
+    return outcome;
+  }
+  if (state->export_blocked) {
+    monitor::error_event("export_in_progress", "resource", uri);
+    util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
+                        dispatch::export_blocked_error_text());
   }
   return outcome;
 }
@@ -56,9 +80,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Recent editor output log (print/printerr/script errors)"),
       [make_result, &queue](const std::string &uri) {
-        if (godot_autopilot::ExportGuard::is_exporting()) {
-          return make_result(uri, dispatch::export_blocked_error_text());
-        }
+        reject_debugger_resource_if_exporting();
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<DebuggerTaskState>();
         dispatch::BoundedWaitOutcome outcome = run_debugger_task(
@@ -86,9 +108,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Runtime errors and warnings from the running game"),
       [make_result, &queue](const std::string &uri) {
-        if (godot_autopilot::ExportGuard::is_exporting()) {
-          return make_result(uri, dispatch::export_blocked_error_text());
-        }
+        reject_debugger_resource_if_exporting();
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<DebuggerTaskState>();
         dispatch::BoundedWaitOutcome outcome = run_debugger_task(
@@ -115,10 +135,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
                           ResourceOptions{}.Description(
                               "Runtime print() output from the running game"),
                           [make_result, &queue](const std::string &uri) {
-                            if (godot_autopilot::ExportGuard::is_exporting()) {
-                              return make_result(
-                                  uri, dispatch::export_blocked_error_text());
-                            }
+                            reject_debugger_resource_if_exporting();
                             const tools::TraceContext ctx =
                                 tools::capture_trace_context();
                             auto state = std::make_shared<DebuggerTaskState>();
@@ -151,9 +168,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Current stack trace when debugger is paused on a breakpoint"),
       [make_result, &queue](const std::string &uri) {
-        if (godot_autopilot::ExportGuard::is_exporting()) {
-          return make_result(uri, dispatch::export_blocked_error_text());
-        }
+        reject_debugger_resource_if_exporting();
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<DebuggerTaskState>();
         dispatch::BoundedWaitOutcome outcome = run_debugger_task(
@@ -180,9 +195,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       "debugger-scene-tree", "godot://debugger/scene-tree",
       ResourceOptions{}.Description("Remote scene tree of the running game"),
       [make_result, &queue](const std::string &uri) {
-        if (godot_autopilot::ExportGuard::is_exporting()) {
-          return make_result(uri, dispatch::export_blocked_error_text());
-        }
+        reject_debugger_resource_if_exporting();
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<DebuggerTaskState>();
         dispatch::BoundedWaitOutcome outcome = run_debugger_task(
@@ -210,9 +223,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Latest performance monitor data from the running game"),
       [make_result, &queue](const std::string &uri) {
-        if (godot_autopilot::ExportGuard::is_exporting()) {
-          return make_result(uri, dispatch::export_blocked_error_text());
-        }
+        reject_debugger_resource_if_exporting();
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<DebuggerTaskState>();
         dispatch::BoundedWaitOutcome outcome = run_debugger_task(
@@ -240,9 +251,7 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Current debugger session state (active/breaked/running)"),
       [make_result, &queue](const std::string &uri) {
-        if (godot_autopilot::ExportGuard::is_exporting()) {
-          return make_result(uri, dispatch::export_blocked_error_text());
-        }
+        reject_debugger_resource_if_exporting();
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<DebuggerTaskState>();
         dispatch::BoundedWaitOutcome outcome = run_debugger_task(
