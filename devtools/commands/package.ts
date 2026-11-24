@@ -14,35 +14,39 @@ import {
   hostPlatformLib,
 } from "../lib/config";
 import { errorMessage } from "../lib/cmake";
+import { selectUniqueArtifact } from "../lib/artifact-selection";
 import { generateGdextension } from "../lib/gdextension";
 import { writeZip, type ZipSourceEntry } from "../lib/zip";
 
 const ADDON_SUBPATH = path.join("addons", "godot-autopilot");
 const ADDON_ARCHIVE_PREFIX = "addons/godot-autopilot";
 
-function findFirstFile(dir: string, name: string): string | null {
+function findAllFiles(dir: string): string[] {
   let entries: Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
-    return null;
+    return [];
   }
+  const found: string[] = [];
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
-    if (entry.isFile() && entry.name === name) return full;
-    if (entry.isDirectory()) {
-      const found = findFirstFile(full, name);
-      if (found !== null) return found;
-    }
+    if (entry.isFile()) found.push(full);
+    if (entry.isDirectory()) found.push(...findAllFiles(full));
   }
-  return null;
+  return found.sort();
 }
 
-function collectPlatformLibs(libsDir: string, targetAddonDir: string): Set<string> {
+function collectPlatformLibs(libsDir: string, targetAddonDir: string, preset: "debug" | "release"): Set<string> {
   const collected = new Set<string>();
+  const candidates = findAllFiles(libsDir);
   for (const libName of Object.values(PLATFORM_LIBS)) {
-    const source = findFirstFile(libsDir, libName);
-    if (source === null) continue;
+    const verdict = selectUniqueArtifact(candidates, libName, preset);
+    if (verdict.failure === "missing") continue;
+    if (verdict.failure !== "none") {
+      throw new Error(`Ambiguous or invalid artifact for ${libName} under ${libsDir}: ${verdict.failure}`);
+    }
+    const source = verdict.selected!;
     fs.cpSync(source, path.join(targetAddonDir, libName), { preserveTimestamps: true });
     console.log(`  ${libName}  <- ${path.relative(libsDir, source)}`);
     collected.add(libName);
@@ -74,8 +78,9 @@ function collectPackageFiles(
   libDir: string,
   targetAddonDir: string,
   requiredLibs: readonly string[],
+  preset: "debug" | "release",
 ): void {
-  const collected = collectPlatformLibs(libDir, targetAddonDir);
+  const collected = collectPlatformLibs(libDir, targetAddonDir, preset);
   const missing = requiredLibs.filter((name) => !collected.has(name));
   if (missing.length > 0) {
     throw new Error(`Missing platform libraries under ${libDir}: ${missing.join(", ")}`);
@@ -127,7 +132,7 @@ function packageAddon(libsDir: string | null, preset: "debug" | "release"): void
   try {
     const stageAddon = path.join(stageRoot, ADDON_SUBPATH);
     fs.mkdirSync(stageAddon, { recursive: true });
-    collectPackageFiles(libDir, stageAddon, requiredLibs);
+    collectPackageFiles(libDir, stageAddon, requiredLibs, preset);
     const zipPath = path.join(distDir, `godot-autopilot-${ADDON_VERSION}.zip`);
     const entries: ZipSourceEntry[] = [
       {
