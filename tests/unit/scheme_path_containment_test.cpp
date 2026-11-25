@@ -308,6 +308,13 @@ TEST_F(SchemePathContainmentTest, PermissionDeniedAncestorIsUnresolved) {
   if (ec) {
     GTEST_SKIP() << "permission changes are not available";
   }
+  std::error_code probe_ec;
+  std::filesystem::directory_iterator probe(locked, probe_ec);
+  if (!probe_ec) {
+    std::filesystem::permissions(locked, std::filesystem::perms::owner_all,
+                                 std::filesystem::perm_options::replace, ec);
+    GTEST_SKIP() << "filesystem does not enforce directory permissions";
+  }
   const auto status = project_path_resolve_status(
       (locked / "child.tres").generic_string(), root.generic_string());
   EXPECT_EQ(status, ProjectPathResolveStatus::Unresolved);
