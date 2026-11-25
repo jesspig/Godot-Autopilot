@@ -5,4 +5,11 @@
 # 不改根 CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_API_CONTRACT_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/core/protocol/gcp_envelope.cpp)
+    ${CMAKE_SOURCE_DIR}/src/core/protocol/gcp_envelope.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/control_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/confirmation_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/catalog_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/invocation_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/job_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/event_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/trace_service.cpp)

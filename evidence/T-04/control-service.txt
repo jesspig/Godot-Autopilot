@@ -1,0 +1,66 @@
+T-05 / 协议无关 ControlService —— 实现证据说明（本文件仅记录静态事实，未运行任何测试）
+
+一、范围与边界
+本任务在 worktree .worktrees/cli-native-control-plane-protocol（分支 feature/cli-native-control-plane-protocol）完成。
+服务层只消费 std 类型与 gda::gcp::GcpEnvelope 等纯数据；不 include godot_cpp / mcp；不调用 Godot API；不新增 execute_sync()。
+Godot 调用仍须由后续 GcpDispatcher 经 CommandQueue 在主线程完成；本层不触碰引擎。
+
+二、新增与修改文件
+源码 src/core/control/
+  control_types.hpp          Artifact、fnv1a_hex、normalize_params、param_bool/int、sanitize_text（header-only 工具）
+  confirmation_service.hpp/.cpp   challenge / TTL / 参数摘要 / accept / decline / expire / 重放拦截
+  catalog_service.hpp/.cpp        list / search / describe / alias 解析 / categories / replace / remove
+  job_service.hpp/.cpp            instance_id+generation+task_id 键、状态/进度/结果/取消阶段/TTL、snapshot/restore
+  event_service.hpp/.cpp          seq、cursor、subscribe/unsubscribe、poll、since、backpressure、floor
+  trace_service.hpp/.cpp          traceparent 解析/重建、trace_id/span_id 复用、span 栈 begin/end
+  invocation_service.hpp/.cpp     ExportProbe / 参数规范化 / 别名 / sink dispatch / deferred wait / 错误水位 / artifact / 脱敏
+  control_service.hpp/.cpp        门面：持有全部子服务，并把自身成员注入 InvocationService 的依赖
+测试 tests/
+  support/control_fixture.hpp/.cpp FakeSink、FakeWaiter、traceparent/params/request/catalog 构造器
+  unit/control_confirmation_test.cpp
+  unit/control_catalog_test.cpp
+  unit/control_job_test.cpp
+  unit/control_event_test.cpp
+  unit/control_trace_test.cpp
+  unit/control_invocation_test.cpp
+  unit/control_service_test.cpp
+CMake（双登记）
+  cmake/sources/api_contract.cmake          根侧 GDA_API_CONTRACT_SOURCES 新增 7 个 control/*.cpp
+  cmake/sources/api_unit_contract.cmake     测试侧 GDA_UNIT_CONTRACT_SOURCES 新增同 7 个 control/*.cpp 与 control_fixture.cpp
+
+三、服务接口摘要
+ConfirmationService: issue(req,params,issued_at,nonce?) -> Challenge；accept/decline(req,params,now) -> ConfirmResult；expire(now)；find/has_pending/pending_count；已决请求返回 already_resolved 防重放。TTL 与摘要直接复用 gcp::challenge_fresh / gcp::param_digest。
+CatalogService: add/replace/remove/clear；list(category,limit,offset)；search(CatalogQuery)；describe(name_or_alias)；resolve_alias；categories。评分与过滤为纯数据实现，alias -> canonical。
+JobService: create(instance,generation,task_id?,ttl,now)；get/advance/set_progress/set_result/fail/request_cancel/advance_cancel；expire(now) 仅清理终态；set_generation 隔离旧代；snapshot/restore 文本持久化。
+EventService: publish 单调 seq（自 1）；subscribe 校验 cursor；poll 推进 cursor 并回报 Backpressure（hard 时返回空）；since；set_floor  Expire 旧 cursor。
+TraceService: parse/make_traceparent（gcp::valid_traceparent 校验）；begin 复用入站 trace_id、以入站 span 为 parent 生成新 span；end 检查栈顶；new_trace_id/new_span_id 为确定性十六进制。
+InvocationService: invoke 依序做规范化 -> 别名 -> 导出期拒绝 -> 高风险 challenge -> sink dispatch -> deferred wait -> 错误水位 -> 脱敏 -> artifact；confirm 校验 challenge 后复用 dispatch；cancel 走 JobService.request_cancel；desensitize 默认 true；无 sink 时返回 result_unknown。
+ControlService: 门面暴露 confirmation/catalog/jobs/events/trace/invocation；setter 允许后续 dispatcher 注入 clock、export/risk probe、sink、waiter 与 desensitize 开关。
+
+四、测试用例清单（共 25 项，均静态编写，未运行）
+control_confirmation_test.cpp     3 项：IssueCarriesDigestTtlAndNonce / AcceptRequiresFreshMatchingParams / DeclineAndExpirePrunePending
+control_catalog_test.cpp          4 项：AddDescribeAndAliasResolution / ListFiltersCategoryAndPaginates / SearchScoresAndRespectsFilters / ReplaceRemoveAndCategories
+control_job_test.cpp              4 项：CreateGetAndGenerationIsolation / ProgressResultAndTerminalGuard / CancellationStagesAdvanceMonotonically / TtlExpiryAndSnapshotRestore
+control_event_test.cpp            4 项：PublishSeqIsMonotonicAndCursorValidation / SubscribePollAdvancesCursor / BackpressureHardBlocksPoll / SinceAndFloorExpiresCursor
+control_trace_test.cpp            3 项：ParseAndRebuildTraceparent / BeginEndPropagatesTraceAndSpan / InvalidIncomingStartsNewTrace
+control_invocation_test.cpp       5 项：NormalizeParamsAndAliasResolution / ExportTimeRejectsBeforeDispatch / HighRiskRequiresConfirmationAndConfirmDispatches / DeferredWaitAndDesensitizedArtifact / CancelAndErrorWatermark
+control_service_test.cpp          2 项：FacadeSharesCatalogAndConfirmationWithInvocation / FacadeExposesJobsEventsAndTrace
+合计 25 项（3+4+4+4+3+5+2）。
+
+五、双登记位置
+根侧：cmake/sources/api_contract.cmake 第 9-15 行（7 个 src/core/control/*.cpp），该文件由根 CMakeLists.txt line 71 include 并汇入 GDA_API_CONTRACT_SOURCES。
+测试侧：cmake/sources/api_unit_contract.cmake 第 25-32 行（同 7 个 .cpp + tests/support/control_fixture.cpp），汇入 GDA_UNIT_CONTRACT_SOURCES 后进入 GDA_UNIT_BUSINESS_SOURCES。
+tests/CMakeLists.txt 未修改：unit/*.cpp 由 glob 自动纳入 gda_unit_tests，support/*.cpp 经上条测试侧清单纳入，无需额外改动。
+源码注释仅保留 `// namespace` 结尾标记；静态 grep 确认 src/core/control 与 control_*_test.cpp 无其他注释、无 godot/mcp/execute_sync 引用。
+
+六、未运行验证原因
+按任务约束，子代理不运行 cmake / build / ctest / bun test；本任务只写源码与证据文本，构建与测试由主代理统一执行。因此上文全部用例为「已编写、未执行」，不声称任何测试通过。
+
+七、风险与待主代理核对
+1. 新增 7 个生产编译单元依赖双登记正确；若 cmake configure 后 source_manifest_guard 报告 production 与 src/*.cpp 不等，优先核对两处清单。
+2. gda_unit_tests 链接 godot-cpp 等目标，control_*_test.cpp 由 glob 纳入；需确认 fixture 的 .cpp 仅在测试侧清单登记一次，避免与其他目标重复定义。
+3. TraceService 的 new_trace_id/new_span_id 使用函数内静态计数器，跨进程内多个用例时取值递增而非固定；测试只断言长度与合法性，不固定具体值。
+4. JobService::snapshot/restore 以 tab 分隔并将字段内 tab/newline/pipe 折叠为空格；仅作为纯数据持久化示意，非二进制兼容格式。
+5. InvocationService 的 deferred wait 通过 DeferredWaiter 注入，默认无等待器时保留 pending；真实异步等待须由 dispatcher 提供 waiter，并在 CommandQueue 线程边界外完成。
+6. 高风险确认的最终执行门仍在 SpecTool：InvocationService 只产出 needs_confirmation 与 challenge，confirm 成功后才调用注入的 sink；若 dispatcher 注入的 sink 未再次执行 SpecTool 风险判定，须在 dispatcher 侧补齐。
+7. 脱敏实现为基于 key=value 的轻量掩码；真实敏感字段清单与脱敏策略应由 dispatcher 复用既有 sanitize_policy，本层只保证默认开启与基本 key 掩码。
