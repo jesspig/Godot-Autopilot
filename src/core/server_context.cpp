@@ -15,11 +15,14 @@
 #include "core/observability/monitor.hpp"
 #include <cstdlib>
 #include <chrono>
+#include <cctype>
+#include <functional>
 #include <thread>
 #include <exception>
 #include <map>
 #include <string_view>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 #include <mcp/Content.hpp>
 #include <mcp/JsonRpc.hpp>
@@ -28,6 +31,12 @@
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
 
+#include "core/control/control_service.hpp"
+#include "core/control/gcp_dispatcher.hpp"
+#include "core/control/invocation_service.hpp"
+#include "core/control/trace_service.hpp"
+#include "core/protocol/gcp_envelope.hpp"
+#include "util/json_value.hpp"
 #include "core/transport/api_token.hpp"
 #include "core/path_util.hpp"
 #include "core/storage/gda_home.hpp"
@@ -60,6 +69,187 @@ int64_t now_epoch_ms() {
              std::chrono::system_clock::now().time_since_epoch())
       .count();
 }
+
+bool is_sensitive_param_key(const std::string &key) {
+  std::string lowered;
+  for (char character : key) {
+    lowered.push_back(
+        static_cast<char>(std::tolower(static_cast<unsigned char>(character))));
+  }
+  return lowered.find("token") != std::string::npos ||
+         lowered.find("secret") != std::string::npos ||
+         lowered.find("password") != std::string::npos ||
+         lowered.find("credential") != std::string::npos ||
+         lowered.find("api_key") != std::string::npos ||
+         lowered.find("apikey") != std::string::npos;
+}
+
+class GcpInvocationSink final : public gda::control::InvocationSink {
+public:
+  GcpInvocationSink(std::shared_ptr<GodotTransport> transport,
+                    IpcWaiterSet *waiters, CommandQueue *queue,
+                    gda::control::JobService *jobs,
+                    std::function<void()> release_in_flight,
+                    std::string instance_id)
+      : transport_(std::move(transport)),
+        waiters_(waiters),
+        queue_(queue),
+        jobs_(jobs),
+        release_in_flight_(std::move(release_in_flight)),
+        instance_id_(std::move(instance_id)) {}
+
+  gda::control::InvocationResult
+  dispatch(const gda::control::InvocationRequest &request) override {
+    gda::control::InvocationResult result;
+    if (!transport_ || waiters_ == nullptr || queue_ == nullptr ||
+        jobs_ == nullptr) {
+      result.status = gda::gcp::Status::error;
+      result.error = gda::gcp::ErrorCode::result_unknown;
+      result.error_message = "GCP dispatch sink unavailable";
+      return result;
+    }
+    const std::string connection = "gcp-" + request.request_id;
+    godot_autopilot::util::JsonValue arguments(
+        godot_autopilot::util::JsonValue::object_tag);
+    for (const gda::gcp::Param &param : request.params) {
+      if (param.key == "confirm" || param.key == "generation" ||
+          param.key == "wait" || param.key == "deferred" ||
+          param.key == "await_async" || is_sensitive_param_key(param.key)) {
+        continue;
+      }
+      arguments[param.key] = godot_autopilot::util::JsonValue(param.value);
+    }
+    std::string traceparent = request.traceparent;
+    if (!gda::gcp::valid_traceparent(traceparent)) {
+      traceparent = gda::control::TraceService::make_traceparent(
+          gda::control::TraceService::new_trace_id(),
+          gda::control::TraceService::new_span_id());
+    }
+    godot_autopilot::util::JsonValue meta(
+        godot_autopilot::util::JsonValue::object_tag);
+    meta["traceparent"] = godot_autopilot::util::JsonValue(traceparent);
+    godot_autopilot::util::JsonValue params(
+        godot_autopilot::util::JsonValue::object_tag);
+    params["name"] = godot_autopilot::util::JsonValue(request.tool);
+    params["arguments"] = std::move(arguments);
+    params["_meta"] = std::move(meta);
+    godot_autopilot::util::JsonValue document(
+        godot_autopilot::util::JsonValue::object_tag);
+    document["jsonrpc"] = godot_autopilot::util::JsonValue("2.0");
+    document["id"] = godot_autopilot::util::JsonValue(request.request_id);
+    document["method"] = godot_autopilot::util::JsonValue("tools/call");
+    document["params"] = std::move(params);
+
+    const mcp_wire::ParsedRequest parsed =
+        mcp_wire::parse_request(document.Dump());
+    if (!parsed.ok) {
+      result.status = gda::gcp::Status::error;
+      result.error = gda::gcp::ErrorCode::result_unknown;
+      result.error_message = "GCP request could not be encoded";
+      return result;
+    }
+    std::string submit_error;
+    if (!transport_->submit(parsed, connection, submit_error)) {
+      result.status = gda::gcp::Status::error;
+      result.error = gda::gcp::ErrorCode::result_unknown;
+      result.error_message = submit_error;
+      return result;
+    }
+    const std::string task_id = jobs_->make_task_id();
+    jobs_->create(request.instance_id, request.generation, task_id, 0,
+                  now_epoch_ms());
+    const std::string request_key = parsed.request_id;
+    const std::string instance_id = request.instance_id;
+    const std::int64_t generation = request.generation;
+    const std::int64_t deadline_ms = request.deadline_ms > 0
+                                         ? request.deadline_ms
+                                         : gda::gcp::kDefaultDeadlineMs;
+    bool spawned = false;
+    try {
+      spawned = waiters_->spawn(
+          [transport = transport_, connection, request_key, queue = queue_,
+           jobs = jobs_, task_id, instance_id, generation, deadline_ms,
+           release = release_in_flight_](const auto &cancelled) {
+          std::string response;
+          bool cancellation_sent = false;
+          const bool ready = transport->await_response(
+              connection, request_key, response,
+              std::chrono::milliseconds(deadline_ms), &cancellation_sent);
+          if (cancelled->load(std::memory_order_acquire)) {
+            if (release) {
+              release();
+            }
+            return;
+          }
+          gda::control::InvocationResult final;
+          if (ready) {
+            try {
+              const godot_autopilot::util::JsonValue doc =
+                  godot_autopilot::util::JsonValue::Parse(response);
+              const godot_autopilot::util::JsonValue *failure =
+                  doc.Find("error");
+              if (failure != nullptr && failure->IsObject()) {
+                final.status = gda::gcp::Status::error;
+                final.error = gda::gcp::ErrorCode::result_unknown;
+                final.error_message = failure->Dump();
+              } else {
+                final.status = gda::gcp::Status::ok;
+                final.payload = response;
+              }
+            } catch (...) {
+              final.status = gda::gcp::Status::error;
+              final.error = gda::gcp::ErrorCode::result_unknown;
+              final.error_message = "GCP response decode failed";
+            }
+          } else {
+            final.status = gda::gcp::Status::error;
+            final.error = gda::gcp::ErrorCode::result_unknown;
+            final.error_message = "result_unknown";
+          }
+          queue->submit([jobs, task_id, instance_id, generation,
+                         final = std::move(final), release]() {
+            const gda::control::TaskKey key{instance_id, generation, task_id};
+            const std::int64_t now = std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                                         .count();
+            if (final.status == gda::gcp::Status::ok) {
+              jobs->set_result(key, final.payload, now);
+              jobs->advance(key, gda::gcp::TaskState::succeeded, now);
+            } else {
+              jobs->fail(key, final.error, final.error_message, now);
+            }
+            if (release) {
+              release();
+            }
+          });
+        });
+    } catch (...) {
+      spawned = false;
+    }
+    if (!spawned) {
+      const gda::control::TaskKey key{instance_id, generation, task_id};
+      jobs_->fail(key, gda::gcp::ErrorCode::result_unknown,
+                  "GCP waiter unavailable", now_epoch_ms());
+      result.status = gda::gcp::Status::error;
+      result.error = gda::gcp::ErrorCode::result_unknown;
+      result.error_message = "GCP waiter unavailable";
+      return result;
+    }
+    result.status = gda::gcp::Status::pending;
+    result.task_id = task_id;
+    result.payload = "pending";
+    return result;
+  }
+
+private:
+  std::shared_ptr<GodotTransport> transport_;
+  IpcWaiterSet *waiters_;
+  CommandQueue *queue_;
+  gda::control::JobService *jobs_;
+  std::function<void()> release_in_flight_;
+  std::string instance_id_;
+};
 
 } // namespace
 
@@ -315,6 +505,17 @@ bool ServerContext::start() {
 
     transport_ = godot_transport_reset();
     ipc_waiters_.open();
+    gcp_instance_id_ =
+        "gda-gcp-" + std::to_string(util::api_host_process_id());
+    gcp_control_ = std::make_unique<gda::control::ControlService>();
+    gcp_sink_ = std::make_unique<GcpInvocationSink>(
+        transport_, &ipc_waiters_, &queue_, &gcp_control_->jobs(),
+        []() {
+          ipc_transport::ipc_transport_instance().release_in_flight();
+        },
+        gcp_instance_id_);
+    gcp_dispatcher_ = std::make_unique<gda::control::GcpDispatcher>(
+        *gcp_control_, gcp_instance_id_, gcp_sink_.get());
     transport_->set_inbound_rewrite([](mcp::JsonRpcMessage &message) {
       auto *request = std::get_if<mcp::JsonRpcRequest>(&message);
       if (request == nullptr || request->method != "tools/call" ||
@@ -353,6 +554,43 @@ bool ServerContext::start() {
         [this, transport = transport_](std::uint64_t connection_id,
                                  const std::string &line) {
           auto &ipc = ipc_transport::ipc_transport_instance();
+          if (gcp_dispatcher_ != nullptr &&
+              gda::control::GcpDispatcher::looks_like_gcp(line)) {
+            if (!ipc.acquire_in_flight()) {
+              gda::gcp::GcpEnvelope envelope;
+              envelope.v = gda::gcp::kEnvelopeVersion;
+              envelope.kind = gda::gcp::Kind::response;
+              envelope.id = "gcp-backpressure";
+              envelope.instance_id = gcp_instance_id_;
+              envelope.method = "hello";
+              envelope.trace.traceparent =
+                  gda::control::TraceService::make_traceparent(
+                      gda::control::TraceService::new_trace_id(),
+                      gda::control::TraceService::new_span_id());
+              envelope.status = gda::gcp::Status::error;
+              envelope.error = gda::gcp::ErrorCode::backpressure_exceeded;
+              envelope.error_message = "too many in-flight IPC requests";
+              envelope.request_id = std::string("unknown");
+              std::string frame;
+              if (gda::control::GcpDispatcher::encode(envelope, frame)) {
+                ipc.queue_line(connection_id, std::move(frame));
+              }
+              return;
+            }
+            const gda::control::DispatchResult result =
+                gcp_dispatcher_->handle_frame(connection_id, line);
+            if (!result.response_text.empty()) {
+              ipc.queue_line(connection_id, result.response_text);
+            }
+            for (const gda::control::OutboxEntry &event :
+                 gcp_dispatcher_->drain_events()) {
+              ipc.queue_line(event.connection_id, event.frame);
+            }
+            if (result.state != gda::control::DispatchState::awaiting) {
+              ipc.release_in_flight();
+            }
+            return;
+          }
           if (!ipc.acquire_in_flight()) {
             ipc.queue_line(connection_id,
                            mcp_wire::build_error_response_text(
@@ -588,6 +826,10 @@ bool ServerContext::start() {
     running_ = true;
     instance_started_ = true;
     write_instance_record();
+    if (gcp_dispatcher_ != nullptr && !instance_id_.empty()) {
+      gcp_instance_id_ = instance_id_;
+      gcp_dispatcher_->set_instance_id(instance_id_);
+    }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server started on " + host_ + ":" +
@@ -646,6 +888,9 @@ void ServerContext::rollback_start() {
     transport_.reset();
   }
   ipc_waiters_.join();
+  gcp_dispatcher_.reset();
+  gcp_sink_.reset();
+  gcp_control_.reset();
   http_transport_instance().stop();
   dispatch::clear_handlers();
   clear_active_registry();
@@ -709,6 +954,9 @@ void ServerContext::stop() {
   ipc_transport::ipc_transport_instance().stop();
   if (!running_ && !server_ && !transport_) {
     ipc_waiters_.join();
+    gcp_dispatcher_.reset();
+    gcp_sink_.reset();
+    gcp_control_.reset();
     http_transport_instance().stop();
     ipc_token_.clear();
     return;
@@ -725,6 +973,9 @@ void ServerContext::stop() {
   server_.reset();
   transport_.reset();
   ipc_waiters_.join();
+  gcp_dispatcher_.reset();
+  gcp_sink_.reset();
+  gcp_control_.reset();
   if (http_transport_is_listening()) {
     http_transport_instance().stop();
   }

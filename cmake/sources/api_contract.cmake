@@ -6,6 +6,7 @@
 # ====================================================================
 set(GDA_API_CONTRACT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/protocol/gcp_envelope.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/gcp_dispatcher.cpp
     ${CMAKE_SOURCE_DIR}/src/core/control/control_service.cpp
     ${CMAKE_SOURCE_DIR}/src/core/control/confirmation_service.cpp
     ${CMAKE_SOURCE_DIR}/src/core/control/catalog_service.cpp
