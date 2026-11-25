@@ -1,0 +1,314 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       SRV*C:\Symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.016 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+CommandLine: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests\gda_unit_tests_probe.exe --gtest_filter=McpWireTest.RejectsMalformedBody
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       SRV*C:\Symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Symbol search path is: SRV*C:\Symbols*https://msdl.microsoft.com/download/symbols;C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff6`3eb90000 00007ff6`40c01000   gda_unit_tests.exe
+ModLoad: 00007ffd`2a770000 00007ffd`2a9dc000   ntdll.dll
+ModLoad: 00007ffd`28e10000 00007ffd`28edb000   C:\WINDOWS\System32\KERNEL32.DLL
+ModLoad: 00007ffd`28020000 00007ffd`28429000   C:\WINDOWS\System32\KERNELBASE.dll
+ModLoad: 00007ffd`2a4b0000 00007ffd`2a530000   C:\WINDOWS\System32\WS2_32.dll
+ModLoad: 00007ffd`27b10000 00007ffd`27c5c000   C:\WINDOWS\System32\ucrtbase.dll
+ModLoad: 00007ffd`29a80000 00007ffd`29b98000   C:\WINDOWS\System32\RPCRT4.dll
+ModLoad: 00007ffd`27e60000 00007ffd`27fde000   C:\WINDOWS\System32\CRYPT32.dll
+ModLoad: 00007ffd`2a160000 00007ffd`2a21c000   C:\WINDOWS\System32\ADVAPI32.dll
+ModLoad: 00007ffd`28430000 00007ffd`284d9000   C:\WINDOWS\System32\msvcrt.dll
+ModLoad: 00007ffd`277f0000 00007ffd`2781a000   C:\WINDOWS\SYSTEM32\bcrypt.dll
+ModLoad: 00007ffd`297b0000 00007ffd`29858000   C:\WINDOWS\System32\sechost.dll
+(8168.7938): Break instruction exception - code 80000003 (first chance)
+ntdll!LdrpDoDebuggerBreak+0x35:
+00007ffd`2a895245 cc              int     3
+0:000> cdb: Reading initial command '.reload; g; !analyze -v; kPn; q'
+Reloading current modules
+............
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpWireTest.RejectsMalformedBody
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpWireTest
+[ RUN      ] McpWireTest.RejectsMalformedBody
+(8168.7938): C++ EH exception - code e06d7363 (first chance)
+Critical error detected c0000374
+(8168.7938): Break instruction exception - code 80000003 (first chance)
+Reloading current modules
+............
+*******************************************************************************
+*                                                                             *
+*                        Exception Analysis                                   *
+*                                                                             *
+*******************************************************************************
+
+*** WARNING: Unable to verify checksum for gda_unit_tests.exe
+
+KEY_VALUES_STRING: 1
+
+    Key  : Analysis.CPU.mSec
+    Value: 3125
+
+    Key  : Analysis.Elapsed.mSec
+    Value: 23604
+
+    Key  : Analysis.IO.Other.Mb
+    Value: 6
+
+    Key  : Analysis.IO.Read.Mb
+    Value: 1
+
+    Key  : Analysis.IO.Write.Mb
+    Value: 17
+
+    Key  : Analysis.Init.CPU.mSec
+    Value: 375
+
+    Key  : Analysis.Init.Elapsed.mSec
+    Value: 7416
+
+    Key  : Analysis.Memory.CommitPeak.Mb
+    Value: 159
+
+    Key  : Analysis.Version.DbgEng
+    Value: 10.0.29680.1004
+
+    Key  : Analysis.Version.Description
+    Value: 10.2608.26.1 amd64fre
+
+    Key  : Analysis.Version.Ext
+    Value: 1.2608.26.1
+
+    Key  : Failure.Bucket
+    Value: BREAKPOINT_80000003_gda_unit_tests.exe!heap_corruption
+
+    Key  : Failure.Exception.Code
+    Value: 0x80000003
+
+    Key  : Failure.Exception.IP.Address
+    Value: 0x7ffd2a805a24
+
+    Key  : Failure.Exception.IP.Module
+    Value: ntdll
+
+    Key  : Failure.Exception.IP.Offset
+    Value: 0x95a24
+
+    Key  : Failure.Hash
+    Value: {10ebd36f-448e-5e3f-f80c-681e6b24e3f5}
+
+    Key  : Failure.ProblemClass.Primary
+    Value: BREAKPOINT
+
+    Key  : Faulting.IP.Type
+    Value: Paged
+
+    Key  : Timeline.OS.Boot.DeltaSec
+    Value: 26679
+
+    Key  : Timeline.Process.Start.DeltaSec
+    Value: 7
+
+    Key  : WER.OS.Branch
+    Value: ge_release
+
+    Key  : WER.OS.Platform
+    Value: Windows
+
+    Key  : WER.OS.Version
+    Value: 10.0.26300.1
+
+    Key  : WER.Process.Name
+    Value: gda_unit_tests.exe
+
+
+NTGLOBALFLAG:  70
+
+APPLICATION_VERIFIER_FLAGS:  0
+
+EXCEPTION_RECORD:  (.exr -1)
+ExceptionAddress: 00007ffd2a805a24 (ntdll!RtlReportCriticalFailure+0x0000000000000068)
+   ExceptionCode: 80000003 (Break instruction exception)
+  ExceptionFlags: 00000000
+NumberParameters: 1
+   Parameter[0]: 0000000000000000
+
+FAULTING_THREAD:  7938
+
+PROCESS_NAME:  gda_unit_tests.exe
+
+ERROR_CODE: (NTSTATUS) 0x80000003 - {    }
+
+EXCEPTION_CODE: (NTSTATUS) 0x80000003 (2147483651) - {    }
+
+EXCEPTION_CODE_STR:  80000003
+
+EXCEPTION_PARAMETER1:  0000000000000000
+
+STACK_TEXT:  
+00000000`00000000 00000000`00000000 gda_unit_tests.exe!heap_corruption+0x0
+00000000`00000000 00000000`00000000 unknown![~0s]+0x0
+00007ffd`2a942138 00007ffd`2a79754c ntdll!RtlFreeHeap+0x0
+00007ffd`2a942140 00007ff6`4013421c gda_unit_tests!_free_base+0x0
+00007ffd`2a942148 00007ff6`3eb97467 gda_unit_tests!std::_Deallocate<16>+0x0
+00007ffd`2a942150 00007ff6`3eb988e6 gda_unit_tests!std::allocator<char>::deallocate+0x0
+00007ffd`2a942158 00007ff6`3eb9885b gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Deallocate_for_capacity+0x0
+00007ffd`2a942160 00007ff6`3eb9876b gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Tidy_deallocate+0x0
+00007ffd`2a942168 00007ff6`3eb98508 gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::~basic_string+0x0
+00007ffd`2a942170 00007ff6`3f512964 gda_unit_tests!mcp::McpError::~McpError+0x0
+00007ffd`2a942178 00007ff6`400c5ae6 gda_unit_tests!__DestructExceptionObject+0x0
+00007ffd`2a942180 00007ff6`4011ad5d gda_unit_tests!__FrameHandler3::CxxCallCatchBlock+0x0
+00007ffd`2a942188 00007ffd`2a8971e6 ntdll!RcConsolidateFrames+0x0
+00007ffd`2a942190 00007ff6`3f51e251 gda_unit_tests!godot_autopilot::mcp_wire::parse_request+0x0
+00007ffd`2a942198 00007ff6`3ee2b743 gda_unit_tests!McpWireTest_RejectsMalformedBody_Test::TestBody+0x0
+00007ffd`2a9421a0 00007ff6`400240f0 gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test,void>+0x0
+00007ffd`2a9421a8 00007ff6`40008a98 gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::Test,void>+0x0
+00007ffd`2a9421b0 00007ff6`3ffeba53 gda_unit_tests!testing::Test::Run+0x0
+00007ffd`2a9421b8 00007ff6`3ffec599 gda_unit_tests!testing::TestInfo::Run+0x0
+00007ffd`2a9421c0 00007ff6`3ffece3f gda_unit_tests!testing::TestSuite::Run+0x0
+00007ffd`2a9421c8 00007ff6`3fffb320 gda_unit_tests!testing::internal::UnitTestImpl::RunAllTests+0x0
+00007ffd`2a9421d0 00007ff6`40027840 gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>+0x0
+00007ffd`2a9421d8 00007ff6`4000ab98 gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>+0x0
+00007ffd`2a9421e0 00007ff6`3fffaed9 gda_unit_tests!testing::UnitTest::Run+0x0
+00007ffd`2a9421e8 00007ff6`400513e1 gda_unit_tests!RUN_ALL_TESTS+0x0
+00007ffd`2a9421f0 00007ff6`4005139b gda_unit_tests!main+0x0
+00007ffd`2a9421f8 00007ff6`400c564f gda_unit_tests!__scrt_common_main_seh+0x0
+00007ffd`2a942200 00007ffd`28e3dda7 KERNEL32!BaseThreadInitThunk+0x0
+00007ffd`2a942208 00007ffd`2a839c5c ntdll!RtlUserThreadStart+0x0
+
+
+STACK_COMMAND: !heap ; ** Pseudo Context ** Pseudo ** Value: ffffffff ** ; kb
+
+IP_IN_PAGED_CODE: 
+ntdll!RtlReportCriticalFailure+68
+00007ffd`2a805a24 cc              int     3
+
+SYMBOL_NAME:  gda_unit_tests.exe!heap_corruption
+
+MODULE_NAME: gda_unit_tests
+
+IMAGE_NAME:  gda_unit_tests.exe
+
+FAILURE_BUCKET_ID:  BREAKPOINT_80000003_gda_unit_tests.exe!heap_corruption
+
+OS_VERSION:  10.0.26300.1
+
+BUILDLAB_STR:  ge_release
+
+OSPLATFORM_TYPE:  x64
+
+OSNAME:  Windows 10
+
+FAILURE_ID_HASH:  {10ebd36f-448e-5e3f-f80c-681e6b24e3f5}
+
+Followup:     MachineOwner
+---------
+
+ # Child-SP          RetAddr               Call Site
+00 00000054`742fc230 00007ffd`2a77ae02     ntdll!RtlReportCriticalFailure+0x68
+01 00000054`742fc320 00007ffd`2a89338a     ntdll!RtlpHeapHandleError+0x12
+02 00000054`742fc350 00007ffd`2a79754c     ntdll!RtlpHpHeapHandleError+0x7a
+03 00000054`742fc380 00007ff6`4013421c     ntdll!RtlFreeHeap+0x2bc
+04 00000054`742fc470 00007ff6`3eb97467     gda_unit_tests!_free_base(
+			void * block = <Value unavailable error>)+0x1c
+05 00000054`742fc4a0 00007ff6`3eb988e6     gda_unit_tests!std::_Deallocate<16>(
+			void * _Ptr = 0x00000000`ffff8044, 
+			unsigned int64 _Bytes = 0x38)+0x37
+06 00000054`742fc4e0 00007ff6`3eb9885b     gda_unit_tests!std::allocator<char>::deallocate(
+			char * _Ptr = 0x00000000`ffff8044 "--- memory read error at address 0x00000000`ffff8044 ---", 
+			unsigned int64 _Count = 0x38)+0x26
+07 00000054`742fc520 00007ff6`3eb9876b     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Deallocate_for_capacity(
+			class std::allocator<char> * _Al = 0x00000054`742fe800 allocator, 
+			char * _Old_ptr = 0x00000000`ffff8044 "--- memory read error at address 0x00000000`ffff8044 ---", 
+			unsigned int64 _Capacity = 0x37)+0x2b
+08 00000054`742fc560 00007ff6`3eb98508     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Tidy_deallocate(void)+0x6b
+09 00000054`742fc5c0 00007ff6`3f512964     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::~basic_string(void)+0x18
+0a 00000054`742fc600 00007ff6`400c5ae6     gda_unit_tests!mcp::McpError::~McpError(void)+0x34
+0b 00000054`742fc640 00007ff6`4011ad5d     gda_unit_tests!__DestructExceptionObject(
+			struct EHExceptionRecord * pExcept = 0x00007ff6`3f51e288, 
+			unsigned char fThrowNotAllowed = 0x01 '')+0x46
+0c 00000054`742fc690 00007ffd`2a8971e6     gda_unit_tests!__FrameHandler3::CxxCallCatchBlock(
+			struct _EXCEPTION_RECORD * pExcept = <Value unavailable error>)+0x1cd
+0d 00000054`742fc760 00007ff6`3f51e251     ntdll!RcConsolidateFrames+0x6
+0e 00000054`742ff550 00007ff6`3ee2b743     gda_unit_tests!godot_autopilot::mcp_wire::parse_request(
+			class std::basic_string<char,std::char_traits<char>,std::allocator<char> > * body = 0x00000000`00000027)+0x61
+0f 00000054`742ff750 00007ff6`400240f0     gda_unit_tests!McpWireTest_RejectsMalformedBody_Test::TestBody(void)+0x43
+10 00000054`742ff9b0 00007ff6`40008a98     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x00000187`708e0880, 
+			<function> * method = 0x00007ff6`40008c40, 
+			char * location = 0x00007ff6`403db7b0 "the test body")+0x20
+11 00000054`742ffa10 00007ff6`3ffeba53     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x00000187`7067a980, 
+			<function> * method = 0x00000054`742ffd30, 
+			char * location = 0x00007ff6`3ffeba53 "H???")+0x48
+12 00000054`742ffac0 00007ff6`3ffec599     gda_unit_tests!testing::Test::Run(void)+0x93
+13 00000054`742ffb00 00007ff6`3ffece3f     gda_unit_tests!testing::TestInfo::Run(void)+0x119
+14 00000054`742ffb70 00007ff6`3fffb320     gda_unit_tests!testing::TestSuite::Run(void)+0x18f
+15 00000054`742ffbf0 00007ff6`40027840     gda_unit_tests!testing::internal::UnitTestImpl::RunAllTests(void)+0x3f0
+16 00000054`742ffce0 00007ff6`4000ab98     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x00000187`7067a980, 
+			<function> * method = 0x00007ff6`3fffaf30, 
+			char * location = 0x00007ff6`403dc145 "auxiliary test code (environments or event listeners)")+0x20
+17 00000054`742ffd40 00007ff6`3fffaed9     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x00000054`742ffe70, 
+			<function> * method = 0x00007ff6`3fffaed9, 
+			char * location = 0x00000054`00000000 "--- memory read error at address 0x00000054`00000000 ---")+0x48
+18 00000054`742ffe00 00007ff6`400513e1     gda_unit_tests!testing::UnitTest::Run(void)+0xe9
+19 00000054`742ffe80 00007ff6`4005139b     gda_unit_tests!RUN_ALL_TESTS(void)+0x11
+1a 00000054`742ffeb0 00007ff6`400c564f     gda_unit_tests!main(
+			int argc = 0n1, 
+			char ** argv = 0x00000187`7066d310)+0x4b
+1b (Inline Function) --------`--------     gda_unit_tests!invoke_main(void)+0x22
+1c 00000054`742fff00 00007ffd`28e3dda7     gda_unit_tests!__scrt_common_main_seh(void)+0x10f
+1d 00000054`742fff40 00007ffd`2a839c5c     KERNEL32!BaseThreadInitThunk+0x17
+1e 00000054`742fff70 00000000`00000000     ntdll!RtlUserThreadStart+0x2c
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

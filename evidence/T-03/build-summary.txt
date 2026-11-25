@@ -1,0 +1,14 @@
+command: cmake --preset debug
+exit_code: 0
+
+command: cmake --build --preset debug
+initial_exit_code: 1
+initial_root_causes:
+  - ok_result overload ambiguity from ADL after replacing mcp::JsonValue with util::JsonValue
+  - SDK fields assigned util::JsonValue without explicit adapter conversion
+  - transport probe omitted json_value and adapter source files
+resolution:
+  - removed duplicate local ok_result and renamed the runtime bridge helper
+  - inserted explicit FromSdk/ToSdk conversions at SDK boundaries in production and tests
+  - registered json_value and adapter sources in the transport probe
+final_exit_code: 0
