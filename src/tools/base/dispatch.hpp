@@ -11,14 +11,14 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mcp/McpTypes.hpp>
 #include <tools/base/tool_invoke.hpp>
 
 namespace godot_autopilot {
 namespace dispatch {
 
-using HandlerFn = std::function<mcp::JsonValue(const mcp::JsonValue &)>;
+using HandlerFn = std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)>;
 
 using HandlerMap = std::unordered_map<std::string, HandlerFn>;
 
@@ -34,25 +34,25 @@ std::string main_thread_timeout_message(const std::string &label,
                                         int64_t waited_ms,
                                         bool cancelled_before_execution);
 
-mcp::JsonValue main_thread_timeout_result(const std::string &label,
+godot_autopilot::util::JsonValue main_thread_timeout_result(const std::string &label,
                                           int64_t waited_ms,
                                           bool cancelled_before_execution);
 
 std::string dispatch_exception_message(const std::string &name,
                                        const std::string &reason,
-                                       const mcp::JsonValue &args);
+                                       const godot_autopilot::util::JsonValue &args);
 
-mcp::JsonValue queue_unavailable_result(const std::string &name,
+godot_autopilot::util::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason);
 
-mcp::JsonValue queue_unavailable_result(const std::string &name,
+godot_autopilot::util::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason,
                                         const CommandQueue::Stats &stats,
                                         int64_t oldest_pending_ms,
                                         int64_t last_drain_age_ms,
                                         int64_t waited_ms);
 
-mcp::JsonValue dispatch_timeout_result(const std::string &name,
+godot_autopilot::util::JsonValue dispatch_timeout_result(const std::string &name,
                                        int64_t waited_ms,
                                        const CommandQueue::Stats &stats,
                                        int64_t oldest_pending_ms,
@@ -60,7 +60,7 @@ mcp::JsonValue dispatch_timeout_result(const std::string &name,
                                        bool cancelled_before_execution,
                                        bool health);
 
-mcp::JsonValue exec_timeout_result(int64_t timeout_ms,
+godot_autopilot::util::JsonValue exec_timeout_result(int64_t timeout_ms,
                                    int64_t execution_time_ms);
 
 struct BoundedWaitOutcome {
@@ -131,18 +131,18 @@ BoundedWaitOutcome run_bounded_on_main_thread(
   return out;
 }
 
-mcp::JsonValue run_on_main_thread_with_budget(
+godot_autopilot::util::JsonValue run_on_main_thread_with_budget(
     CommandQueue &queue, const std::string &tool_name, uint32_t tool_flags,
-    std::function<mcp::JsonValue()> fn);
+    std::function<godot_autopilot::util::JsonValue()> fn);
 
-mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &label,
-                                     std::function<mcp::JsonValue()> slice,
+godot_autopilot::util::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &label,
+                                     std::function<godot_autopilot::util::JsonValue()> slice,
                                      int64_t budget_ms);
 
-mcp::JsonValue resolve_deferred_wait(const std::string &name,
-                                      mcp::JsonValue result);
+godot_autopilot::util::JsonValue resolve_deferred_wait(const std::string &name,
+                                      godot_autopilot::util::JsonValue result);
 
-bool has_deferred_marker(const mcp::JsonValue &result);
+bool has_deferred_marker(const godot_autopilot::util::JsonValue &result);
 
 struct DepthContext {
   int depth = 0;
@@ -167,13 +167,13 @@ private:
   std::optional<tools::ScopedTraceContext> trace_scope_;
 };
 
-mcp::JsonValue call_handler(const std::string &name,
-                            const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue call_handler(const std::string &name,
+                            const godot_autopilot::util::JsonValue &args,
                             const DepthContext &depth_ctx = {});
 
 mcp::CallToolResult export_blocked_result();
 
-mcp::JsonValue export_blocked_json_result();
+godot_autopilot::util::JsonValue export_blocked_json_result();
 
 std::string export_blocked_error_text();
 

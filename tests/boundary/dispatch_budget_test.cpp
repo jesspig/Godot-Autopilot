@@ -122,9 +122,9 @@ TEST(DispatchBudgetTest, ClampCeilingStaysBelowTheTransportTimeout) {
 TEST(DispatchBudgetTest, ClosedQueueReturnsQueueUnavailable) {
   CommandQueue queue;
   queue.close();
-  const mcp::JsonValue result = run_on_main_thread_with_budget(
+  const godot_autopilot::util::JsonValue result = run_on_main_thread_with_budget(
       queue, "ping", kHealthProbe,
-      [] { return mcp::JsonValue(mcp::JsonValue::object_tag); });
+      [] { return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag); });
   EXPECT_TRUE(result.Find("error") != nullptr);
   EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
   EXPECT_TRUE(result["retryable"].GetBool());
@@ -134,9 +134,9 @@ TEST(DispatchBudgetTest, ClosedQueueReturnsQueueUnavailable) {
 TEST(DispatchBudgetTest, FullQueueReturnsQueueUnavailable) {
   CommandQueue queue(1);
   auto pending = queue.submit([] { return 7; });
-  const mcp::JsonValue result = run_on_main_thread_with_budget(
+  const godot_autopilot::util::JsonValue result = run_on_main_thread_with_budget(
       queue, "ping", kHealthProbe,
-      [] { return mcp::JsonValue(mcp::JsonValue::object_tag); });
+      [] { return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag); });
   EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
   EXPECT_NE(result["error"].GetString().find("full"), std::string::npos);
   queue.drain();

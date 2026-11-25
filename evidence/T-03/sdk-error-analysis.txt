@@ -1,0 +1,15 @@
+command: cdb.exe -y <local symbols> -c "g; !analyze -v; kPn; q" build/debug/tests/gda_unit_tests.exe --gtest_filter=McpWireTest.RejectsMalformedBody
+exit_code: 0 after debugger quit; target fault was 0xc0000374 without debugger
+key_output:
+  - mcp::McpError::~McpError destroys a std::string whose buffer pointer is 0xffff8044
+  - throw site: mcp::detail::json::Parser::Fail -> mcp::JsonValue::Parse -> mcp::DeserializeMessage -> godot_autopilot::mcp_wire::parse_request
+  - second failing case: mcp::McpError data optional destroys a corrupted mcp::JsonValue
+
+resolution:
+  - parse_request pre-validates input with GDA JsonValue and returns structured error before SDK parse exceptions
+  - register_all_tools rejects re-registration with adapters::SdkError before SDK duplicate-tool exception
+  - log bridge test emits the SDK log record directly instead of relying on FileTaskStore's throwing error path
+
+conclusion:
+  - all six previously failing cases pass after avoiding the SDK McpError construction paths
+  - this is a compatibility workaround for the observed SDK exception-object corruption, not a relaxation of validation

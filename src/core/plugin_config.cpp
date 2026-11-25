@@ -13,7 +13,7 @@
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mcp/McpError.hpp>
 
 #include "core/storage/legacy_store.hpp"
@@ -41,7 +41,7 @@ std::string project_config_file_path() {
 }
 
 ConfigReadStatus read_config_object(const std::string &path,
-                                    mcp::JsonValue::Object &doc,
+                                    godot_autopilot::util::JsonValue::Object &doc,
                                     std::string &error) {
   error.clear();
   godot::Ref<godot::FileAccess> file =
@@ -53,15 +53,15 @@ ConfigReadStatus read_config_object(const std::string &path,
   godot::String content = file->get_as_text();
   file->close();
   try {
-    mcp::JsonValue parsed = mcp::JsonValue::Parse(content.utf8().get_data());
+    godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(content.utf8().get_data());
     if (!parsed.IsObject()) {
       error = "config root is not a JSON object";
       return ConfigReadStatus::kParseFailed;
     }
     doc = std::move(parsed.GetObject());
     return ConfigReadStatus::kOk;
-  } catch (const mcp::McpError &e) {
-    error = std::string(e.ErrorMessage());
+  } catch (const godot_autopilot::util::JsonError &e) {
+    error = std::string(e.what());
   } catch (const std::exception &e) {
     error = e.what();
   } catch (...) {
@@ -101,7 +101,7 @@ void note_legacy_config_source(const char *key) {
 }
 
 bool find_config_value_with_legacy(const std::string &primary_path,
-                                   const char *key, mcp::JsonValue &out,
+                                   const char *key, godot_autopilot::util::JsonValue &out,
                                    bool &from_legacy) {
   from_legacy = false;
   const std::string legacy_path = LegacyStore::legacy_config_path();
@@ -124,7 +124,7 @@ bool find_config_value_with_legacy(const std::string &primary_path,
 }
 
 bool write_config_value(const std::string &path, const char *key,
-                        const mcp::JsonValue &value) {
+                        const godot_autopilot::util::JsonValue &value) {
   if (path.empty()) {
     LogSystem::instance().log_detailed(
         LogLevel::Error, LogCategory::System,
@@ -142,7 +142,7 @@ bool write_config_value(const std::string &path, const char *key,
         std::string("path=") + path);
     return false;
   }
-  mcp::JsonValue::Object doc;
+  godot_autopilot::util::JsonValue::Object doc;
   std::string error;
   const ConfigReadStatus status = read_config_object(path, doc, error);
   std::string content;
@@ -172,7 +172,7 @@ int PluginConfig::load_port() {
         "Plugin config path unavailable for port lookup");
     return -1;
   }
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = false;
   if (!find_config_value_with_legacy(path, kPortKey, value, from_legacy) ||
       !value.IsInt()) {
@@ -183,7 +183,7 @@ int PluginConfig::load_port() {
 
 bool PluginConfig::save_port(int port) {
   return write_config_value(project_config_file_path(), kPortKey,
-                             mcp::JsonValue(static_cast<int64_t>(port)));
+                             godot_autopilot::util::JsonValue(static_cast<int64_t>(port)));
 }
 
 bool PluginConfig::load_show_time() {
@@ -194,7 +194,7 @@ bool PluginConfig::load_show_time() {
         "Plugin config path unavailable for show_time lookup");
     return true;
   }
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = false;
   if (!find_config_value_with_legacy(path, kShowTimeKey, value, from_legacy) ||
       !value.IsBool()) {
@@ -205,7 +205,7 @@ bool PluginConfig::load_show_time() {
 
 bool PluginConfig::save_show_time(bool show) {
   return write_config_value(global_config_file_path(), kShowTimeKey,
-                             mcp::JsonValue(show));
+                             godot_autopilot::util::JsonValue(show));
 }
 
 bool PluginConfig::load_desensitize() {
@@ -216,7 +216,7 @@ bool PluginConfig::load_desensitize() {
         "Plugin config path unavailable for desensitize lookup");
     return true;
   }
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = false;
   if (!find_config_value_with_legacy(path, kDesensitizeKey, value,
                                      from_legacy) ||
@@ -228,7 +228,7 @@ bool PluginConfig::load_desensitize() {
 
 bool PluginConfig::save_desensitize(bool value) {
   return write_config_value(global_config_file_path(), kDesensitizeKey,
-                            mcp::JsonValue(value));
+                            godot_autopilot::util::JsonValue(value));
 }
 
 } // namespace godot_autopilot

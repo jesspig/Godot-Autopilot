@@ -2,7 +2,7 @@
 #define GODOT_AUTOPILOT_NAV_TOOLS_HPP
 
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -132,62 +132,62 @@ const std::vector<std::string> kAstarPathActions = {
     "get_id_path", "get_point_path", "add_point", "connect", "disconnect",
     "get_path"};
 
-inline mcp::JsonValue nav_query_schema(
+inline godot_autopilot::util::JsonValue nav_query_schema(
     const std::vector<ParamSpec> &params,
     std::initializer_list<const char *> modes, const char *description) {
-  mcp::JsonValue raw = schema::build_schema(params);
-  mcp::JsonValue mode(mcp::JsonValue::object_tag);
-  mode["type"] = mcp::JsonValue("string");
-  mode["description"] = mcp::JsonValue(description);
-  mcp::JsonValue values(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue raw = schema::build_schema(params);
+  godot_autopilot::util::JsonValue mode(godot_autopilot::util::JsonValue::object_tag);
+  mode["type"] = godot_autopilot::util::JsonValue("string");
+  mode["description"] = godot_autopilot::util::JsonValue(description);
+  godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::array_tag);
   for (const char *value : modes) {
-    values.PushBack(mcp::JsonValue(value));
+    values.PushBack(godot_autopilot::util::JsonValue(value));
   }
   mode["enum"] = std::move(values);
-  mcp::JsonValue *properties = raw.Find("properties");
+  godot_autopilot::util::JsonValue *properties = raw.Find("properties");
   if (properties != nullptr && properties->IsObject()) {
     (*properties)["mode"] = std::move(mode);
   }
   return raw;
 }
 
-inline mcp::JsonValue nav_query_alias_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue nav_query_alias_args(const godot_autopilot::util::JsonValue &args,
                                            const char *mode,
                                            int64_t dimension) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["mode"] = mcp::JsonValue(mode);
-  out["dimension"] = mcp::JsonValue(dimension);
+  out["mode"] = godot_autopilot::util::JsonValue(mode);
+  out["dimension"] = godot_autopilot::util::JsonValue(dimension);
   return out;
 }
 
-inline mcp::JsonValue nav_query_path_alias_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue nav_query_path_alias_args(const godot_autopilot::util::JsonValue &args,
                                                 int64_t dimension) {
-  mcp::JsonValue out = nav_query_alias_args(args, "path_query", dimension);
-  const mcp::JsonValue *optimize = out.Find("optimize");
+  godot_autopilot::util::JsonValue out = nav_query_alias_args(args, "path_query", dimension);
+  const godot_autopilot::util::JsonValue *optimize = out.Find("optimize");
   if (optimize != nullptr && optimize->IsBool()) {
     out["simplify"] = *optimize;
   }
   return out;
 }
 
-inline mcp::JsonValue nav_query_path_alias_project(
-    const mcp::JsonValue &canonical) {
+inline godot_autopilot::util::JsonValue nav_query_path_alias_project(
+    const godot_autopilot::util::JsonValue &canonical) {
   if (canonical.Find("error") != nullptr) {
     return canonical;
   }
-  const mcp::JsonValue *result = canonical.Find("result");
+  const godot_autopilot::util::JsonValue *result = canonical.Find("result");
   if (result == nullptr || !result->IsObject()) {
     return canonical;
   }
-  const mcp::JsonValue *path = result->Find("path");
+  const godot_autopilot::util::JsonValue *path = result->Find("path");
   if (path == nullptr) {
     return canonical;
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue(mcp::JsonValue::Object{{"path", *path}});
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::Object{{"path", *path}});
   return out;
 }
 
@@ -270,23 +270,23 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
           "Query mode: path_query|closest_point|closest_point_normal|closest_point_owner|closest_point_to_segment|regions|agents|links|iteration|force_update|agent_state"),
       {
           ToolAlias{"get_nav_2d_map_path", "nav_query",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return nav_query_path_alias_args(args, 2);
                     },
                     nav_query_path_alias_project, "0.4.0", "0.6.0"},
           ToolAlias{"get_nav_3d_map_path", "nav_query",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return nav_query_path_alias_args(args, 3);
                     },
                     nav_query_path_alias_project, "0.4.0", "0.6.0"},
           ToolAlias{"get_nav_3d_map_closest_point_to_segment", "nav_query",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return nav_query_alias_args(
                           args, "closest_point_to_segment", 3);
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_nav_3d_agent_state", "nav_query",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return nav_query_alias_args(args, "agent_state", 3);
                     },
                     {}, "0.4.0", "0.6.0"},

@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_THEME_TOOLS_HPP
 #define GODOT_AUTOPILOT_THEME_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -45,23 +45,23 @@ const std::vector<ParamSpec> kUpdateControlLayoutParams = {
 const std::vector<std::string> kUpdateThemeActions = {"create", "bundle"};
 const std::vector<std::string> kUpdateControlLayoutActions = {"apply", "layout"};
 
-inline mcp::JsonValue theme_item_bundle_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue theme_item_bundle_args(const godot_autopilot::util::JsonValue &args,
                                              const char *kind,
                                              const char *value_field) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue("bundle");
-  const mcp::JsonValue *path = args.Find("path");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue("bundle");
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
   if (path != nullptr) {
     out["path"] = *path;
   }
-  mcp::JsonValue type_map(mcp::JsonValue::object_tag);
-  mcp::JsonValue item_map(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *varname = args.Find("varname");
-  const mcp::JsonValue *value = args.Find(value_field);
+  godot_autopilot::util::JsonValue type_map(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue item_map(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *varname = args.Find("varname");
+  const godot_autopilot::util::JsonValue *value = args.Find(value_field);
   if (varname != nullptr && value != nullptr) {
     item_map[varname->GetString()] = *value;
   }
-  const mcp::JsonValue *theme_type = args.Find("theme_type");
+  const godot_autopilot::util::JsonValue *theme_type = args.Find("theme_type");
   if (theme_type != nullptr) {
     type_map[theme_type->GetString()] = std::move(item_map);
   }
@@ -69,87 +69,87 @@ inline mcp::JsonValue theme_item_bundle_args(const mcp::JsonValue &args,
   return out;
 }
 
-inline mcp::JsonValue validate_theme_item_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue validate_theme_item_args(const godot_autopilot::util::JsonValue &args,
                                                const char *value_field,
                                                bool require_int,
                                                bool require_object,
                                                const char *value_error) {
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *theme_type = args.Find("theme_type");
-  const mcp::JsonValue *varname = args.Find("varname");
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *theme_type = args.Find("theme_type");
+  const godot_autopilot::util::JsonValue *varname = args.Find("varname");
   if (path == nullptr || !path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return error;
   }
   if (theme_type == nullptr || !theme_type->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: theme_type");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: theme_type");
     return error;
   }
   if (varname == nullptr || !varname->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: varname");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: varname");
     return error;
   }
-  const mcp::JsonValue *value = args.Find(value_field);
+  const godot_autopilot::util::JsonValue *value = args.Find(value_field);
   if (value == nullptr || (require_int && !value->IsInt()) ||
       (require_object && !value->IsObject())) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(value_error);
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(value_error);
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue project_theme_item_result(
-    const mcp::JsonValue &result, const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue("ok");
-  const mcp::JsonValue *path = result.Find("path");
+inline godot_autopilot::util::JsonValue project_theme_item_result(
+    const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue("ok");
+  const godot_autopilot::util::JsonValue *path = result.Find("path");
   if (path == nullptr) {
     path = args.Find("path");
   }
   if (path != nullptr) {
     out["path"] = *path;
   }
-  const mcp::JsonValue *theme_type = args.Find("theme_type");
+  const godot_autopilot::util::JsonValue *theme_type = args.Find("theme_type");
   if (theme_type != nullptr) {
     out["theme_type"] = *theme_type;
   }
-  const mcp::JsonValue *varname = args.Find("varname");
+  const godot_autopilot::util::JsonValue *varname = args.Find("varname");
   if (varname != nullptr) {
     out["varname"] = *varname;
   }
-  const mcp::JsonValue *saved = result.Find("saved");
-  out["saved"] = saved != nullptr ? *saved : mcp::JsonValue(true);
-  const mcp::JsonValue *verified = result.Find("verified");
+  const godot_autopilot::util::JsonValue *saved = result.Find("saved");
+  out["saved"] = saved != nullptr ? *saved : godot_autopilot::util::JsonValue(true);
+  const godot_autopilot::util::JsonValue *verified = result.Find("verified");
   out["verified"] =
-      verified != nullptr ? *verified : mcp::JsonValue(false);
+      verified != nullptr ? *verified : godot_autopilot::util::JsonValue(false);
   return out;
 }
 
-inline mcp::JsonValue create_theme_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue("create");
-  const mcp::JsonValue *path = args.Find("path");
+inline godot_autopilot::util::JsonValue create_theme_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue("create");
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
   if (path != nullptr) {
     out["path"] = *path;
   }
-  const mcp::JsonValue *base_type = args.Find("base_type");
+  const godot_autopilot::util::JsonValue *base_type = args.Find("base_type");
   if (base_type != nullptr) {
     out["base_type"] = *base_type;
   }
   return out;
 }
 
-inline mcp::JsonValue theme_bundle_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue("bundle");
+inline godot_autopilot::util::JsonValue theme_bundle_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue("bundle");
   const char *keys[] = {"path", "colors", "constants", "font_sizes",
                         "styleboxes"};
   for (const char *key : keys) {
-    const mcp::JsonValue *value = args.Find(key);
+    const godot_autopilot::util::JsonValue *value = args.Find(key);
     if (value != nullptr) {
       out[key] = *value;
     }
@@ -157,12 +157,12 @@ inline mcp::JsonValue theme_bundle_args(const mcp::JsonValue &args) {
   return out;
 }
 
-inline mcp::JsonValue apply_theme_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue("apply");
+inline godot_autopilot::util::JsonValue apply_theme_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue("apply");
   const char *keys[] = {"theme_path", "control_path"};
   for (const char *key : keys) {
-    const mcp::JsonValue *value = args.Find(key);
+    const godot_autopilot::util::JsonValue *value = args.Find(key);
     if (value != nullptr) {
       out[key] = *value;
     }
@@ -170,15 +170,15 @@ inline mcp::JsonValue apply_theme_args(const mcp::JsonValue &args) {
   return out;
 }
 
-inline mcp::JsonValue layout_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue("layout");
+inline godot_autopilot::util::JsonValue layout_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue("layout");
   const char *keys[] = {"path",     "preset",      "keep_offsets",
                         "anchors",  "offsets",     "size_flags_h",
                         "size_flags_v", "grow_h",   "grow_v",
                         "min_size"};
   for (const char *key : keys) {
-    const mcp::JsonValue *value = args.Find(key);
+    const godot_autopilot::util::JsonValue *value = args.Find(key);
     if (value != nullptr) {
       out[key] = *value;
     }
@@ -186,65 +186,65 @@ inline mcp::JsonValue layout_args(const mcp::JsonValue &args) {
   return out;
 }
 
-inline mcp::JsonValue control_anchor_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue("layout");
-  const mcp::JsonValue *control_path = args.Find("control_path");
+inline godot_autopilot::util::JsonValue control_anchor_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue("layout");
+  const godot_autopilot::util::JsonValue *control_path = args.Find("control_path");
   if (control_path != nullptr) {
     out["path"] = *control_path;
   }
-  const mcp::JsonValue *preset = args.Find("preset");
+  const godot_autopilot::util::JsonValue *preset = args.Find("preset");
   if (preset != nullptr) {
     out["preset"] = *preset;
   }
-  const mcp::JsonValue *keep_offsets = args.Find("keep_offsets");
+  const godot_autopilot::util::JsonValue *keep_offsets = args.Find("keep_offsets");
   if (keep_offsets != nullptr) {
     out["keep_offsets"] = *keep_offsets;
   }
   return out;
 }
 
-inline mcp::JsonValue validate_control_anchor_args(
-    const mcp::JsonValue &args) {
-  const mcp::JsonValue *control_path = args.Find("control_path");
-  const mcp::JsonValue *preset = args.Find("preset");
+inline godot_autopilot::util::JsonValue validate_control_anchor_args(
+    const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *control_path = args.Find("control_path");
+  const godot_autopilot::util::JsonValue *preset = args.Find("preset");
   if (control_path == nullptr || !control_path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: control_path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: control_path");
     return error;
   }
   if (preset == nullptr || !preset->IsInt()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(
         "missing or invalid required parameter: preset (Control LayoutPreset "
         "integer)");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue project_control_anchor_result(
-    const mcp::JsonValue &result, const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue("ok");
-  const mcp::JsonValue *control_path = args.Find("control_path");
+inline godot_autopilot::util::JsonValue project_control_anchor_result(
+    const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue("ok");
+  const godot_autopilot::util::JsonValue *control_path = args.Find("control_path");
   if (control_path != nullptr) {
     out["control_path"] = *control_path;
   }
-  const mcp::JsonValue *preset = result.Find("preset");
+  const godot_autopilot::util::JsonValue *preset = result.Find("preset");
   if (preset == nullptr) {
     preset = args.Find("preset");
   }
   if (preset != nullptr) {
     out["preset"] = *preset;
   }
-  const mcp::JsonValue *keep_offsets = result.Find("keep_offsets");
+  const godot_autopilot::util::JsonValue *keep_offsets = result.Find("keep_offsets");
   if (keep_offsets == nullptr) {
     keep_offsets = args.Find("keep_offsets");
   }
   out["keep_offsets"] =
-      keep_offsets != nullptr ? *keep_offsets : mcp::JsonValue(false);
-  const mcp::JsonValue *note = result.Find("note");
+      keep_offsets != nullptr ? *keep_offsets : godot_autopilot::util::JsonValue(false);
+  const godot_autopilot::util::JsonValue *note = result.Find("note");
   if (note != nullptr) {
     out["note"] = *note;
   }
@@ -282,11 +282,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               theme_bundle_args, {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_theme_color", "update_theme",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return theme_item_bundle_args(args, "colors", "color");
               },
               {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return validate_theme_item_args(
                     args, "color", false, false,
                     "missing required parameter: color");
@@ -294,11 +294,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               project_theme_item_result},
           ToolAlias{
               "set_theme_constant", "update_theme",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return theme_item_bundle_args(args, "constants", "constant");
               },
               {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return validate_theme_item_args(
                     args, "constant", true, false,
                     "missing or invalid required parameter: constant (integer)");
@@ -306,11 +306,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               project_theme_item_result},
           ToolAlias{
               "set_theme_font_size", "update_theme",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return theme_item_bundle_args(args, "font_sizes", "font_size");
               },
               {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return validate_theme_item_args(
                     args, "font_size", true, false,
                     "missing or invalid required parameter: font_size (integer)");
@@ -318,11 +318,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               project_theme_item_result},
           ToolAlias{
               "set_theme_stylebox_flat", "update_theme",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return theme_item_bundle_args(args, "styleboxes", "stylebox");
               },
               {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return validate_theme_item_args(
                     args, "stylebox", false, true,
                     "missing or invalid required parameter: stylebox (object "

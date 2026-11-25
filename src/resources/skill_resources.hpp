@@ -3,7 +3,7 @@
 
 #include "util/skill_gen.hpp"
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -138,21 +138,21 @@ inline std::vector<CatalogEntry> build_catalog(
 }
 
 inline std::string catalog_to_json(const std::vector<CatalogEntry> &catalog) {
-  mcp::JsonValue items(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue items(godot_autopilot::util::JsonValue::array_tag);
   for (const CatalogEntry &entry : catalog) {
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["name"] = mcp::JsonValue(entry.name);
-    item["description"] = mcp::JsonValue(entry.description);
-    mcp::JsonValue files(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["name"] = godot_autopilot::util::JsonValue(entry.name);
+    item["description"] = godot_autopilot::util::JsonValue(entry.description);
+    godot_autopilot::util::JsonValue files(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &file : entry.files) {
-      files.PushBack(mcp::JsonValue(file));
+      files.PushBack(godot_autopilot::util::JsonValue(file));
     }
     item["files"] = std::move(files);
     items.PushBack(std::move(item));
   }
 
-  mcp::JsonValue root(mcp::JsonValue::object_tag);
-  root["count"] = mcp::JsonValue(static_cast<std::int64_t>(catalog.size()));
+  godot_autopilot::util::JsonValue root(godot_autopilot::util::JsonValue::object_tag);
+  root["count"] = godot_autopilot::util::JsonValue(static_cast<std::int64_t>(catalog.size()));
   root["skills"] = std::move(items);
   return root.Dump(-1);
 }

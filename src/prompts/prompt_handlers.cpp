@@ -12,6 +12,7 @@
 #include "prompts/prompt_tool_usage.hpp"
 #include "tools/base/dispatch.hpp"
 #include "util/error_util.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/McpError.hpp>
 #include <memory>
@@ -75,7 +76,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
       mcp::PromptOptions{}.Description("Guide to create a basic 3D scene with "
                                        "camera, lighting, and a test object"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt create-3d-scene",
             [](std::string &content) { content = prompt_create_3d_scene(); });
@@ -87,7 +88,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "Guide to set up a 3D character controller with CharacterBody3D, "
           "collision, and movement script"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt setup-character",
             [](std::string &content) { content = prompt_setup_character(); });
@@ -99,7 +100,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "Guide to use physics debugging tools including ray casts, shape "
           "casts, and performance monitors"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt debug-physics",
             [](std::string &content) { content = prompt_debug_physics(); });
@@ -110,7 +111,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
       mcp::PromptOptions{}.Description(
           "Guide to configure input actions in Project Settings and test them"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt setup-input-map",
             [](std::string &content) { content = prompt_setup_input_map(); });
@@ -122,7 +123,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "Guide to create a simple GUI with CanvasLayer, containers, buttons, "
           "and labels"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt setup-gui",
             [](std::string &content) { content = prompt_setup_gui(); });
@@ -134,7 +135,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "Usage examples for the 19 most commonly used MCP tools with JSON "
           "input/output and gotchas"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt tool-usage",
             [](std::string &content) { content = prompt_tool_usage(); });
@@ -146,7 +147,7 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "Godot keycode reference for InputEventKey and Variant type JSON "
           "mapping for property operations"),
       [&queue](const std::string &,
-               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+               const std::optional<godot_autopilot::adapters::SdkJson> &) -> mcp::GetPromptResult {
         return run_prompt_task(
             queue, "prompt keycode-reference",
             [](std::string &content) { content = prompt_keycode_reference(); });

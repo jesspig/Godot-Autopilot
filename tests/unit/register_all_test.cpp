@@ -27,7 +27,9 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_catalog.hpp"
 #include "tools/base/tool_registry.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include "support/tool_catalog_baseline.hpp"
+#include "util/json_value.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>
@@ -51,7 +53,7 @@ const char *const kValidCategories[] = {
     "TileMap",
     "Meta",       "Auto"};
 
-bool has_schema_params(const mcp::JsonValue &schema) {
+bool has_schema_params(const godot_autopilot::util::JsonValue &schema) {
   const auto *props = schema.Find("properties");
   return props != nullptr && props->IsObject() && !props->GetObject().empty();
 }
@@ -177,14 +179,14 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
 TEST_F(RegisteredServerFixture, ReloadScriptSchemaExposesKeepStateOptional) {
   auto info = catalog.get_tool("reload_script");
   ASSERT_TRUE(info.has_value());
-  const mcp::JsonValue *props = info->input_schema.Find("properties");
+  const godot_autopilot::util::JsonValue *props = info->input_schema.Find("properties");
   ASSERT_NE(props, nullptr);
   ASSERT_TRUE(props->IsObject());
-  const mcp::JsonValue *keep = props->Find("keep_state");
+  const godot_autopilot::util::JsonValue *keep = props->Find("keep_state");
   ASSERT_NE(keep, nullptr);
   ASSERT_TRUE(keep->IsObject());
   EXPECT_EQ(keep->At("type").GetString(), "boolean");
-  const mcp::JsonValue *required = info->input_schema.Find("required");
+  const godot_autopilot::util::JsonValue *required = info->input_schema.Find("required");
   ASSERT_NE(required, nullptr);
   ASSERT_TRUE(required->IsArray());
   for (const auto &item : required->GetArray()) {
@@ -193,8 +195,8 @@ TEST_F(RegisteredServerFixture, ReloadScriptSchemaExposesKeepStateOptional) {
 }
 
 TEST_F(RegisteredServerFixture, ToolDetailSideEffectIsMachineReadable) {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
-  args["name"] = mcp::JsonValue("code_execute");
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["name"] = godot_autopilot::util::JsonValue("code_execute");
   auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
   const auto *tool = result.Find("tool");
   ASSERT_NE(tool, nullptr);
@@ -209,8 +211,8 @@ TEST_F(RegisteredServerFixture, EveryToolDetailReportsNonEmptySideEffect) {
   const auto tools = catalog.get_all_tools();
   ASSERT_GT(tools.size(), size_t{0});
   for (const auto &tool : tools) {
-    mcp::JsonValue args(mcp::JsonValue::object_tag);
-    args["name"] = mcp::JsonValue(tool.name);
+    godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+    args["name"] = godot_autopilot::util::JsonValue(tool.name);
     auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
     const auto *info = result.Find("tool");
     ASSERT_NE(info, nullptr) << tool.name;
@@ -252,33 +254,33 @@ TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
 }
 
 TEST(ToolResultIsErrorTest, DetectsErrorField) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue("boom");
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["error"] = godot_autopilot::util::JsonValue("boom");
   EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
 }
 
 TEST(ToolResultIsErrorTest, IgnoresPlainObjectWithoutError) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["result"] = godot_autopilot::util::JsonValue("ok");
   EXPECT_FALSE(godot_autopilot::tool_result_is_error(result));
 }
 
 TEST(ToolResultIsErrorTest, IgnoresNonObjectResult) {
-  EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue("text")));
-  EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue()));
+  EXPECT_FALSE(godot_autopilot::tool_result_is_error(godot_autopilot::util::JsonValue("text")));
+  EXPECT_FALSE(godot_autopilot::tool_result_is_error(godot_autopilot::util::JsonValue()));
 }
 
 TEST(ToolResultIsErrorTest, DetectsStructuredErrorCode) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  mcp::JsonValue structured(mcp::JsonValue::object_tag);
-  structured["code"] = mcp::JsonValue("when_timeout");
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue structured(godot_autopilot::util::JsonValue::object_tag);
+  structured["code"] = godot_autopilot::util::JsonValue("when_timeout");
   result["structured_error"] = std::move(structured);
   EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
 }
 
 TEST(ToolResultIsErrorTest, DetectsRuntimeErrorFlag) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["runtime_error"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["runtime_error"] = godot_autopilot::util::JsonValue(true);
   EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
 }
 
@@ -315,14 +317,16 @@ TEST_F(RegisteredServerFixture,
        ExportStartingAfterSubmissionBlocksFinalToolExecution) {
   godot_autopilot::ExportState export_state;
   std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params["name"] = mcp::JsonValue("search_tools");
-  params["arguments"] = mcp::JsonValue(mcp::JsonValue::object_tag);
-  std::promise<mcp::JsonValue> completed;
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+  params["name"] = godot_autopilot::util::JsonValue("search_tools");
+  params["arguments"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  std::promise<godot_autopilot::util::JsonValue> completed;
   auto completed_future = completed.get_future();
   std::thread worker([&] {
     try {
-      completed.set_value(client->SendRequest("tools/call", params).get());
+      completed.set_value(godot_autopilot::adapters::FromSdk(
+          client->SendRequest("tools/call",
+                              godot_autopilot::adapters::ToSdk(params)).get()));
     } catch (...) {
       completed.set_exception(std::current_exception());
     }
@@ -354,7 +358,7 @@ TEST_F(RegisteredServerFixture,
 }
 
 TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
@@ -366,8 +370,8 @@ TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
 
 TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
   std::string big(600, 'x');
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
-  args["payload"] = mcp::JsonValue(big);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["payload"] = godot_autopilot::util::JsonValue(big);
 
   auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
@@ -444,9 +448,11 @@ TEST(RegisterAllSurfaceTest, FullSurfaceRegistersAllToolsAcrossPages) {
   EXPECT_EQ(all_tools.tools.size(), full_catalog.size());
   EXPECT_GT(full_catalog.size(), static_cast<size_t>(7));
 
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  mcp::JsonValue first_json =
-      full_client->SendRequest("tools/list", params).get();
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue first_json =
+      godot_autopilot::adapters::FromSdk(
+          full_client->SendRequest("tools/list",
+                                   godot_autopilot::adapters::ToSdk(params)).get());
   const auto *first_tools = first_json.Find("tools");
   ASSERT_NE(first_tools, nullptr) << first_json.Dump();
   ASSERT_TRUE(first_tools->IsArray()) << first_json.Dump();
@@ -497,8 +503,8 @@ TEST(RegisterAllSurfaceTest, FullSurfaceSendsListChangedOnDynamicRefresh) {
     godot_autopilot::ToolSpec spec{
         "gda_test_dynamic_tool", "Dynamic test tool", "Testing", {"dynamic"}};
     spec.side_effect = godot_autopilot::SideEffect::None;
-    spec.handler = [](const mcp::JsonValue &) {
-      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    spec.handler = [](const godot_autopilot::util::JsonValue &) {
+      return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     };
     godot_autopilot::dynamic_specs::store().push_back(std::move(spec));
   }
@@ -630,8 +636,8 @@ TEST_F(RegisteredServerFixture, SceneWritingToolsDeclareWritesScene) {
       "assign_mesh_to_instance",
       "tween_editor_property"};
   for (const char *name : kSceneWriters) {
-    mcp::JsonValue args(mcp::JsonValue::object_tag);
-    args["name"] = mcp::JsonValue(name);
+    godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+    args["name"] = godot_autopilot::util::JsonValue(name);
     auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
     const auto *tool = result.Find("tool");
     ASSERT_NE(tool, nullptr) << name;

@@ -1,23 +1,23 @@
 #ifndef GODOT_AUTOPILOT_THEME_OPS_HPP
 #define GODOT_AUTOPILOT_THEME_OPS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace theme_ops {
 
-mcp::JsonValue handle_create_theme_resource(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_theme_color(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_theme_constant(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_theme_font_size(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_theme_stylebox_flat(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_theme_info(const mcp::JsonValue &args);
-mcp::JsonValue handle_apply_theme_to_control(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_control_anchor_preset(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_control_layout(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_theme_item_bundle(const mcp::JsonValue &args);
-mcp::JsonValue handle_update_theme(const mcp::JsonValue &args);
-mcp::JsonValue handle_update_control_layout(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_create_theme_resource(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_theme_color(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_theme_constant(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_theme_font_size(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_theme_stylebox_flat(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_theme_info(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_apply_theme_to_control(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_control_anchor_preset(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_control_layout(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_theme_item_bundle(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_update_theme(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_update_control_layout(const godot_autopilot::util::JsonValue &args);
 
 } // namespace theme_ops
 } // namespace godot_autopilot

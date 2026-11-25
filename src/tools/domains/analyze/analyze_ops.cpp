@@ -39,7 +39,7 @@ constexpr int64_t DEFAULT_MAX_DEPTH = 3;
 constexpr int64_t DEFAULT_MAX_STATE_NODES = 200;
 constexpr const char *AUTOLOAD_PREFIX = "autoload/";
 
-bool read_string_arg(const mcp::JsonValue &args, const char *key,
+bool read_string_arg(const godot_autopilot::util::JsonValue &args, const char *key,
                      std::string &out) {
   auto *v = args.Find(key);
   if (v && v->IsString()) {
@@ -49,12 +49,12 @@ bool read_string_arg(const mcp::JsonValue &args, const char *key,
   return false;
 }
 
-bool require_string_arg(const mcp::JsonValue &args, const char *key,
+bool require_string_arg(const godot_autopilot::util::JsonValue &args, const char *key,
                         std::string &out) {
   return util::require_nonempty_string_arg(args, key, out);
 }
 
-int64_t read_int_arg(const mcp::JsonValue &args, const char *key,
+int64_t read_int_arg(const godot_autopilot::util::JsonValue &args, const char *key,
                      int64_t fallback) {
   auto *v = args.Find(key);
   if (!v || !v->IsNumber())
@@ -71,11 +71,11 @@ bool ends_with(const std::string &s, const std::string &suffix) {
          s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-void push_problem(mcp::JsonValue &problems, const char *kind,
+void push_problem(godot_autopilot::util::JsonValue &problems, const char *kind,
                   const std::string &message) {
-  mcp::JsonValue p(mcp::JsonValue::object_tag);
-  p["kind"] = mcp::JsonValue(kind);
-  p["message"] = mcp::JsonValue(message);
+  godot_autopilot::util::JsonValue p(godot_autopilot::util::JsonValue::object_tag);
+  p["kind"] = godot_autopilot::util::JsonValue(kind);
+  p["message"] = godot_autopilot::util::JsonValue(message);
   problems.PushBack(std::move(p));
 }
 
@@ -221,7 +221,7 @@ std::string describe_object(godot::Object *obj, godot::Node *scene_root) {
 
 void append_connection_edges(
     const godot::TypedArray<godot::Dictionary> &connections,
-    godot::Node *scene_root, bool neighbor_is_target, mcp::JsonValue &edges,
+    godot::Node *scene_root, bool neighbor_is_target, godot_autopilot::util::JsonValue &edges,
     std::set<std::string> &edge_keys, std::vector<godot::Node *> &neighbors) {
   for (int i = 0; i < connections.size(); i++) {
     godot::Dictionary conn = connections[i];
@@ -264,12 +264,12 @@ void append_connection_edges(
       if (!edge_keys.insert(key).second)
         continue;
 
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["from"] = mcp::JsonValue(describe_object(source_obj, scene_root));
-      e["signal"] = mcp::JsonValue(sig_name);
-      e["to"] = mcp::JsonValue(describe_object(target_obj, scene_root));
-      e["method"] = mcp::JsonValue(method);
-      e["persisted"] = mcp::JsonValue(persisted);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["from"] = godot_autopilot::util::JsonValue(describe_object(source_obj, scene_root));
+      e["signal"] = godot_autopilot::util::JsonValue(sig_name);
+      e["to"] = godot_autopilot::util::JsonValue(describe_object(target_obj, scene_root));
+      e["method"] = godot_autopilot::util::JsonValue(method);
+      e["persisted"] = godot_autopilot::util::JsonValue(persisted);
       edges.PushBack(std::move(e));
 
       godot::Node *neighbor = godot::Object::cast_to<godot::Node>(
@@ -280,19 +280,19 @@ void append_connection_edges(
   }
 }
 
-mcp::JsonValue scene_state_summary(const godot::Ref<godot::SceneState> &state,
+godot_autopilot::util::JsonValue scene_state_summary(const godot::Ref<godot::SceneState> &state,
                                    int64_t max_nodes) {
   const int32_t node_count = state->get_node_count();
   const int64_t returned = max_nodes < node_count ? max_nodes : node_count;
-  mcp::JsonValue nodes(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue nodes(godot_autopilot::util::JsonValue::array_tag);
   for (int32_t i = 0; i < static_cast<int32_t>(returned); i++) {
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["path"] = mcp::JsonValue(util::to_std(state->get_node_path(i, false)));
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["path"] = godot_autopilot::util::JsonValue(util::to_std(state->get_node_path(i, false)));
     item["type"] =
-        mcp::JsonValue(util::to_std(godot::String(state->get_node_type(i))));
+        godot_autopilot::util::JsonValue(util::to_std(godot::String(state->get_node_type(i))));
     item["owner"] =
-        mcp::JsonValue(util::to_std(state->get_node_owner_path(i)));
-    mcp::JsonValue properties(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue(util::to_std(state->get_node_owner_path(i)));
+    godot_autopilot::util::JsonValue properties(godot_autopilot::util::JsonValue::object_tag);
     const int32_t property_count = state->get_node_property_count(i);
     for (int32_t p = 0; p < property_count; p++) {
       properties[util::to_std(
@@ -300,44 +300,44 @@ mcp::JsonValue scene_state_summary(const godot::Ref<godot::SceneState> &state,
           VariantJson::serialize(state->get_node_property_value(i, p));
     }
     item["properties"] = std::move(properties);
-    mcp::JsonValue groups(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue groups(godot_autopilot::util::JsonValue::array_tag);
     godot::PackedStringArray node_groups = state->get_node_groups(i);
     for (int g = 0; g < node_groups.size(); g++)
-      groups.PushBack(mcp::JsonValue(util::to_std(node_groups[g])));
+      groups.PushBack(godot_autopilot::util::JsonValue(util::to_std(node_groups[g])));
     item["groups"] = std::move(groups);
     nodes.PushBack(std::move(item));
   }
   const int32_t connection_count = state->get_connection_count();
-  mcp::JsonValue connections(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue connections(godot_autopilot::util::JsonValue::array_tag);
   for (int32_t i = 0; i < connection_count; i++) {
-    mcp::JsonValue connection(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue connection(godot_autopilot::util::JsonValue::object_tag);
     connection["source"] =
-        mcp::JsonValue(util::to_std(state->get_connection_source(i)));
-    connection["signal"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue(util::to_std(state->get_connection_source(i)));
+    connection["signal"] = godot_autopilot::util::JsonValue(
         util::to_std(godot::String(state->get_connection_signal(i))));
     connection["target"] =
-        mcp::JsonValue(util::to_std(state->get_connection_target(i)));
-    connection["method"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue(util::to_std(state->get_connection_target(i)));
+    connection["method"] = godot_autopilot::util::JsonValue(
         util::to_std(godot::String(state->get_connection_method(i))));
-    connection["flags"] = mcp::JsonValue(
+    connection["flags"] = godot_autopilot::util::JsonValue(
         static_cast<int64_t>(state->get_connection_flags(i)));
     connections.PushBack(std::move(connection));
   }
-  mcp::JsonValue summary(mcp::JsonValue::object_tag);
-  summary["node_count"] = mcp::JsonValue(static_cast<int64_t>(node_count));
-  summary["returned_nodes"] = mcp::JsonValue(returned);
-  summary["truncated"] = mcp::JsonValue(returned < node_count);
-  summary["max_nodes"] = mcp::JsonValue(max_nodes);
+  godot_autopilot::util::JsonValue summary(godot_autopilot::util::JsonValue::object_tag);
+  summary["node_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(node_count));
+  summary["returned_nodes"] = godot_autopilot::util::JsonValue(returned);
+  summary["truncated"] = godot_autopilot::util::JsonValue(returned < node_count);
+  summary["max_nodes"] = godot_autopilot::util::JsonValue(max_nodes);
   summary["nodes"] = std::move(nodes);
   summary["connection_count"] =
-      mcp::JsonValue(static_cast<int64_t>(connection_count));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(connection_count));
   summary["connections"] = std::move(connections);
   return summary;
 }
 
 } // namespace
 
-mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_analyze_project(const godot_autopilot::util::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
     return util::error_json(
@@ -356,7 +356,7 @@ mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
                     "unused_resources or signal_flow");
 }
 
-mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_validate_scene_file(const godot_autopilot::util::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))
     return util::error_json("missing required parameter: path (res:// scene file, "
@@ -379,8 +379,8 @@ mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
     return util::error_json("ResourceLoader is unavailable");
 
   godot::String res_path(path.c_str());
-  mcp::JsonValue problems(mcp::JsonValue::array_tag);
-  mcp::JsonValue missing(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue problems(godot_autopilot::util::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue missing(godot_autopilot::util::JsonValue::array_tag);
 
   godot::Ref<godot::PackedScene> scene =
       loader->load(res_path, "PackedScene",
@@ -402,7 +402,7 @@ mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
       if (!resolved_ok)
         continue;
       if (!godot::FileAccess::file_exists(godot::String(resolved.c_str()))) {
-        missing.PushBack(mcp::JsonValue(dep));
+        missing.PushBack(godot_autopilot::util::JsonValue(dep));
         push_problem(problems, "missing_dependency",
                      "\"" + path + "\" depends on \"" + dep +
                          "\" which does not exist on disk");
@@ -421,23 +421,23 @@ mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
 
   bool valid = problems.Size() == 0;
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["valid"] = mcp::JsonValue(valid);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["valid"] = godot_autopilot::util::JsonValue(valid);
   inner["problems"] = std::move(problems);
   inner["missing_dependencies"] = std::move(missing);
-  inner["dependency_count"] = mcp::JsonValue(dependency_count);
+  inner["dependency_count"] = godot_autopilot::util::JsonValue(dependency_count);
   if (include_state) {
     if (scene.is_null()) {
       inner["state_error"] =
-          mcp::JsonValue("no PackedScene state available because the file "
+          godot_autopilot::util::JsonValue("no PackedScene state available because the file "
                          "failed to load");
     } else {
       godot::Ref<godot::SceneState> state = scene->get_state();
       if (state.is_null()) {
-        inner["state_error"] = mcp::JsonValue(
+        inner["state_error"] = godot_autopilot::util::JsonValue(
             "PackedScene::get_state() returned null for this file");
       } else {
-        mcp::JsonValue summary = scene_state_summary(state, max_nodes);
+        godot_autopilot::util::JsonValue summary = scene_state_summary(state, max_nodes);
         inner["node_count"] = summary["node_count"];
         inner["returned_nodes"] = summary["returned_nodes"];
         inner["truncated"] = summary["truncated"];
@@ -449,12 +449,12 @@ mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
       }
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }
 
-mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_find_unused_resources(const godot_autopilot::util::JsonValue &args) {
   std::string directory;
   read_string_arg(args, "directory", directory);
 
@@ -532,7 +532,7 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue unused(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue unused(godot_autopilot::util::JsonValue::array_tag);
   for (const auto &entry : files) {
     const std::string &path = entry.first;
     if (referenced.count(path) > 0)
@@ -544,30 +544,30 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
       exempted.insert(path);
       continue;
     }
-    mcp::JsonValue u(mcp::JsonValue::object_tag);
-    u["path"] = mcp::JsonValue(path);
-    u["type"] = mcp::JsonValue(entry.second);
+    godot_autopilot::util::JsonValue u(godot_autopilot::util::JsonValue::object_tag);
+    u["path"] = godot_autopilot::util::JsonValue(path);
+    u["type"] = godot_autopilot::util::JsonValue(entry.second);
     unused.PushBack(std::move(u));
   }
 
-  mcp::JsonValue unresolved_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue unresolved_arr(godot_autopilot::util::JsonValue::array_tag);
   for (const auto &uid : unresolved_uids)
-    unresolved_arr.PushBack(mcp::JsonValue(uid));
+    unresolved_arr.PushBack(godot_autopilot::util::JsonValue(uid));
 
-  mcp::JsonValue exempted_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue exempted_arr(godot_autopilot::util::JsonValue::array_tag);
   for (const auto &e : exempted)
-    exempted_arr.PushBack(mcp::JsonValue(e));
+    exempted_arr.PushBack(godot_autopilot::util::JsonValue(e));
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["scanned"] = mcp::JsonValue(static_cast<int64_t>(files.size()));
-  inner["filesystem_scanning"] = mcp::JsonValue(efs_scanning);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["scanned"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(files.size()));
+  inner["filesystem_scanning"] = godot_autopilot::util::JsonValue(efs_scanning);
   inner["unused"] = std::move(unused);
   inner["unresolved_uids"] = std::move(unresolved_arr);
   inner["exempted"] = std::move(exempted_arr);
   if (text_supplemented > 0)
-    inner["text_supplemented"] = mcp::JsonValue(text_supplemented);
+    inner["text_supplemented"] = godot_autopilot::util::JsonValue(text_supplemented);
   if (text_truncated)
-    inner["text_scan_truncated"] = mcp::JsonValue(true);
+    inner["text_scan_truncated"] = godot_autopilot::util::JsonValue(true);
   std::string note;
   if (efs_scanning)
     note += "editor filesystem is scanning, results may be stale — run "
@@ -580,13 +580,13 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
   if (text_truncated)
     note += "text fallback hit its size budget and skipped files; ";
   if (!note.empty())
-    inner["note"] = mcp::JsonValue(note);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+    inner["note"] = godot_autopilot::util::JsonValue(note);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }
 
-mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_trace_signal_flow(const godot_autopilot::util::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))
     return util::error_json("missing required parameter: path (edited-scene node "
@@ -621,7 +621,7 @@ mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
   std::set<int64_t> visited{
       static_cast<int64_t>(root_node->get_instance_id())};
 
-  mcp::JsonValue edges(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue edges(godot_autopilot::util::JsonValue::array_tag);
   std::set<std::string> edge_keys;
 
   while (!queue.empty()) {
@@ -657,11 +657,11 @@ mcp::JsonValue handle_trace_signal_flow(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["root"] = mcp::JsonValue(describe_node(root_node, scene_root));
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["root"] = godot_autopilot::util::JsonValue(describe_node(root_node, scene_root));
   inner["edges"] = std::move(edges);
-  inner["edge_count"] = mcp::JsonValue(static_cast<int64_t>(edge_keys.size()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  inner["edge_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(edge_keys.size()));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }

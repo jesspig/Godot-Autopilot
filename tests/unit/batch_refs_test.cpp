@@ -14,37 +14,37 @@ using godot_autopilot::code_exec_ops::handle_batch_execute;
 
 namespace {
 
-std::string status_of(const mcp::JsonValue &item) {
-  const mcp::JsonValue *st = item.Find("status");
+std::string status_of(const godot_autopilot::util::JsonValue &item) {
+  const godot_autopilot::util::JsonValue *st = item.Find("status");
   if (st == nullptr || !st->IsString())
     return "<no status>";
   return st->GetString();
 }
 
-std::string error_of(const mcp::JsonValue &item) {
-  const mcp::JsonValue *err = item.Find("error");
+std::string error_of(const godot_autopilot::util::JsonValue &item) {
+  const godot_autopilot::util::JsonValue *err = item.Find("error");
   if (err == nullptr || !err->IsString())
     return "<no error>";
   return err->GetString();
 }
 
-void register_basic_handlers(mcp::JsonValue *echo_seen, bool *echo_called) {
+void register_basic_handlers(godot_autopilot::util::JsonValue *echo_seen, bool *echo_called) {
   godot_autopilot::dispatch::replace_handlers(
       {{"const_v1",
-        [](const mcp::JsonValue &) {
-          return mcp::JsonValue::Parse(R"({"v":1})");
+        [](const godot_autopilot::util::JsonValue &) {
+          return godot_autopilot::util::JsonValue::Parse(R"({"v":1})");
         }},
        {"fail",
-        [](const mcp::JsonValue &) {
-          return mcp::JsonValue::Parse(R"({"error":"boom"})");
+        [](const godot_autopilot::util::JsonValue &) {
+          return godot_autopilot::util::JsonValue::Parse(R"({"error":"boom"})");
         }},
        {"echo",
-        [echo_seen, echo_called](const mcp::JsonValue &args) {
+        [echo_seen, echo_called](const godot_autopilot::util::JsonValue &args) {
           if (echo_called)
             *echo_called = true;
           if (echo_seen)
             *echo_seen = args;
-          return mcp::JsonValue::Parse(R"({"seen":true})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"seen":true})");
         }}},
       {});
 }
@@ -68,12 +68,12 @@ protected:
 };
 
 TEST_F(BatchRefsTest, PrevChain) {
-  mcp::JsonValue seen_args;
+  godot_autopilot::util::JsonValue seen_args;
   bool echo_called = false;
   register_basic_handlers(&seen_args, &echo_called);
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "const_v1"},
           {"tool": "echo", "args": {"x": "$prev"}}
@@ -83,15 +83,15 @@ TEST_F(BatchRefsTest, PrevChain) {
 
   ASSERT_TRUE(echo_called);
   ASSERT_TRUE(seen_args.IsObject());
-  const mcp::JsonValue *x = seen_args.Find("x");
+  const godot_autopilot::util::JsonValue *x = seen_args.Find("x");
   ASSERT_NE(x, nullptr);
   ASSERT_TRUE(x->IsObject());
-  const mcp::JsonValue *v = x->Find("v");
+  const godot_autopilot::util::JsonValue *v = x->Find("v");
   ASSERT_NE(v, nullptr);
   ASSERT_TRUE(v->IsInt());
   EXPECT_EQ(v->GetInt(), 1);
 
-  const mcp::JsonValue *results = result.Find("results");
+  const godot_autopilot::util::JsonValue *results = result.Find("results");
   ASSERT_NE(results, nullptr);
   ASSERT_TRUE(results->IsArray());
   ASSERT_EQ(results->Size(), 2u);
@@ -100,12 +100,12 @@ TEST_F(BatchRefsTest, PrevChain) {
 }
 
 TEST_F(BatchRefsTest, StepsRef) {
-  mcp::JsonValue seen_args;
+  godot_autopilot::util::JsonValue seen_args;
   bool echo_called = false;
   register_basic_handlers(&seen_args, &echo_called);
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "const_v1"},
           {"tool": "echo", "args": {
@@ -117,34 +117,34 @@ TEST_F(BatchRefsTest, StepsRef) {
       })"));
 
   ASSERT_TRUE(echo_called);
-  const mcp::JsonValue *nested = seen_args.Find("nested");
+  const godot_autopilot::util::JsonValue *nested = seen_args.Find("nested");
   ASSERT_NE(nested, nullptr);
   ASSERT_TRUE(nested->IsObject());
-  const mcp::JsonValue *list = nested->Find("list");
+  const godot_autopilot::util::JsonValue *list = nested->Find("list");
   ASSERT_NE(list, nullptr);
   ASSERT_TRUE(list->IsArray());
   ASSERT_EQ(list->Size(), 1u);
   ASSERT_TRUE((*list)[0].IsObject());
-  const mcp::JsonValue *inner_v = (*list)[0].Find("v");
+  const godot_autopilot::util::JsonValue *inner_v = (*list)[0].Find("v");
   ASSERT_NE(inner_v, nullptr);
   EXPECT_EQ(inner_v->GetInt(), 1);
-  const mcp::JsonValue *literal = seen_args.Find("literal");
+  const godot_autopilot::util::JsonValue *literal = seen_args.Find("literal");
   ASSERT_NE(literal, nullptr);
   EXPECT_EQ(literal->GetString(), "prefix $prev suffix");
 
-  const mcp::JsonValue *results = result.Find("results");
+  const godot_autopilot::util::JsonValue *results = result.Find("results");
   ASSERT_NE(results, nullptr);
   ASSERT_EQ(results->Size(), 2u);
   EXPECT_EQ(status_of((*results)[1]), "ok");
 }
 
 TEST_F(BatchRefsTest, ForwardRefError) {
-  mcp::JsonValue seen_args;
+  godot_autopilot::util::JsonValue seen_args;
   bool echo_called = false;
   register_basic_handlers(&seen_args, &echo_called);
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "echo", "args": {"x": "$steps[1].result"}},
           {"tool": "const_v1"}
@@ -152,7 +152,7 @@ TEST_F(BatchRefsTest, ForwardRefError) {
         "stop_on_error": false
       })"));
 
-  const mcp::JsonValue *results = result.Find("results");
+  const godot_autopilot::util::JsonValue *results = result.Find("results");
   ASSERT_NE(results, nullptr);
   ASSERT_EQ(results->Size(), 2u);
   EXPECT_EQ(status_of((*results)[0]), "error");
@@ -166,15 +166,15 @@ TEST_F(BatchRefsTest, ForwardRefError) {
 TEST_F(BatchRefsTest, PrevOnFirstOpError) {
   register_basic_handlers(nullptr, nullptr);
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "const_v1", "args": {"x": "$prev"}}
         ],
         "stop_on_error": false
       })"));
 
-  const mcp::JsonValue *results = result.Find("results");
+  const godot_autopilot::util::JsonValue *results = result.Find("results");
   ASSERT_NE(results, nullptr);
   ASSERT_EQ(results->Size(), 1u);
   EXPECT_EQ(status_of((*results)[0]), "error");
@@ -187,15 +187,15 @@ TEST_F(BatchRefsTest, PrevOnFirstOpError) {
 TEST_F(BatchRefsTest, WrongStatusError) {
   register_basic_handlers(nullptr, nullptr);
 
-  const mcp::JsonValue error_as_result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue error_as_result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "const_v1"},
           {"tool": "const_v1", "args": {"x": "$steps[0].error"}}
         ],
         "stop_on_error": false
       })"));
-  const mcp::JsonValue *results_a = error_as_result.Find("results");
+  const godot_autopilot::util::JsonValue *results_a = error_as_result.Find("results");
   ASSERT_NE(results_a, nullptr);
   ASSERT_EQ(results_a->Size(), 2u);
   EXPECT_EQ(status_of((*results_a)[0]), "ok");
@@ -204,15 +204,15 @@ TEST_F(BatchRefsTest, WrongStatusError) {
   EXPECT_NE(err_a.find("unresolvable reference"), std::string::npos);
   EXPECT_NE(err_a.find("wrong status"), std::string::npos);
 
-  const mcp::JsonValue result_as_error = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result_as_error = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "fail"},
           {"tool": "const_v1", "args": {"x": "$steps[0].result"}}
         ],
         "stop_on_error": false
       })"));
-  const mcp::JsonValue *results_b = result_as_error.Find("results");
+  const godot_autopilot::util::JsonValue *results_b = result_as_error.Find("results");
   ASSERT_NE(results_b, nullptr);
   ASSERT_EQ(results_b->Size(), 2u);
   EXPECT_EQ(status_of((*results_b)[0]), "error");
@@ -225,25 +225,25 @@ TEST_F(BatchRefsTest, WrongStatusError) {
 TEST_F(BatchRefsTest, RollbackOnErrorMustBeBoolean) {
   register_basic_handlers(nullptr, nullptr);
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [{"tool": "const_v1"}],
         "rollback_on_error": "yes"
       })"));
 
-  const mcp::JsonValue *error = result.Find("error");
+  const godot_autopilot::util::JsonValue *error = result.Find("error");
   ASSERT_NE(error, nullptr);
   ASSERT_TRUE(error->IsString());
   EXPECT_EQ(error->GetString(), "rollback_on_error must be a boolean");
 }
 
 TEST_F(BatchRefsTest, StopOnErrorRespected) {
-  mcp::JsonValue seen_args;
+  godot_autopilot::util::JsonValue seen_args;
   bool echo_called = false;
   register_basic_handlers(&seen_args, &echo_called);
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "const_v1"},
           {"tool": "const_v1", "args": {"x": "$steps[5].result"}},
@@ -253,7 +253,7 @@ TEST_F(BatchRefsTest, StopOnErrorRespected) {
       })"));
 
   EXPECT_FALSE(echo_called);
-  const mcp::JsonValue *results = result.Find("results");
+  const godot_autopilot::util::JsonValue *results = result.Find("results");
   ASSERT_NE(results, nullptr);
   ASSERT_EQ(results->Size(), 2u);
   EXPECT_EQ(status_of((*results)[0]), "ok");
@@ -263,19 +263,19 @@ TEST_F(BatchRefsTest, StopOnErrorRespected) {
   EXPECT_NE(error_of((*results)[1]).find("index out of range"),
             std::string::npos);
 
-  const mcp::JsonValue *total = result.Find("total");
+  const godot_autopilot::util::JsonValue *total = result.Find("total");
   ASSERT_NE(total, nullptr);
   EXPECT_EQ(total->GetInt(), 2);
-  const mcp::JsonValue *succeeded = result.Find("succeeded");
-  const mcp::JsonValue *failed = result.Find("failed");
-  const mcp::JsonValue *skipped = result.Find("skipped");
+  const godot_autopilot::util::JsonValue *succeeded = result.Find("succeeded");
+  const godot_autopilot::util::JsonValue *failed = result.Find("failed");
+  const godot_autopilot::util::JsonValue *skipped = result.Find("skipped");
   ASSERT_NE(succeeded, nullptr);
   ASSERT_NE(failed, nullptr);
   ASSERT_NE(skipped, nullptr);
   EXPECT_EQ(succeeded->GetInt(), 1);
   EXPECT_EQ(failed->GetInt(), 1);
   EXPECT_EQ(skipped->GetInt(), 1);
-  const mcp::JsonValue *note = result.Find("note");
+  const godot_autopilot::util::JsonValue *note = result.Find("note");
   ASSERT_NE(note, nullptr);
   EXPECT_NE(note->GetString().find("stopped at operation 2/3"),
             std::string::npos);
@@ -287,20 +287,20 @@ TEST_F(BatchRefsTest, ExportStartingAfterFirstStepBlocksRemainingSteps) {
   bool second_called = false;
   godot_autopilot::dispatch::replace_handlers(
       {{"start_export",
-        [&export_scope, &export_state](const mcp::JsonValue &) {
+        [&export_scope, &export_state](const godot_autopilot::util::JsonValue &) {
           export_scope = std::make_unique<godot_autopilot::ExportState::Scope>(
               export_state);
-          return mcp::JsonValue::Parse(R"({"result":1})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result":1})");
         }},
        {"after_export",
-        [&second_called](const mcp::JsonValue &) {
+        [&second_called](const godot_autopilot::util::JsonValue &) {
           second_called = true;
-          return mcp::JsonValue::Parse(R"({"result":2})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result":2})");
         }}},
       {});
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [
           {"tool": "start_export"},
           {"tool": "after_export"}
@@ -310,7 +310,7 @@ TEST_F(BatchRefsTest, ExportStartingAfterFirstStepBlocksRemainingSteps) {
   export_scope.reset();
 
   EXPECT_FALSE(second_called);
-  const mcp::JsonValue *results = result.Find("results");
+  const godot_autopilot::util::JsonValue *results = result.Find("results");
   ASSERT_NE(results, nullptr);
   ASSERT_EQ(results->Size(), 2u);
   EXPECT_EQ(status_of((*results)[0]), "ok");
@@ -328,14 +328,14 @@ TEST_F(BatchRefsTest, ExportInProgressBlocksBatchBeforeUndoSnapshot) {
   bool handler_called = false;
   godot_autopilot::dispatch::replace_handlers(
       {{"probe",
-        [&handler_called](const mcp::JsonValue &) {
+        [&handler_called](const godot_autopilot::util::JsonValue &) {
           handler_called = true;
-          return mcp::JsonValue::Parse(R"({"result":1})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result":1})");
         }}},
       {});
 
-  const mcp::JsonValue result = handle_batch_execute(
-      mcp::JsonValue::Parse(R"({
+  const godot_autopilot::util::JsonValue result = handle_batch_execute(
+      godot_autopilot::util::JsonValue::Parse(R"({
         "operations": [{"tool": "probe"}],
         "rollback_on_error": true
       })"));

@@ -4,7 +4,7 @@
 #include "tools/base/runtime_ops.hpp"
 
 #include <gtest/gtest.h>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <utility>
 
@@ -14,7 +14,7 @@ using godot_autopilot::build_cancel_request_body;
 using godot_autopilot::runtime::response_envelope::carry_transport_fields;
 using godot_autopilot::runtime_ops::build_game_timeout_receipt;
 using godot_autopilot::runtime_ops::GameTimeoutReceiptInput;
-using mcp::JsonValue;
+using godot_autopilot::util::JsonValue;
 
 GameTimeoutReceiptInput eval_timeout_input() {
   GameTimeoutReceiptInput input;

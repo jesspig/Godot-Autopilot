@@ -13,11 +13,11 @@ using godot_autopilot::util::inline_resource::kMaxDepth;
 using godot_autopilot::util::inline_resource::nested_depth;
 
 Description inspect_json(const std::string &json) {
-  return inspect(mcp::JsonValue::Parse(json));
+  return inspect(godot_autopilot::util::JsonValue::Parse(json));
 }
 
 int depth_of(const std::string &json) {
-  return nested_depth(mcp::JsonValue::Parse(json));
+  return nested_depth(godot_autopilot::util::JsonValue::Parse(json));
 }
 
 const char kChainOfTwo[] = R"({

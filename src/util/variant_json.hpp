@@ -2,17 +2,17 @@
 #define GODOT_AUTOPILOT_VARIANT_JSON_HPP
 
 #include <godot_cpp/variant/variant.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 
 bool node_ref_path_is_safe(const std::string &path);
 
 struct VariantJson {
-  static mcp::JsonValue serialize(const godot::Variant &v);
-  static godot::Variant deserialize(const mcp::JsonValue &j,
+  static godot_autopilot::util::JsonValue serialize(const godot::Variant &v);
+  static godot::Variant deserialize(const godot_autopilot::util::JsonValue &j,
                                     const std::string &type_hint = "");
-  static godot::Variant deserialize_strict(const mcp::JsonValue &j,
+  static godot::Variant deserialize_strict(const godot_autopilot::util::JsonValue &j,
                                            const std::string &type_hint);
 };
 

@@ -17,7 +17,7 @@
 namespace godot_autopilot {
 namespace spriteframes_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -234,7 +234,7 @@ JV handle_add_frame(const JV &args) {
   return r;
 }
 
-mcp::JsonValue handle_update_spriteframes(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_update_spriteframes(const godot_autopilot::util::JsonValue &args) {
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     return util::error_json("missing required parameter: action");

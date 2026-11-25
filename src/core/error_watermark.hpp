@@ -5,7 +5,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace error_watermark {
@@ -51,20 +51,20 @@ inline int64_t consume_new_errors(
   return total;
 }
 
-inline bool object_has_error(const mcp::JsonValue &object) {
+inline bool object_has_error(const godot_autopilot::util::JsonValue &object) {
   if (!object.IsObject()) {
     return false;
   }
   if (object.Find("error") != nullptr) {
     return true;
   }
-  if (const mcp::JsonValue *runtime = object.Find("runtime_error");
+  if (const godot_autopilot::util::JsonValue *runtime = object.Find("runtime_error");
       runtime != nullptr && runtime->IsBool() && runtime->GetBool()) {
     return true;
   }
-  if (const mcp::JsonValue *structured = object.Find("structured_error");
+  if (const godot_autopilot::util::JsonValue *structured = object.Find("structured_error");
       structured != nullptr && structured->IsObject()) {
-    if (const mcp::JsonValue *code = structured->Find("code");
+    if (const godot_autopilot::util::JsonValue *code = structured->Find("code");
         code != nullptr && code->IsString() && !code->GetString().empty()) {
       return true;
     }
@@ -72,12 +72,12 @@ inline bool object_has_error(const mcp::JsonValue &object) {
   return false;
 }
 
-inline int64_t count_response_errors(const mcp::JsonValue &response) {
+inline int64_t count_response_errors(const godot_autopilot::util::JsonValue &response) {
   if (!response.IsObject()) {
     return 0;
   }
   int64_t count = object_has_error(response) ? 1 : 0;
-  if (const mcp::JsonValue *results = response.Find("results");
+  if (const godot_autopilot::util::JsonValue *results = response.Find("results");
       results != nullptr && results->IsArray()) {
     for (const auto &item : results->GetArray()) {
       if (object_has_error(item)) {

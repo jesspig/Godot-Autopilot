@@ -24,8 +24,8 @@ godot_autopilot::ToolSpec make_plain_spec() {
   spec.category = "Test";
   spec.side_effect = godot_autopilot::SideEffect::None;
   spec.flags = godot_autopilot::tool_flags::kNone;
-  spec.handler = [](const mcp::JsonValue &) {
-    return mcp::JsonValue(mcp::JsonValue::object_tag);
+  spec.handler = [](const godot_autopilot::util::JsonValue &) {
+    return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   };
   return spec;
 }
@@ -33,7 +33,7 @@ godot_autopilot::ToolSpec make_plain_spec() {
 } // namespace
 
 TEST(ToolPipelineTraitsTest, AttachImageDataTopLevel) {
-  mcp::JsonValue result = mcp::JsonValue::Parse(
+  godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
       R"({"data":"QUJD","format":"png","width":640,"height":480})");
   std::vector<mcp::ContentVariant> content;
   ASSERT_TRUE(
@@ -50,8 +50,8 @@ TEST(ToolPipelineTraitsTest, AttachImageDataTopLevel) {
 }
 
 TEST(ToolPipelineTraitsTest, RejectNonPngFormat) {
-  mcp::JsonValue result =
-      mcp::JsonValue::Parse(R"({"data":"QUJD","format":"jpg"})");
+  godot_autopilot::util::JsonValue result =
+      godot_autopilot::util::JsonValue::Parse(R"({"data":"QUJD","format":"jpg"})");
   std::vector<mcp::ContentVariant> content;
   std::string reason;
   EXPECT_FALSE(
@@ -63,8 +63,8 @@ TEST(ToolPipelineTraitsTest, RejectNonPngFormat) {
 }
 
 TEST(ToolPipelineTraitsTest, RejectMissingData) {
-  mcp::JsonValue result =
-      mcp::JsonValue::Parse(R"({"result":{"width":100,"height":50}})");
+  godot_autopilot::util::JsonValue result =
+      godot_autopilot::util::JsonValue::Parse(R"({"result":{"width":100,"height":50}})");
   std::vector<mcp::ContentVariant> content;
   EXPECT_FALSE(
       godot_autopilot::util::try_attach_image_data(result, content));
@@ -74,12 +74,12 @@ TEST(ToolPipelineTraitsTest, RejectMissingData) {
 
 TEST(ToolPipelineTraitsTest, RunPostWithoutFlagsPassesThrough) {
   godot_autopilot::ToolSpec spec = make_plain_spec();
-  mcp::JsonValue args =
-      mcp::JsonValue::Parse(R"({"observe":true})");
-  mcp::JsonValue result = mcp::JsonValue::Parse(
+  godot_autopilot::util::JsonValue args =
+      godot_autopilot::util::JsonValue::Parse(R"({"observe":true})");
+  godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
       R"({"result":{"ok":true,"width":100}})");
   const std::string before = result.Dump();
-  mcp::JsonValue out =
+  godot_autopilot::util::JsonValue out =
       godot_autopilot::pipeline::run_post(spec, args, std::move(result));
   EXPECT_EQ(out.Dump(), before);
   EXPECT_FALSE(out["result"].Contains("observe_error"));

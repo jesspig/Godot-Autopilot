@@ -14,7 +14,7 @@ namespace godot_autopilot {
 namespace resources {
 
 struct ResourceValueRedaction {
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool redacted = false;
 };
 
@@ -45,34 +45,34 @@ inline bool resource_value_is_sensitive(
 }
 
 inline ResourceValueRedaction redact_resource_value(
-    const std::string &key, const mcp::JsonValue &value,
+    const std::string &key, const godot_autopilot::util::JsonValue &value,
     const std::map<std::string, std::string> &metadata = {},
     const std::vector<std::string> &allowed_keys = {}) {
   if (sanitize_policy::sensitive_key_is_allowed(key, allowed_keys)) {
     return {value, false};
   }
   if (resource_value_is_sensitive(key, metadata)) {
-    return {mcp::JsonValue(sanitize_policy::kRedactedValue), true};
+    return {godot_autopilot::util::JsonValue(sanitize_policy::kRedactedValue), true};
   }
   sanitize_policy::RedactionResult redacted =
       sanitize_policy::redact_sensitive_values(value, allowed_keys);
   return {std::move(redacted.value), redacted.redacted};
 }
 
-inline mcp::JsonValue resource_value_response(
+inline godot_autopilot::util::JsonValue resource_value_response(
     const ResourceValueRedaction &redaction) {
   if (!redaction.redacted) {
     return redaction.value;
   }
-  mcp::JsonValue response(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue response(godot_autopilot::util::JsonValue::object_tag);
   response["value"] = redaction.value;
-  response["redacted"] = mcp::JsonValue(true);
+  response["redacted"] = godot_autopilot::util::JsonValue(true);
   return response;
 }
 
-inline mcp::JsonValue redacted_resource_response() {
+inline godot_autopilot::util::JsonValue redacted_resource_response() {
   return resource_value_response(
-      {mcp::JsonValue(sanitize_policy::kRedactedValue), true});
+      {godot_autopilot::util::JsonValue(sanitize_policy::kRedactedValue), true});
 }
 
 } // namespace resources

@@ -2,7 +2,7 @@
 #define GODOT_AUTOPILOT_TOOL_INVOKE_HPP
 
 #include <cstdint>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,7 +12,7 @@ namespace tools {
 
 constexpr int kMaxInvokeDepth = 8;
 
-mcp::JsonValue invoke_tool(const std::string &name, const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue invoke_tool(const std::string &name, const godot_autopilot::util::JsonValue &args);
 
 int invoke_depth();
 

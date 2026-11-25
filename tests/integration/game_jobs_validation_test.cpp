@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <string>
 
@@ -15,17 +15,17 @@ class GameJobsSuite : public IntegrationHarnessWithAllow {
   GameJobsSuite() : IntegrationHarnessWithAllow("game_runtime") {}
 };
 
-mcp::JsonValue make_args() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue make_args() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-mcp::JsonValue start_args() {
-  mcp::JsonValue args = make_args();
-  args["confirm"] = mcp::JsonValue(true);
+godot_autopilot::util::JsonValue start_args() {
+  godot_autopilot::util::JsonValue args = make_args();
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
   return args;
 }
 
-void assert_exact_error(const mcp::JsonValue &result,
+void assert_exact_error(const godot_autopilot::util::JsonValue &result,
                         const std::string &expected) {
   const auto *v = result.Find("error");
   ASSERT_NE(v, nullptr) << result.Dump();
@@ -34,25 +34,25 @@ void assert_exact_error(const mcp::JsonValue &result,
 }
 
 TEST_F(GameJobsSuite, StartGameJobMissingOp) {
-  mcp::JsonValue result = call("start_game_job", start_args());
+  godot_autopilot::util::JsonValue result = call("start_game_job", start_args());
   assert_exact_error(
       result, "missing required parameter: op (currently only \"eval\")");
 }
 
 TEST_F(GameJobsSuite, StartGameJobUnsupportedOp) {
-  mcp::JsonValue args = start_args();
-  args["op"] = mcp::JsonValue("status");
+  godot_autopilot::util::JsonValue args = start_args();
+  args["op"] = godot_autopilot::util::JsonValue("status");
   args["params"] = make_args();
-  mcp::JsonValue result = call("start_game_job", args);
+  godot_autopilot::util::JsonValue result = call("start_game_job", args);
   assert_exact_error(
       result,
       "unsupported op: status — start_game_job currently supports op \"eval\" only");
 }
 
 TEST_F(GameJobsSuite, StartGameJobMissingParams) {
-  mcp::JsonValue args = start_args();
-  args["op"] = mcp::JsonValue("eval");
-  mcp::JsonValue result = call("start_game_job", args);
+  godot_autopilot::util::JsonValue args = start_args();
+  args["op"] = godot_autopilot::util::JsonValue("eval");
+  godot_autopilot::util::JsonValue result = call("start_game_job", args);
   assert_exact_error(
       result,
       "missing required parameter: params (object passed to the wrapped op "
@@ -60,26 +60,26 @@ TEST_F(GameJobsSuite, StartGameJobMissingParams) {
 }
 
 TEST_F(GameJobsSuite, StartGameJobTimeoutOutOfRange) {
-  mcp::JsonValue args = start_args();
-  args["op"] = mcp::JsonValue("eval");
-  mcp::JsonValue params = make_args();
-  params["action"] = mcp::JsonValue("script");
-  params["source_code"] = mcp::JsonValue("func _run() -> void: pass");
+  godot_autopilot::util::JsonValue args = start_args();
+  args["op"] = godot_autopilot::util::JsonValue("eval");
+  godot_autopilot::util::JsonValue params = make_args();
+  params["action"] = godot_autopilot::util::JsonValue("script");
+  params["source_code"] = godot_autopilot::util::JsonValue("func _run() -> void: pass");
   args["params"] = std::move(params);
-  args["timeout_ms"] = mcp::JsonValue(25001);
-  mcp::JsonValue result = call("start_game_job", args);
+  args["timeout_ms"] = godot_autopilot::util::JsonValue(25001);
+  godot_autopilot::util::JsonValue result = call("start_game_job", args);
   assert_exact_error(result,
                      "timeout_ms must be an integer between 1 and 25000");
 }
 
 TEST_F(GameJobsSuite, StartGameJobValidArgsNoGameReturnsRuntimeError) {
-  mcp::JsonValue args = start_args();
-  args["op"] = mcp::JsonValue("eval");
-  mcp::JsonValue params = make_args();
-  params["action"] = mcp::JsonValue("script");
-  params["source_code"] = mcp::JsonValue("func _run() -> void: pass");
+  godot_autopilot::util::JsonValue args = start_args();
+  args["op"] = godot_autopilot::util::JsonValue("eval");
+  godot_autopilot::util::JsonValue params = make_args();
+  params["action"] = godot_autopilot::util::JsonValue("script");
+  params["source_code"] = godot_autopilot::util::JsonValue("func _run() -> void: pass");
   args["params"] = std::move(params);
-  mcp::JsonValue result = call("start_game_job", args);
+  godot_autopilot::util::JsonValue result = call("start_game_job", args);
   const auto *error = result.Find("error");
   ASSERT_NE(error, nullptr) << result.Dump();
   ASSERT_TRUE(error->IsString()) << result.Dump();
@@ -91,16 +91,16 @@ TEST_F(GameJobsSuite, StartGameJobValidArgsNoGameReturnsRuntimeError) {
 }
 
 TEST_F(GameJobsSuite, GetGameJobMissingJobId) {
-  mcp::JsonValue result = call("get_game_job", make_args());
+  godot_autopilot::util::JsonValue result = call("get_game_job", make_args());
   assert_exact_error(
       result,
       "missing required parameter: job_id (integer returned by start_game_job)");
 }
 
 TEST_F(GameJobsSuite, GetGameJobUnknownJobIdFourPartError) {
-  mcp::JsonValue args = make_args();
-  args["job_id"] = mcp::JsonValue(999999);
-  mcp::JsonValue result = call("get_game_job", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["job_id"] = godot_autopilot::util::JsonValue(999999);
+  godot_autopilot::util::JsonValue result = call("get_game_job", args);
   assert_exact_error(
       result,
       "unknown or already collected game job: 999999"
@@ -112,18 +112,18 @@ TEST_F(GameJobsSuite, GetGameJobUnknownJobIdFourPartError) {
 }
 
 TEST_F(GameJobsSuite, GetGameJobCancelWrongType) {
-  mcp::JsonValue args = make_args();
-  args["job_id"] = mcp::JsonValue(1);
-  args["cancel"] = mcp::JsonValue("yes");
-  mcp::JsonValue result = call("get_game_job", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["job_id"] = godot_autopilot::util::JsonValue(1);
+  args["cancel"] = godot_autopilot::util::JsonValue("yes");
+  godot_autopilot::util::JsonValue result = call("get_game_job", args);
   assert_exact_error(result, "cancel must be a boolean");
 }
 
 TEST_F(GameJobsSuite, GetGameJobTimeoutNegative) {
-  mcp::JsonValue args = make_args();
-  args["job_id"] = mcp::JsonValue(1);
-  args["timeout_ms"] = mcp::JsonValue(-1);
-  mcp::JsonValue result = call("get_game_job", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["job_id"] = godot_autopilot::util::JsonValue(1);
+  args["timeout_ms"] = godot_autopilot::util::JsonValue(-1);
+  godot_autopilot::util::JsonValue result = call("get_game_job", args);
   assert_exact_error(result,
                      "timeout_ms must be an integer between 0 and 25000");
 }

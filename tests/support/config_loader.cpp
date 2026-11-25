@@ -24,7 +24,7 @@ constexpr const char *kKnownCapabilities[] = {
     throw RuntimeError(path + ": " + msg);
 }
 
-std::string TypeName(const mcp::JsonValue& v) {
+std::string TypeName(const godot_autopilot::util::JsonValue& v) {
     if (v.IsNull())   return "null";
     if (v.IsBool())   return "bool";
     if (v.IsInt())    return "integer";
@@ -37,7 +37,7 @@ std::string TypeName(const mcp::JsonValue& v) {
 
 } // namespace
 
-void RequireType(const mcp::JsonValue& v, const std::string& path, const std::string& expected) {
+void RequireType(const godot_autopilot::util::JsonValue& v, const std::string& path, const std::string& expected) {
     if (!v.IsObject() && expected == "object")  return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
     if (!v.IsArray() && expected == "array")    return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
     if (!v.IsString() && expected == "string")  return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
@@ -48,7 +48,7 @@ void RequireType(const mcp::JsonValue& v, const std::string& path, const std::st
 
 namespace {
 
-void RejectUnknown(const mcp::JsonValue& v, std::initializer_list<const char*> allowed,
+void RejectUnknown(const godot_autopilot::util::JsonValue& v, std::initializer_list<const char*> allowed,
                    const std::string& path) {
     if (!v.IsObject()) return;
     for (const auto& entry : v.GetObject()) {
@@ -80,56 +80,56 @@ std::string ReadFile(const std::string& json_path) {
     return ss.str();
 }
 
-std::string ParseOptionalId(const mcp::JsonValue& v, const std::string& path) {
-    const mcp::JsonValue* id = v.Find("id");
+std::string ParseOptionalId(const godot_autopilot::util::JsonValue& v, const std::string& path) {
+    const godot_autopilot::util::JsonValue* id = v.Find("id");
     if (!id) return "";
     RequireType(*id, path + ".id", "string");
     return id->GetString();
 }
 
-StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
+StepExpect ParseExpect(const godot_autopilot::util::JsonValue& v, const std::string& path) {
     StepExpect exp;
     RejectUnknown(v, {"has_keys", "field_checks", "allow_error"}, path);
-    if (const mcp::JsonValue* ae = v.Find("allow_error")) {
+    if (const godot_autopilot::util::JsonValue* ae = v.Find("allow_error")) {
         RequireType(*ae, path + ".allow_error", "bool");
         exp.allow_error = ae->GetBool();
     }
-    if (const mcp::JsonValue* hk = v.Find("has_keys")) {
+    if (const godot_autopilot::util::JsonValue* hk = v.Find("has_keys")) {
         RequireType(*hk, path + ".has_keys", "array");
-        const mcp::JsonValue::Array& arr = hk->GetArray();
+        const godot_autopilot::util::JsonValue::Array& arr = hk->GetArray();
         for (size_t i = 0; i < arr.size(); ++i) {
             const std::string item_path = path + ".has_keys[" + std::to_string(i) + "]";
             RequireType(arr[i], item_path, "string");
             exp.has_keys.push_back(arr[i].GetString());
         }
     }
-    if (const mcp::JsonValue* fc = v.Find("field_checks")) {
+    if (const godot_autopilot::util::JsonValue* fc = v.Find("field_checks")) {
         RequireType(*fc, path + ".field_checks", "array");
-        const mcp::JsonValue::Array& arr = fc->GetArray();
+        const godot_autopilot::util::JsonValue::Array& arr = fc->GetArray();
         for (size_t i = 0; i < arr.size(); ++i) {
             const std::string item_path = path + ".field_checks[" + std::to_string(i) + "]";
             RequireType(arr[i], item_path, "object");
             RejectUnknown(arr[i], {"key", "value", "not_empty", "not_contains", "allow_error"},
                           item_path);
             StepExpect::FieldCheck check;
-            const mcp::JsonValue* key = arr[i].Find("key");
+            const godot_autopilot::util::JsonValue* key = arr[i].Find("key");
             if (!key) Fail(item_path, "缺少必填字段 key");
             RequireType(*key, item_path + ".key", "string");
             check.key = key->GetString();
-            if (const mcp::JsonValue* val = arr[i].Find("value")) {
+            if (const godot_autopilot::util::JsonValue* val = arr[i].Find("value")) {
                 check.has_value = true;
                 check.value = *val;
             }
-            if (const mcp::JsonValue* ne = arr[i].Find("not_empty")) {
+            if (const godot_autopilot::util::JsonValue* ne = arr[i].Find("not_empty")) {
                 RequireType(*ne, item_path + ".not_empty", "bool");
                 check.not_empty = ne->GetBool();
             }
-            if (const mcp::JsonValue* nc = arr[i].Find("not_contains")) {
+            if (const godot_autopilot::util::JsonValue* nc = arr[i].Find("not_contains")) {
                 RequireType(*nc, item_path + ".not_contains", "string");
                 check.has_not_contains = true;
                 check.not_contains = nc->GetString();
             }
-            if (const mcp::JsonValue* ae = arr[i].Find("allow_error")) {
+            if (const godot_autopilot::util::JsonValue* ae = arr[i].Find("allow_error")) {
                 RequireType(*ae, item_path + ".allow_error", "bool");
                 exp.allow_error = exp.allow_error || ae->GetBool();
             }
@@ -139,48 +139,48 @@ StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
     return exp;
 }
 
-Step ParseToolStep(const mcp::JsonValue& v, const std::string& path) {
+Step ParseToolStep(const godot_autopilot::util::JsonValue& v, const std::string& path) {
     Step step;
     RejectUnknown(v, {"tool", "traverse", "id", "args", "expect", "soft_error"}, path);
     const std::string id = ParseOptionalId(v, path);
-    const mcp::JsonValue* tool = v.Find("tool");
+    const godot_autopilot::util::JsonValue* tool = v.Find("tool");
     if (!tool) Fail(path, "缺少必填字段 tool");
     RequireType(*tool, path + ".tool", "string");
     step.tool = tool->GetString();
     step.id = id.empty() ? step.tool : id;
-    if (const mcp::JsonValue* args = v.Find("args")) {
+    if (const godot_autopilot::util::JsonValue* args = v.Find("args")) {
         RequireType(*args, path + ".args", "object");
         step.args = *args;
     } else {
-        step.args = mcp::JsonValue(mcp::JsonValue::object_tag);
+        step.args = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     }
-    if (const mcp::JsonValue* expect = v.Find("expect")) {
+    if (const godot_autopilot::util::JsonValue* expect = v.Find("expect")) {
         RequireType(*expect, path + ".expect", "object");
         step.expect = ParseExpect(*expect, path + ".expect");
         if (step.expect.has_keys.empty() && step.expect.field_checks.empty())
             Fail(path + ".expect", "空的 expect 无断言，删除该字段或补充 has_keys/field_checks");
     }
-    if (const mcp::JsonValue* soft = v.Find("soft_error")) {
+    if (const godot_autopilot::util::JsonValue* soft = v.Find("soft_error")) {
         RequireType(*soft, path + ".soft_error", "string");
         step.soft_error = soft->GetString();
     }
     return step;
 }
 
-Step ParseTraverseStep(const mcp::JsonValue& v, const std::string& path, size_t index) {
+Step ParseTraverseStep(const godot_autopilot::util::JsonValue& v, const std::string& path, size_t index) {
     Step step;
     const std::string id = ParseOptionalId(v, path);
     step.id = id.empty() ? ("step_" + std::to_string(index)) : id;
-    const mcp::JsonValue* trav = v.Find("traverse");
+    const godot_autopilot::util::JsonValue* trav = v.Find("traverse");
     RequireType(*trav, path + ".traverse", "object");
-    const mcp::JsonValue* kind = trav->Find("kind");
+    const godot_autopilot::util::JsonValue* kind = trav->Find("kind");
     if (!kind) Fail(path + ".traverse.kind", "缺少必填字段 kind");
     RequireType(*kind, path + ".traverse.kind", "string");
     if (kind->GetString() != "domain_tools") {
         Fail(path + ".traverse.kind", "仅支持 \"domain_tools\"，实际是 \"" + kind->GetString() + "\"");
     }
     step.traverse_kind = kind->GetString();
-    const mcp::JsonValue* mode = trav->Find("mode");
+    const godot_autopilot::util::JsonValue* mode = trav->Find("mode");
     if (mode) {
         RequireType(*mode, path + ".traverse.mode", "string");
         const std::string& m = mode->GetString();
@@ -194,7 +194,7 @@ Step ParseTraverseStep(const mcp::JsonValue& v, const std::string& path, size_t 
     return step;
 }
 
-Step ParseStageStep(const mcp::JsonValue& v, const std::string& path, size_t index) {
+Step ParseStageStep(const godot_autopilot::util::JsonValue& v, const std::string& path, size_t index) {
     if (!v.IsObject()) Fail(path, "必须是 object");
     const bool has_tool = v.Contains("tool");
     const bool has_traverse = v.Contains("traverse");
@@ -205,16 +205,16 @@ Step ParseStageStep(const mcp::JsonValue& v, const std::string& path, size_t ind
     return ParseTraverseStep(v, path, index);
 }
 
-Step ParsePlainStep(const mcp::JsonValue& v, const std::string& path) {
+Step ParsePlainStep(const godot_autopilot::util::JsonValue& v, const std::string& path) {
     if (!v.IsObject()) Fail(path, "必须是 object");
     if (v.Contains("traverse")) Fail(path + ".traverse", "before_all/after_all 步骤不支持 traverse");
     if (v.Contains("expect"))   Fail(path + ".expect", "before_all/after_all 步骤不支持 expect");
     return ParseToolStep(v, path);
 }
 
-std::vector<Step> ParseStepsArray(const mcp::JsonValue& arr, const std::string& path, bool allow_traverse) {
+std::vector<Step> ParseStepsArray(const godot_autopilot::util::JsonValue& arr, const std::string& path, bool allow_traverse) {
     std::vector<Step> out;
-    const mcp::JsonValue::Array& elems = arr.GetArray();
+    const godot_autopilot::util::JsonValue::Array& elems = arr.GetArray();
     for (size_t i = 0; i < elems.size(); ++i) {
         const std::string item_path = path + "[" + std::to_string(i) + "]";
         out.push_back(allow_traverse ? ParseStageStep(elems[i], item_path, i)
@@ -227,9 +227,9 @@ std::vector<Step> ParseStepsArray(const mcp::JsonValue& arr, const std::string& 
 
 TestCase load_test_case(const std::string& json_path) {
     const std::string text = ReadFile(json_path);
-    mcp::JsonValue root;
+    godot_autopilot::util::JsonValue root;
     try {
-        root = mcp::JsonValue::Parse(text);
+        root = godot_autopilot::util::JsonValue::Parse(text);
     } catch (const std::runtime_error&) {
         throw RuntimeError(json_path + ": JSON 语法错误");
     }
@@ -237,22 +237,22 @@ TestCase load_test_case(const std::string& json_path) {
     RejectUnknown(root, {"name", "description", "headless", "pipeline", "requires"}, "");
 
     TestCase tc;
-    const mcp::JsonValue* name = root.Find("name");
+    const godot_autopilot::util::JsonValue* name = root.Find("name");
     if (!name) Fail("name", "缺少必填字段");
     RequireType(*name, "name", "string");
     tc.name = name->GetString();
 
-    if (const mcp::JsonValue* desc = root.Find("description")) {
+    if (const godot_autopilot::util::JsonValue* desc = root.Find("description")) {
         RequireType(*desc, "description", "string");
         tc.description = desc->GetString();
     }
-    if (const mcp::JsonValue* hl = root.Find("headless")) {
+    if (const godot_autopilot::util::JsonValue* hl = root.Find("headless")) {
         RequireType(*hl, "headless", "bool");
         tc.headless = hl->GetBool();
     }
-    if (const mcp::JsonValue* req = root.Find("requires")) {
+    if (const godot_autopilot::util::JsonValue* req = root.Find("requires")) {
         RequireType(*req, "requires", "array");
-        const mcp::JsonValue::Array& caps = req->GetArray();
+        const godot_autopilot::util::JsonValue::Array& caps = req->GetArray();
         for (size_t i = 0; i < caps.size(); ++i) {
             const std::string item_path = "requires[" + std::to_string(i) + "]";
             RequireType(caps[i], item_path, "string");
@@ -273,12 +273,12 @@ TestCase load_test_case(const std::string& json_path) {
         }
     }
 
-    const mcp::JsonValue* pipe = root.Find("pipeline");
+    const godot_autopilot::util::JsonValue* pipe = root.Find("pipeline");
     if (!pipe) Fail("pipeline", "缺少必填字段");
     RequireType(*pipe, "pipeline", "object");
     RejectUnknown(*pipe, {"on_failure", "before_all", "stages", "after_all"}, "pipeline");
 
-    if (const mcp::JsonValue* of = pipe->Find("on_failure")) {
+    if (const godot_autopilot::util::JsonValue* of = pipe->Find("on_failure")) {
         RequireType(*of, "pipeline.on_failure", "string");
         const std::string& s = of->GetString();
         if (s != "fail_fast" && s != "continue") {
@@ -289,22 +289,22 @@ TestCase load_test_case(const std::string& json_path) {
         tc.on_failure = "fail_fast";
     }
 
-    if (const mcp::JsonValue* ba = pipe->Find("before_all")) {
+    if (const godot_autopilot::util::JsonValue* ba = pipe->Find("before_all")) {
         RequireType(*ba, "pipeline.before_all", "array");
         tc.before_all = ParseStepsArray(*ba, "pipeline.before_all", false);
     }
-    if (const mcp::JsonValue* stages = pipe->Find("stages")) {
+    if (const godot_autopilot::util::JsonValue* stages = pipe->Find("stages")) {
         RequireType(*stages, "pipeline.stages", "array");
-        const mcp::JsonValue::Array& stage_list = stages->GetArray();
+        const godot_autopilot::util::JsonValue::Array& stage_list = stages->GetArray();
         for (size_t i = 0; i < stage_list.size(); ++i) {
             const std::string stage_path = "pipeline.stages[" + std::to_string(i) + "]";
-            const mcp::JsonValue& stage = stage_list[i];
+            const godot_autopilot::util::JsonValue& stage = stage_list[i];
             RequireType(stage, stage_path, "object");
             RejectUnknown(stage, {"id", "steps"}, stage_path);
-            if (const mcp::JsonValue* sid = stage.Find("id")) {
+            if (const godot_autopilot::util::JsonValue* sid = stage.Find("id")) {
                 RequireType(*sid, stage_path + ".id", "string");
             }
-            const mcp::JsonValue* steps = stage.Find("steps");
+            const godot_autopilot::util::JsonValue* steps = stage.Find("steps");
             if (!steps) Fail(stage_path, "缺少必填字段 steps");
             RequireType(*steps, stage_path + ".steps", "array");
             std::vector<Step> parsed = ParseStepsArray(*steps, stage_path + ".steps", true);
@@ -313,7 +313,7 @@ TestCase load_test_case(const std::string& json_path) {
                             std::make_move_iterator(parsed.end()));
         }
     }
-    if (const mcp::JsonValue* aa = pipe->Find("after_all")) {
+    if (const godot_autopilot::util::JsonValue* aa = pipe->Find("after_all")) {
         RequireType(*aa, "pipeline.after_all", "array");
         tc.after_all = ParseStepsArray(*aa, "pipeline.after_all", false);
     }

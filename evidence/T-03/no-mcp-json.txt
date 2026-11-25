@@ -1,0 +1,3 @@
+no-mcp-json-guard: strict mode: 0 occurrence(s) in 0 file(s)
+no-mcp-json-guard: mcp-json-value-type 0 occurrence(s)
+no-mcp-json-guard: mcp-json-value-include 0 occurrence(s)

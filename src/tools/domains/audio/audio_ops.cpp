@@ -153,7 +153,7 @@ constexpr int kDefaultWavMixRate = 44100;
 constexpr int kMinWavMixRate = 1000;
 constexpr int kMaxWavMixRate = 192000;
 
-bool parse_wav_name(const mcp::JsonValue &args, std::string &out_name,
+bool parse_wav_name(const godot_autopilot::util::JsonValue &args, std::string &out_name,
                     std::string &out_error) {
   out_name.clear();
   out_error.clear();
@@ -166,7 +166,7 @@ bool parse_wav_name(const mcp::JsonValue &args, std::string &out_name,
   return true;
 }
 
-bool parse_wav_format(const mcp::JsonValue &args, int &out_bits,
+bool parse_wav_format(const godot_autopilot::util::JsonValue &args, int &out_bits,
                       std::string &out_error) {
   out_bits = 16;
   out_error.clear();
@@ -182,7 +182,7 @@ bool parse_wav_format(const mcp::JsonValue &args, int &out_bits,
   return true;
 }
 
-bool parse_wav_mix_rate(const mcp::JsonValue &args, int fallback_rate,
+bool parse_wav_mix_rate(const godot_autopilot::util::JsonValue &args, int fallback_rate,
                         int &out_rate, std::string &out_error) {
   out_rate = fallback_rate;
   out_error.clear();
@@ -199,7 +199,7 @@ bool parse_wav_mix_rate(const mcp::JsonValue &args, int fallback_rate,
   return true;
 }
 
-bool parse_wav_stereo(const mcp::JsonValue &args, bool &out_stereo,
+bool parse_wav_stereo(const godot_autopilot::util::JsonValue &args, bool &out_stereo,
                       std::string &out_error) {
   out_stereo = false;
   out_error.clear();
@@ -268,28 +268,28 @@ godot::Ref<godot::AudioStreamWAV> instantiate_wav(std::string &out_error) {
   return wav;
 }
 
-mcp::JsonValue wav_locator(const std::string &name,
+godot_autopilot::util::JsonValue wav_locator(const std::string &name,
                            const godot::Ref<godot::AudioStreamWAV> &wav,
                            int format_bits, int mix_rate, bool stereo,
                            int64_t frames) {
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
-  info["class"] = mcp::JsonValue("AudioStreamWAV");
-  info["name"] = mcp::JsonValue(name);
-  info["path"] = mcp::JsonValue("memory://" + name);
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+  info["class"] = godot_autopilot::util::JsonValue("AudioStreamWAV");
+  info["name"] = godot_autopilot::util::JsonValue(name);
+  info["path"] = godot_autopilot::util::JsonValue("memory://" + name);
   info["object_id"] =
-      mcp::JsonValue(static_cast<int64_t>(wav->get_instance_id()));
-  info["object_id_str"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(wav->get_instance_id()));
+  info["object_id_str"] = godot_autopilot::util::JsonValue(
       std::to_string(static_cast<int64_t>(wav->get_instance_id())));
-  info["format"] = mcp::JsonValue(static_cast<int64_t>(format_bits));
-  info["mix_rate"] = mcp::JsonValue(static_cast<int64_t>(mix_rate));
-  info["stereo"] = mcp::JsonValue(stereo);
-  info["frames"] = mcp::JsonValue(frames);
+  info["format"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(format_bits));
+  info["mix_rate"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(mix_rate));
+  info["stereo"] = godot_autopilot::util::JsonValue(stereo);
+  info["frames"] = godot_autopilot::util::JsonValue(frames);
   return info;
 }
 
 } // namespace
 
-mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_get_layout(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_bus_layout called");
   auto *server = godot::AudioServer::get_singleton();
@@ -305,9 +305,9 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
     action = action_p->GetString();
   }
   if (action == "count") {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] =
-        mcp::JsonValue(static_cast<int64_t>(server->get_bus_count()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(server->get_bus_count()));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "get_audio_bus_layout completed");
     return r;
@@ -323,8 +323,8 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
       return util::error_json("audio bus not found at index: " +
                               std::to_string(index));
     }
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["result"] = godot_autopilot::util::JsonValue(util::to_std(server->get_bus_name(index)));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "get_audio_bus_layout completed");
     return r;
@@ -336,14 +336,14 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
   }
   auto layout = server->generate_bus_layout();
   auto serialized = VariantJson::serialize(layout);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(serialized);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_bus_layout completed");
   return r;
 }
 
-mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_set_layout(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_layout called");
   auto *server = godot::AudioServer::get_singleton();
@@ -362,10 +362,10 @@ mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
   server->set_bus_layout(layout);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_layout completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_set_volume(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_volume_db called");
   auto *server = godot::AudioServer::get_singleton();
@@ -389,10 +389,10 @@ mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
   server->set_bus_volume_db(idx, vol);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_volume_db completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_set_mute(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_mute called");
   auto *server = godot::AudioServer::get_singleton();
@@ -415,10 +415,10 @@ mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
   server->set_bus_mute(idx, mu->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_mute completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_set_bypass(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_bypass_effects called");
   auto *server = godot::AudioServer::get_singleton();
@@ -441,10 +441,10 @@ mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
   server->set_bus_bypass_effects(idx, bp->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_bypass_effects completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_effect_add(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_audio_bus_effect called");
   auto *server = godot::AudioServer::get_singleton();
@@ -487,10 +487,10 @@ mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
   server->add_bus_effect(idx, effect_ref, position);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_audio_bus_effect completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_effect_remove(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "remove_audio_bus_effect called");
   auto *server = godot::AudioServer::get_singleton();
@@ -515,10 +515,10 @@ mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
   server->remove_bus_effect(bus_idx, effect_idx);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "remove_audio_bus_effect completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stream_play(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "play_audio_player called");
   auto *np = args.Find("node_path");
@@ -578,10 +578,10 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
   ap.play(from_pos);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "play_audio_player completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stream_stop(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_audio_player called");
   auto *np = args.Find("node_path");
@@ -604,10 +604,10 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
   ap.stop();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_audio_player completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stream_set_volume(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_player_volume_db called");
   auto *np = args.Find("node_path");
@@ -635,10 +635,10 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
   ap.set_volume_db(vol);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_player_volume_db completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stream_set_pitch(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_player_pitch_scale called");
   auto *np = args.Find("node_path");
@@ -666,10 +666,10 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
   ap.set_pitch_scale(pitch);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_player_pitch_scale completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stream_get_playback_position(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_player_playback_position called");
   auto *np = args.Find("node_path");
@@ -690,14 +690,14 @@ mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue &args) {
         path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   float pos = ap.get_playback_position();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(static_cast<double>(pos));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue(static_cast<double>(pos));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_player_playback_position completed");
   return r;
 }
 
-mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stream_seek(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "seek_audio_player called");
   auto *np = args.Find("node_path");
@@ -725,10 +725,10 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args) {
   ap.seek(to_pos);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "seek_audio_player completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_set_solo(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_solo called");
   auto *server = godot::AudioServer::get_singleton();
@@ -751,10 +751,10 @@ mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
   server->set_bus_solo(idx, sl->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_solo completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_get_output_device_list(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_device_outputs called");
   auto *server = godot::AudioServer::get_singleton();
@@ -762,18 +762,18 @@ mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &) {
     return util::error_json("AudioServer not available");
   }
   auto devices = server->get_output_device_list();
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < devices.size(); i++) {
-    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
+    arr.PushBack(godot_autopilot::util::JsonValue(util::to_std(devices[i])));
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_device_outputs completed");
   return r;
 }
 
-mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_output_device(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_output called");
   auto *server = godot::AudioServer::get_singleton();
@@ -787,10 +787,10 @@ mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
   server->set_output_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_output completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_input_device(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_input called");
   auto *server = godot::AudioServer::get_singleton();
@@ -804,10 +804,10 @@ mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
   server->set_input_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_input completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_start_input_capture(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_start_input_capture(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "start_audio_input_capture called");
   auto *server = godot::AudioServer::get_singleton();
@@ -829,10 +829,10 @@ mcp::JsonValue handle_start_input_capture(const mcp::JsonValue &args) {
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "start_audio_input_capture completed");
-  return util::ok_result(mcp::JsonValue("ok"));
+  return util::ok_result(godot_autopilot::util::JsonValue("ok"));
 }
 
-mcp::JsonValue handle_stop_input_capture(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_stop_input_capture(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_audio_input_capture called");
   auto *server = godot::AudioServer::get_singleton();
@@ -918,17 +918,17 @@ mcp::JsonValue handle_stop_input_capture(const mcp::JsonValue &args) {
     return util::error_json("failed to stop audio input capture (error " +
                             std::to_string(static_cast<int>(stop_err)) + ")");
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  mcp::JsonValue info = wav_locator(name, wav, format_bits, mix_rate, stereo,
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue info = wav_locator(name, wav, format_bits, mix_rate, stereo,
                                     frames);
-  info["truncated"] = mcp::JsonValue(truncated);
+  info["truncated"] = godot_autopilot::util::JsonValue(truncated);
   r["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_audio_input_capture completed");
   return r;
 }
 
-mcp::JsonValue handle_create_wav(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_wav(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_audiostream_wav called");
   std::string name;
@@ -994,7 +994,7 @@ mcp::JsonValue handle_create_wav(const mcp::JsonValue &args) {
   wav->set_data(data);
   resource_ops::register_memory_resource(wav, name);
   wav->set_path(godot::String(("memory://" + name).c_str()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] =
       wav_locator(name, wav, format_bits, mix_rate, stereo, frames);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -1002,7 +1002,7 @@ mcp::JsonValue handle_create_wav(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_get_input_devices(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_get_input_devices(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_input_devices called");
   auto *server = godot::AudioServer::get_singleton();
@@ -1010,19 +1010,19 @@ mcp::JsonValue handle_get_input_devices(const mcp::JsonValue &) {
     return util::error_json("AudioServer not available");
   }
   auto devices = server->get_input_device_list();
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < devices.size(); i++) {
-    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
+    arr.PushBack(godot_autopilot::util::JsonValue(util::to_std(devices[i])));
   }
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
   info["devices"] = std::move(arr);
   info["current"] =
-      mcp::JsonValue(util::to_std(server->get_input_device()));
+      godot_autopilot::util::JsonValue(util::to_std(server->get_input_device()));
   info["input_mix_rate"] =
-      mcp::JsonValue(static_cast<double>(server->get_input_mix_rate()));
-  info["frames_available"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<double>(server->get_input_mix_rate()));
+  info["frames_available"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(server->get_input_frames_available()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_audio_input_devices completed");
@@ -1031,23 +1031,23 @@ mcp::JsonValue handle_get_input_devices(const mcp::JsonValue &) {
 
 namespace {
 
-mcp::JsonValue audio_action_error(const std::string &message) {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue(message);
+godot_autopilot::util::JsonValue audio_action_error(const std::string &message) {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue(message);
   return error;
 }
 
-mcp::JsonValue strip_audio_action(const mcp::JsonValue &args) {
-  mcp::JsonValue out = args.IsObject()
+godot_autopilot::util::JsonValue strip_audio_action(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   out.GetObject().erase("action");
   return out;
 }
 
-bool read_audio_action(const mcp::JsonValue &args, std::string &out,
-                       mcp::JsonValue &error) {
-  const mcp::JsonValue *action = args.Find("action");
+bool read_audio_action(const godot_autopilot::util::JsonValue &args, std::string &out,
+                       godot_autopilot::util::JsonValue &error) {
+  const godot_autopilot::util::JsonValue *action = args.Find("action");
   if (action == nullptr) {
     error = audio_action_error("missing required parameter: action");
     return false;
@@ -1062,18 +1062,18 @@ bool read_audio_action(const mcp::JsonValue &args, std::string &out,
 
 } // namespace
 
-mcp::JsonValue handle_bus_info(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_info(const godot_autopilot::util::JsonValue &args) {
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
   }
   const int count = server->get_bus_count();
-  mcp::JsonValue names(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue names(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < count; i++) {
-    names.PushBack(mcp::JsonValue(util::to_std(server->get_bus_name(i))));
+    names.PushBack(godot_autopilot::util::JsonValue(util::to_std(server->get_bus_name(i))));
   }
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
-  info["count"] = mcp::JsonValue(static_cast<int64_t>(count));
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+  info["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(count));
   info["names"] = std::move(names);
   if (const auto *index_p = args.Find("bus_index")) {
     if (!index_p->IsInt()) {
@@ -1085,25 +1085,25 @@ mcp::JsonValue handle_bus_info(const mcp::JsonValue &args) {
       return util::error_json("audio bus not found at index: " +
                               std::to_string(index));
     }
-    mcp::JsonValue bus(mcp::JsonValue::object_tag);
-    bus["index"] = mcp::JsonValue(static_cast<int64_t>(index));
-    bus["name"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+    godot_autopilot::util::JsonValue bus(godot_autopilot::util::JsonValue::object_tag);
+    bus["index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(index));
+    bus["name"] = godot_autopilot::util::JsonValue(util::to_std(server->get_bus_name(index)));
     bus["volume_db"] =
-        mcp::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
-    bus["muted"] = mcp::JsonValue(server->is_bus_mute(index));
-    bus["solo"] = mcp::JsonValue(server->is_bus_solo(index));
+        godot_autopilot::util::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
+    bus["muted"] = godot_autopilot::util::JsonValue(server->is_bus_mute(index));
+    bus["solo"] = godot_autopilot::util::JsonValue(server->is_bus_solo(index));
     bus["bypass_effects"] =
-        mcp::JsonValue(server->is_bus_bypassing_effects(index));
+        godot_autopilot::util::JsonValue(server->is_bus_bypassing_effects(index));
     bus["effect_count"] =
-        mcp::JsonValue(static_cast<int64_t>(server->get_bus_effect_count(index)));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(server->get_bus_effect_count(index)));
     info["bus"] = std::move(bus);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   return r;
 }
 
-mcp::JsonValue handle_bus_metrics(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_bus_metrics(const godot_autopilot::util::JsonValue &args) {
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -1137,69 +1137,69 @@ mcp::JsonValue handle_bus_metrics(const mcp::JsonValue &args) {
       channel_peaks.empty() ? kSilenceFloorDb : channel_peaks[0];
   const double peak_right =
       channel_peaks.size() >= 2 ? channel_peaks[1] : peak_left;
-  mcp::JsonValue peaks(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue peaks(godot_autopilot::util::JsonValue::array_tag);
   for (const double db : channel_peaks) {
-    peaks.PushBack(mcp::JsonValue(db));
+    peaks.PushBack(godot_autopilot::util::JsonValue(db));
   }
   const int effect_count = server->get_bus_effect_count(index);
-  mcp::JsonValue effects(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue effects(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < effect_count; ++i) {
     auto effect = server->get_bus_effect(index, i);
-    mcp::JsonValue entry(mcp::JsonValue::object_tag);
-    entry["index"] = mcp::JsonValue(static_cast<int64_t>(i));
-    entry["class"] = mcp::JsonValue(effect.is_valid()
+    godot_autopilot::util::JsonValue entry(godot_autopilot::util::JsonValue::object_tag);
+    entry["index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(i));
+    entry["class"] = godot_autopilot::util::JsonValue(effect.is_valid()
                                         ? util::to_std(effect->get_class())
                                         : std::string());
     effects.PushBack(std::move(entry));
   }
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
-  info["bus_index"] = mcp::JsonValue(static_cast<int64_t>(index));
-  info["bus_name"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
-  info["channels"] = mcp::JsonValue(static_cast<int64_t>(channels));
-  info["effect_count"] = mcp::JsonValue(static_cast<int64_t>(effect_count));
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+  info["bus_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(index));
+  info["bus_name"] = godot_autopilot::util::JsonValue(util::to_std(server->get_bus_name(index)));
+  info["channels"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(channels));
+  info["effect_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(effect_count));
   info["effects"] = std::move(effects);
-  info["send"] = mcp::JsonValue(
+  info["send"] = godot_autopilot::util::JsonValue(
       util::to_std(godot::String(server->get_bus_send(index))));
-  info["peak_left_db"] = mcp::JsonValue(peak_left);
-  info["peak_right_db"] = mcp::JsonValue(peak_right);
+  info["peak_left_db"] = godot_autopilot::util::JsonValue(peak_left);
+  info["peak_right_db"] = godot_autopilot::util::JsonValue(peak_right);
   info["peaks_db"] = std::move(peaks);
   info["mix_rate"] =
-      mcp::JsonValue(static_cast<double>(server->get_mix_rate()));
-  info["speaker_mode"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<double>(server->get_mix_rate()));
+  info["speaker_mode"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(server->get_speaker_mode()));
   info["driver_name"] =
-      mcp::JsonValue(util::to_std(server->get_driver_name()));
+      godot_autopilot::util::JsonValue(util::to_std(server->get_driver_name()));
   info["volume_db"] =
-      mcp::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
-  info["muted"] = mcp::JsonValue(server->is_bus_mute(index));
-  info["solo"] = mcp::JsonValue(server->is_bus_solo(index));
+      godot_autopilot::util::JsonValue(static_cast<double>(server->get_bus_volume_db(index)));
+  info["muted"] = godot_autopilot::util::JsonValue(server->is_bus_mute(index));
+  info["solo"] = godot_autopilot::util::JsonValue(server->is_bus_solo(index));
   info["bypass_effects"] =
-      mcp::JsonValue(server->is_bus_bypassing_effects(index));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue(server->is_bus_bypassing_effects(index));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   return r;
 }
 
-mcp::JsonValue handle_input_status(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_input_status(const godot_autopilot::util::JsonValue &) {
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
   }
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
   info["current"] =
-      mcp::JsonValue(util::to_std(server->get_input_device()));
+      godot_autopilot::util::JsonValue(util::to_std(server->get_input_device()));
   info["input_mix_rate"] =
-      mcp::JsonValue(static_cast<double>(server->get_input_mix_rate()));
-  info["frames_available"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<double>(server->get_input_mix_rate()));
+  info["frames_available"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(server->get_input_frames_available()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   return r;
 }
 
-mcp::JsonValue handle_audio_bus(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_audio_bus(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_audio_action(args, action, error)) {
     return error;
   }
@@ -1236,9 +1236,9 @@ mcp::JsonValue handle_audio_bus(const mcp::JsonValue &args) {
       "set_volume, set_mute, set_solo, set_bypass, add_effect)");
 }
 
-mcp::JsonValue handle_audio_player(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_audio_player(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_audio_action(args, action, error)) {
     return error;
   }
@@ -1266,9 +1266,9 @@ mcp::JsonValue handle_audio_player(const mcp::JsonValue &args) {
       "get_position)");
 }
 
-mcp::JsonValue handle_audio_device(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_audio_device(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_audio_action(args, action, error)) {
     return error;
   }
@@ -1293,9 +1293,9 @@ mcp::JsonValue handle_audio_device(const mcp::JsonValue &args) {
       "set_input, get_input_status)");
 }
 
-mcp::JsonValue handle_audio_capture(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_audio_capture(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_audio_action(args, action, error)) {
     return error;
   }

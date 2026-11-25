@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_GROUP_TOOLS_HPP
 #define GODOT_AUTOPILOT_GROUP_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,13 +21,13 @@ const std::vector<ParamSpec> kNodeGroupParams = {
     {"group_name", "string", "Group name to add or remove (string, e.g. 'enemies')", true},
 };
 
-inline mcp::JsonValue node_group_alias_args_with_action(
-    const mcp::JsonValue &args, const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+inline godot_autopilot::util::JsonValue node_group_alias_args_with_action(
+    const godot_autopilot::util::JsonValue &args, const char *action) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -37,7 +37,7 @@ inline ToolAlias node_group_action_alias(const char *name,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return node_group_alias_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";

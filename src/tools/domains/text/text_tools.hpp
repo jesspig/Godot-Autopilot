@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TEXT_TOOLS_HPP
 #define GODOT_AUTOPILOT_TEXT_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -47,10 +47,10 @@ const std::vector<std::string> kShapedTextActions = {
 const std::vector<std::string> kTextQueryActions = {
     "has_feature", "locale_right_to_left"};
 
-inline mcp::JsonValue text_action_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue text_action_args(const godot_autopilot::util::JsonValue &args,
                                        const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   if (!args.IsObject()) {
     return out;
   }
@@ -82,31 +82,31 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "create_text_font", "font",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "create");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_text_font_data", "font",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "set_data");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_text_font_antialiasing", "font",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "set_antialiasing");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_text_font_hinting", "font",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "set_hinting");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_text_font_system_path", "font",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "system_path");
               },
               {}, "0.4.0", "0.6.0"},
@@ -126,19 +126,19 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "create_shaped_text", "shaped_text",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "create");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "add_shaped_text_string", "shaped_text",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "add_string");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_shaped_text_size", "shaped_text",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "get_size");
               },
               {}, "0.4.0", "0.6.0"},
@@ -158,13 +158,13 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "has_text_feature", "text_query",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "has_feature");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "is_text_locale_right_to_left", "text_query",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return text_action_args(args, "locale_right_to_left");
               },
               {}, "0.4.0", "0.6.0"},

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mcp/client/McpClient.hpp>
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
@@ -409,7 +409,7 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
   for (const godot_autopilot::ToolInfo &tool :
        registry_catalog().get_all_tools()) {
     allowed.insert(tool.name);
-    const mcp::JsonValue *props = tool.input_schema.Find("properties");
+    const godot_autopilot::util::JsonValue *props = tool.input_schema.Find("properties");
     if (props != nullptr && props->IsObject()) {
       for (const auto &entry : *props) {
         allowed.insert(entry.first);

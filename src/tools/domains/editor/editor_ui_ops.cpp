@@ -508,40 +508,40 @@ int viewport_image_dimension(godot::SubViewport *viewport, bool width) {
   return static_cast<int>(std::lround(value));
 }
 
-mcp::JsonValue element_to_json(const Element &element) {
-  mcp::JsonValue object(mcp::JsonValue::object_tag);
-  object["id"] = mcp::JsonValue(element.id);
+godot_autopilot::util::JsonValue element_to_json(const Element &element) {
+  godot_autopilot::util::JsonValue object(godot_autopilot::util::JsonValue::object_tag);
+  object["id"] = godot_autopilot::util::JsonValue(element.id);
   if (!element.path.empty())
-    object["path"] = mcp::JsonValue(element.path);
+    object["path"] = godot_autopilot::util::JsonValue(element.path);
   if (!element.type.empty())
-    object["type"] = mcp::JsonValue(element.type);
+    object["type"] = godot_autopilot::util::JsonValue(element.type);
   if (!element.name.empty())
-    object["name"] = mcp::JsonValue(element.name);
+    object["name"] = godot_autopilot::util::JsonValue(element.name);
   if (!element.text.empty())
-    object["text"] = mcp::JsonValue(element.text);
+    object["text"] = godot_autopilot::util::JsonValue(element.text);
   if (!element.tooltip.empty())
-    object["tooltip"] = mcp::JsonValue(element.tooltip);
+    object["tooltip"] = godot_autopilot::util::JsonValue(element.tooltip);
   if (!element.accessibility_name.empty())
-    object["accessibility_name"] = mcp::JsonValue(element.accessibility_name);
+    object["accessibility_name"] = godot_autopilot::util::JsonValue(element.accessibility_name);
   if (!element.placeholder.empty())
-    object["placeholder"] = mcp::JsonValue(element.placeholder);
-  object["enabled"] = mcp::JsonValue(element.enabled);
-  mcp::JsonValue position(mcp::JsonValue::object_tag);
-  position["x"] = mcp::JsonValue(element.x);
-  position["y"] = mcp::JsonValue(element.y);
+    object["placeholder"] = godot_autopilot::util::JsonValue(element.placeholder);
+  object["enabled"] = godot_autopilot::util::JsonValue(element.enabled);
+  godot_autopilot::util::JsonValue position(godot_autopilot::util::JsonValue::object_tag);
+  position["x"] = godot_autopilot::util::JsonValue(element.x);
+  position["y"] = godot_autopilot::util::JsonValue(element.y);
   object["position"] = std::move(position);
-  mcp::JsonValue size(mcp::JsonValue::object_tag);
-  size["x"] = mcp::JsonValue(element.w);
-  size["y"] = mcp::JsonValue(element.h);
+  godot_autopilot::util::JsonValue size(godot_autopilot::util::JsonValue::object_tag);
+  size["x"] = godot_autopilot::util::JsonValue(element.w);
+  size["y"] = godot_autopilot::util::JsonValue(element.h);
   object["size"] = std::move(size);
-  object["window_id"] = mcp::JsonValue(element.window_id);
+  object["window_id"] = godot_autopilot::util::JsonValue(element.window_id);
   return object;
 }
 
-bool read_int_param(const mcp::JsonValue &args, const char *name, int default_value, int *out,
+bool read_int_param(const godot_autopilot::util::JsonValue &args, const char *name, int default_value, int *out,
                     std::string *error) {
   *out = default_value;
-  const mcp::JsonValue *value = args.Find(name);
+  const godot_autopilot::util::JsonValue *value = args.Find(name);
   if (!value)
     return true;
   if (!value->IsNumber()) {
@@ -558,10 +558,10 @@ bool read_int_param(const mcp::JsonValue &args, const char *name, int default_va
   return true;
 }
 
-bool read_bool_param(const mcp::JsonValue &args, const char *name, bool default_value, bool *out,
+bool read_bool_param(const godot_autopilot::util::JsonValue &args, const char *name, bool default_value, bool *out,
                      std::string *error) {
   *out = default_value;
-  const mcp::JsonValue *value = args.Find(name);
+  const godot_autopilot::util::JsonValue *value = args.Find(name);
   if (!value)
     return true;
   if (!value->IsBool()) {
@@ -572,9 +572,9 @@ bool read_bool_param(const mcp::JsonValue &args, const char *name, bool default_
   return true;
 }
 
-bool read_string_param(const mcp::JsonValue &args, const char *name, std::string *out,
+bool read_string_param(const godot_autopilot::util::JsonValue &args, const char *name, std::string *out,
                        std::string *error) {
-  const mcp::JsonValue *value = args.Find(name);
+  const godot_autopilot::util::JsonValue *value = args.Find(name);
   if (!value)
     return true;
   if (!value->IsString()) {
@@ -585,9 +585,9 @@ bool read_string_param(const mcp::JsonValue &args, const char *name, std::string
   return true;
 }
 
-bool extract_vec2(const mcp::JsonValue &object, godot::Vector2 *out) {
-  const mcp::JsonValue *x = object.Find("x");
-  const mcp::JsonValue *y = object.Find("y");
+bool extract_vec2(const godot_autopilot::util::JsonValue &object, godot::Vector2 *out) {
+  const godot_autopilot::util::JsonValue *x = object.Find("x");
+  const godot_autopilot::util::JsonValue *y = object.Find("y");
   if (!x || !x->IsNumber() || !y || !y->IsNumber())
     return false;
   const double xv = x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble();
@@ -928,29 +928,29 @@ std::vector<SceneNodeHit> pick_scene_nodes_2d(double window_x, double window_y,
   return hits;
 }
 
-mcp::JsonValue scene_tree_row_to_json(const SceneTreeRow &row) {
-  mcp::JsonValue object(mcp::JsonValue::object_tag);
-  object["path"] = mcp::JsonValue(row.path);
-  object["name"] = mcp::JsonValue(row.name);
+godot_autopilot::util::JsonValue scene_tree_row_to_json(const SceneTreeRow &row) {
+  godot_autopilot::util::JsonValue object(godot_autopilot::util::JsonValue::object_tag);
+  object["path"] = godot_autopilot::util::JsonValue(row.path);
+  object["name"] = godot_autopilot::util::JsonValue(row.name);
   if (!row.type.empty())
-    object["type"] = mcp::JsonValue(row.type);
-  object["depth"] = mcp::JsonValue(row.depth);
-  object["selected"] = mcp::JsonValue(row.selected);
-  object["collapsed"] = mcp::JsonValue(row.collapsed);
-  object["visible"] = mcp::JsonValue(row.visible);
+    object["type"] = godot_autopilot::util::JsonValue(row.type);
+  object["depth"] = godot_autopilot::util::JsonValue(row.depth);
+  object["selected"] = godot_autopilot::util::JsonValue(row.selected);
+  object["collapsed"] = godot_autopilot::util::JsonValue(row.collapsed);
+  object["visible"] = godot_autopilot::util::JsonValue(row.visible);
   if (row.has_rect) {
-    mcp::JsonValue rect(mcp::JsonValue::object_tag);
-    mcp::JsonValue position(mcp::JsonValue::object_tag);
-    position["x"] = mcp::JsonValue(row.x);
-    position["y"] = mcp::JsonValue(row.y);
-    mcp::JsonValue size(mcp::JsonValue::object_tag);
-    size["x"] = mcp::JsonValue(row.w);
-    size["y"] = mcp::JsonValue(row.h);
+    godot_autopilot::util::JsonValue rect(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue position(godot_autopilot::util::JsonValue::object_tag);
+    position["x"] = godot_autopilot::util::JsonValue(row.x);
+    position["y"] = godot_autopilot::util::JsonValue(row.y);
+    godot_autopilot::util::JsonValue size(godot_autopilot::util::JsonValue::object_tag);
+    size["x"] = godot_autopilot::util::JsonValue(row.w);
+    size["y"] = godot_autopilot::util::JsonValue(row.h);
     rect["position"] = std::move(position);
     rect["size"] = std::move(size);
     object["rect"] = std::move(rect);
   } else {
-    object["rect"] = mcp::JsonValue(nullptr);
+    object["rect"] = godot_autopilot::util::JsonValue(nullptr);
   }
   return object;
 }
@@ -1064,7 +1064,7 @@ void draw_annotations(godot::Ref<godot::Image> image, const std::vector<MarkRect
   }
 }
 
-mcp::JsonValue handle_get_editor_ui_elements(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_editor_ui_elements(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_editor_ui_elements called");
 
@@ -1087,15 +1087,15 @@ mcp::JsonValue handle_get_editor_ui_elements(const mcp::JsonValue &args) {
   const std::vector<Element> elements =
       collect_elements(query, type_filter, interactive_only, max_elements, &truncated);
 
-  mcp::JsonValue array(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
   for (const Element &element : elements)
     array.PushBack(element_to_json(element));
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
   inner["elements"] = std::move(array);
-  inner["count"] = mcp::JsonValue(static_cast<int>(elements.size()));
-  inner["truncated"] = mcp::JsonValue(truncated);
-  inner["space"] = mcp::JsonValue("window");
+  inner["count"] = godot_autopilot::util::JsonValue(static_cast<int>(elements.size()));
+  inner["truncated"] = godot_autopilot::util::JsonValue(truncated);
+  inner["space"] = godot_autopilot::util::JsonValue("window");
   if (elements.empty()) {
     std::string note =
         "no visible editor UI elements matched: the editor window may not be "
@@ -1108,16 +1108,16 @@ mcp::JsonValue handle_get_editor_ui_elements(const mcp::JsonValue &args) {
       note += " (type_filter='" + type_filter + "')";
     if (interactive_only)
       note += " (interactive_only=true)";
-    inner["note"] = mcp::JsonValue(note);
+    inner["note"] = godot_autopilot::util::JsonValue(note);
   }
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_hit_test_editor_point(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "hit_test_editor_point called");
 
-  const mcp::JsonValue *position = args.Find("position");
+  const godot_autopilot::util::JsonValue *position = args.Find("position");
   if (!position || !position->IsObject())
     return util::error_json("missing required parameter: position");
   godot::Vector2 point;
@@ -1140,14 +1140,14 @@ mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args) {
   const std::vector<Element> hits =
       hit_test(point.x, point.y, window_id, max_results);
 
-  mcp::JsonValue array(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
   for (const Element &element : hits)
     array.PushBack(element_to_json(element));
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
   inner["hits"] = std::move(array);
-  inner["count"] = mcp::JsonValue(static_cast<int>(hits.size()));
-  inner["space"] = mcp::JsonValue("window");
+  inner["count"] = godot_autopilot::util::JsonValue(static_cast<int>(hits.size()));
+  inner["space"] = godot_autopilot::util::JsonValue("window");
 
   if (include_scene_nodes) {
     SceneTreeRow row;
@@ -1155,29 +1155,29 @@ mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args) {
     if (scene_tree_row_at_point(point.x, point.y, window_id, &row, &tree_error)) {
       inner["scene_tree_item"] = scene_tree_row_to_json(row);
     } else if (!tree_error.empty()) {
-      inner["scene_tree_error"] = mcp::JsonValue(tree_error);
+      inner["scene_tree_error"] = godot_autopilot::util::JsonValue(tree_error);
     }
 
     std::string pick_error;
     const std::vector<SceneNodeHit> scene_nodes =
         pick_scene_nodes_2d(point.x, point.y, window_id, 8, &pick_error);
-    mcp::JsonValue scene_nodes_json(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue scene_nodes_json(godot_autopilot::util::JsonValue::array_tag);
     for (const SceneNodeHit &node : scene_nodes) {
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["path"] = mcp::JsonValue(node.path);
-      item["name"] = mcp::JsonValue(node.name);
-      item["type"] = mcp::JsonValue(node.type);
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+      item["path"] = godot_autopilot::util::JsonValue(node.path);
+      item["name"] = godot_autopilot::util::JsonValue(node.name);
+      item["type"] = godot_autopilot::util::JsonValue(node.type);
       scene_nodes_json.PushBack(std::move(item));
     }
     inner["scene_nodes"] = std::move(scene_nodes_json);
-    inner["scene_node_count"] = mcp::JsonValue(static_cast<int>(scene_nodes.size()));
+    inner["scene_node_count"] = godot_autopilot::util::JsonValue(static_cast<int>(scene_nodes.size()));
     if (!pick_error.empty())
-      inner["scene_nodes_error"] = mcp::JsonValue(pick_error);
+      inner["scene_nodes_error"] = godot_autopilot::util::JsonValue(pick_error);
   }
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_scene_tree_items(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_scene_tree_items(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "scene_tree_items called");
 
@@ -1223,20 +1223,20 @@ mcp::JsonValue handle_scene_tree_items(const mcp::JsonValue &args) {
                               "use get_scene_tree for the scene model");
   }
 
-  mcp::JsonValue array(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
   for (const SceneTreeRow &row : rows)
     array.PushBack(scene_tree_row_to_json(row));
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
   inner["rows"] = std::move(array);
-  inner["count"] = mcp::JsonValue(static_cast<int>(rows.size()));
-  inner["truncated"] = mcp::JsonValue(truncated);
-  inner["window_id"] = mcp::JsonValue(window_id);
-  inner["space"] = mcp::JsonValue("window");
+  inner["count"] = godot_autopilot::util::JsonValue(static_cast<int>(rows.size()));
+  inner["truncated"] = godot_autopilot::util::JsonValue(truncated);
+  inner["window_id"] = godot_autopilot::util::JsonValue(window_id);
+  inner["space"] = godot_autopilot::util::JsonValue("window");
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_select_scene_tree_node(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_select_scene_tree_node(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "select_scene_tree_node called");
 
@@ -1323,21 +1323,21 @@ mcp::JsonValue handle_select_scene_tree_node(const mcp::JsonValue &args) {
   const int selected_count =
       static_cast<int>(selection->get_selected_nodes().size());
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["ok"] = mcp::JsonValue(true);
-  inner["path"] = mcp::JsonValue(node_scene_path(node, scene_root));
-  inner["selected_count"] = mcp::JsonValue(selected_count);
-  inner["inspected"] = mcp::JsonValue(inspected);
-  inner["focused"] = mcp::JsonValue(focused);
-  inner["tree_found"] = mcp::JsonValue(tree_found);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["ok"] = godot_autopilot::util::JsonValue(true);
+  inner["path"] = godot_autopilot::util::JsonValue(node_scene_path(node, scene_root));
+  inner["selected_count"] = godot_autopilot::util::JsonValue(selected_count);
+  inner["inspected"] = godot_autopilot::util::JsonValue(inspected);
+  inner["focused"] = godot_autopilot::util::JsonValue(focused);
+  inner["tree_found"] = godot_autopilot::util::JsonValue(tree_found);
   if (!tree_found)
-    inner["note"] = mcp::JsonValue(
+    inner["note"] = godot_autopilot::util::JsonValue(
         "editor scene tree control not found, so the row was not scrolled into "
         "view; selection and inspector still applied");
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_get_editor_viewport_geometry(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_editor_viewport_geometry(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_editor_viewport_geometry called");
 
@@ -1361,36 +1361,36 @@ mcp::JsonValue handle_get_editor_viewport_geometry(const mcp::JsonValue &args) {
   const int image_height = viewport_image_dimension(viewport, false);
   godot::Window *window = viewport->get_window();
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["viewport"] = mcp::JsonValue(which);
-  inner["window_id"] = mcp::JsonValue(window ? window->get_window_id() : 0);
-  inner["space"] = mcp::JsonValue("window");
-  inner["image_width"] = mcp::JsonValue(image_width);
-  inner["image_height"] = mcp::JsonValue(image_height);
-  mcp::JsonValue viewport_size(mcp::JsonValue::object_tag);
-  viewport_size["x"] = mcp::JsonValue(image_width);
-  viewport_size["y"] = mcp::JsonValue(image_height);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["viewport"] = godot_autopilot::util::JsonValue(which);
+  inner["window_id"] = godot_autopilot::util::JsonValue(window ? window->get_window_id() : 0);
+  inner["space"] = godot_autopilot::util::JsonValue("window");
+  inner["image_width"] = godot_autopilot::util::JsonValue(image_width);
+  inner["image_height"] = godot_autopilot::util::JsonValue(image_height);
+  godot_autopilot::util::JsonValue viewport_size(godot_autopilot::util::JsonValue::object_tag);
+  viewport_size["x"] = godot_autopilot::util::JsonValue(image_width);
+  viewport_size["y"] = godot_autopilot::util::JsonValue(image_height);
   inner["viewport_size"] = std::move(viewport_size);
 
-  mcp::JsonValue mapping_json(mcp::JsonValue::object_tag);
-  mapping_json["scale_x"] = mcp::JsonValue(mapping.scale_x);
-  mapping_json["scale_y"] = mcp::JsonValue(mapping.scale_y);
-  mapping_json["offset_x"] = mcp::JsonValue(mapping.offset_x);
-  mapping_json["offset_y"] = mcp::JsonValue(mapping.offset_y);
+  godot_autopilot::util::JsonValue mapping_json(godot_autopilot::util::JsonValue::object_tag);
+  mapping_json["scale_x"] = godot_autopilot::util::JsonValue(mapping.scale_x);
+  mapping_json["scale_y"] = godot_autopilot::util::JsonValue(mapping.scale_y);
+  mapping_json["offset_x"] = godot_autopilot::util::JsonValue(mapping.offset_x);
+  mapping_json["offset_y"] = godot_autopilot::util::JsonValue(mapping.offset_y);
   inner["mapping"] = std::move(mapping_json);
 
   if (which == "2d") {
     const godot::Transform2D canvas_transform = viewport->get_global_canvas_transform();
     const godot::Vector2 canvas_origin = canvas_transform.get_origin();
     const godot::Vector2 canvas_zoom = canvas_transform.get_scale();
-    mcp::JsonValue canvas(mcp::JsonValue::object_tag);
-    mcp::JsonValue origin(mcp::JsonValue::object_tag);
-    origin["x"] = mcp::JsonValue(static_cast<double>(canvas_origin.x));
-    origin["y"] = mcp::JsonValue(static_cast<double>(canvas_origin.y));
+    godot_autopilot::util::JsonValue canvas(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue origin(godot_autopilot::util::JsonValue::object_tag);
+    origin["x"] = godot_autopilot::util::JsonValue(static_cast<double>(canvas_origin.x));
+    origin["y"] = godot_autopilot::util::JsonValue(static_cast<double>(canvas_origin.y));
     canvas["origin"] = std::move(origin);
-    mcp::JsonValue zoom(mcp::JsonValue::object_tag);
-    zoom["x"] = mcp::JsonValue(static_cast<double>(canvas_zoom.x));
-    zoom["y"] = mcp::JsonValue(static_cast<double>(canvas_zoom.y));
+    godot_autopilot::util::JsonValue zoom(godot_autopilot::util::JsonValue::object_tag);
+    zoom["x"] = godot_autopilot::util::JsonValue(static_cast<double>(canvas_zoom.x));
+    zoom["y"] = godot_autopilot::util::JsonValue(static_cast<double>(canvas_zoom.y));
     canvas["zoom"] = std::move(zoom);
     inner["canvas"] = std::move(canvas);
   }
@@ -1398,15 +1398,15 @@ mcp::JsonValue handle_get_editor_viewport_geometry(const mcp::JsonValue &args) {
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_editor_ui(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_ui(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_editor_ui called");
   auto *action_p = args.Find("action");
   const std::string action =
       (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
   if (action.empty()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(
         "missing required parameter: action "
         "(elements|hit|geometry|scene_tree_items)");
     return error;
@@ -1423,8 +1423,8 @@ mcp::JsonValue handle_editor_ui(const mcp::JsonValue &args) {
   if (action == "scene_tree_items") {
     return handle_scene_tree_items(args);
   }
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue(
       "invalid action: expected elements|hit|geometry|scene_tree_items");
   return error;
 }

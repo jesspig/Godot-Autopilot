@@ -18,8 +18,8 @@ using godot_autopilot::side_effect_of;
 
 namespace {
 
-mcp::JsonValue echo_handler(const mcp::JsonValue& args) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue echo_handler(const godot_autopilot::util::JsonValue& args) {
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   for (const auto& entry : args.GetObject()) {
     result[entry.first] = entry.second;
   }
@@ -64,11 +64,11 @@ TEST(ToolRegistryTest, ExecuteEchoArgs) {
 
   auto tool = registry.find("tool_a");
   ASSERT_NE(tool, nullptr);
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   args["v"] = 5;
-  mcp::JsonValue result = tool->execute(args);
+  godot_autopilot::util::JsonValue result = tool->execute(args);
   ASSERT_TRUE(result.IsObject());
-  const mcp::JsonValue* v = result.Find("v");
+  const godot_autopilot::util::JsonValue* v = result.Find("v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->GetInt(), 5);
 }
@@ -115,8 +115,8 @@ TEST(ToolRegistryTest, SpecToolFlagsDriveMetaRoutingAndToolInfo) {
   spec.category = "Meta";
   spec.flags = godot_autopilot::tool_flags::kMeta |
                godot_autopilot::tool_flags::kDynamic;
-  spec.handler = [](const mcp::JsonValue&) {
-    return mcp::JsonValue(mcp::JsonValue::object_tag);
+  spec.handler = [](const godot_autopilot::util::JsonValue&) {
+    return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   };
 
   auto tool = make_spec_tool(std::move(spec));

@@ -1,0 +1,124 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.015 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+CommandLine: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests\gda_unit_tests_probe.exe --gtest_filter=LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Symbol search path is: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff6`3eb90000 00007ff6`40c01000   gda_unit_tests.exe
+ModLoad: 00007ffd`2a770000 00007ffd`2a9dc000   ntdll.dll
+ModLoad: 00007ffd`28e10000 00007ffd`28edb000   C:\WINDOWS\System32\KERNEL32.DLL
+ModLoad: 00007ffd`28020000 00007ffd`28429000   C:\WINDOWS\System32\KERNELBASE.dll
+ModLoad: 00007ffd`2a4b0000 00007ffd`2a530000   C:\WINDOWS\System32\WS2_32.dll
+ModLoad: 00007ffd`27b10000 00007ffd`27c5c000   C:\WINDOWS\System32\ucrtbase.dll
+ModLoad: 00007ffd`29a80000 00007ffd`29b98000   C:\WINDOWS\System32\RPCRT4.dll
+ModLoad: 00007ffd`27e60000 00007ffd`27fde000   C:\WINDOWS\System32\CRYPT32.dll
+ModLoad: 00007ffd`2a160000 00007ffd`2a21c000   C:\WINDOWS\System32\ADVAPI32.dll
+ModLoad: 00007ffd`277f0000 00007ffd`2781a000   C:\WINDOWS\SYSTEM32\bcrypt.dll
+ModLoad: 00007ffd`28430000 00007ffd`284d9000   C:\WINDOWS\System32\msvcrt.dll
+ModLoad: 00007ffd`297b0000 00007ffd`29858000   C:\WINDOWS\System32\sechost.dll
+ModLoad: 00000201`750e0000 00000201`75188000   C:\WINDOWS\System32\sechost.dll
+(7124.6e00): Break instruction exception - code 80000003 (first chance)
+ntdll!RtlGetReturnAddressHijackTarget+0xa45:
+00007ffd`2a895245 cc              int     3
+0:000> cdb: Reading initial command 'g; kPn; q'
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from LogSystemTest
+[ RUN      ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+(7124.6e00): C++ EH exception - code e06d7363 (first chance)
+(7124.6e00): Access violation - code c0000005 (first chance)
+First chance exceptions are reported before any exception handling.
+This exception may be expected and handled.
+*** WARNING: Unable to verify checksum for gda_unit_tests.exe
+ # Child-SP          RetAddr               Call Site
+00 00000036`c335c800 00007ff6`3ed68552     gda_unit_tests+0x1d871c
+01 00000036`c335c870 00000036`c335ef98     gda_unit_tests+0x1d8552
+02 00000036`c335c940 00000036`c335c98f     0x00000036`c335ef98
+03 00000036`c335c948 00007ff6`3ed65e68     0x00000036`c335c98f
+04 00000036`c335c950 00007ff6`3ed65e08     gda_unit_tests+0x1d5e68
+05 00000036`c335c9a0 00007ff6`3ed64683     gda_unit_tests+0x1d5e08
+06 00000036`c335c9e0 00007ff6`3ffc3653     gda_unit_tests+0x1d4683
+07 00000036`c335ca10 00007ff6`3ffc3633     gda_unit_tests+0x1433653
+08 00000036`c335ca40 00007ff6`3ffc3613     gda_unit_tests+0x1433633
+09 00000036`c335ca70 00007ff6`3ffc1673     gda_unit_tests+0x1433613
+0a 00000036`c335caa0 00007ff6`3ffaa987     gda_unit_tests+0x1431673
+0b 00000036`c335cad0 00007ff6`3eb9c403     gda_unit_tests+0x141a987
+0c 00000036`c335cc60 00007ff6`3eb9c3d3     gda_unit_tests+0xc403
+0d 00000036`c335cca0 00007ff6`3eb9c3b3     gda_unit_tests+0xc3d3
+0e 00000036`c335ccd0 00007ff6`3eb9c393     gda_unit_tests+0xc3b3
+0f 00000036`c335cd00 00007ff6`3eb9c373     gda_unit_tests+0xc393
+10 00000036`c335cd30 00007ff6`3eb9c353     gda_unit_tests+0xc373
+11 00000036`c335cd60 00007ff6`3eb9c2f3     gda_unit_tests+0xc353
+12 00000036`c335cd90 00007ff6`3f512956     gda_unit_tests+0xc2f3
+13 00000036`c335cdc0 00007ff6`400c5ae6     gda_unit_tests+0x982956
+14 00000036`c335ce00 00007ff6`4011ad5d     gda_unit_tests+0x1535ae6
+15 00000036`c335ce50 00007ffd`2a8971e6     gda_unit_tests+0x158ad5d
+16 00000036`c335cf20 00007ff6`3ee1eb65     ntdll!RtlCaptureContext2+0x4a6
+17 00000036`c335f0f0 00007ff6`400240f0     gda_unit_tests+0x28eb65
+18 00000036`c335f830 00007ff6`40008a98     gda_unit_tests+0x14940f0
+19 00000036`c335f890 00007ff6`3ffeba53     gda_unit_tests+0x1478a98
+1a 00000036`c335f940 00007ff6`3ffec599     gda_unit_tests+0x145ba53
+1b 00000036`c335f980 00007ff6`3ffece3f     gda_unit_tests+0x145c599
+1c 00000036`c335f9f0 00007ff6`3fffb320     gda_unit_tests+0x145ce3f
+1d 00000036`c335fa70 00007ff6`40027840     gda_unit_tests+0x146b320
+1e 00000036`c335fb60 00007ff6`4000ab98     gda_unit_tests+0x1497840
+1f 00000036`c335fbc0 00007ff6`3fffaed9     gda_unit_tests+0x147ab98
+20 00000036`c335fc80 00007ff6`400513e1     gda_unit_tests+0x146aed9
+21 00000036`c335fd00 00007ff6`4005139b     gda_unit_tests+0x14c13e1
+22 00000036`c335fd30 00007ff6`400c564f     gda_unit_tests+0x14c139b
+23 00000036`c335fd80 00007ffd`28e3dda7     gda_unit_tests+0x153564f
+24 00000036`c335fdc0 00007ffd`2a839c5c     KERNEL32!BaseThreadInitThunk+0x17
+25 00000036`c335fdf0 00000000`00000000     ntdll!RtlUserThreadStart+0x2c
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

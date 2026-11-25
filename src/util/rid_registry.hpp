@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include <godot_cpp/variant/rid.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <unordered_map>
 
 namespace godot_autopilot {
@@ -39,7 +39,7 @@ template <typename Domain> inline RidStore &rid_store() {
 }
 
 template <typename Domain>
-inline godot::RID resolve_rid(const mcp::JsonValue &args, const char *key) {
+inline godot::RID resolve_rid(const godot_autopilot::util::JsonValue &args, const char *key) {
   auto *it = args.Find(key);
   if (!it || !it->IsNumber())
     return godot::RID();

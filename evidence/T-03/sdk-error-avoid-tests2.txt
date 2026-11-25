@@ -1,0 +1,21 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-json/build/debug
+    Start 534: LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+1/6 Test #534: LogSystemTest.SdkLogBridgeRoutesStoreFailureReason ....................   Passed    0.73 sec
+    Start 539: McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid
+2/6 Test #539: McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid ...................   Passed    0.15 sec
+    Start 547: McpWireTest.RejectsMalformedBody
+3/6 Test #547: McpWireTest.RejectsMalformedBody ......................................   Passed    0.15 sec
+    Start 574: McpHttpShimTest.RejectsUnparsableBody
+4/6 Test #574: McpHttpShimTest.RejectsUnparsableBody .................................   Passed    0.15 sec
+    Start 655: RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+5/6 Test #655: RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools ...   Passed    1.00 sec
+    Start 992: StableMcpErrorTest.PreservesShortMessageAcrossThrow
+6/6 Test #992: StableMcpErrorTest.PreservesShortMessageAcrossThrow ...................   Passed    0.02 sec
+
+100% tests passed out of 6
+
+Label Time Summary:
+boundary    =   0.02 sec*proc (1 test)
+unit        =   2.17 sec*proc (5 tests)
+
+Total Test time (real) =   2.79 sec

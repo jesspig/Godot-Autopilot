@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace test_tools {
@@ -21,17 +21,17 @@ const std::vector<ParamSpec> kRunGdscriptTestsParams = {
     {"timeout_ms", "integer", "Timeout budget for the whole run in milliseconds (integer, default: 10000, max: 30000); once exhausted remaining cases are skipped and the running case is flagged running_over_budget", false},
 };
 
-inline mcp::JsonValue test_files_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *directory = args.Find("directory");
+inline godot_autopilot::util::JsonValue test_files_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *directory = args.Find("directory");
   out["directory"] = directory != nullptr && directory->IsString()
                          ? *directory
-                         : mcp::JsonValue("res://tests");
-  const mcp::JsonValue *pattern = args.Find("pattern");
+                         : godot_autopilot::util::JsonValue("res://tests");
+  const godot_autopilot::util::JsonValue *pattern = args.Find("pattern");
   out["pattern"] = pattern != nullptr && pattern->IsString()
                        ? *pattern
-                       : mcp::JsonValue("*.gda_test.gd");
-  const mcp::JsonValue *timeout = args.Find("timeout_ms");
+                       : godot_autopilot::util::JsonValue("*.gda_test.gd");
+  const godot_autopilot::util::JsonValue *timeout = args.Find("timeout_ms");
   if (timeout != nullptr) {
     out["timeout_ms"] = *timeout;
   }

@@ -21,8 +21,8 @@ namespace {
 constexpr size_t CONTEXT_RADIUS = 240;
 constexpr size_t ANCHOR_ECHO_LIMIT = 120;
 
-bool get_flag(const mcp::JsonValue &args, const char *name) {
-  const mcp::JsonValue *flag = args.Find(name);
+bool get_flag(const godot_autopilot::util::JsonValue &args, const char *name) {
+  const godot_autopilot::util::JsonValue *flag = args.Find(name);
   return flag != nullptr && flag->IsBool() && flag->GetBool();
 }
 
@@ -137,7 +137,7 @@ void notify_editors(const std::string &path) {
 
 } // namespace
 
-mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_patch(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString() || it_path->GetString().empty()) {
     return util::error_json("missing required parameter: path");
@@ -213,52 +213,52 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
   }
 
   if (patched == original) {
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["path"] = mcp::JsonValue(path);
-    j["mode"] = mcp::JsonValue(mode);
-    j["anchor_found"] = mcp::JsonValue(true);
-    j["anchor_index"] = mcp::JsonValue(static_cast<int64_t>(anchor_pos));
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["path"] = godot_autopilot::util::JsonValue(path);
+    j["mode"] = godot_autopilot::util::JsonValue(mode);
+    j["anchor_found"] = godot_autopilot::util::JsonValue(true);
+    j["anchor_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(anchor_pos));
     j["anchor_occurrences"] =
-        mcp::JsonValue(static_cast<int64_t>(anchor_count));
-    j["unchanged"] = mcp::JsonValue(true);
-    j["disk_write"] = mcp::JsonValue(false);
-    j["verified"] = mcp::JsonValue(true);
-    j["readback"] = mcp::JsonValue(true);
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(anchor_count));
+    j["unchanged"] = godot_autopilot::util::JsonValue(true);
+    j["disk_write"] = godot_autopilot::util::JsonValue(false);
+    j["verified"] = godot_autopilot::util::JsonValue(true);
+    j["readback"] = godot_autopilot::util::JsonValue(true);
     j["disk_bytes"] =
-        mcp::JsonValue(static_cast<int64_t>(original.size()));
-    j["content_hash"] = mcp::JsonValue(script_ops::fnv1a64_hex(original));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(original.size()));
+    j["content_hash"] = godot_autopilot::util::JsonValue(script_ops::fnv1a64_hex(original));
     j["content_hash_algo"] =
-        mcp::JsonValue(script_ops::content_hash_algo_name());
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue(script_ops::content_hash_algo_name());
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(j);
     r["note"] =
-        mcp::JsonValue("patched text is identical to the file on disk; "
+        godot_autopilot::util::JsonValue("patched text is identical to the file on disk; "
                        "nothing was written");
     return r;
   }
 
   if (preview_only) {
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["path"] = mcp::JsonValue(path);
-    j["mode"] = mcp::JsonValue(mode);
-    j["anchor_found"] = mcp::JsonValue(true);
-    j["anchor_index"] = mcp::JsonValue(static_cast<int64_t>(anchor_pos));
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["path"] = godot_autopilot::util::JsonValue(path);
+    j["mode"] = godot_autopilot::util::JsonValue(mode);
+    j["anchor_found"] = godot_autopilot::util::JsonValue(true);
+    j["anchor_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(anchor_pos));
     j["anchor_occurrences"] =
-        mcp::JsonValue(static_cast<int64_t>(anchor_count));
-    j["preview"] = mcp::JsonValue(preview);
-    j["dry_run"] = mcp::JsonValue(dry_run);
-    j["disk_write"] = mcp::JsonValue(false);
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(anchor_count));
+    j["preview"] = godot_autopilot::util::JsonValue(preview);
+    j["dry_run"] = godot_autopilot::util::JsonValue(dry_run);
+    j["disk_write"] = godot_autopilot::util::JsonValue(false);
     j["original_bytes"] =
-        mcp::JsonValue(static_cast<int64_t>(original.size()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(original.size()));
     j["patched_bytes"] =
-        mcp::JsonValue(static_cast<int64_t>(patched.size()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(patched.size()));
     j["before_context"] =
-        mcp::JsonValue(context_around(original, anchor_pos, anchor.size()));
-    j["after_context"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue(context_around(original, anchor_pos, anchor.size()));
+    j["after_context"] = godot_autopilot::util::JsonValue(
         context_around(patched, edit_pos, replacement.size()));
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(j);
-    r["note"] = mcp::JsonValue(
+    r["note"] = godot_autopilot::util::JsonValue(
         "preview only — nothing was written and the patched text was not "
         "compiled; the formal write compiles before saving and aborts with "
         "zero disk writes on compilation failure");
@@ -277,16 +277,16 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
     std::string message = save_error + " Original content " +
                           (rolled_back ? "was restored."
                                        : "RESTORE FAILED: " + rollback_error);
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(message);
-    e["disk_write"] = mcp::JsonValue(true);
-    e["rolled_back"] = mcp::JsonValue(rolled_back);
-    mcp::JsonValue details(mcp::JsonValue::object_tag);
-    details["code"] = mcp::JsonValue("script_write_failed");
-    details["path"] = mcp::JsonValue(path);
-    details["rolled_back"] = mcp::JsonValue(rolled_back);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(message);
+    e["disk_write"] = godot_autopilot::util::JsonValue(true);
+    e["rolled_back"] = godot_autopilot::util::JsonValue(rolled_back);
+    godot_autopilot::util::JsonValue details(godot_autopilot::util::JsonValue::object_tag);
+    details["code"] = godot_autopilot::util::JsonValue("script_write_failed");
+    details["path"] = godot_autopilot::util::JsonValue(path);
+    details["rolled_back"] = godot_autopilot::util::JsonValue(rolled_back);
     if (!rolled_back) {
-      details["rollback_error"] = mcp::JsonValue(rollback_error);
+      details["rollback_error"] = godot_autopilot::util::JsonValue(rollback_error);
     }
     e["structured_error"] = std::move(details);
     return e;
@@ -301,30 +301,30 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
   std::string cache_refresh_error;
   bool cache_refreshed = script_ops::refresh_script_cache(path, cache_refresh_error);
 
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["path"] = mcp::JsonValue(path);
-  j["mode"] = mcp::JsonValue(mode);
-  j["anchor_found"] = mcp::JsonValue(true);
-  j["anchor_index"] = mcp::JsonValue(static_cast<int64_t>(anchor_pos));
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["path"] = godot_autopilot::util::JsonValue(path);
+  j["mode"] = godot_autopilot::util::JsonValue(mode);
+  j["anchor_found"] = godot_autopilot::util::JsonValue(true);
+  j["anchor_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(anchor_pos));
   j["anchor_occurrences"] =
-      mcp::JsonValue(static_cast<int64_t>(anchor_count));
-  j["disk_write"] = mcp::JsonValue(true);
-  j["verified"] = mcp::JsonValue(verified);
-  j["readback"] = mcp::JsonValue(readback);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(anchor_count));
+  j["disk_write"] = godot_autopilot::util::JsonValue(true);
+  j["verified"] = godot_autopilot::util::JsonValue(verified);
+  j["readback"] = godot_autopilot::util::JsonValue(readback);
   if (readback) {
-    j["disk_bytes"] = mcp::JsonValue(static_cast<int64_t>(read_back.size()));
-    j["content_hash"] = mcp::JsonValue(script_ops::fnv1a64_hex(read_back));
+    j["disk_bytes"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(read_back.size()));
+    j["content_hash"] = godot_autopilot::util::JsonValue(script_ops::fnv1a64_hex(read_back));
     j["content_hash_algo"] =
-        mcp::JsonValue(script_ops::content_hash_algo_name());
+        godot_autopilot::util::JsonValue(script_ops::content_hash_algo_name());
   }
-  j["rolled_back"] = mcp::JsonValue(rolled_back);
-  j["cache_refreshed"] = mcp::JsonValue(cache_refreshed);
+  j["rolled_back"] = godot_autopilot::util::JsonValue(rolled_back);
+  j["cache_refreshed"] = godot_autopilot::util::JsonValue(cache_refreshed);
   if (!cache_refreshed) {
-    j["cache_refresh_error"] = mcp::JsonValue(cache_refresh_error);
+    j["cache_refresh_error"] = godot_autopilot::util::JsonValue(cache_refresh_error);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(j);
-  r["note"] = mcp::JsonValue(
+  r["note"] = godot_autopilot::util::JsonValue(
       "editor cache was refreshed for this file; if a game is running with the "
       "old script, call reload_game_scripts first and then "
       "reload_current_scene (or retry the operation) — reloading the scene "

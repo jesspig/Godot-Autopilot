@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "task": "T-03",
+  "batches": [
+    {
+      "name": "adapters",
+      "scope": "src/adapters",
+      "result": "JsonValue, McpError, SHA-256 and image content bridges added"
+    },
+    {
+      "name": "pure-logic",
+      "scope": "storage, observability, tool args, schema, confirmation, inline JSON, input guards",
+      "result": "mcp::JsonValue replaced by util::JsonValue"
+    },
+    {
+      "name": "config-storage-errors",
+      "scope": "plugin_config, legacy_store, resource_fs, error and sanitize helpers",
+      "result": "parse errors and SHA-256 routed through GDA or adapters"
+    },
+    {
+      "name": "sdk-boundary",
+      "scope": "register_all, server_context, godot_transport, mcp_http_shim, prompts, resources",
+      "result": "explicit FromSdk/ToSdk conversion at SDK types"
+    },
+    {
+      "name": "runtime-domains",
+      "scope": "runtime and tools/domains",
+      "result": "type and include replacement with preserved behavior"
+    }
+  ],
+  "guard_results": {
+    "no_mcp_json_guard_strict": "0 occurrences in 0 files",
+    "src_mcp_json_value_refs": 0,
+    "tests_mcp_json_value_refs": 0,
+    "comment_guard": "OK",
+    "source_manifest_guard": "OK"
+  },
+  "remaining_mcp_sdk_types": {
+    "count": 22,
+    "note": "non-JsonValue SDK protocol types intentionally retained behind adapters until T-16"
+  }
+}

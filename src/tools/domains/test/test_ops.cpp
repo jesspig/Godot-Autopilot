@@ -140,7 +140,7 @@ std::string filter_abort_noise(const std::string &text) {
   return kept;
 }
 
-int parse_timeout_ms(const mcp::JsonValue &args) {
+int parse_timeout_ms(const godot_autopilot::util::JsonValue &args) {
   int value = TEST_DEFAULT_TIMEOUT_MS;
   if (auto *tm = args.Find("timeout_ms")) {
     if (tm->IsInt())
@@ -307,7 +307,7 @@ bool compile_case_script(godot::Ref<godot::GDScript> &script,
 }
 
 struct CaseOutcome {
-  mcp::JsonValue checks{mcp::JsonValue::array_tag};
+  godot_autopilot::util::JsonValue checks{godot_autopilot::util::JsonValue::array_tag};
   bool aborted = false;
   std::string runtime_error;
 };
@@ -396,14 +396,14 @@ struct TestCaseSpec {
 struct CaseResult {
   std::string name;
   std::string status;
-  mcp::JsonValue checks{mcp::JsonValue::array_tag};
+  godot_autopilot::util::JsonValue checks{godot_autopilot::util::JsonValue::array_tag};
   std::string error;
   std::string reason;
   int64_t elapsed_ms = 0;
   bool running_over_budget = false;
 };
 
-bool case_has_failed_check(const mcp::JsonValue &checks) {
+bool case_has_failed_check(const godot_autopilot::util::JsonValue &checks) {
   if (!checks.IsArray())
     return false;
   for (const auto &c : checks.GetArray()) {
@@ -414,22 +414,22 @@ bool case_has_failed_check(const mcp::JsonValue &checks) {
   return false;
 }
 
-mcp::JsonValue case_to_json(const CaseResult &cr) {
-  mcp::JsonValue o(mcp::JsonValue::object_tag);
-  o["name"] = mcp::JsonValue(cr.name);
-  o["status"] = mcp::JsonValue(cr.status);
+godot_autopilot::util::JsonValue case_to_json(const CaseResult &cr) {
+  godot_autopilot::util::JsonValue o(godot_autopilot::util::JsonValue::object_tag);
+  o["name"] = godot_autopilot::util::JsonValue(cr.name);
+  o["status"] = godot_autopilot::util::JsonValue(cr.status);
   o["checks"] = cr.checks;
-  o["elapsed_ms"] = mcp::JsonValue(cr.elapsed_ms);
+  o["elapsed_ms"] = godot_autopilot::util::JsonValue(cr.elapsed_ms);
   if (!cr.error.empty())
-    o["error"] = mcp::JsonValue(cr.error);
+    o["error"] = godot_autopilot::util::JsonValue(cr.error);
   if (!cr.reason.empty())
-    o["reason"] = mcp::JsonValue(cr.reason);
+    o["reason"] = godot_autopilot::util::JsonValue(cr.reason);
   if (cr.running_over_budget)
-    o["running_over_budget"] = mcp::JsonValue(true);
+    o["running_over_budget"] = godot_autopilot::util::JsonValue(true);
   return o;
 }
 
-mcp::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
+godot_autopilot::util::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
                          int timeout_ms) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "gdscript test suite executing " +
@@ -440,7 +440,7 @@ mcp::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
     return ms_between(suite_start, std::chrono::steady_clock::now());
   };
 
-  mcp::JsonValue cases(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue cases(godot_autopilot::util::JsonValue::array_tag);
   int64_t passed = 0;
   int64_t failed = 0;
   int64_t skipped = 0;
@@ -481,7 +481,7 @@ mcp::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
         ++passed;
     };
 
-    cr.checks = mcp::JsonValue(mcp::JsonValue::array_tag);
+    cr.checks = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
 
     WrappedCase w;
     std::string error_out;
@@ -520,16 +520,16 @@ mcp::JsonValue run_suite(const std::vector<TestCaseSpec> &specs,
     finish_case(cr.status == "fail");
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  mcp::JsonValue summary(mcp::JsonValue::object_tag);
-  summary["total"] = mcp::JsonValue(static_cast<int64_t>(specs.size()));
-  summary["passed"] = mcp::JsonValue(passed);
-  summary["failed"] = mcp::JsonValue(failed);
-  summary["skipped"] = mcp::JsonValue(skipped);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue summary(godot_autopilot::util::JsonValue::object_tag);
+  summary["total"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(specs.size()));
+  summary["passed"] = godot_autopilot::util::JsonValue(passed);
+  summary["failed"] = godot_autopilot::util::JsonValue(failed);
+  summary["skipped"] = godot_autopilot::util::JsonValue(skipped);
   r["summary"] = std::move(summary);
   r["cases"] = std::move(cases);
   if (any_over_budget) {
-    r["note"] = mcp::JsonValue(
+    r["note"] = godot_autopilot::util::JsonValue(
         "one or more cases finished past the timeout budget: GDScript "
         "execution is synchronous, so the currently running case cannot be "
         "interrupted; remaining cases were skipped with reason 'timeout "
@@ -570,7 +570,7 @@ bool wildcard_match(const std::string &text, const std::string &pattern) {
 namespace godot_autopilot {
 namespace test_ops {
 
-mcp::JsonValue handle_run_gdscript_tests(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_run_gdscript_tests(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "run_gdscript_tests called");
 
@@ -593,8 +593,8 @@ mcp::JsonValue handle_run_gdscript_tests(const mcp::JsonValue &args) {
   for (size_t i = 0; i < arr.size(); ++i) {
     TestCaseSpec spec;
     const auto &item = arr[i];
-    const mcp::JsonValue *name_v = nullptr;
-    const mcp::JsonValue *src_v = nullptr;
+    const godot_autopilot::util::JsonValue *name_v = nullptr;
+    const godot_autopilot::util::JsonValue *src_v = nullptr;
     if (item.IsObject()) {
       name_v = item.Find("name");
       src_v = item.Find("source");
@@ -614,13 +614,13 @@ mcp::JsonValue handle_run_gdscript_tests(const mcp::JsonValue &args) {
     specs.push_back(std::move(spec));
   }
 
-  mcp::JsonValue r = run_suite(specs, timeout_ms);
+  godot_autopilot::util::JsonValue r = run_suite(specs, timeout_ms);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "run_gdscript_tests completed");
   return r;
 }
 
-mcp::JsonValue handle_run_gdscript_test_files(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_run_gdscript_test_files(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "run_gdscript_test_files called");
 
@@ -687,13 +687,13 @@ mcp::JsonValue handle_run_gdscript_test_files(const mcp::JsonValue &args) {
     specs.push_back(std::move(spec));
   }
 
-  mcp::JsonValue r = run_suite(specs, timeout_ms);
-  mcp::JsonValue files_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue r = run_suite(specs, timeout_ms);
+  godot_autopilot::util::JsonValue files_arr(godot_autopilot::util::JsonValue::array_tag);
   for (const auto &f : files)
-    files_arr.PushBack(mcp::JsonValue(f));
+    files_arr.PushBack(godot_autopilot::util::JsonValue(f));
   r["files"] = std::move(files_arr);
   if (files.empty()) {
-    r["note"] = mcp::JsonValue("no files matched pattern '" + pattern +
+    r["note"] = godot_autopilot::util::JsonValue("no files matched pattern '" + pattern +
                                "' in directory '" + dir_norm + "'");
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,

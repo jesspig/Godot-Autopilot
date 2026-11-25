@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <string_view>
 
@@ -11,7 +11,7 @@ namespace godot_autopilot {
 namespace script_ops {
 
 int script_load_cache_mode(bool fresh);
-bool wants_fresh_load(const mcp::JsonValue &args);
+bool wants_fresh_load(const godot_autopilot::util::JsonValue &args);
 
 } // namespace script_ops
 } // namespace godot_autopilot
@@ -24,8 +24,8 @@ namespace {
 constexpr int kCacheModeIgnore = 0;
 constexpr int kCacheModeReuse = 1;
 
-mcp::JsonValue args_with(std::string_view key, const mcp::JsonValue &value) {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue args_with(std::string_view key, const godot_autopilot::util::JsonValue &value) {
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   args[key] = value;
   return args;
 }
@@ -41,25 +41,25 @@ TEST(ScriptFreshnessTest, FreshLoadBypassesResourceCache) {
 }
 
 TEST(ScriptFreshnessTest, FreshFlagDefaultsToFalse) {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   EXPECT_FALSE(wants_fresh_load(args));
 }
 
 TEST(ScriptFreshnessTest, FreshFlagTrueEnablesDiskReload) {
-  EXPECT_TRUE(wants_fresh_load(args_with("fresh", mcp::JsonValue(true))));
+  EXPECT_TRUE(wants_fresh_load(args_with("fresh", godot_autopilot::util::JsonValue(true))));
 }
 
 TEST(ScriptFreshnessTest, FreshFlagFalseKeepsCachedSemantics) {
-  EXPECT_FALSE(wants_fresh_load(args_with("fresh", mcp::JsonValue(false))));
+  EXPECT_FALSE(wants_fresh_load(args_with("fresh", godot_autopilot::util::JsonValue(false))));
 }
 
 TEST(ScriptFreshnessTest, FreshFlagIgnoresNonBooleanValues) {
-  EXPECT_FALSE(wants_fresh_load(args_with("fresh", mcp::JsonValue(1))));
-  EXPECT_FALSE(wants_fresh_load(args_with("fresh", mcp::JsonValue("true"))));
-  EXPECT_FALSE(wants_fresh_load(args_with("fresh", mcp::JsonValue())));
+  EXPECT_FALSE(wants_fresh_load(args_with("fresh", godot_autopilot::util::JsonValue(1))));
+  EXPECT_FALSE(wants_fresh_load(args_with("fresh", godot_autopilot::util::JsonValue("true"))));
+  EXPECT_FALSE(wants_fresh_load(args_with("fresh", godot_autopilot::util::JsonValue())));
 }
 
 TEST(ScriptFreshnessTest, UnrelatedArgumentsKeepCachedSemantics) {
   EXPECT_FALSE(
-      wants_fresh_load(args_with("path", mcp::JsonValue("res://probe.gd"))));
+      wants_fresh_load(args_with("path", godot_autopilot::util::JsonValue("res://probe.gd"))));
 }

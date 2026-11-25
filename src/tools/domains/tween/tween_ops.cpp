@@ -18,7 +18,7 @@
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -27,7 +27,7 @@
 namespace godot_autopilot {
 namespace tween_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

@@ -1,0 +1,140 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.015 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+CommandLine: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests\gda_unit_tests.exe --gtest_filter=CodeQualityC4Test.ValidateDeclaredChecksRequiredAndTypes
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Symbol search path is: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff6`bcb60000 00007ff6`bebd1000   gda_unit_tests.exe
+ModLoad: 00007ffd`2a770000 00007ffd`2a9dc000   ntdll.dll
+ModLoad: 00007ffc`4c1c0000 00007ffc`4c232000   C:\WINDOWS\System32\verifier.dll
+Page heap: pid 0x25E4: page heap enabled with flags 0x3.
+AVRF: gda_unit_tests.exe: pid 0x25E4: flags 0x80000001: application verifier enabled
+ModLoad: 00007ffc`9b6f0000 00007ffc`9b731000   C:\WINDOWS\SYSTEM32\vrfcore.dll
+AVRF: Failed to create logging directory C:\Users\jesspig\AppVerifierLogs (status C0000022)
+ModLoad: 00007ffd`28e10000 00007ffd`28edb000   C:\WINDOWS\System32\KERNEL32.DLL
+ModLoad: 00007ffd`28020000 00007ffd`28429000   C:\WINDOWS\System32\KERNELBASE.dll
+ModLoad: 00007ffd`2a4b0000 00007ffd`2a530000   C:\WINDOWS\System32\WS2_32.dll
+ModLoad: 00007ffd`27b10000 00007ffd`27c5c000   C:\WINDOWS\System32\ucrtbase.dll
+ModLoad: 00007ffd`29a80000 00007ffd`29b98000   C:\WINDOWS\System32\RPCRT4.dll
+ModLoad: 00007ffd`27e60000 00007ffd`27fde000   C:\WINDOWS\System32\CRYPT32.dll
+ModLoad: 00007ffd`277f0000 00007ffd`2781a000   C:\WINDOWS\SYSTEM32\bcrypt.dll
+ModLoad: 00007ffd`2a160000 00007ffd`2a21c000   C:\WINDOWS\System32\ADVAPI32.dll
+ModLoad: 00007ffd`297b0000 00007ffd`29858000   C:\WINDOWS\System32\sechost.dll
+ModLoad: 00007ffd`28430000 00007ffd`284d9000   C:\WINDOWS\System32\msvcrt.dll
+(25e4.6fa4): Break instruction exception - code 80000003 (first chance)
+ntdll!RtlGetReturnAddressHijackTarget+0xa45:
+00007ffd`2a895245 cc              int     3
+0:000> cdb: Reading initial command 'g; kPn; q'
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = CodeQualityC4Test.ValidateDeclaredChecksRequiredAndTypes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CodeQualityC4Test
+[ RUN      ] CodeQualityC4Test.ValidateDeclaredChecksRequiredAndTypes
+(25e4.6fa4): C++ EH exception - code e06d7363 (first chance)
+(25e4.6fa4): Access violation - code c0000005 (first chance)
+First chance exceptions are reported before any exception handling.
+This exception may be expected and handled.
+*** WARNING: Unable to verify checksum for gda_unit_tests.exe
+ # Child-SP          RetAddr               Call Site
+00 0000009e`274fc968 00007ff6`bcb79513     gda_unit_tests!strlen(void)+0x31
+01 0000009e`274fc970 00007ff6`bcb65d03     gda_unit_tests!std::_Narrow_char_traits<char,int>::length(
+			char * _First = 0x000001e5`5898efd0 "--- memory read error at address 0x000001e5`5898efd0 ---")+0x13
+02 0000009e`274fc9a0 00007ff6`bd4c0cd6     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::basic_string(
+			char * _Ptr = 0x000001e5`5898efd0 "--- memory read error at address 0x000001e5`5898efd0 ---")+0x33
+03 0000009e`274fca00 00007ff6`bcbcbf9f     gda_unit_tests!godot_autopilot::util::JsonValue::JsonValue(
+			char * v = 0x000001e5`5898efd0 "--- memory read error at address 0x000001e5`5898efd0 ---")+0x36
+04 0000009e`274fca70 00007ff6`be11d3e0     gda_unit_tests!godot_autopilot::spec_detail::validate_dynamic_args(
+			class godot_autopilot::util::JsonValue * args = 0x00000000`00000000, 
+			class std::vector<godot_autopilot::schema::ParamDef,std::allocator<godot_autopilot::schema::ParamDef> > * params = 0x00000000`00000000)+0x67f
+05 0000009e`274fcaa0 00007ff6`be0ea787     gda_unit_tests!_CallSettingFrame(void)+0x20
+06 0000009e`274fcad0 00007ffd`2a8971e6     gda_unit_tests!__FrameHandler3::CxxCallCatchBlock(
+			struct _EXCEPTION_RECORD * pExcept = 0x0000009e`274fd870)+0x107
+07 0000009e`274fcba0 00007ff6`bcbcbc0b     ntdll!RtlCaptureContext2+0x4a6
+08 0000009e`274feca0 00007ff6`bcc57f64     gda_unit_tests!godot_autopilot::spec_detail::validate_dynamic_args(
+			class godot_autopilot::util::JsonValue * args = 0x00000000`00000000, 
+			class std::vector<godot_autopilot::schema::ParamDef,std::allocator<godot_autopilot::schema::ParamDef> > * params = 0x00000000`000a97b8)+0x2eb
+09 0000009e`274feff0 00007ff6`bcc56de1     gda_unit_tests!`anonymous namespace'::dynamic_validation_error(
+			class godot_autopilot::util::JsonValue * args = 0x000001e5`4d790000, 
+			class std::vector<godot_autopilot::schema::ParamDef,std::allocator<godot_autopilot::schema::ParamDef> > * params = 0x00007ffd`2a807126 { size=0x1bd02aca8815476 })+0x44
+0a 0000009e`274ff0c0 00007ff6`bdff3be0     gda_unit_tests!CodeQualityC4Test_ValidateDeclaredChecksRequiredAndTypes_Test::TestBody(void)+0x361
+0b 0000009e`274ff7a0 00007ff6`bdfd8588     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x000001e5`5894eff0, 
+			<function> * method = 0x00007ff6`bdfd8730, 
+			char * location = 0x00007ff6`be3ab6a0 "the test body")+0x20
+0c 0000009e`274ff800 00007ff6`bdfbb543     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x000001e5`5049eda0, 
+			<function> * method = 0x0000009e`274ffb20, 
+			char * location = 0x00007ff6`bdfbb543 "H???")+0x48
+0d 0000009e`274ff8b0 00007ff6`bdfbc089     gda_unit_tests!testing::Test::Run(void)+0x93
+0e 0000009e`274ff8f0 00007ff6`bdfbc92f     gda_unit_tests!testing::TestInfo::Run(void)+0x119
+0f 0000009e`274ff960 00007ff6`bdfcae10     gda_unit_tests!testing::TestSuite::Run(void)+0x18f
+10 0000009e`274ff9e0 00007ff6`bdff7330     gda_unit_tests!testing::internal::UnitTestImpl::RunAllTests(void)+0x3f0
+11 0000009e`274ffad0 00007ff6`bdfda688     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x000001e5`5049eda0, 
+			<function> * method = 0x00007ff6`bdfcaa20, 
+			char * location = 0x00007ff6`be3ac035 "auxiliary test code (environments or event listeners)")+0x20
+12 0000009e`274ffb30 00007ff6`bdfca9c9     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x0000009e`274ffc60, 
+			<function> * method = 0x00007ff6`bdfca9c9, 
+			char * location = 0x0000009e`00000000 "--- memory read error at address 0x0000009e`00000000 ---")+0x48
+13 0000009e`274ffbf0 00007ff6`be020ed1     gda_unit_tests!testing::UnitTest::Run(void)+0xe9
+14 0000009e`274ffc70 00007ff6`be020e8b     gda_unit_tests!RUN_ALL_TESTS(void)+0x11
+15 0000009e`274ffca0 00007ff6`be09513f     gda_unit_tests!main(
+			int argc = 0n1, 
+			char ** argv = 0x000001e5`503ccf10)+0x4b
+16 (Inline Function) --------`--------     gda_unit_tests!invoke_main(void)+0x22
+17 0000009e`274ffcf0 00007ffd`28e3dda7     gda_unit_tests!__scrt_common_main_seh(void)+0x10f
+18 0000009e`274ffd30 00007ffd`2a839c5c     KERNEL32!BaseThreadInitThunk+0x17
+19 0000009e`274ffd60 00000000`00000000     ntdll!RtlUserThreadStart+0x2c
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

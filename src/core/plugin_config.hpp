@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 
@@ -22,21 +22,21 @@ public:
   static bool save_desensitize(bool value);
 
   static bool merge_value(ConfigReadStatus status,
-                          const mcp::JsonValue::Object &doc, const char *key,
-                          const mcp::JsonValue &value, std::string &out_text);
+                          const godot_autopilot::util::JsonValue::Object &doc, const char *key,
+                          const godot_autopilot::util::JsonValue &value, std::string &out_text);
 };
 
 inline bool PluginConfig::merge_value(ConfigReadStatus status,
-                                      const mcp::JsonValue::Object &doc,
+                                      const godot_autopilot::util::JsonValue::Object &doc,
                                       const char *key,
-                                      const mcp::JsonValue &value,
+                                      const godot_autopilot::util::JsonValue &value,
                                       std::string &out_text) {
   if (status == ConfigReadStatus::kParseFailed) {
     return false;
   }
-  mcp::JsonValue::Object merged = doc;
+  godot_autopilot::util::JsonValue::Object merged = doc;
   merged[key] = value;
-  out_text = mcp::JsonValue(std::move(merged)).Dump(2);
+  out_text = godot_autopilot::util::JsonValue(std::move(merged)).Dump(2);
   return true;
 }
 

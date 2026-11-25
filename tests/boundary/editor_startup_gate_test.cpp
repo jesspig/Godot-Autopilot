@@ -19,14 +19,14 @@ const char *kPlayNormalError =
 const char *kCreateNormalError =
     "parent node not found: Main — 当前没有可编辑的场景根节点";
 
-mcp::JsonValue normal_error(const std::string &text) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(text);
+godot_autopilot::util::JsonValue normal_error(const std::string &text) {
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue(text);
   return e;
 }
 
-std::string error_text(const mcp::JsonValue &value) {
-  const mcp::JsonValue *field = value.Find("error");
+std::string error_text(const godot_autopilot::util::JsonValue &value) {
+  const godot_autopilot::util::JsonValue *field = value.Find("error");
   return field && field->IsString() ? std::string(field->GetString())
                                     : std::string();
 }
@@ -70,25 +70,25 @@ TEST(EditorStartupGateTest, StartupMarkProducesNonNegativeElapsed) {
 }
 
 TEST(EditorStartupGateTest, StartupErrorCarriesIf02Contract) {
-  const mcp::JsonValue e = startup_in_progress_error();
+  const godot_autopilot::util::JsonValue e = startup_in_progress_error();
   ASSERT_TRUE(e.IsObject());
-  const mcp::JsonValue *code = e.Find("error_code");
+  const godot_autopilot::util::JsonValue *code = e.Find("error_code");
   ASSERT_NE(code, nullptr);
   ASSERT_TRUE(code->IsString());
   EXPECT_EQ(code->GetString(), "startup_in_progress");
-  const mcp::JsonValue *verdict_code = e.Find("code");
+  const godot_autopilot::util::JsonValue *verdict_code = e.Find("code");
   ASSERT_NE(verdict_code, nullptr);
   ASSERT_TRUE(verdict_code->IsString());
   EXPECT_EQ(verdict_code->GetString(), "startup_in_progress");
-  const mcp::JsonValue *retryable = e.Find("retryable");
+  const godot_autopilot::util::JsonValue *retryable = e.Find("retryable");
   ASSERT_NE(retryable, nullptr);
   ASSERT_TRUE(retryable->IsBool());
   EXPECT_TRUE(retryable->GetBool());
-  const mcp::JsonValue *hint = e.Find("hint");
+  const godot_autopilot::util::JsonValue *hint = e.Find("hint");
   ASSERT_NE(hint, nullptr);
   ASSERT_TRUE(hint->IsString());
   EXPECT_FALSE(std::string(hint->GetString()).empty());
-  const mcp::JsonValue *retry_after = e.Find("retry_after_ms");
+  const godot_autopilot::util::JsonValue *retry_after = e.Find("retry_after_ms");
   ASSERT_NE(retry_after, nullptr);
   ASSERT_TRUE(retry_after->IsInt());
   EXPECT_GT(retry_after->GetInt(), 0);
@@ -104,12 +104,12 @@ TEST(EditorStartupGateTest, StartupErrorDropsMisattributionText) {
 }
 
 TEST(EditorStartupGateTest, GatedErrorInWindowReturnsStructuredStartup) {
-  const mcp::JsonValue gated =
+  const godot_autopilot::util::JsonValue gated =
       startup_gated_error(true, normal_error(kPlayNormalError));
-  const mcp::JsonValue *code = gated.Find("error_code");
+  const godot_autopilot::util::JsonValue *code = gated.Find("error_code");
   ASSERT_NE(code, nullptr);
   EXPECT_EQ(code->GetString(), "startup_in_progress");
-  const mcp::JsonValue *retryable = gated.Find("retryable");
+  const godot_autopilot::util::JsonValue *retryable = gated.Find("retryable");
   ASSERT_NE(retryable, nullptr);
   EXPECT_TRUE(retryable->GetBool());
   EXPECT_NE(error_text(gated), kPlayNormalError);
@@ -118,7 +118,7 @@ TEST(EditorStartupGateTest, GatedErrorInWindowReturnsStructuredStartup) {
 }
 
 TEST(EditorStartupGateTest, GatedErrorOutsideWindowKeepsPlayTextVerbatim) {
-  const mcp::JsonValue gated =
+  const godot_autopilot::util::JsonValue gated =
       startup_gated_error(false, normal_error(kPlayNormalError));
   EXPECT_EQ(error_text(gated), kPlayNormalError);
   EXPECT_EQ(gated.Find("error_code"), nullptr);
@@ -127,7 +127,7 @@ TEST(EditorStartupGateTest, GatedErrorOutsideWindowKeepsPlayTextVerbatim) {
 }
 
 TEST(EditorStartupGateTest, GatedErrorOutsideWindowKeepsCreateTextVerbatim) {
-  const mcp::JsonValue gated =
+  const godot_autopilot::util::JsonValue gated =
       startup_gated_error(false, normal_error(kCreateNormalError));
   EXPECT_EQ(error_text(gated), kCreateNormalError);
   EXPECT_EQ(gated.Find("error_code"), nullptr);
@@ -135,9 +135,9 @@ TEST(EditorStartupGateTest, GatedErrorOutsideWindowKeepsCreateTextVerbatim) {
 }
 
 TEST(EditorStartupGateTest, GatedErrorInWindowReplacesCreateMisattribution) {
-  const mcp::JsonValue gated =
+  const godot_autopilot::util::JsonValue gated =
       startup_gated_error(true, normal_error(kCreateNormalError));
-  const mcp::JsonValue *code = gated.Find("error_code");
+  const godot_autopilot::util::JsonValue *code = gated.Find("error_code");
   ASSERT_NE(code, nullptr);
   EXPECT_EQ(code->GetString(), "startup_in_progress");
   EXPECT_FALSE(contains(error_text(gated), "parent node not found"));

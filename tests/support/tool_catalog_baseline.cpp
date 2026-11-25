@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace {
 
@@ -32,8 +32,8 @@ std::filesystem::path find_baseline_path() {
       std::filesystem::current_path().string());
 }
 
-std::size_t require_int(const mcp::JsonValue &root, const char *key) {
-  const mcp::JsonValue *value = root.Find(key);
+std::size_t require_int(const godot_autopilot::util::JsonValue &root, const char *key) {
+  const godot_autopilot::util::JsonValue *value = root.Find(key);
   if (value == nullptr || !value->IsInt() || value->GetInt() < 0) {
     throw std::runtime_error(
         std::string("tool catalog baseline requires a non-negative integer: ") +
@@ -56,9 +56,9 @@ const ToolCatalogBaseline &load_tool_catalog_baseline() {
     }
     const std::string text((std::istreambuf_iterator<char>(input)),
                            std::istreambuf_iterator<char>());
-    mcp::JsonValue root;
+    godot_autopilot::util::JsonValue root;
     try {
-      root = mcp::JsonValue::Parse(text);
+      root = godot_autopilot::util::JsonValue::Parse(text);
     } catch (const std::exception &ex) {
       throw std::runtime_error("failed to parse tool catalog baseline " +
                                path.string() + ": " + ex.what());

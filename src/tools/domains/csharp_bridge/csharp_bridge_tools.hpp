@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_CSHARP_BRIDGE_TOOLS_HPP
 #define GODOT_AUTOPILOT_CSHARP_BRIDGE_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -55,10 +55,10 @@ const std::vector<std::string> kCSharpMemberActions = {"get", "set", "call",
 const std::vector<std::string> kCSharpEventActions = {"subscribe",
                                                       "unsubscribe"};
 
-inline mcp::JsonValue csharp_action_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue csharp_action_args(const godot_autopilot::util::JsonValue &args,
                                          const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   if (!args.IsObject()) {
     return out;
   }
@@ -90,25 +90,25 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "csharp_get_property", "csharp_member",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return csharp_action_args(args, "get");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "csharp_set_property", "csharp_member",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return csharp_action_args(args, "set");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "csharp_call_method", "csharp_member",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return csharp_action_args(args, "call");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "csharp_list_members", "csharp_member",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return csharp_action_args(args, "list");
               },
               {}, "0.4.0", "0.6.0"},
@@ -128,13 +128,13 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "csharp_subscribe_event", "csharp_event",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return csharp_action_args(args, "subscribe");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "csharp_unsubscribe_event", "csharp_event",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return csharp_action_args(args, "unsubscribe");
               },
               {}, "0.4.0", "0.6.0"},

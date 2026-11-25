@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_SCRIPT_TOOLS_HPP
 #define GODOT_AUTOPILOT_SCRIPT_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
