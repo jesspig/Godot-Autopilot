@@ -39,8 +39,8 @@ int script_load_cache_mode(bool fresh) {
                : static_cast<int>(godot::ResourceLoader::CACHE_MODE_REUSE);
 }
 
-bool wants_fresh_load(const mcp::JsonValue &args) {
-  const mcp::JsonValue *flag = args.Find("fresh");
+bool wants_fresh_load(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *flag = args.Find("fresh");
   return flag != nullptr && flag->IsBool() && flag->GetBool();
 }
 
@@ -114,21 +114,21 @@ constexpr const char *NODE_PATH_HINT =
 constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
 constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
 
-mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
+godot_autopilot::util::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
   if (res.is_null())
-    return mcp::JsonValue(nullptr);
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
-  j["path"] = mcp::JsonValue(util::to_std(res->get_path()));
-  j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-  j["object_id_str"] = mcp::JsonValue(
+    return godot_autopilot::util::JsonValue(nullptr);
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["class"] = godot_autopilot::util::JsonValue(util::to_std(res->get_class()));
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(res->get_path()));
+  j["object_id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+  j["object_id_str"] = godot_autopilot::util::JsonValue(
       std::to_string(static_cast<int64_t>(res->get_instance_id())));
   return j;
 }
 
 bool load_script_resource(const std::string &path, bool fresh,
                           godot::Ref<godot::Script> &out_script,
-                          mcp::JsonValue &err_out) {
+                          godot_autopilot::util::JsonValue &err_out) {
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
     err_out = util::error_json("ResourceLoader not available");
@@ -155,22 +155,22 @@ bool load_script_resource(const std::string &path, bool fresh,
 
 bool load_script_or_error(const std::string &path,
                           godot::Ref<godot::Script> &out_script,
-                          mcp::JsonValue &err_out) {
+                          godot_autopilot::util::JsonValue &err_out) {
   return load_script_resource(path, false, out_script, err_out);
 }
 
 bool load_script_fresh(const std::string &path,
                        godot::Ref<godot::Script> &out_script,
-                       mcp::JsonValue &err_out) {
+                       godot_autopilot::util::JsonValue &err_out) {
   if (!load_script_resource(path, true, out_script, err_out))
     return false;
   out_script->reload(true);
   return true;
 }
 
-bool load_script_for_read(const std::string &path, const mcp::JsonValue &args,
+bool load_script_for_read(const std::string &path, const godot_autopilot::util::JsonValue &args,
                           godot::Ref<godot::Script> &out_script,
-                          mcp::JsonValue &err_out) {
+                          godot_autopilot::util::JsonValue &err_out) {
   return wants_fresh_load(args)
              ? load_script_fresh(path, out_script, err_out)
              : load_script_or_error(path, out_script, err_out);
@@ -180,9 +180,9 @@ bool load_script_for_read(const std::string &path, const mcp::JsonValue &args,
 
 bool refresh_script_cache(const std::string &path, std::string &error_out) {
   godot::Ref<godot::Script> refreshed;
-  mcp::JsonValue refresh_err;
+  godot_autopilot::util::JsonValue refresh_err;
   if (!load_script_fresh(path, refreshed, refresh_err)) {
-    const mcp::JsonValue *msg = refresh_err.Find("error");
+    const godot_autopilot::util::JsonValue *msg = refresh_err.Find("error");
     error_out = (msg != nullptr && msg->IsString())
                     ? msg->GetString()
                     : std::string("script cache refresh failed");
@@ -191,13 +191,13 @@ bool refresh_script_cache(const std::string &path, std::string &error_out) {
   return true;
 }
 
-mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
-  const mcp::JsonValue *it_expr = args.Find("expression");
-  const mcp::JsonValue *it_source = args.Find("source_code");
+godot_autopilot::util::JsonValue handle_execute_gdscript(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *it_expr = args.Find("expression");
+  const godot_autopilot::util::JsonValue *it_source = args.Find("source_code");
   if (it_expr != nullptr && it_source != nullptr)
     return util::error_json(
         "invalid parameter: pass only one of expression/source_code");
-  const mcp::JsonValue *chosen = it_expr != nullptr ? it_expr : it_source;
+  const godot_autopilot::util::JsonValue *chosen = it_expr != nullptr ? it_expr : it_source;
   if (chosen == nullptr)
     return util::error_json(
         "missing required parameter: expression or source_code");
@@ -216,8 +216,8 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   if (gdscript_wrap::has_top_level_func_def(cleaned)) {
 
     if (!gdscript_wrap::defines_function_named(cleaned, "_run")) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("multi-function mode requires a func _run() "
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("multi-function mode requires a func _run() "
                                   "entry point（或将函数改为 lambda 变量）");
       return e;
     }
@@ -229,8 +229,8 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
         expression, "_run",
         "var SceneRoot := EditorInterface.get_edited_scene_root()", true);
     if (!wrap.ok) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(wrap.error);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(wrap.error);
       return e;
     }
     wrapped = wrap.wrapped;
@@ -240,8 +240,8 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   godot::Ref<godot::GDScript> script;
   script.instantiate();
   if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to create GDScript instance");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("failed to create GDScript instance");
     return e;
   }
 
@@ -260,8 +260,8 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
                  "\nerror lines above were mapped from the generated wrapper "
                  "script";
         });
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(message);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(message);
     return e;
   }
 
@@ -292,9 +292,9 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
     if (temp_added && temp_node->get_parent())
       temp_node->get_parent()->remove_child(temp_node);
     memdelete(temp_node);
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("unexpected error: compiled script missing _run method");
+        godot_autopilot::util::JsonValue("unexpected error: compiled script missing _run method");
     return e;
   }
 
@@ -308,52 +308,52 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
     temp_node->get_parent()->remove_child(temp_node);
   memdelete(temp_node);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(result);
   if (!new_output_text.empty()) {
     r["output"] =
-        mcp::JsonValue(gdscript_wrap::truncate_capture_text(new_output_text));
+        godot_autopilot::util::JsonValue(gdscript_wrap::truncate_capture_text(new_output_text));
   }
   if (!new_error_text.empty()) {
     std::string errors = gdscript_wrap::truncate_capture_text(new_error_text);
     if (new_error_text.find("Node not found") != std::string::npos) {
       errors += gdscript_wrap::NODE_NOT_FOUND_HINT;
     }
-    r["errors"] = mcp::JsonValue(errors);
+    r["errors"] = godot_autopilot::util::JsonValue(errors);
   }
   return r;
 }
 
-mcp::JsonValue handle_load(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_load(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   std::string path = it_path->GetString();
 
   godot::Ref<godot::Script> script;
-  mcp::JsonValue load_err;
+  godot_autopilot::util::JsonValue load_err;
   if (!load_script_for_read(path, args, script, load_err))
     return load_err;
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = serialize_resource(script);
   return r;
 }
 
-mcp::JsonValue handle_create(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   auto *it_code = args.Find("source_code");
   if (!it_code || !it_code->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: source_code");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: source_code");
     return e;
   }
   std::string path = it_path->GetString();
@@ -374,32 +374,32 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   bool file_exists_on_disk =
       godot::FileAccess::file_exists(godot::String(path.c_str()));
   if (!overwrite && file_exists_on_disk) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("file already exists: " + path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("file already exists: " + path +
                                 " — pass overwrite=true to replace it");
     return e;
   }
 
   std::string compile_error;
   if (!try_compile_source(source_code, path, compile_error)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(compile_error);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(compile_error);
     return e;
   }
 
   godot::Ref<godot::GDScript> script;
   script.instantiate();
   if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to create GDScript");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("failed to create GDScript");
     return e;
   }
 
   script->set_source_code(godot::String::utf8(source_code.c_str()));
   script->set_path_cache(godot::String(path.c_str()));
   if (script->reload() != godot::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(compile_error.empty()
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(compile_error.empty()
                                     ? std::string("script compilation failed")
                                     : compile_error);
     return e;
@@ -407,28 +407,28 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
 
   auto *saver = godot::ResourceSaver::get_singleton();
   if (!saver) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceSaver not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("ResourceSaver not available");
     return e;
   }
 
   std::string dir_created;
   std::string dir_error;
   if (!resource_fs::ensure_parent_directory(path, dir_created, dir_error)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(dir_error);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(dir_error);
     return e;
   }
 
   godot::Error err = saver->save(script, godot::String(path.c_str()));
   if (err != godot::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to save script, error code: " +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("failed to save script, error code: " +
                                 std::to_string(static_cast<int>(err)));
-    mcp::JsonValue details(mcp::JsonValue::object_tag);
-    details["code"] = mcp::JsonValue("script_save_failed");
-    details["path"] = mcp::JsonValue(path);
-    details["io_error"] = mcp::JsonValue(static_cast<int64_t>(err));
+    godot_autopilot::util::JsonValue details(godot_autopilot::util::JsonValue::object_tag);
+    details["code"] = godot_autopilot::util::JsonValue("script_save_failed");
+    details["path"] = godot_autopilot::util::JsonValue(path);
+    details["io_error"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(err));
     e["structured_error"] = std::move(details);
     return e;
   }
@@ -437,19 +437,19 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   const resource_fs::TextWriteResult write_result =
       resource_fs::verify_text_file(path, source_code, file_system);
   if (!write_result.ok) {
-    mcp::JsonValue e = util::error_json(
+    godot_autopilot::util::JsonValue e = util::error_json(
         "script write verification failed: " + write_result.message);
-    mcp::JsonValue details(mcp::JsonValue::object_tag);
-    details["code"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue details(godot_autopilot::util::JsonValue::object_tag);
+    details["code"] = godot_autopilot::util::JsonValue(
         resource_fs::text_write_failure_code(write_result.failure));
-    details["path"] = mcp::JsonValue(path);
+    details["path"] = godot_autopilot::util::JsonValue(path);
     details["io_error"] =
-        mcp::JsonValue(static_cast<int64_t>(write_result.io_error));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(write_result.io_error));
     details["expected_bytes"] =
-        mcp::JsonValue(static_cast<int64_t>(write_result.expected_bytes));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(write_result.expected_bytes));
     if (write_result.actual_bytes >= 0) {
       details["actual_bytes"] =
-          mcp::JsonValue(static_cast<int64_t>(write_result.actual_bytes));
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(write_result.actual_bytes));
     }
     e["structured_error"] = std::move(details);
     return e;
@@ -469,33 +469,33 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["path"] = mcp::JsonValue(path);
-  j["class"] = mcp::JsonValue("GDScript");
-  j["overwritten"] = mcp::JsonValue(file_exists_on_disk);
-  j["verified"] = mcp::JsonValue(verified);
-  j["readback"] = mcp::JsonValue(readback);
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["path"] = godot_autopilot::util::JsonValue(path);
+  j["class"] = godot_autopilot::util::JsonValue("GDScript");
+  j["overwritten"] = godot_autopilot::util::JsonValue(file_exists_on_disk);
+  j["verified"] = godot_autopilot::util::JsonValue(verified);
+  j["readback"] = godot_autopilot::util::JsonValue(readback);
   if (readback) {
-    j["disk_bytes"] = mcp::JsonValue(static_cast<int64_t>(read_back.size()));
-    j["content_hash"] = mcp::JsonValue(fnv1a64_hex(read_back));
-    j["content_hash_algo"] = mcp::JsonValue(content_hash_algo_name());
+    j["disk_bytes"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(read_back.size()));
+    j["content_hash"] = godot_autopilot::util::JsonValue(fnv1a64_hex(read_back));
+    j["content_hash_algo"] = godot_autopilot::util::JsonValue(content_hash_algo_name());
   }
-  j["cache_refreshed"] = mcp::JsonValue(cache_refreshed);
+  j["cache_refreshed"] = godot_autopilot::util::JsonValue(cache_refreshed);
   if (!cache_refreshed) {
-    j["cache_refresh_error"] = mcp::JsonValue(cache_refresh_error);
+    j["cache_refresh_error"] = godot_autopilot::util::JsonValue(cache_refresh_error);
   }
   godot::StringName global_name = script->get_global_name();
   if (global_name != godot::StringName()) {
     j["global_class_name"] =
-        mcp::JsonValue(util::to_std(godot::String(global_name)));
+        godot_autopilot::util::JsonValue(util::to_std(godot::String(global_name)));
 
-    j["global_class_hint"] = mcp::JsonValue(
+    j["global_class_hint"] = godot_autopilot::util::JsonValue(
         "global class registration may be delayed — cross-script references "
         "may need preload() or a filesystem rescan");
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(j);
-  r["note"] = mcp::JsonValue(
+  r["note"] = godot_autopilot::util::JsonValue(
       "editor cache was refreshed for this file; if a game is running with the "
       "old script, call reload_game_scripts first and then "
       "reload_current_scene (or retry the operation) — reloading the scene "
@@ -504,17 +504,17 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_attach_to_node(const godot_autopilot::util::JsonValue &args) {
   auto *it_node = args.Find("node_path");
   auto *it_script = args.Find("script_path");
   if (!it_node || !it_node->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   if (!it_script || !it_script->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: script_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: script_path");
     return e;
   }
   std::string node_path = it_node->GetString();
@@ -527,14 +527,14 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   std::string hint;
   godot::Node *node = util::resolve_scene_node(node_path, root, &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path +
                                 NODE_PATH_HINT + " — " + hint);
     return e;
   }
 
   godot::Ref<godot::Script> script;
-  mcp::JsonValue load_err;
+  godot_autopilot::util::JsonValue load_err;
   if (!load_script_fresh(script_path, script, load_err))
     return load_err;
 
@@ -550,32 +550,32 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   } else {
     node->set_script(godot::Variant(script));
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("script attached to " + node_path);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("script attached to " + node_path);
   const script_capability::Result capability =
       script_capability::inspect_loaded(script);
-  r["instantiated"] = mcp::JsonValue(capability.editor_runnable);
-  r["editor_runnable"] = mcp::JsonValue(capability.editor_runnable);
-  r["runtime_mountable"] = mcp::JsonValue(capability.runtime_mountable);
-  r["code"] = mcp::JsonValue(script_capability::code_name(capability.code));
+  r["instantiated"] = godot_autopilot::util::JsonValue(capability.editor_runnable);
+  r["editor_runnable"] = godot_autopilot::util::JsonValue(capability.editor_runnable);
+  r["runtime_mountable"] = godot_autopilot::util::JsonValue(capability.runtime_mountable);
+  r["code"] = godot_autopilot::util::JsonValue(script_capability::code_name(capability.code));
   scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
   if (!capability.editor_runnable && capability.runtime_mountable) {
-    r["note"] = mcp::JsonValue(
+    r["note"] = godot_autopilot::util::JsonValue(
         "runtime-only script: it runs in the game, not in the editor");
   } else if (!capability.runtime_mountable) {
-    r["note"] = mcp::JsonValue(
+    r["note"] = godot_autopilot::util::JsonValue(
         "script is not mountable: " +
         std::string(script_capability::code_name(capability.code)));
   }
   return r;
 }
 
-mcp::JsonValue handle_detach_from_node(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_detach_from_node(const godot_autopilot::util::JsonValue &args) {
   auto *it_node = args.Find("node_path");
   if (!it_node || !it_node->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   std::string node_path = it_node->GetString();
@@ -587,8 +587,8 @@ mcp::JsonValue handle_detach_from_node(const mcp::JsonValue &args) {
   std::string hint;
   godot::Node *node = util::resolve_scene_node(node_path, root, &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path +
                                 NODE_PATH_HINT + " — " + hint);
     return e;
   }
@@ -606,17 +606,17 @@ mcp::JsonValue handle_detach_from_node(const mcp::JsonValue &args) {
     node->set_script(godot::Variant());
   }
   scene_dirty_tracker::mark_scene_modified();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("script detached from " + node_path);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("script detached from " + node_path);
   util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
-mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_property(const godot_autopilot::util::JsonValue &args) {
   auto *it_prop = args.Find("property");
   if (!it_prop || !it_prop->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: property");
     return e;
   }
   std::string property = it_prop->GetString();
@@ -625,13 +625,13 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
   if (it_path && it_path->IsString()) {
     std::string script_path = it_path->GetString();
     godot::Ref<godot::Script> script;
-    mcp::JsonValue load_err;
+    godot_autopilot::util::JsonValue load_err;
     if (!load_script_for_read(script_path, args, script, load_err))
       return load_err;
 
     godot::StringName prop_name(property.c_str());
     godot::Variant val = script->get_property_default_value(prop_name);
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(val);
     return r;
   }
@@ -646,40 +646,40 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
     std::string hint;
     godot::Node *node = util::resolve_scene_node(node_path, root, &hint);
     if (!node) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("node not found: " + node_path +
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path +
                                   NODE_PATH_HINT + " — " + hint);
       return e;
     }
     godot::StringName prop_name(property.c_str());
     godot::Variant val = node->get(prop_name);
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(val);
     return r;
   }
 
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("must provide either script_path or node_path");
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue("must provide either script_path or node_path");
   return e;
 }
 
-mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_property(const godot_autopilot::util::JsonValue &args) {
   auto *it_node = args.Find("node_path");
   auto *it_prop = args.Find("property");
   auto *it_val = args.Find("value");
   if (!it_node || !it_node->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   if (!it_prop || !it_prop->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: property");
     return e;
   }
   if (!it_val) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: value");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: value");
     return e;
   }
   std::string node_path = it_node->GetString();
@@ -692,8 +692,8 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   std::string hint;
   godot::Node *node = util::resolve_scene_node(node_path, root, &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path +
                                 NODE_PATH_HINT + " — " + hint);
     return e;
   }
@@ -709,23 +709,23 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   node->set(prop_name, value);
   scene_dirty_tracker::mark_scene_modified();
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
-mcp::JsonValue handle_call_function(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_call_function(const godot_autopilot::util::JsonValue &args) {
   auto *it_node = args.Find("node_path");
   if (!it_node || !it_node->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   auto *it_func = args.Find("function");
   if (!it_func || !it_func->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: function");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: function");
     return e;
   }
   std::string node_path = it_node->GetString();
@@ -738,17 +738,17 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue &args) {
   std::string hint;
   godot::Node *node = util::resolve_scene_node(node_path, root, &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path +
                                 NODE_PATH_HINT + " — " + hint);
     return e;
   }
 
   godot::Ref<godot::Script> script = node->get_script();
   if (script.is_valid() && !script->can_instantiate()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("script is not instantiable in the editor: " +
+        godot_autopilot::util::JsonValue("script is not instantiable in the editor: " +
                        util::to_std(script->get_path()) +
                        " — scripts must be marked @tool to run in the editor, "
                        "or run the game to execute non-tool scripts");
@@ -757,8 +757,8 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue &args) {
 
   godot::StringName func_name(function.c_str());
   if (!node->has_method(func_name)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("method not found: " + function + " on node " +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("method not found: " + function + " on node " +
                                 node_path);
     return e;
   }
@@ -778,25 +778,25 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue &args) {
   godot::Variant result = node->callv(func_name, args_arr);
   if (result.get_type() == godot::Variant::NIL && script.is_valid() &&
       !script->can_instantiate()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("method call failed on node " + node_path +
+        godot_autopilot::util::JsonValue("method call failed on node " + node_path +
                        ": script instance unavailable in the editor — scripts "
                        "must be marked @tool to run in the editor, or run the "
                        "game to execute non-tool scripts");
     return e;
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(result);
   return r;
 }
 
-mcp::JsonValue handle_reload(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_reload(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   std::string path = it_path->GetString();
@@ -807,32 +807,32 @@ mcp::JsonValue handle_reload(const mcp::JsonValue &args) {
     keep_state = ks->GetBool();
 
   godot::Ref<godot::Script> script;
-  mcp::JsonValue load_err;
+  godot_autopilot::util::JsonValue load_err;
   if (!load_script_fresh(path, script, load_err))
     return load_err;
 
   godot::Error reload_result = script->reload(keep_state);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(static_cast<int64_t>(reload_result));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(reload_result));
   return r;
 }
 
-mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_variable_list(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   std::string path = it_path->GetString();
 
   godot::Ref<godot::Script> script;
-  mcp::JsonValue load_err;
+  godot_autopilot::util::JsonValue load_err;
   if (!load_script_for_read(path, args, script, load_err))
     return load_err;
 
   godot::TypedArray<godot::Dictionary> props = script->get_script_property_list();
-  mcp::JsonValue result(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::array_tag);
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
     int usage = 0;
@@ -843,22 +843,22 @@ mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args) {
         (usage & PROPERTY_USAGE_INTERNAL) != 0) {
       continue;
     }
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["usage"] = mcp::JsonValue(static_cast<int64_t>(usage));
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["usage"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(usage));
     if (dict.has("name")) {
       item["name"] =
-          mcp::JsonValue(util::to_std(dict["name"].operator godot::String()));
+          godot_autopilot::util::JsonValue(util::to_std(dict["name"].operator godot::String()));
     }
     if (dict.has("type")) {
       int type_id = static_cast<int>(dict["type"]);
-      item["type_id"] = mcp::JsonValue(static_cast<int64_t>(type_id));
-      item["type"] = mcp::JsonValue(util::to_std(godot::Variant::get_type_name(
+      item["type_id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(type_id));
+      item["type"] = godot_autopilot::util::JsonValue(util::to_std(godot::Variant::get_type_name(
           static_cast<godot::Variant::Type>(type_id))));
     }
     result.PushBack(std::move(item));
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result);
   return r;
 }

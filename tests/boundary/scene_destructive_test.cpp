@@ -73,7 +73,7 @@ TEST(SceneDestructiveTest, ReloadDiscardGate) {
   EXPECT_EQ(check_reload_discard(true, true, true), ReloadDiscardFailure::kNone);
 }
 
-static mcp::JsonValue find_tool_schema(
+static godot_autopilot::util::JsonValue find_tool_schema(
     const std::vector<std::unique_ptr<godot_autopilot::ToolBase>> &tools,
     const std::string &name) {
   for (const auto &tool : tools) {
@@ -81,29 +81,29 @@ static mcp::JsonValue find_tool_schema(
       return tool->input_schema();
     }
   }
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-static bool schema_has_property(const mcp::JsonValue &schema,
+static bool schema_has_property(const godot_autopilot::util::JsonValue &schema,
                                 const std::string &name) {
-  const mcp::JsonValue *properties = schema.Find("properties");
+  const godot_autopilot::util::JsonValue *properties = schema.Find("properties");
   return properties != nullptr && properties->IsObject() &&
          properties->Find(name) != nullptr;
 }
 
 TEST(SceneDestructiveTest, SchemasExposeDestructiveGuards) {
   const auto scene_tools = godot_autopilot::scene_tools::make_tools();
-  const mcp::JsonValue edit = find_tool_schema(scene_tools, "edit_scene_node");
+  const godot_autopilot::util::JsonValue edit = find_tool_schema(scene_tools, "edit_scene_node");
   EXPECT_TRUE(schema_has_property(edit, "confirm"));
-  const mcp::JsonValue pack = find_tool_schema(scene_tools, "pack_scene");
+  const godot_autopilot::util::JsonValue pack = find_tool_schema(scene_tools, "pack_scene");
   EXPECT_TRUE(schema_has_property(pack, "overwrite"));
 
   const auto editor_tools = godot_autopilot::editor_tools::make_tools();
-  const mcp::JsonValue scene_control =
+  const godot_autopilot::util::JsonValue scene_control =
       find_tool_schema(editor_tools, "editor_scene_control");
   EXPECT_TRUE(schema_has_property(scene_control, "discard_unsaved"));
   EXPECT_TRUE(schema_has_property(scene_control, "confirm"));
-  const mcp::JsonValue save = find_tool_schema(editor_tools, "save_editor_scene");
+  const godot_autopilot::util::JsonValue save = find_tool_schema(editor_tools, "save_editor_scene");
   EXPECT_TRUE(schema_has_property(save, "overwrite"));
   EXPECT_TRUE(schema_has_property(save, "confirm"));
 }

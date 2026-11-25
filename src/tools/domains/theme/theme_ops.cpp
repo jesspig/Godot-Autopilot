@@ -32,7 +32,7 @@ namespace {
 constexpr int kMinAnchorPreset = 0;
 constexpr int kMaxAnchorPreset = 15;
 
-bool need_string(const mcp::JsonValue &args, const char *key,
+bool need_string(const godot_autopilot::util::JsonValue &args, const char *key,
                  std::string &out_value) {
   auto *it = args.Find(key);
   if (!it || !it->IsString() || it->GetString().empty()) {
@@ -130,7 +130,7 @@ bool persist_theme(const godot::Ref<godot::Theme> &theme,
   return true;
 }
 
-bool parse_color_value(const mcp::JsonValue &val, godot::Color &out_color,
+bool parse_color_value(const godot_autopilot::util::JsonValue &val, godot::Color &out_color,
                        std::string &out_error) {
   if (val.IsString()) {
     const std::string hex = val.GetString();
@@ -169,7 +169,7 @@ bool parse_color_value(const mcp::JsonValue &val, godot::Color &out_color,
 }
 
 template <typename FnAll, typename FnSide>
-bool apply_per_side(const mcp::JsonValue &val, FnAll apply_all,
+bool apply_per_side(const godot_autopilot::util::JsonValue &val, FnAll apply_all,
                     FnSide apply_side, const char *param_name,
                     const char *const (&side_keys)[4],
                     std::string &out_error) {
@@ -227,7 +227,7 @@ bool is_user_path(const std::string &p) {
 
 } // namespace
 
-mcp::JsonValue handle_create_theme_resource(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_theme_resource(const godot_autopilot::util::JsonValue &args) {
   std::string path;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -262,18 +262,18 @@ mcp::JsonValue handle_create_theme_resource(const mcp::JsonValue &args) {
     return util::error_json(save_error);
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["saved"] = mcp::JsonValue(true);
-  r["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["saved"] = godot_autopilot::util::JsonValue(true);
+  r["verified"] = godot_autopilot::util::JsonValue(verified);
   if (!base_type.empty()) {
-    r["base_type"] = mcp::JsonValue(base_type);
+    r["base_type"] = godot_autopilot::util::JsonValue(base_type);
   }
   return r;
 }
 
-mcp::JsonValue handle_set_theme_color(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_theme_color(const godot_autopilot::util::JsonValue &args) {
   std::string path, theme_type, varname;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -306,17 +306,17 @@ mcp::JsonValue handle_set_theme_color(const mcp::JsonValue &args) {
   if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["theme_type"] = mcp::JsonValue(theme_type);
-  r["varname"] = mcp::JsonValue(varname);
-  r["saved"] = mcp::JsonValue(true);
-  r["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["theme_type"] = godot_autopilot::util::JsonValue(theme_type);
+  r["varname"] = godot_autopilot::util::JsonValue(varname);
+  r["saved"] = godot_autopilot::util::JsonValue(true);
+  r["verified"] = godot_autopilot::util::JsonValue(verified);
   return r;
 }
 
-mcp::JsonValue handle_set_theme_constant(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_theme_constant(const godot_autopilot::util::JsonValue &args) {
   std::string path, theme_type, varname;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -346,17 +346,17 @@ mcp::JsonValue handle_set_theme_constant(const mcp::JsonValue &args) {
   if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["theme_type"] = mcp::JsonValue(theme_type);
-  r["varname"] = mcp::JsonValue(varname);
-  r["saved"] = mcp::JsonValue(true);
-  r["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["theme_type"] = godot_autopilot::util::JsonValue(theme_type);
+  r["varname"] = godot_autopilot::util::JsonValue(varname);
+  r["saved"] = godot_autopilot::util::JsonValue(true);
+  r["verified"] = godot_autopilot::util::JsonValue(verified);
   return r;
 }
 
-mcp::JsonValue handle_set_theme_font_size(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_theme_font_size(const godot_autopilot::util::JsonValue &args) {
   std::string path, theme_type, varname;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -386,17 +386,17 @@ mcp::JsonValue handle_set_theme_font_size(const mcp::JsonValue &args) {
   if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["theme_type"] = mcp::JsonValue(theme_type);
-  r["varname"] = mcp::JsonValue(varname);
-  r["saved"] = mcp::JsonValue(true);
-  r["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["theme_type"] = godot_autopilot::util::JsonValue(theme_type);
+  r["varname"] = godot_autopilot::util::JsonValue(varname);
+  r["saved"] = godot_autopilot::util::JsonValue(true);
+  r["verified"] = godot_autopilot::util::JsonValue(verified);
   return r;
 }
 
-mcp::JsonValue handle_set_theme_stylebox_flat(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_theme_stylebox_flat(const godot_autopilot::util::JsonValue &args) {
   std::string path, theme_type, varname;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -485,17 +485,17 @@ mcp::JsonValue handle_set_theme_stylebox_flat(const mcp::JsonValue &args) {
   if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["theme_type"] = mcp::JsonValue(theme_type);
-  r["varname"] = mcp::JsonValue(varname);
-  r["saved"] = mcp::JsonValue(true);
-  r["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["theme_type"] = godot_autopilot::util::JsonValue(theme_type);
+  r["varname"] = godot_autopilot::util::JsonValue(varname);
+  r["saved"] = godot_autopilot::util::JsonValue(true);
+  r["verified"] = godot_autopilot::util::JsonValue(verified);
   return r;
 }
 
-mcp::JsonValue handle_get_theme_info(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_theme_info(const godot_autopilot::util::JsonValue &args) {
   std::string path;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -507,58 +507,58 @@ mcp::JsonValue handle_get_theme_info(const mcp::JsonValue &args) {
   }
 
   godot::PackedStringArray types = theme->get_type_list();
-  mcp::JsonValue types_json(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue types_json(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < types.size(); i++) {
     const std::string type_name = util::to_std(types[i]);
     const godot::String &type_gs = types[i];
 
-    mcp::JsonValue entry(mcp::JsonValue::object_tag);
-    entry["type"] = mcp::JsonValue(type_name);
+    godot_autopilot::util::JsonValue entry(godot_autopilot::util::JsonValue::object_tag);
+    entry["type"] = godot_autopilot::util::JsonValue(type_name);
 
     const godot::PackedStringArray color_items = theme->get_color_list(type_gs);
-    mcp::JsonValue colors(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue colors(godot_autopilot::util::JsonValue::array_tag);
     for (int c = 0; c < color_items.size(); c++) {
-      colors.PushBack(mcp::JsonValue(util::to_std(color_items[c])));
+      colors.PushBack(godot_autopilot::util::JsonValue(util::to_std(color_items[c])));
     }
     entry["colors"] = std::move(colors);
 
     const godot::PackedStringArray constant_items =
         theme->get_constant_list(type_gs);
-    mcp::JsonValue constants(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue constants(godot_autopilot::util::JsonValue::array_tag);
     for (int c = 0; c < constant_items.size(); c++) {
-      constants.PushBack(mcp::JsonValue(util::to_std(constant_items[c])));
+      constants.PushBack(godot_autopilot::util::JsonValue(util::to_std(constant_items[c])));
     }
     entry["constants"] = std::move(constants);
 
     const godot::PackedStringArray font_size_items =
         theme->get_font_size_list(type_gs);
-    mcp::JsonValue font_sizes(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue font_sizes(godot_autopilot::util::JsonValue::array_tag);
     for (int c = 0; c < font_size_items.size(); c++) {
-      font_sizes.PushBack(mcp::JsonValue(util::to_std(font_size_items[c])));
+      font_sizes.PushBack(godot_autopilot::util::JsonValue(util::to_std(font_size_items[c])));
     }
     entry["font_sizes"] = std::move(font_sizes);
 
     const godot::PackedStringArray stylebox_items =
         theme->get_stylebox_list(type_gs);
-    mcp::JsonValue styleboxes(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue styleboxes(godot_autopilot::util::JsonValue::array_tag);
     for (int c = 0; c < stylebox_items.size(); c++) {
-      styleboxes.PushBack(mcp::JsonValue(util::to_std(stylebox_items[c])));
+      styleboxes.PushBack(godot_autopilot::util::JsonValue(util::to_std(stylebox_items[c])));
     }
     entry["styleboxes"] = std::move(styleboxes);
 
     types_json.PushBack(std::move(entry));
   }
 
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["path"] = mcp::JsonValue(path);
-  result["type_count"] = mcp::JsonValue(static_cast<int64_t>(types.size()));
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["path"] = godot_autopilot::util::JsonValue(path);
+  result["type_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(types.size()));
   result["types"] = std::move(types_json);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result);
   return r;
 }
 
-mcp::JsonValue handle_apply_theme_to_control(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_apply_theme_to_control(const godot_autopilot::util::JsonValue &args) {
   std::string theme_path, control_path;
   if (!need_string(args, "theme_path", theme_path)) {
     return util::error_json("missing required parameter: theme_path");
@@ -579,15 +579,15 @@ mcp::JsonValue handle_apply_theme_to_control(const mcp::JsonValue &args) {
   control->set_theme(theme);
   scene_dirty_tracker::mark_scene_modified();
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["control_path"] = mcp::JsonValue(control_path);
-  r["theme_path"] = mcp::JsonValue(theme_path);
-  r["note"] = mcp::JsonValue(kSceneNotSavedNote);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["control_path"] = godot_autopilot::util::JsonValue(control_path);
+  r["theme_path"] = godot_autopilot::util::JsonValue(theme_path);
+  r["note"] = godot_autopilot::util::JsonValue(kSceneNotSavedNote);
   return r;
 }
 
-mcp::JsonValue handle_set_control_anchor_preset(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_control_anchor_preset(const godot_autopilot::util::JsonValue &args) {
   std::string control_path;
   if (!need_string(args, "control_path", control_path)) {
     return util::error_json("missing required parameter: control_path");
@@ -621,16 +621,16 @@ mcp::JsonValue handle_set_control_anchor_preset(const mcp::JsonValue &args) {
                               keep_offsets);
   scene_dirty_tracker::mark_scene_modified();
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["control_path"] = mcp::JsonValue(control_path);
-  r["preset"] = mcp::JsonValue(static_cast<int64_t>(preset));
-  r["keep_offsets"] = mcp::JsonValue(keep_offsets);
-  r["note"] = mcp::JsonValue(kSceneNotSavedNote);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["control_path"] = godot_autopilot::util::JsonValue(control_path);
+  r["preset"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(preset));
+  r["keep_offsets"] = godot_autopilot::util::JsonValue(keep_offsets);
+  r["note"] = godot_autopilot::util::JsonValue(kSceneNotSavedNote);
   return r;
 }
 
-mcp::JsonValue handle_set_control_layout(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_control_layout(const godot_autopilot::util::JsonValue &args) {
   std::string path;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -938,43 +938,43 @@ mcp::JsonValue handle_set_control_layout(const mcp::JsonValue &args) {
     }
   }
   scene_dirty_tracker::mark_scene_modified();
-  mcp::JsonValue out_anchors(mcp::JsonValue::object_tag);
-  out_anchors["left"] = mcp::JsonValue(static_cast<double>(new_vals[0]));
-  out_anchors["top"] = mcp::JsonValue(static_cast<double>(new_vals[1]));
-  out_anchors["right"] = mcp::JsonValue(static_cast<double>(new_vals[2]));
-  out_anchors["bottom"] = mcp::JsonValue(static_cast<double>(new_vals[3]));
-  mcp::JsonValue out_offsets(mcp::JsonValue::object_tag);
-  out_offsets["left"] = mcp::JsonValue(static_cast<double>(new_vals[4]));
-  out_offsets["top"] = mcp::JsonValue(static_cast<double>(new_vals[5]));
-  out_offsets["right"] = mcp::JsonValue(static_cast<double>(new_vals[6]));
-  out_offsets["bottom"] = mcp::JsonValue(static_cast<double>(new_vals[7]));
+  godot_autopilot::util::JsonValue out_anchors(godot_autopilot::util::JsonValue::object_tag);
+  out_anchors["left"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[0]));
+  out_anchors["top"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[1]));
+  out_anchors["right"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[2]));
+  out_anchors["bottom"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[3]));
+  godot_autopilot::util::JsonValue out_offsets(godot_autopilot::util::JsonValue::object_tag);
+  out_offsets["left"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[4]));
+  out_offsets["top"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[5]));
+  out_offsets["right"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[6]));
+  out_offsets["bottom"] = godot_autopilot::util::JsonValue(static_cast<double>(new_vals[7]));
   godot::Vector2 final_min = static_cast<godot::Vector2>(new_vals[12]);
-  mcp::JsonValue out_min(mcp::JsonValue::object_tag);
-  out_min["x"] = mcp::JsonValue(static_cast<double>(final_min.x));
-  out_min["y"] = mcp::JsonValue(static_cast<double>(final_min.y));
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue("ok");
-  out["path"] = mcp::JsonValue(path);
+  godot_autopilot::util::JsonValue out_min(godot_autopilot::util::JsonValue::object_tag);
+  out_min["x"] = godot_autopilot::util::JsonValue(static_cast<double>(final_min.x));
+  out_min["y"] = godot_autopilot::util::JsonValue(static_cast<double>(final_min.y));
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue("ok");
+  out["path"] = godot_autopilot::util::JsonValue(path);
   if (has_preset) {
-    out["preset"] = mcp::JsonValue(static_cast<int64_t>(preset));
-    out["keep_offsets"] = mcp::JsonValue(keep_offsets);
+    out["preset"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(preset));
+    out["keep_offsets"] = godot_autopilot::util::JsonValue(keep_offsets);
   }
   out["anchors"] = std::move(out_anchors);
   out["offsets"] = std::move(out_offsets);
-  out["size_flags_h"] = mcp::JsonValue(static_cast<int64_t>(new_vals[8]));
-  out["size_flags_v"] = mcp::JsonValue(static_cast<int64_t>(new_vals[9]));
-  out["grow_h"] = mcp::JsonValue(static_cast<int64_t>(new_vals[10]));
-  out["grow_v"] = mcp::JsonValue(static_cast<int64_t>(new_vals[11]));
+  out["size_flags_h"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(new_vals[8]));
+  out["size_flags_v"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(new_vals[9]));
+  out["grow_h"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(new_vals[10]));
+  out["grow_v"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(new_vals[11]));
   out["min_size"] = std::move(out_min);
-  out["undoable"] = mcp::JsonValue(undoable);
+  out["undoable"] = godot_autopilot::util::JsonValue(undoable);
   if (!undoable) {
-    out["undo_skip_reason"] = mcp::JsonValue("EditorUndoRedoManager not available");
+    out["undo_skip_reason"] = godot_autopilot::util::JsonValue("EditorUndoRedoManager not available");
   }
-  out["note"] = mcp::JsonValue(kSceneNotSavedNote);
+  out["note"] = godot_autopilot::util::JsonValue(kSceneNotSavedNote);
   return out;
 }
 
-mcp::JsonValue handle_set_theme_item_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_theme_item_bundle(const godot_autopilot::util::JsonValue &args) {
   std::string path;
   if (!need_string(args, "path", path)) {
     return util::error_json("missing required parameter: path");
@@ -1258,23 +1258,23 @@ mcp::JsonValue handle_set_theme_item_bundle(const mcp::JsonValue &args) {
   if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["saved"] = mcp::JsonValue(true);
-  r["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["saved"] = godot_autopilot::util::JsonValue(true);
+  r["verified"] = godot_autopilot::util::JsonValue(verified);
   r["colors_applied"] =
-      mcp::JsonValue(static_cast<int64_t>(staged_colors.size()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(staged_colors.size()));
   r["constants_applied"] =
-      mcp::JsonValue(static_cast<int64_t>(staged_constants.size()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(staged_constants.size()));
   r["font_sizes_applied"] =
-      mcp::JsonValue(static_cast<int64_t>(staged_font_sizes.size()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(staged_font_sizes.size()));
   r["styleboxes_applied"] =
-      mcp::JsonValue(static_cast<int64_t>(staged_boxes.size()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(staged_boxes.size()));
   return r;
 }
 
-mcp::JsonValue handle_update_theme(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_update_theme(const godot_autopilot::util::JsonValue &args) {
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     return util::error_json("missing required parameter: action");
@@ -1290,7 +1290,7 @@ mcp::JsonValue handle_update_theme(const mcp::JsonValue &args) {
                           "': expected create or bundle");
 }
 
-mcp::JsonValue handle_update_control_layout(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_update_control_layout(const godot_autopilot::util::JsonValue &args) {
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     return util::error_json("missing required parameter: action");

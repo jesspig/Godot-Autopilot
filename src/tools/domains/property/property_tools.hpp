@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_PROPERTY_TOOLS_HPP
 #define GODOT_AUTOPILOT_PROPERTY_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -57,39 +57,39 @@ const std::vector<ParamSpec> kSignalDisconnectParams = {
     {"method", "string", "Method name of the connected callable (string, e.g. 'set_health')", true},
 };
 
-inline mcp::JsonValue set_properties_batch_args(
-    const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *properties = args.Find("properties");
+inline godot_autopilot::util::JsonValue set_properties_batch_args(
+    const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *properties = args.Find("properties");
   if (path != nullptr) out["path"] = *path;
   if (properties != nullptr) out["properties"] = *properties;
-  const mcp::JsonValue *atomic = args.Find("atomic");
-  out["atomic"] = atomic != nullptr ? *atomic : mcp::JsonValue(true);
+  const godot_autopilot::util::JsonValue *atomic = args.Find("atomic");
+  out["atomic"] = atomic != nullptr ? *atomic : godot_autopilot::util::JsonValue(true);
   return out;
 }
 
-inline mcp::JsonValue validate_set_properties_batch(
-    const mcp::JsonValue &args) {
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *properties = args.Find("properties");
-  const mcp::JsonValue *atomic = args.Find("atomic");
+inline godot_autopilot::util::JsonValue validate_set_properties_batch(
+    const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *properties = args.Find("properties");
+  const godot_autopilot::util::JsonValue *atomic = args.Find("atomic");
   if (path == nullptr || !path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return error;
   }
   if (properties == nullptr || !properties->IsObject()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: properties");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: properties");
     return error;
   }
   if (atomic != nullptr && !atomic->IsBool()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("invalid parameter: atomic must be a boolean");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("invalid parameter: atomic must be a boolean");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
 } // namespace

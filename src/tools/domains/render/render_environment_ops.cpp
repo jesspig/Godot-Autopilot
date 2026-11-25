@@ -7,14 +7,14 @@
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <cstdint>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <unordered_map>
 
 namespace godot_autopilot {
 namespace render_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

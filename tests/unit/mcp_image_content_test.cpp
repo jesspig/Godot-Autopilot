@@ -35,7 +35,7 @@ TEST(McpImageContentTest, WhitelistCoversCaptureAndObserveTools) {
 }
 
 TEST(McpImageContentTest, AttachesTopLevelData) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
         R"({"data":"QUJD","format":"png","width":640,"height":480,"path":"user://shot.png"})");
     std::vector<mcp::ContentVariant> content;
     ASSERT_TRUE(try_attach_image_content("capture_game_viewport", result, content));
@@ -55,7 +55,7 @@ TEST(McpImageContentTest, AttachesTopLevelData) {
 }
 
 TEST(McpImageContentTest, AttachesNestedEditorResultData) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
         R"({"result":{"data":"QUJD","format":"png","width":100,"height":50}})");
     std::vector<mcp::ContentVariant> content;
     ASSERT_TRUE(
@@ -65,7 +65,7 @@ TEST(McpImageContentTest, AttachesNestedEditorResultData) {
     ASSERT_NE(image, nullptr);
     EXPECT_EQ(image->data, "QUJD");
     EXPECT_EQ(image->mime_type, "image/png");
-    mcp::JsonValue &inner = result["result"];
+    godot_autopilot::util::JsonValue &inner = result["result"];
     EXPECT_EQ(inner["data"].GetString(), "<attached-as-image-content>");
     EXPECT_TRUE(inner["image_attached"].GetBool());
     EXPECT_EQ(inner["width"].GetInt(), 100);
@@ -73,7 +73,7 @@ TEST(McpImageContentTest, AttachesNestedEditorResultData) {
 }
 
 TEST(McpImageContentTest, AttachesNestedDisplayResultData) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
         R"({"result":{"mime":"image/png","format":"png","data":"QUJD"}})");
     std::vector<mcp::ContentVariant> content;
     ASSERT_TRUE(
@@ -82,14 +82,14 @@ TEST(McpImageContentTest, AttachesNestedDisplayResultData) {
     const mcp::ImageContent *image = image_at(content, 0);
     ASSERT_NE(image, nullptr);
     EXPECT_EQ(image->data, "QUJD");
-    mcp::JsonValue &inner = result["result"];
+    godot_autopilot::util::JsonValue &inner = result["result"];
     EXPECT_EQ(inner["data"].GetString(), "<attached-as-image-content>");
     EXPECT_EQ(inner["mime"].GetString(), "image/png");
     EXPECT_TRUE(inner["image_attached"].GetBool());
 }
 
 TEST(McpImageContentTest, PrefersTopLevelDataOverNested) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
         R"({"data":"TOPDATA","result":{"data":"NESTED","format":"png"}})");
     std::vector<mcp::ContentVariant> content;
     ASSERT_TRUE(try_attach_image_content("capture_editor_viewport", result, content));
@@ -104,7 +104,7 @@ TEST(McpImageContentTest, PrefersTopLevelDataOverNested) {
 }
 
 TEST(McpImageContentTest, FallsBackToNestedDataWhenTopLevelEmpty) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
         R"({"data":"","result":{"data":"QUJD","format":"png"}})");
     std::vector<mcp::ContentVariant> content;
     ASSERT_TRUE(
@@ -121,8 +121,8 @@ TEST(McpImageContentTest, FallsBackToNestedDataWhenTopLevelEmpty) {
 }
 
 TEST(McpImageContentTest, IgnoresNonWhitelistedTool) {
-    mcp::JsonValue result =
-        mcp::JsonValue::Parse(R"({"data":"QUJD","format":"png"})");
+    godot_autopilot::util::JsonValue result =
+        godot_autopilot::util::JsonValue::Parse(R"({"data":"QUJD","format":"png"})");
     std::vector<mcp::ContentVariant> content;
     EXPECT_FALSE(
         try_attach_image_content("create_scene_node", result, content));
@@ -132,7 +132,7 @@ TEST(McpImageContentTest, IgnoresNonWhitelistedTool) {
 }
 
 TEST(McpImageContentTest, IgnoresNonObjectJson) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(R"(["QUJD"])");
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(R"(["QUJD"])");
     std::vector<mcp::ContentVariant> content;
     EXPECT_FALSE(
         try_attach_image_content("capture_game_viewport", result, content));
@@ -142,8 +142,8 @@ TEST(McpImageContentTest, IgnoresNonObjectJson) {
 }
 
 TEST(McpImageContentTest, IgnoresMissingData) {
-    mcp::JsonValue result =
-        mcp::JsonValue::Parse(R"({"result":{"width":100,"height":50}})");
+    godot_autopilot::util::JsonValue result =
+        godot_autopilot::util::JsonValue::Parse(R"({"result":{"width":100,"height":50}})");
     std::vector<mcp::ContentVariant> content;
     EXPECT_FALSE(
         try_attach_image_content("capture_editor_viewport", result, content));
@@ -152,8 +152,8 @@ TEST(McpImageContentTest, IgnoresMissingData) {
 }
 
 TEST(McpImageContentTest, RejectsNonPngFormat) {
-    mcp::JsonValue result =
-        mcp::JsonValue::Parse(R"({"data":"QUJD","format":"jpg"})");
+    godot_autopilot::util::JsonValue result =
+        godot_autopilot::util::JsonValue::Parse(R"({"data":"QUJD","format":"jpg"})");
     std::vector<mcp::ContentVariant> content;
     EXPECT_FALSE(
         try_attach_image_content("capture_game_viewport", result, content));
@@ -163,7 +163,7 @@ TEST(McpImageContentTest, RejectsNonPngFormat) {
 }
 
 TEST(McpImageContentTest, TreatsMissingFormatAsPng) {
-    mcp::JsonValue result = mcp::JsonValue::Parse(R"({"data":"QUJD"})");
+    godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(R"({"data":"QUJD"})");
     std::vector<mcp::ContentVariant> content;
     ASSERT_TRUE(try_attach_image_content("capture_game_viewport", result, content));
     ASSERT_EQ(content.size(), 1u);

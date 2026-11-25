@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TILESET_TOOLS_HPP
 #define GODOT_AUTOPILOT_TILESET_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,10 +32,10 @@ const std::vector<ParamSpec> kUpdateTilesetParams = {
 const std::vector<std::string> kUpdateTilesetActions = {
     "add_atlas_source", "add_physics_layer", "set_tile_collision"};
 
-inline mcp::JsonValue tileset_action_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue tileset_action_args(const godot_autopilot::util::JsonValue &args,
                                           const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   if (!args.IsObject()) {
     return out;
   }
@@ -67,19 +67,19 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "add_tilemap_atlas_source", "update_tileset",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return tileset_action_args(args, "add_atlas_source");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "add_tilemap_physics_layer", "update_tileset",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return tileset_action_args(args, "add_physics_layer");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_tilemap_tile_collision", "update_tileset",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return tileset_action_args(args, "set_tile_collision");
               },
               {}, "0.4.0", "0.6.0"},

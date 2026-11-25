@@ -42,30 +42,30 @@
 
 namespace godot_autopilot {
 namespace property_ops {
-mcp::JsonValue handle_signal_connect(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_signal_connect(const godot_autopilot::util::JsonValue &args) {
   auto *it_source = args.Find("source_path");
   auto *it_signal = args.Find("signal");
   auto *it_target = args.Find("target_path");
   auto *it_method = args.Find("method");
   auto *it_persist = args.Find("persist");
   if (!it_source || !it_source->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: source_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: source_path");
     return e;
   }
   if (!it_signal || !it_signal->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: signal");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: signal");
     return e;
   }
   if (!it_target || !it_target->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: target_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: target_path");
     return e;
   }
   if (!it_method || !it_method->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: method");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: method");
     return e;
   }
 
@@ -83,34 +83,34 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue &args) {
   godot::Node *source =
       util::resolve_scene_node(source_path, find_edited_scene_root(), &hint);
   if (!source) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("source node not found: " + source_path + " — " + hint);
+        godot_autopilot::util::JsonValue("source node not found: " + source_path + " — " + hint);
     return e;
   }
 
   godot::Node *target =
       util::resolve_scene_node(target_path, find_edited_scene_root(), &hint);
   if (!target) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("target node not found: " + target_path + " — " + hint);
+        godot_autopilot::util::JsonValue("target node not found: " + target_path + " — " + hint);
     return e;
   }
 
   godot::StringName sig_name(signal_name.c_str());
   if (!source->has_signal(sig_name)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("signal not found: " + signal_name);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("signal not found: " + signal_name);
     return e;
   }
 
   godot::Callable callable(target, godot::StringName(method_name.c_str()));
   if (source->is_connected(sig_name, callable)) {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("already_connected");
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["result"] = godot_autopilot::util::JsonValue("already_connected");
     r["info"] =
-        mcp::JsonValue("signal is already connected to this callable on the "
+        godot_autopilot::util::JsonValue("signal is already connected to this callable on the "
                        "node; scene instances inherit persistent connections — "
                        "use signal_disconnect to remove it");
     util::add_scene_info_fields(r, util::edited_scene_info());
@@ -119,22 +119,22 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue &args) {
   godot::Error err = source->connect(
       sig_name, callable, persist ? godot::Object::CONNECT_PERSIST : 0);
   if (err != godot::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to connect signal: error code " +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("failed to connect signal: error code " +
                                 std::to_string(static_cast<int>(err)));
     return e;
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("connected");
-  r["persisted"] = mcp::JsonValue(persist);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("connected");
+  r["persisted"] = godot_autopilot::util::JsonValue(persist);
   if (persist) {
     r["note"] =
-        mcp::JsonValue("connection created with CONNECT_PERSIST — it is saved "
+        godot_autopilot::util::JsonValue("connection created with CONNECT_PERSIST — it is saved "
                        "with the scene and inherited by every instantiation; "
                        "avoid connecting the same signal+callable again");
   } else {
-    r["note"] = mcp::JsonValue("connection created without CONNECT_PERSIST — "
+    r["note"] = godot_autopilot::util::JsonValue("connection created without CONNECT_PERSIST — "
                                "it is not saved with the scene");
   }
   scene_dirty_tracker::mark_scene_modified();
@@ -142,29 +142,29 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_signal_disconnect(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_signal_disconnect(const godot_autopilot::util::JsonValue &args) {
   auto *it_source = args.Find("source_path");
   auto *it_signal = args.Find("signal");
   auto *it_target = args.Find("target_path");
   auto *it_method = args.Find("method");
   if (!it_source || !it_source->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: source_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: source_path");
     return e;
   }
   if (!it_signal || !it_signal->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: signal");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: signal");
     return e;
   }
   if (!it_target || !it_target->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: target_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: target_path");
     return e;
   }
   if (!it_method || !it_method->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: method");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: method");
     return e;
   }
 
@@ -177,32 +177,32 @@ mcp::JsonValue handle_signal_disconnect(const mcp::JsonValue &args) {
   godot::Node *source =
       util::resolve_scene_node(source_path, find_edited_scene_root(), &hint);
   if (!source) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("source node not found: " + source_path + " — " + hint);
+        godot_autopilot::util::JsonValue("source node not found: " + source_path + " — " + hint);
     return e;
   }
 
   godot::Node *target =
       util::resolve_scene_node(target_path, find_edited_scene_root(), &hint);
   if (!target) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("target node not found: " + target_path + " — " + hint);
+        godot_autopilot::util::JsonValue("target node not found: " + target_path + " — " + hint);
     return e;
   }
 
   godot::StringName sig_name(signal_name.c_str());
   godot::Callable callable(target, godot::StringName(method_name.c_str()));
   if (!source->is_connected(sig_name, callable)) {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("not_connected");
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["result"] = godot_autopilot::util::JsonValue("not_connected");
     util::add_scene_info_fields(r, util::edited_scene_info());
     return r;
   }
   source->disconnect(sig_name, callable);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("disconnected");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("disconnected");
   scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
   return r;

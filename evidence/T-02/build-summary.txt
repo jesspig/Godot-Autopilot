@@ -1,0 +1,19 @@
+command: cmake --preset debug
+exit_code: 0
+
+command: cmake --build --preset debug
+initial_exit_code: 1
+initial_errors:
+  - json_value.cpp FormatDouble declared buf in both preprocessor branches
+  - json_value.cpp called non-existent reader.GetParseError()
+resolution: renamed the fallback buffer and used reader.GetParseErrorCode()
+final_exit_code: 0
+final_progress: 499/500
+artifacts:
+  - build/debug/godot-autopilot.dll
+  - build/debug/tests/gda_unit_tests.exe
+  - build/debug/tests/gda_json_parity_probe.exe
+
+additional_fix:
+  - strict duplicate-key path now records the array index on the parent array frame
+  - root CMake target was manually recompiled after the edit tool preserved source timestamps

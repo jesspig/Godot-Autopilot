@@ -1,0 +1,6 @@
+command: cmake --build --preset debug
+exit_code: 143
+reason: harness foreground timeout after 120 seconds
+progress: 759/1621 build steps emitted
+compiler_errors: none observed
+next: resume incremental build with a 600000 ms timeout

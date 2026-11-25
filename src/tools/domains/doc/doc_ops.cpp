@@ -22,22 +22,22 @@ namespace doc_ops {
 
 namespace {
 
-mcp::JsonValue variant_to_json(const godot::Variant &v) {
+godot_autopilot::util::JsonValue variant_to_json(const godot::Variant &v) {
   switch (v.get_type()) {
   case godot::Variant::NIL:
-    return mcp::JsonValue(nullptr);
+    return godot_autopilot::util::JsonValue(nullptr);
   case godot::Variant::BOOL:
-    return mcp::JsonValue(static_cast<bool>(v));
+    return godot_autopilot::util::JsonValue(static_cast<bool>(v));
   case godot::Variant::INT:
-    return mcp::JsonValue(static_cast<int64_t>(v));
+    return godot_autopilot::util::JsonValue(static_cast<int64_t>(v));
   case godot::Variant::FLOAT:
-    return mcp::JsonValue(static_cast<double>(v));
+    return godot_autopilot::util::JsonValue(static_cast<double>(v));
   case godot::Variant::STRING: {
     godot::String s = static_cast<godot::String>(v);
-    return mcp::JsonValue(util::to_std(s));
+    return godot_autopilot::util::JsonValue(util::to_std(s));
   }
   case godot::Variant::DICTIONARY: {
-    mcp::JsonValue obj(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue obj(godot_autopilot::util::JsonValue::object_tag);
     godot::Dictionary d = static_cast<godot::Dictionary>(v);
     godot::Array keys = d.keys();
     for (int i = 0; i < keys.size(); i++) {
@@ -52,7 +52,7 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
   case godot::Variant::PACKED_FLOAT32_ARRAY:
   case godot::Variant::PACKED_INT64_ARRAY:
   case godot::Variant::PACKED_FLOAT64_ARRAY: {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     godot::Array a = static_cast<godot::Array>(v);
     for (int i = 0; i < a.size(); i++) {
       arr.PushBack(variant_to_json(a[i]));
@@ -60,7 +60,7 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
     return arr;
   }
   default:
-    return mcp::JsonValue(util::to_std(v.stringify()));
+    return godot_autopilot::util::JsonValue(util::to_std(v.stringify()));
   }
 }
 
@@ -414,20 +414,20 @@ const VariantBuiltin *find_variant_builtin(const std::string &name) {
 
 } // namespace
 
-mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_class(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_docs_class called");
-  if (const mcp::JsonValue *query = args.Find("query")) {
+  if (const godot_autopilot::util::JsonValue *query = args.Find("query")) {
     if (!query->IsString()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
       e["error"] =
-          mcp::JsonValue("invalid parameter: query must be a string");
+          godot_autopilot::util::JsonValue("invalid parameter: query must be a string");
       return e;
     }
-    if (const mcp::JsonValue *conflict = args.Find("class")) {
+    if (const godot_autopilot::util::JsonValue *conflict = args.Find("class")) {
       if (conflict != nullptr && conflict->IsString()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue(
             "class and query are mutually exclusive: pass class to read one "
             "class or query to search class names");
         return e;
@@ -437,16 +437,16 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   }
   auto *np = args.Find("class");
   if (!np || !np->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: class");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: class");
     return e;
   }
   std::string class_name = np->GetString();
   std::string section_param;
   if (auto *sp = args.Find("section")) {
     if (!sp->IsString()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "invalid parameter: section must be a comma-separated string of "
           "methods, properties, signals, enums, constants");
       return e;
@@ -456,8 +456,8 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   std::string member_param;
   if (auto *mp = args.Find("member")) {
     if (!mp->IsString()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "invalid parameter: member must be a case-insensitive substring");
       return e;
     }
@@ -466,9 +466,9 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   bool exact = false;
   if (auto *exact_p = args.Find("exact")) {
     if (!exact_p->IsBool()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
       e["error"] =
-          mcp::JsonValue("invalid parameter: exact must be a boolean");
+          godot_autopilot::util::JsonValue("invalid parameter: exact must be a boolean");
       return e;
     }
     exact = exact_p->GetBool();
@@ -500,8 +500,8 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
       } else if (token == "constants") {
         want_constants = true;
       } else if (!token.empty()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue(
             "unknown section '" + token +
             "' for get_docs_class (expected methods, properties, signals, "
             "enums, constants)");
@@ -534,78 +534,78 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
                !want_enums && !want_constants) {
       kind = "property";
     }
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(kind + " not found: " + member_param +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(kind + " not found: " + member_param +
                                 " in class " + class_name);
     return e;
   };
   auto *cd = godot::ClassDBSingleton::get_singleton();
   if (!cd) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ClassDBSingleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("ClassDBSingleton not available");
     return e;
   }
   godot::StringName sn(class_name.c_str());
   if (!cd->class_exists(sn)) {
     if (const VariantBuiltin *builtin = find_variant_builtin(class_name)) {
-      mcp::JsonValue result(mcp::JsonValue::object_tag);
-      result["name"] = mcp::JsonValue(builtin->canonical);
-      result["value_kind"] = mcp::JsonValue("builtin");
+      godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+      result["name"] = godot_autopilot::util::JsonValue(builtin->canonical);
+      result["value_kind"] = godot_autopilot::util::JsonValue("builtin");
       result["variant_type"] =
-          mcp::JsonValue(static_cast<int64_t>(builtin->type));
-      result["json_shape"] = mcp::JsonValue(builtin->json_shape);
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(builtin->type));
+      result["json_shape"] = godot_autopilot::util::JsonValue(builtin->json_shape);
       if (want_methods) {
-        mcp::JsonValue arr(mcp::JsonValue::array_tag);
+        godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
         for (const auto &m : builtin->methods) {
           if (!member_ok(m)) {
             continue;
           }
-          mcp::JsonValue item(mcp::JsonValue::object_tag);
-          item["name"] = mcp::JsonValue(m);
+          godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+          item["name"] = godot_autopilot::util::JsonValue(m);
           arr.PushBack(std::move(item));
           any_match = true;
         }
         result["methods"] = std::move(arr);
       }
       if (want_constants) {
-        mcp::JsonValue arr(mcp::JsonValue::array_tag);
+        godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
         for (const auto &c : builtin->constants) {
           if (!member_ok(c.first)) {
             continue;
           }
-          mcp::JsonValue item(mcp::JsonValue::object_tag);
-          item["name"] = mcp::JsonValue(c.first);
-          item["value"] = mcp::JsonValue(c.second);
+          godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+          item["name"] = godot_autopilot::util::JsonValue(c.first);
+          item["value"] = godot_autopilot::util::JsonValue(c.second);
           arr.PushBack(std::move(item));
           any_match = true;
         }
         result["constants"] = std::move(arr);
       }
-      result["note"] = mcp::JsonValue(
+      result["note"] = godot_autopilot::util::JsonValue(
           "builtin Variant value type (no ClassDB entry); methods and "
           "constants are a curated subset");
       if (exact && !member_param.empty() && !any_match) {
         return exact_missing_error();
       }
-      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
       r["result"] = std::move(result);
       LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                                 "get_docs_class completed");
       return r;
     }
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("class not found: " + class_name);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("class not found: " + class_name);
     return e;
   }
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["name"] = mcp::JsonValue(class_name);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["name"] = godot_autopilot::util::JsonValue(class_name);
   result["parent_class"] =
-      mcp::JsonValue(util::to_std(godot::String(cd->get_parent_class(sn))));
+      godot_autopilot::util::JsonValue(util::to_std(godot::String(cd->get_parent_class(sn))));
   result["api_type"] =
-      mcp::JsonValue(static_cast<int64_t>(cd->class_get_api_type(sn)));
-  result["can_instantiate"] = mcp::JsonValue(cd->can_instantiate(sn));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(cd->class_get_api_type(sn)));
+  result["can_instantiate"] = godot_autopilot::util::JsonValue(cd->can_instantiate(sn));
   if (want_methods) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     godot::TypedArray<godot::Dictionary> methods =
         cd->class_get_method_list(sn, false);
     for (int i = 0; i < methods.size(); i++) {
@@ -624,7 +624,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     result["methods"] = std::move(arr);
   }
   if (want_properties) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     godot::TypedArray<godot::Dictionary> props =
         cd->class_get_property_list(sn, false);
     for (int i = 0; i < props.size(); i++) {
@@ -643,7 +643,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     result["properties"] = std::move(arr);
   }
   if (want_signals) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     godot::TypedArray<godot::Dictionary> signals =
         cd->class_get_signal_list(sn, false);
     for (int i = 0; i < signals.size(); i++) {
@@ -662,25 +662,25 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     result["signals"] = std::move(arr);
   }
   if (want_enums) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     godot::PackedStringArray enum_names = cd->class_get_enum_list(sn, false);
     for (int i = 0; i < enum_names.size(); i++) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
       std::string ename = util::to_std(enum_names[i]);
-      e["name"] = mcp::JsonValue(ename);
-      mcp::JsonValue ec(mcp::JsonValue::array_tag);
+      e["name"] = godot_autopilot::util::JsonValue(ename);
+      godot_autopilot::util::JsonValue ec(godot_autopilot::util::JsonValue::array_tag);
       int kept = 0;
       godot::PackedStringArray enum_consts =
           cd->class_get_enum_constants(sn, godot::StringName(ename.c_str()));
       for (int j = 0; j < enum_consts.size(); j++) {
-        mcp::JsonValue cv(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue cv(godot_autopilot::util::JsonValue::object_tag);
         std::string cname = util::to_std(enum_consts[j]);
         if (!member_ok(cname)) {
           continue;
         }
-        cv["name"] = mcp::JsonValue(cname);
+        cv["name"] = godot_autopilot::util::JsonValue(cname);
         cv["value"] =
-            mcp::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
+            godot_autopilot::util::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
                 sn, godot::StringName(cname.c_str()))));
         ec.PushBack(std::move(cv));
         kept++;
@@ -698,18 +698,18 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     result["enums"] = std::move(arr);
   }
   if (want_constants) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     godot::PackedStringArray const_names =
         cd->class_get_integer_constant_list(sn, false);
     for (int i = 0; i < const_names.size(); i++) {
-      mcp::JsonValue cv(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue cv(godot_autopilot::util::JsonValue::object_tag);
       std::string cname = util::to_std(const_names[i]);
       if (!member_ok(cname)) {
         continue;
       }
-      cv["name"] = mcp::JsonValue(cname);
+      cv["name"] = godot_autopilot::util::JsonValue(cname);
       cv["value"] =
-          mcp::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
               sn, godot::StringName(cname.c_str()))));
       arr.PushBack(std::move(cv));
       any_match = true;
@@ -719,49 +719,49 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   if (exact && !member_param.empty() && !any_match) {
     return exact_missing_error();
   }
-  result["note"] = mcp::JsonValue("class reference without docstrings");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  result["note"] = godot_autopilot::util::JsonValue("class reference without docstrings");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_docs_class completed");
   return r;
 }
 
-mcp::JsonValue handle_search(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_search(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_docs_class query called");
   auto *qp = args.Find("query");
   if (!qp || !qp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: query");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: query");
     return e;
   }
   std::string query = qp->GetString();
   auto *cd = godot::ClassDBSingleton::get_singleton();
   if (!cd) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ClassDBSingleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("ClassDBSingleton not available");
     return e;
   }
   const std::string query_lower = util::ascii_lowercase(query);
   godot::PackedStringArray all_classes = cd->get_class_list();
-  mcp::JsonValue results_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue results_arr(godot_autopilot::util::JsonValue::array_tag);
   int count = 0;
   for (int i = 0; i < all_classes.size() && count < 50; i++) {
     std::string name = util::to_std(all_classes[i]);
     const std::string name_lower = util::ascii_lowercase(name);
     if (name_lower.find(query_lower) != std::string::npos) {
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["name"] = mcp::JsonValue(name);
-      item["parent"] = mcp::JsonValue(util::to_std(godot::String(
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+      item["name"] = godot_autopilot::util::JsonValue(name);
+      item["parent"] = godot_autopilot::util::JsonValue(util::to_std(godot::String(
           cd->get_parent_class(godot::StringName(name.c_str())))));
-      item["api_type"] = mcp::JsonValue(static_cast<int64_t>(
+      item["api_type"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(
           cd->class_get_api_type(godot::StringName(name.c_str()))));
       results_arr.PushBack(std::move(item));
       count++;
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(results_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_docs_class query completed");

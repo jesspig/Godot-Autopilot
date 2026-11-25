@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_ANALYZE_TOOLS_HPP
 #define GODOT_AUTOPILOT_ANALYZE_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,13 +26,13 @@ const std::vector<ParamSpec> kAnalyzeProjectParams = {
     {"max_nodes", "integer", "validate_scene: maximum number of state nodes to return when include_state is true, >= 1 (default: 200); extra nodes set truncated true", false},
 };
 
-inline mcp::JsonValue analyze_alias_args_with_action(
-    const mcp::JsonValue &args, const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+inline godot_autopilot::util::JsonValue analyze_alias_args_with_action(
+    const godot_autopilot::util::JsonValue &args, const char *action) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -41,7 +41,7 @@ inline ToolAlias analyze_action_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return analyze_alias_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";

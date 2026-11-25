@@ -2,7 +2,7 @@
 #define GODOT_AUTOPILOT_GRIDMAP_OPS_HPP
 
 #include <cstdint>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace gridmap_ops {
@@ -37,11 +37,11 @@ inline bool box_exceeds_cell_limit(const BoxRange &range, int64_t limit) {
   return box_cell_count_bounded(range, limit) > limit;
 }
 
-mcp::JsonValue handle_create(const mcp::JsonValue &args);
-mcp::JsonValue handle_create_library_item(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_cell(const mcp::JsonValue &args);
-mcp::JsonValue handle_fill_box(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_used_cells(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_create(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_create_library_item(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_cell(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_fill_box(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_used_cells(const godot_autopilot::util::JsonValue &args);
 
 } // namespace gridmap_ops
 } // namespace godot_autopilot

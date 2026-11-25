@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_GAME_TOOLS_HPP
 #define GODOT_AUTOPILOT_GAME_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -11,18 +11,18 @@
 
 namespace godot_autopilot {
 namespace runtime_ops {
-mcp::JsonValue handle_game_input_bundle(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args);
-mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args);
-mcp::JsonValue handle_translate_text(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_state_bundle(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_ui_bundle(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_evidence_bundle(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_localization_bundle(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_script_bundle(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_input_bundle(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_ui_elements(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_click_game_ui_element(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_game_locale(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_game_locale(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_translation_list(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_translate_text(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_state_bundle(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_ui_bundle(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_evidence_bundle(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_localization_bundle(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_script_bundle(const godot_autopilot::util::JsonValue &args);
 } // namespace runtime_ops
 namespace game_tools {
 
@@ -153,20 +153,20 @@ const std::vector<ParamSpec> kSetGameLocaleParams = {
     {"locale", "string", "Game locale to activate in en or en_US format (e.g. en_US, zh_CN, en); other formats are rejected without changing state", true},
 };
 
-inline mcp::JsonValue game_alias_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue game_alias_action(const godot_autopilot::util::JsonValue &args,
                                         const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue game_alias_rename(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue game_alias_rename(const godot_autopilot::util::JsonValue &args,
                                         const char *from, const char *to,
                                         const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
@@ -177,7 +177,7 @@ inline mcp::JsonValue game_alias_rename(const mcp::JsonValue &args,
   if (out.IsObject()) {
     out.GetObject().erase(from);
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -195,18 +195,18 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Game state to read: status|session|input|job"),
       {
           ToolAlias{"get_game_status", "get_game_state",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "status");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_game_input_status", "get_game_state",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_rename(args, "action", "input_action",
                                                "input");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_game_job", "get_game_state",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "job");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -222,7 +222,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Game UI data to read: elements"),
       {
           ToolAlias{"get_game_ui_elements", "get_game_ui",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "elements");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -238,17 +238,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Evidence action: sample|collect|validate"),
       {
           ToolAlias{"sample_game_property", "get_game_evidence",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "sample");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"collect_game_evidence", "get_game_evidence",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "collect");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"validate_game_ui_layout", "get_game_evidence",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "validate");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -264,13 +264,13 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Script action: execute|start_job"),
       {
           ToolAlias{"execute_game_script", "game_script",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_rename(args, "action", "script_action",
                                                "execute");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"start_game_job", "game_script",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "start_job");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -286,19 +286,19 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Input action: queue|wait|sequence"),
       {
           ToolAlias{"queue_game_input", "game_input",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_rename(args, "action", "input_action",
                                                "queue");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"wait_game_input", "game_input",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_rename(args, "action", "input_action",
                                                "wait");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"sequence_game_inputs", "game_input",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "sequence");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -330,17 +330,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Localization data to read: locale|list|translate"),
       {
           ToolAlias{"get_game_locale", "get_game_localization",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "locale");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_translation_list", "get_game_localization",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "list");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"translate_text", "get_game_localization",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return game_alias_action(args, "translate");
                     },
                     {}, "0.4.0", "0.6.0"},

@@ -42,7 +42,7 @@ std::string trim_ascii(const std::string &text) {
   return text.substr(begin, end - begin);
 }
 
-bool read_required_string_arg(const mcp::JsonValue &args, const char *name,
+bool read_required_string_arg(const godot_autopilot::util::JsonValue &args, const char *name,
                               std::string *out, std::string *error) {
   const util::StringArgStatus status =
       util::string_arg_status(args, name, *out, false);
@@ -57,10 +57,10 @@ bool read_required_string_arg(const mcp::JsonValue &args, const char *name,
   return true;
 }
 
-bool read_bool_arg(const mcp::JsonValue &args, const char *name,
+bool read_bool_arg(const godot_autopilot::util::JsonValue &args, const char *name,
                    bool default_value, bool *out, std::string *error) {
   *out = default_value;
-  const mcp::JsonValue *value = args.Find(name);
+  const godot_autopilot::util::JsonValue *value = args.Find(name);
   if (!value)
     return true;
   if (!value->IsBool()) {
@@ -121,7 +121,7 @@ godot::Key parse_function_key(const std::string &key_lower) {
   return input_map_ops::resolve_function_key(key_lower);
 }
 
-mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_click_editor_element(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "click_editor_element called");
 
@@ -139,7 +139,7 @@ mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
   }
 
   std::string button_name = "left";
-  if (const mcp::JsonValue *button_p = args.Find("button")) {
+  if (const godot_autopilot::util::JsonValue *button_p = args.Find("button")) {
     if (!button_p->IsString())
       return util::error_json("invalid parameter: button must be a string");
     button_name = button_p->GetString();
@@ -181,21 +181,21 @@ mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
       return util::error_json("Input singleton not available");
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["ok"] = mcp::JsonValue(true);
-  inner["path"] = mcp::JsonValue(element.path);
-  inner["type"] = mcp::JsonValue(element.type);
-  inner["button"] = mcp::JsonValue(lower_ascii(button_name));
-  inner["double_click"] = mcp::JsonValue(double_click);
-  inner["window_id"] = mcp::JsonValue(window_id);
-  mcp::JsonValue position(mcp::JsonValue::object_tag);
-  position["x"] = mcp::JsonValue(static_cast<double>(pos.x));
-  position["y"] = mcp::JsonValue(static_cast<double>(pos.y));
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["ok"] = godot_autopilot::util::JsonValue(true);
+  inner["path"] = godot_autopilot::util::JsonValue(element.path);
+  inner["type"] = godot_autopilot::util::JsonValue(element.type);
+  inner["button"] = godot_autopilot::util::JsonValue(lower_ascii(button_name));
+  inner["double_click"] = godot_autopilot::util::JsonValue(double_click);
+  inner["window_id"] = godot_autopilot::util::JsonValue(window_id);
+  godot_autopilot::util::JsonValue position(godot_autopilot::util::JsonValue::object_tag);
+  position["x"] = godot_autopilot::util::JsonValue(static_cast<double>(pos.x));
+  position["y"] = godot_autopilot::util::JsonValue(static_cast<double>(pos.y));
   inner["position"] = std::move(position);
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_type_editor_element_text(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_type_editor_element_text(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "type_editor_element_text called");
 
@@ -246,16 +246,16 @@ mcp::JsonValue handle_type_editor_element_text(const mcp::JsonValue &args) {
       return util::error_json("Input singleton not available");
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["ok"] = mcp::JsonValue(true);
-  inner["path"] = mcp::JsonValue(path);
-  inner["length"] = mcp::JsonValue(text_str.length());
-  inner["focused"] = mcp::JsonValue(focused);
-  inner["submit"] = mcp::JsonValue(submit);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["ok"] = godot_autopilot::util::JsonValue(true);
+  inner["path"] = godot_autopilot::util::JsonValue(path);
+  inner["length"] = godot_autopilot::util::JsonValue(text_str.length());
+  inner["focused"] = godot_autopilot::util::JsonValue(focused);
+  inner["submit"] = godot_autopilot::util::JsonValue(submit);
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_run_editor_shortcut(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_run_editor_shortcut(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "run_editor_shortcut called");
 
@@ -314,27 +314,27 @@ mcp::JsonValue handle_run_editor_shortcut(const mcp::JsonValue &args) {
   if (!inject_key_ex(key, false, ctrl, shift, alt, meta, 0))
     return util::error_json("Input singleton not available");
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["ok"] = mcp::JsonValue(true);
-  inner["shortcut"] = mcp::JsonValue(shortcut);
-  inner["key"] = mcp::JsonValue(static_cast<int>(key));
-  inner["ctrl"] = mcp::JsonValue(ctrl);
-  inner["shift"] = mcp::JsonValue(shift);
-  inner["alt"] = mcp::JsonValue(alt);
-  inner["meta"] = mcp::JsonValue(meta);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["ok"] = godot_autopilot::util::JsonValue(true);
+  inner["shortcut"] = godot_autopilot::util::JsonValue(shortcut);
+  inner["key"] = godot_autopilot::util::JsonValue(static_cast<int>(key));
+  inner["ctrl"] = godot_autopilot::util::JsonValue(ctrl);
+  inner["shift"] = godot_autopilot::util::JsonValue(shift);
+  inner["alt"] = godot_autopilot::util::JsonValue(alt);
+  inner["meta"] = godot_autopilot::util::JsonValue(meta);
   return util::ok_result(std::move(inner));
 }
 
-mcp::JsonValue handle_editor_ui_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_ui_action(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "editor_ui_action called");
   auto *action_p = args.Find("action");
   const std::string action =
       (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
   if (action.empty()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
     error["error"] =
-        mcp::JsonValue("missing required parameter: action (click|type|shortcut)");
+        godot_autopilot::util::JsonValue("missing required parameter: action (click|type|shortcut)");
     return error;
   }
   if (action == "click") {
@@ -346,9 +346,9 @@ mcp::JsonValue handle_editor_ui_action(const mcp::JsonValue &args) {
   if (action == "shortcut") {
     return handle_run_editor_shortcut(args);
   }
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
   error["error"] =
-      mcp::JsonValue("invalid action: expected click|type|shortcut");
+      godot_autopilot::util::JsonValue("invalid action: expected click|type|shortcut");
   return error;
 }
 

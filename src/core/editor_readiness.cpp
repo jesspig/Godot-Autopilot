@@ -38,16 +38,16 @@ bool editor_in_startup_window() {
   return is_startup_window(has_edited_root, editor_startup_elapsed_ms());
 }
 
-mcp::JsonValue startup_in_progress_error() {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(
+godot_autopilot::util::JsonValue startup_in_progress_error() {
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue(
       "editor is still starting up and has not restored an editable scene "
       "yet; retry shortly");
-  e["error_code"] = mcp::JsonValue("startup_in_progress");
-  e["code"] = mcp::JsonValue("startup_in_progress");
-  e["retryable"] = mcp::JsonValue(true);
-  e["retry_after_ms"] = mcp::JsonValue(static_cast<int64_t>(1000));
-  e["hint"] = mcp::JsonValue(
+  e["error_code"] = godot_autopilot::util::JsonValue("startup_in_progress");
+  e["code"] = godot_autopilot::util::JsonValue("startup_in_progress");
+  e["retryable"] = godot_autopilot::util::JsonValue(true);
+  e["retry_after_ms"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(1000));
+  e["hint"] = godot_autopilot::util::JsonValue(
       "the editor startup window is still open; wait for the scene to finish "
       "restoring, then call the tool again");
   return e;
@@ -67,12 +67,12 @@ bool is_import_in_progress() {
   return false;
 }
 
-mcp::JsonValue busy_error() {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(
+godot_autopilot::util::JsonValue busy_error() {
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue(
       "editor is currently importing/scanning resources; retry shortly");
-  e["retryable"] = mcp::JsonValue(true);
-  e["retry_after_ms"] = mcp::JsonValue(static_cast<int64_t>(500));
+  e["retryable"] = godot_autopilot::util::JsonValue(true);
+  e["retry_after_ms"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(500));
   return e;
 }
 

@@ -161,7 +161,7 @@ std::optional<godot::Variant::Type> parse_type_hint(const std::string &hint) {
   return std::nullopt;
 }
 
-double as_double(const mcp::JsonValue &j, double def = 0.0) {
+double as_double(const godot_autopilot::util::JsonValue &j, double def = 0.0) {
   if (j.IsInt())
     return static_cast<double>(j.GetInt());
   if (j.IsDouble())
@@ -169,7 +169,7 @@ double as_double(const mcp::JsonValue &j, double def = 0.0) {
   return def;
 }
 
-int64_t as_int64(const mcp::JsonValue &j, int64_t def = 0) {
+int64_t as_int64(const godot_autopilot::util::JsonValue &j, int64_t def = 0) {
   if (j.IsInt())
     return j.GetInt();
   if (j.IsDouble())
@@ -177,7 +177,7 @@ int64_t as_int64(const mcp::JsonValue &j, int64_t def = 0) {
   return def;
 }
 
-double field_double(const mcp::JsonValue &j, const char *key,
+double field_double(const godot_autopilot::util::JsonValue &j, const char *key,
                     double def = 0.0) {
   auto *v = j.Find(key);
   if (!v)
@@ -185,14 +185,14 @@ double field_double(const mcp::JsonValue &j, const char *key,
   return as_double(*v, def);
 }
 
-int64_t field_int64(const mcp::JsonValue &j, const char *key, int64_t def = 0) {
+int64_t field_int64(const godot_autopilot::util::JsonValue &j, const char *key, int64_t def = 0) {
   auto *v = j.Find(key);
   if (!v)
     return def;
   return as_int64(*v, def);
 }
 
-double nested_double(const mcp::JsonValue &j, const char *outer,
+double nested_double(const godot_autopilot::util::JsonValue &j, const char *outer,
                      const char *inner, double def = 0.0) {
   auto *o = j.Find(outer);
   if (!o || !o->IsObject())
@@ -200,7 +200,7 @@ double nested_double(const mcp::JsonValue &j, const char *outer,
   return field_double(*o, inner, def);
 }
 
-int64_t nested_int64(const mcp::JsonValue &j, const char *outer,
+int64_t nested_int64(const godot_autopilot::util::JsonValue &j, const char *outer,
                      const char *inner, int64_t def = 0) {
   auto *o = j.Find(outer);
   if (!o || !o->IsObject())
@@ -208,13 +208,13 @@ int64_t nested_int64(const mcp::JsonValue &j, const char *outer,
   return field_int64(*o, inner, def);
 }
 
-std::string get_string_or_dump(const mcp::JsonValue &j) {
+std::string get_string_or_dump(const godot_autopilot::util::JsonValue &j) {
   if (j.IsString())
     return j.GetString();
   return j.Dump();
 }
 
-bool try_deserialize_node_ref(const mcp::JsonValue &j,
+bool try_deserialize_node_ref(const godot_autopilot::util::JsonValue &j,
                               godot::Variant &out_variant) {
   if (!j.IsObject())
     return false;
@@ -239,7 +239,7 @@ bool try_deserialize_node_ref(const mcp::JsonValue &j,
   return true;
 }
 
-godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
+godot::Variant deserialize_inferred(const godot_autopilot::util::JsonValue &j) {
   if (j.IsNull())
     return godot::Variant();
   if (j.IsBool())
@@ -288,10 +288,10 @@ godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
   return godot::Variant();
 }
 
-godot::Variant deserialize_as_object(const mcp::JsonValue &j,
+godot::Variant deserialize_as_object(const godot_autopilot::util::JsonValue &j,
                                      const std::string &class_name);
 
-godot::Variant deserialize_typed(const mcp::JsonValue &j,
+godot::Variant deserialize_typed(const godot_autopilot::util::JsonValue &j,
                                  godot::Variant::Type type) {
   using namespace godot;
   switch (type) {
@@ -651,7 +651,7 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
   }
 }
 
-const mcp::JsonValue *strict_number_field(const mcp::JsonValue &obj,
+const godot_autopilot::util::JsonValue *strict_number_field(const godot_autopilot::util::JsonValue &obj,
                                           const char *key, const char *path,
                                           const char *type_name,
                                           const char *example) {
@@ -664,12 +664,12 @@ const mcp::JsonValue *strict_number_field(const mcp::JsonValue &obj,
   return v;
 }
 
-const mcp::JsonValue *strict_required_number(const mcp::JsonValue &obj,
+const godot_autopilot::util::JsonValue *strict_required_number(const godot_autopilot::util::JsonValue &obj,
                                              const char *key,
                                              const char *type_name,
                                              const char *example,
                                              const char *missing_message) {
-  const mcp::JsonValue *v =
+  const godot_autopilot::util::JsonValue *v =
       strict_number_field(obj, key, key, type_name, example);
   if (!v)
     throw RuntimeError(std::string("invalid ") + type_name + ": " +
@@ -677,7 +677,7 @@ const mcp::JsonValue *strict_required_number(const mcp::JsonValue &obj,
   return v;
 }
 
-const mcp::JsonValue *pick_size_axis(const mcp::JsonValue &size,
+const godot_autopilot::util::JsonValue *pick_size_axis(const godot_autopilot::util::JsonValue &size,
                                      const char *container, const char *primary,
                                      const char *alias, bool int_semantics,
                                      const char *type_name,
@@ -703,7 +703,7 @@ const mcp::JsonValue *pick_size_axis(const mcp::JsonValue &size,
   return nullptr;
 }
 
-godot::Variant deserialize_rect2_strict(const mcp::JsonValue &j,
+godot::Variant deserialize_rect2_strict(const godot_autopilot::util::JsonValue &j,
                                         bool int_semantics) {
   const char *type_name = int_semantics ? "Rect2i" : "Rect2";
   const char *example =
@@ -715,16 +715,16 @@ godot::Variant deserialize_rect2_strict(const mcp::JsonValue &j,
   if (!size_j || !size_j->IsObject())
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": 'size' must be an object, e.g. " + example);
-  const mcp::JsonValue *sx_j = pick_size_axis(*size_j, "size", "x", "w",
+  const godot_autopilot::util::JsonValue *sx_j = pick_size_axis(*size_j, "size", "x", "w",
                                               int_semantics, type_name, example);
-  const mcp::JsonValue *sy_j = pick_size_axis(*size_j, "size", "y", "h",
+  const godot_autopilot::util::JsonValue *sy_j = pick_size_axis(*size_j, "size", "y", "h",
                                               int_semantics, type_name, example);
   if (!sx_j || !sy_j)
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": 'size' must provide 'w' and 'h' (or 'x' and "
                              "'y'), e.g. " + example);
-  const mcp::JsonValue *px_j = nullptr;
-  const mcp::JsonValue *py_j = nullptr;
+  const godot_autopilot::util::JsonValue *px_j = nullptr;
+  const godot_autopilot::util::JsonValue *py_j = nullptr;
   if (auto *pos_j = j.Find("position")) {
     if (!pos_j->IsObject())
       throw RuntimeError(std::string("invalid ") + type_name +
@@ -745,7 +745,7 @@ godot::Variant deserialize_rect2_strict(const mcp::JsonValue &j,
       godot::Vector2(as_double(*sx_j), as_double(*sy_j))));
 }
 
-godot::Variant deserialize_vector2_strict(const mcp::JsonValue &j,
+godot::Variant deserialize_vector2_strict(const godot_autopilot::util::JsonValue &j,
                                           bool int_semantics) {
   const char *type_name = int_semantics ? "Vector2i" : "Vector2";
   const char *example = "{\"x\":0,\"y\":0}";
@@ -756,9 +756,9 @@ godot::Variant deserialize_vector2_strict(const mcp::JsonValue &j,
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": 'x' and 'y' are required numbers, e.g. " +
                              example);
-  const mcp::JsonValue *x_j =
+  const godot_autopilot::util::JsonValue *x_j =
       strict_number_field(j, "x", "x", type_name, example);
-  const mcp::JsonValue *y_j =
+  const godot_autopilot::util::JsonValue *y_j =
       strict_number_field(j, "y", "y", type_name, example);
   if (int_semantics) {
     return godot::Variant(godot::Vector2i(as_int64(*x_j), as_int64(*y_j)));
@@ -766,7 +766,7 @@ godot::Variant deserialize_vector2_strict(const mcp::JsonValue &j,
   return godot::Variant(godot::Vector2(as_double(*x_j), as_double(*y_j)));
 }
 
-godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_aabb_strict(const godot_autopilot::util::JsonValue &j) {
   const char *example =
       "{\"position\":{\"x\":0,\"y\":0,\"z\":0},\"size\":{\"w\":64,\"h\":32,"
       "\"d\":16}}";
@@ -777,19 +777,19 @@ godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
   if (!size_j || !size_j->IsObject())
     throw RuntimeError(
         std::string("invalid AABB: 'size' must be an object, e.g. ") + example);
-  const mcp::JsonValue *sx_j =
+  const godot_autopilot::util::JsonValue *sx_j =
       pick_size_axis(*size_j, "size", "x", "w", false, "AABB", example);
-  const mcp::JsonValue *sy_j =
+  const godot_autopilot::util::JsonValue *sy_j =
       pick_size_axis(*size_j, "size", "y", "h", false, "AABB", example);
-  const mcp::JsonValue *sz_j =
+  const godot_autopilot::util::JsonValue *sz_j =
       pick_size_axis(*size_j, "size", "z", "d", false, "AABB", example);
   if (!sx_j || !sy_j || !sz_j)
     throw RuntimeError(
         std::string("invalid AABB: 'size' must provide 'w', 'h' and 'd' (or "
                     "'x', 'y' and 'z'), e.g. ") + example);
-  const mcp::JsonValue *px_j = nullptr;
-  const mcp::JsonValue *py_j = nullptr;
-  const mcp::JsonValue *pz_j = nullptr;
+  const godot_autopilot::util::JsonValue *px_j = nullptr;
+  const godot_autopilot::util::JsonValue *py_j = nullptr;
+  const godot_autopilot::util::JsonValue *pz_j = nullptr;
   if (auto *pos_j = j.Find("position")) {
     if (!pos_j->IsObject())
       throw RuntimeError(
@@ -806,7 +806,7 @@ godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
       godot::Vector3(as_double(*sx_j), as_double(*sy_j), as_double(*sz_j))));
 }
 
-godot::Variant deserialize_transform2d_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_transform2d_strict(const godot_autopilot::util::JsonValue &j) {
   const char *example = "{\"columns\":[[1,0],[0,1],[x,y]]}";
   if (!j.IsObject())
     throw RuntimeError(
@@ -835,7 +835,7 @@ godot::Variant deserialize_transform2d_strict(const mcp::JsonValue &j) {
   return godot::Variant(godot::Transform2D(cols[0], cols[1], cols[2]));
 }
 
-godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_transform3d_strict(const godot_autopilot::util::JsonValue &j) {
   const char *example =
       "{\"basis\":{\"rows\":[[1,0,0],[0,1,0],[0,0,1]]},\"origin\":{\"x\":0,"
       "\"y\":0,\"z\":0}}";
@@ -868,9 +868,9 @@ godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
     b.rows[i] =
         godot::Vector3(as_double(ra[0]), as_double(ra[1]), as_double(ra[2]));
   }
-  const mcp::JsonValue *ox_j = nullptr;
-  const mcp::JsonValue *oy_j = nullptr;
-  const mcp::JsonValue *oz_j = nullptr;
+  const godot_autopilot::util::JsonValue *ox_j = nullptr;
+  const godot_autopilot::util::JsonValue *oy_j = nullptr;
+  const godot_autopilot::util::JsonValue *oz_j = nullptr;
   if (auto *origin_j = j.Find("origin")) {
     if (!origin_j->IsObject())
       throw RuntimeError(
@@ -889,7 +889,7 @@ godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
                         oz_j ? as_double(*oz_j) : 0.0)));
 }
 
-godot::Variant deserialize_vector3_strict(const mcp::JsonValue &j,
+godot::Variant deserialize_vector3_strict(const godot_autopilot::util::JsonValue &j,
                                           bool int_semantics) {
   const char *type_name = int_semantics ? "Vector3i" : "Vector3";
   const char *example = "{\"x\":0,\"y\":0,\"z\":0}";
@@ -897,11 +897,11 @@ godot::Variant deserialize_vector3_strict(const mcp::JsonValue &j,
   if (!j.IsObject())
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
-  const mcp::JsonValue *x_j =
+  const godot_autopilot::util::JsonValue *x_j =
       strict_required_number(j, "x", type_name, example, missing);
-  const mcp::JsonValue *y_j =
+  const godot_autopilot::util::JsonValue *y_j =
       strict_required_number(j, "y", type_name, example, missing);
-  const mcp::JsonValue *z_j =
+  const godot_autopilot::util::JsonValue *z_j =
       strict_required_number(j, "z", type_name, example, missing);
   if (int_semantics) {
     return godot::Variant(
@@ -911,7 +911,7 @@ godot::Variant deserialize_vector3_strict(const mcp::JsonValue &j,
       godot::Vector3(as_double(*x_j), as_double(*y_j), as_double(*z_j)));
 }
 
-godot::Variant deserialize_vector4_strict(const mcp::JsonValue &j,
+godot::Variant deserialize_vector4_strict(const godot_autopilot::util::JsonValue &j,
                                           bool int_semantics) {
   const char *type_name = int_semantics ? "Vector4i" : "Vector4";
   const char *example = "{\"x\":0,\"y\":0,\"z\":0,\"w\":0}";
@@ -919,13 +919,13 @@ godot::Variant deserialize_vector4_strict(const mcp::JsonValue &j,
   if (!j.IsObject())
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
-  const mcp::JsonValue *x_j =
+  const godot_autopilot::util::JsonValue *x_j =
       strict_required_number(j, "x", type_name, example, missing);
-  const mcp::JsonValue *y_j =
+  const godot_autopilot::util::JsonValue *y_j =
       strict_required_number(j, "y", type_name, example, missing);
-  const mcp::JsonValue *z_j =
+  const godot_autopilot::util::JsonValue *z_j =
       strict_required_number(j, "z", type_name, example, missing);
-  const mcp::JsonValue *w_j =
+  const godot_autopilot::util::JsonValue *w_j =
       strict_required_number(j, "w", type_name, example, missing);
   if (int_semantics) {
     return godot::Variant(godot::Vector4i(as_int64(*x_j), as_int64(*y_j),
@@ -935,7 +935,7 @@ godot::Variant deserialize_vector4_strict(const mcp::JsonValue &j,
                                        as_double(*z_j), as_double(*w_j)));
 }
 
-godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_plane_strict(const godot_autopilot::util::JsonValue &j) {
   const char *example =
       "{\"normal\":{\"x\":0,\"y\":1,\"z\":0},\"d\":0} or "
       "{\"x\":0,\"y\":1,\"z\":0,\"d\":0}";
@@ -961,13 +961,13 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
                       "'y' and 'z' numbers, e.g. ") +
           example);
     const char *normal_missing = "'normal' must provide 'x', 'y' and 'z'";
-    const mcp::JsonValue *nx_j =
+    const godot_autopilot::util::JsonValue *nx_j =
         strict_required_number(*normal_j, "x", "Plane", example,
                                normal_missing);
-    const mcp::JsonValue *ny_j =
+    const godot_autopilot::util::JsonValue *ny_j =
         strict_required_number(*normal_j, "y", "Plane", example,
                                normal_missing);
-    const mcp::JsonValue *nz_j =
+    const godot_autopilot::util::JsonValue *nz_j =
         strict_required_number(*normal_j, "z", "Plane", example,
                                normal_missing);
     nx = as_double(*nx_j);
@@ -975,11 +975,11 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
     nz = as_double(*nz_j);
   } else if (has_components) {
     const char *components_missing = "'x', 'y' and 'z' are required numbers";
-    const mcp::JsonValue *x_j =
+    const godot_autopilot::util::JsonValue *x_j =
         strict_required_number(j, "x", "Plane", example, components_missing);
-    const mcp::JsonValue *y_j =
+    const godot_autopilot::util::JsonValue *y_j =
         strict_required_number(j, "y", "Plane", example, components_missing);
-    const mcp::JsonValue *z_j =
+    const godot_autopilot::util::JsonValue *z_j =
         strict_required_number(j, "z", "Plane", example, components_missing);
     nx = as_double(*x_j);
     ny = as_double(*y_j);
@@ -990,7 +990,7 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
                     "top-level 'x', 'y' and 'z', e.g. ") +
         example);
   }
-  const mcp::JsonValue *d_j =
+  const godot_autopilot::util::JsonValue *d_j =
       strict_required_number(j, "d", "Plane", example, "'d' is required");
   const double d = as_double(*d_j);
   if (nx == 0.0 && ny == 0.0 && nz == 0.0 && d != 0.0)
@@ -1002,26 +1002,26 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
   return godot::Variant(godot::Plane(godot::Vector3(nx, ny, nz), d));
 }
 
-godot::Variant deserialize_quaternion_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_quaternion_strict(const godot_autopilot::util::JsonValue &j) {
   const char *type_name = "Quaternion";
   const char *example = "{\"x\":0,\"y\":0,\"z\":0,\"w\":1}";
   const char *missing = "'x', 'y', 'z' and 'w' are required numbers";
   if (!j.IsObject())
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
-  const mcp::JsonValue *x_j =
+  const godot_autopilot::util::JsonValue *x_j =
       strict_required_number(j, "x", type_name, example, missing);
-  const mcp::JsonValue *y_j =
+  const godot_autopilot::util::JsonValue *y_j =
       strict_required_number(j, "y", type_name, example, missing);
-  const mcp::JsonValue *z_j =
+  const godot_autopilot::util::JsonValue *z_j =
       strict_required_number(j, "z", type_name, example, missing);
-  const mcp::JsonValue *w_j =
+  const godot_autopilot::util::JsonValue *w_j =
       strict_required_number(j, "w", type_name, example, missing);
   return godot::Variant(godot::Quaternion(as_double(*x_j), as_double(*y_j),
                                           as_double(*z_j), as_double(*w_j)));
 }
 
-godot::Variant deserialize_basis_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_basis_strict(const godot_autopilot::util::JsonValue &j) {
   const char *example = "{\"rows\":[[1,0,0],[0,1,0],[0,0,1]]}";
   if (!j.IsObject())
     throw RuntimeError(
@@ -1051,7 +1051,7 @@ godot::Variant deserialize_basis_strict(const mcp::JsonValue &j) {
   return godot::Variant(b);
 }
 
-godot::Variant deserialize_projection_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_projection_strict(const godot_autopilot::util::JsonValue &j) {
   const char *example =
       "{\"columns\":[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]}";
   if (!j.IsObject())
@@ -1083,20 +1083,20 @@ godot::Variant deserialize_projection_strict(const mcp::JsonValue &j) {
   return godot::Variant(godot::Projection(cols[0], cols[1], cols[2], cols[3]));
 }
 
-godot::Variant deserialize_color_strict(const mcp::JsonValue &j) {
+godot::Variant deserialize_color_strict(const godot_autopilot::util::JsonValue &j) {
   const char *type_name = "Color";
   const char *example = "{\"r\":0,\"g\":0,\"b\":0,\"a\":1}";
   const char *missing = "'r', 'g' and 'b' are required numbers";
   if (!j.IsObject())
     throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
-  const mcp::JsonValue *r_j =
+  const godot_autopilot::util::JsonValue *r_j =
       strict_required_number(j, "r", type_name, example, missing);
-  const mcp::JsonValue *g_j =
+  const godot_autopilot::util::JsonValue *g_j =
       strict_required_number(j, "g", type_name, example, missing);
-  const mcp::JsonValue *b_j =
+  const godot_autopilot::util::JsonValue *b_j =
       strict_required_number(j, "b", type_name, example, missing);
-  const mcp::JsonValue *a_j =
+  const godot_autopilot::util::JsonValue *a_j =
       strict_number_field(j, "a", "a", type_name, example);
   return godot::Variant(godot::Color(
       static_cast<float>(as_double(*r_j)), static_cast<float>(as_double(*g_j)),
@@ -1104,7 +1104,7 @@ godot::Variant deserialize_color_strict(const mcp::JsonValue &j) {
       static_cast<float>(a_j ? as_double(*a_j) : 1.0)));
 }
 
-godot::Variant deserialize_typed_strict(const mcp::JsonValue &j,
+godot::Variant deserialize_typed_strict(const godot_autopilot::util::JsonValue &j,
                                         godot::Variant::Type type) {
   switch (type) {
   case godot::Variant::VECTOR2:
@@ -1199,7 +1199,7 @@ std::string clean_class_name(const std::string &hint_string) {
   return hint_string.substr(0, sep);
 }
 
-godot::Variant deserialize_as_object(const mcp::JsonValue &j,
+godot::Variant deserialize_as_object(const godot_autopilot::util::JsonValue &j,
                                      const std::string &class_name) {
   if (!j.IsObject())
     return godot::Variant();
@@ -1300,54 +1300,54 @@ std::string bounded_variant_string(std::string value) {
   return value;
 }
 
-mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
+godot_autopilot::util::JsonValue serialize_impl(const godot::Variant &v, int depth,
                               std::unordered_set<uint64_t> &visited) {
   using namespace godot;
   if (depth >= MAX_SERIALIZE_DEPTH)
-    return mcp::JsonValue(DEPTH_EXCEEDED_PLACEHOLDER);
+    return godot_autopilot::util::JsonValue(DEPTH_EXCEEDED_PLACEHOLDER);
   switch (v.get_type()) {
   case Variant::NIL:
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
 
   case Variant::BOOL:
-    return mcp::JsonValue(static_cast<bool>(v));
+    return godot_autopilot::util::JsonValue(static_cast<bool>(v));
 
   case Variant::INT:
-    return mcp::JsonValue(static_cast<int64_t>(v));
+    return godot_autopilot::util::JsonValue(static_cast<int64_t>(v));
 
   case Variant::FLOAT:
-    return mcp::JsonValue(static_cast<double>(v));
+    return godot_autopilot::util::JsonValue(static_cast<double>(v));
 
   case Variant::STRING: {
     godot::String s = v.operator godot::String();
-    return mcp::JsonValue(bounded_variant_string(to_std_string(s)));
+    return godot_autopilot::util::JsonValue(bounded_variant_string(to_std_string(s)));
   }
 
   case Variant::VECTOR2: {
     auto vec = static_cast<Vector2>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(vec.x);
-    j["y"] = mcp::JsonValue(vec.y);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(vec.x);
+    j["y"] = godot_autopilot::util::JsonValue(vec.y);
     return j;
   }
 
   case Variant::VECTOR2I: {
     auto vec = static_cast<Vector2i>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(vec.x);
-    j["y"] = mcp::JsonValue(vec.y);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(vec.x);
+    j["y"] = godot_autopilot::util::JsonValue(vec.y);
     return j;
   }
 
   case Variant::RECT2: {
     auto r = static_cast<Rect2>(v);
-    mcp::JsonValue pos(mcp::JsonValue::object_tag);
-    pos["x"] = mcp::JsonValue(r.position.x);
-    pos["y"] = mcp::JsonValue(r.position.y);
-    mcp::JsonValue sz(mcp::JsonValue::object_tag);
-    sz["x"] = mcp::JsonValue(r.size.x);
-    sz["y"] = mcp::JsonValue(r.size.y);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue pos(godot_autopilot::util::JsonValue::object_tag);
+    pos["x"] = godot_autopilot::util::JsonValue(r.position.x);
+    pos["y"] = godot_autopilot::util::JsonValue(r.position.y);
+    godot_autopilot::util::JsonValue sz(godot_autopilot::util::JsonValue::object_tag);
+    sz["x"] = godot_autopilot::util::JsonValue(r.size.x);
+    sz["y"] = godot_autopilot::util::JsonValue(r.size.y);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["position"] = std::move(pos);
     j["size"] = std::move(sz);
     return j;
@@ -1355,13 +1355,13 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
 
   case Variant::RECT2I: {
     auto r = static_cast<Rect2i>(v);
-    mcp::JsonValue pos(mcp::JsonValue::object_tag);
-    pos["x"] = mcp::JsonValue(r.position.x);
-    pos["y"] = mcp::JsonValue(r.position.y);
-    mcp::JsonValue sz(mcp::JsonValue::object_tag);
-    sz["x"] = mcp::JsonValue(r.size.x);
-    sz["y"] = mcp::JsonValue(r.size.y);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue pos(godot_autopilot::util::JsonValue::object_tag);
+    pos["x"] = godot_autopilot::util::JsonValue(r.position.x);
+    pos["y"] = godot_autopilot::util::JsonValue(r.position.y);
+    godot_autopilot::util::JsonValue sz(godot_autopilot::util::JsonValue::object_tag);
+    sz["x"] = godot_autopilot::util::JsonValue(r.size.x);
+    sz["y"] = godot_autopilot::util::JsonValue(r.size.y);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["position"] = std::move(pos);
     j["size"] = std::move(sz);
     return j;
@@ -1369,89 +1369,89 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
 
   case Variant::VECTOR3: {
     auto vec = static_cast<Vector3>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(vec.x);
-    j["y"] = mcp::JsonValue(vec.y);
-    j["z"] = mcp::JsonValue(vec.z);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(vec.x);
+    j["y"] = godot_autopilot::util::JsonValue(vec.y);
+    j["z"] = godot_autopilot::util::JsonValue(vec.z);
     return j;
   }
 
   case Variant::VECTOR3I: {
     auto vec = static_cast<Vector3i>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(vec.x);
-    j["y"] = mcp::JsonValue(vec.y);
-    j["z"] = mcp::JsonValue(vec.z);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(vec.x);
+    j["y"] = godot_autopilot::util::JsonValue(vec.y);
+    j["z"] = godot_autopilot::util::JsonValue(vec.z);
     return j;
   }
 
   case Variant::TRANSFORM2D: {
     auto t = static_cast<Transform2D>(v);
-    mcp::JsonValue cols(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue cols(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < 3; i++) {
-      mcp::JsonValue::Array col_arr;
-      col_arr.push_back(mcp::JsonValue(t.columns[i].x));
-      col_arr.push_back(mcp::JsonValue(t.columns[i].y));
-      cols.PushBack(mcp::JsonValue(std::move(col_arr)));
+      godot_autopilot::util::JsonValue::Array col_arr;
+      col_arr.push_back(godot_autopilot::util::JsonValue(t.columns[i].x));
+      col_arr.push_back(godot_autopilot::util::JsonValue(t.columns[i].y));
+      cols.PushBack(godot_autopilot::util::JsonValue(std::move(col_arr)));
     }
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["columns"] = std::move(cols);
     return j;
   }
 
   case Variant::VECTOR4: {
     auto vec = static_cast<Vector4>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(vec.x);
-    j["y"] = mcp::JsonValue(vec.y);
-    j["z"] = mcp::JsonValue(vec.z);
-    j["w"] = mcp::JsonValue(vec.w);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(vec.x);
+    j["y"] = godot_autopilot::util::JsonValue(vec.y);
+    j["z"] = godot_autopilot::util::JsonValue(vec.z);
+    j["w"] = godot_autopilot::util::JsonValue(vec.w);
     return j;
   }
 
   case Variant::VECTOR4I: {
     auto vec = static_cast<Vector4i>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(vec.x);
-    j["y"] = mcp::JsonValue(vec.y);
-    j["z"] = mcp::JsonValue(vec.z);
-    j["w"] = mcp::JsonValue(vec.w);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(vec.x);
+    j["y"] = godot_autopilot::util::JsonValue(vec.y);
+    j["z"] = godot_autopilot::util::JsonValue(vec.z);
+    j["w"] = godot_autopilot::util::JsonValue(vec.w);
     return j;
   }
 
   case Variant::PLANE: {
     auto p = static_cast<Plane>(v);
-    mcp::JsonValue norm(mcp::JsonValue::object_tag);
-    norm["x"] = mcp::JsonValue(p.normal.x);
-    norm["y"] = mcp::JsonValue(p.normal.y);
-    norm["z"] = mcp::JsonValue(p.normal.z);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue norm(godot_autopilot::util::JsonValue::object_tag);
+    norm["x"] = godot_autopilot::util::JsonValue(p.normal.x);
+    norm["y"] = godot_autopilot::util::JsonValue(p.normal.y);
+    norm["z"] = godot_autopilot::util::JsonValue(p.normal.z);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["normal"] = std::move(norm);
-    j["d"] = mcp::JsonValue(p.d);
+    j["d"] = godot_autopilot::util::JsonValue(p.d);
     return j;
   }
 
   case Variant::QUATERNION: {
     auto q = static_cast<Quaternion>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["x"] = mcp::JsonValue(q.x);
-    j["y"] = mcp::JsonValue(q.y);
-    j["z"] = mcp::JsonValue(q.z);
-    j["w"] = mcp::JsonValue(q.w);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["x"] = godot_autopilot::util::JsonValue(q.x);
+    j["y"] = godot_autopilot::util::JsonValue(q.y);
+    j["z"] = godot_autopilot::util::JsonValue(q.z);
+    j["w"] = godot_autopilot::util::JsonValue(q.w);
     return j;
   }
 
   case Variant::AABB: {
     auto aabb = static_cast<godot::AABB>(v);
-    mcp::JsonValue pos(mcp::JsonValue::object_tag);
-    pos["x"] = mcp::JsonValue(aabb.position.x);
-    pos["y"] = mcp::JsonValue(aabb.position.y);
-    pos["z"] = mcp::JsonValue(aabb.position.z);
-    mcp::JsonValue sz(mcp::JsonValue::object_tag);
-    sz["x"] = mcp::JsonValue(aabb.size.x);
-    sz["y"] = mcp::JsonValue(aabb.size.y);
-    sz["z"] = mcp::JsonValue(aabb.size.z);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue pos(godot_autopilot::util::JsonValue::object_tag);
+    pos["x"] = godot_autopilot::util::JsonValue(aabb.position.x);
+    pos["y"] = godot_autopilot::util::JsonValue(aabb.position.y);
+    pos["z"] = godot_autopilot::util::JsonValue(aabb.position.z);
+    godot_autopilot::util::JsonValue sz(godot_autopilot::util::JsonValue::object_tag);
+    sz["x"] = godot_autopilot::util::JsonValue(aabb.size.x);
+    sz["y"] = godot_autopilot::util::JsonValue(aabb.size.y);
+    sz["z"] = godot_autopilot::util::JsonValue(aabb.size.z);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["position"] = std::move(pos);
     j["size"] = std::move(sz);
     return j;
@@ -1459,36 +1459,36 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
 
   case Variant::BASIS: {
     auto b = static_cast<Basis>(v);
-    mcp::JsonValue rows(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue rows(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < 3; i++) {
-      mcp::JsonValue::Array row_arr;
-      row_arr.push_back(mcp::JsonValue(b.rows[i].x));
-      row_arr.push_back(mcp::JsonValue(b.rows[i].y));
-      row_arr.push_back(mcp::JsonValue(b.rows[i].z));
-      rows.PushBack(mcp::JsonValue(std::move(row_arr)));
+      godot_autopilot::util::JsonValue::Array row_arr;
+      row_arr.push_back(godot_autopilot::util::JsonValue(b.rows[i].x));
+      row_arr.push_back(godot_autopilot::util::JsonValue(b.rows[i].y));
+      row_arr.push_back(godot_autopilot::util::JsonValue(b.rows[i].z));
+      rows.PushBack(godot_autopilot::util::JsonValue(std::move(row_arr)));
     }
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["rows"] = std::move(rows);
     return j;
   }
 
   case Variant::TRANSFORM3D: {
     auto t3 = static_cast<Transform3D>(v);
-    mcp::JsonValue rows(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue rows(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < 3; i++) {
-      mcp::JsonValue::Array row_arr;
-      row_arr.push_back(mcp::JsonValue(t3.basis.rows[i].x));
-      row_arr.push_back(mcp::JsonValue(t3.basis.rows[i].y));
-      row_arr.push_back(mcp::JsonValue(t3.basis.rows[i].z));
-      rows.PushBack(mcp::JsonValue(std::move(row_arr)));
+      godot_autopilot::util::JsonValue::Array row_arr;
+      row_arr.push_back(godot_autopilot::util::JsonValue(t3.basis.rows[i].x));
+      row_arr.push_back(godot_autopilot::util::JsonValue(t3.basis.rows[i].y));
+      row_arr.push_back(godot_autopilot::util::JsonValue(t3.basis.rows[i].z));
+      rows.PushBack(godot_autopilot::util::JsonValue(std::move(row_arr)));
     }
-    mcp::JsonValue basis_j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue basis_j(godot_autopilot::util::JsonValue::object_tag);
     basis_j["rows"] = std::move(rows);
-    mcp::JsonValue orig(mcp::JsonValue::object_tag);
-    orig["x"] = mcp::JsonValue(t3.origin.x);
-    orig["y"] = mcp::JsonValue(t3.origin.y);
-    orig["z"] = mcp::JsonValue(t3.origin.z);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue orig(godot_autopilot::util::JsonValue::object_tag);
+    orig["x"] = godot_autopilot::util::JsonValue(t3.origin.x);
+    orig["y"] = godot_autopilot::util::JsonValue(t3.origin.y);
+    orig["z"] = godot_autopilot::util::JsonValue(t3.origin.z);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["basis"] = std::move(basis_j);
     j["origin"] = std::move(orig);
     return j;
@@ -1496,46 +1496,46 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
 
   case Variant::PROJECTION: {
     auto p = static_cast<Projection>(v);
-    mcp::JsonValue cols(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue cols(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < 4; i++) {
-      mcp::JsonValue::Array col_arr;
-      col_arr.push_back(mcp::JsonValue(p.columns[i].x));
-      col_arr.push_back(mcp::JsonValue(p.columns[i].y));
-      col_arr.push_back(mcp::JsonValue(p.columns[i].z));
-      col_arr.push_back(mcp::JsonValue(p.columns[i].w));
-      cols.PushBack(mcp::JsonValue(std::move(col_arr)));
+      godot_autopilot::util::JsonValue::Array col_arr;
+      col_arr.push_back(godot_autopilot::util::JsonValue(p.columns[i].x));
+      col_arr.push_back(godot_autopilot::util::JsonValue(p.columns[i].y));
+      col_arr.push_back(godot_autopilot::util::JsonValue(p.columns[i].z));
+      col_arr.push_back(godot_autopilot::util::JsonValue(p.columns[i].w));
+      cols.PushBack(godot_autopilot::util::JsonValue(std::move(col_arr)));
     }
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     j["columns"] = std::move(cols);
     return j;
   }
 
   case Variant::COLOR: {
     auto c = static_cast<Color>(v);
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["r"] = mcp::JsonValue(static_cast<double>(c.r));
-    j["g"] = mcp::JsonValue(static_cast<double>(c.g));
-    j["b"] = mcp::JsonValue(static_cast<double>(c.b));
-    j["a"] = mcp::JsonValue(static_cast<double>(c.a));
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["r"] = godot_autopilot::util::JsonValue(static_cast<double>(c.r));
+    j["g"] = godot_autopilot::util::JsonValue(static_cast<double>(c.g));
+    j["b"] = godot_autopilot::util::JsonValue(static_cast<double>(c.b));
+    j["a"] = godot_autopilot::util::JsonValue(static_cast<double>(c.a));
     return j;
   }
 
   case Variant::STRING_NAME: {
     godot::StringName sn = v.operator godot::StringName();
     godot::String s(sn);
-    return mcp::JsonValue(to_std_string(s));
+    return godot_autopilot::util::JsonValue(to_std_string(s));
   }
 
   case Variant::NODE_PATH: {
     godot::NodePath np = v.operator godot::NodePath();
     godot::String s(np);
-    return mcp::JsonValue(to_std_string(s));
+    return godot_autopilot::util::JsonValue(to_std_string(s));
   }
 
   case Variant::RID: {
     godot::RID rid = v.operator godot::RID();
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    j["id"] = mcp::JsonValue(static_cast<int64_t>(rid.get_id()));
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    j["id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(rid.get_id()));
     return j;
   }
 
@@ -1544,12 +1544,12 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
     if (obj) {
       uint64_t oid = obj->get_instance_id();
       if (visited.count(oid) > 0) {
-        return mcp::JsonValue(CIRCULAR_REF_PLACEHOLDER);
+        return godot_autopilot::util::JsonValue(CIRCULAR_REF_PLACEHOLDER);
       }
       visited.insert(oid);
 
-      mcp::JsonValue j(mcp::JsonValue::object_tag);
-      j["class"] = mcp::JsonValue(to_std_string(obj->get_class()));
+      godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+      j["class"] = godot_autopilot::util::JsonValue(to_std_string(obj->get_class()));
 
       auto props = obj->get_property_list();
       for (int64_t i = 0; i < props.size(); i++) {
@@ -1574,45 +1574,45 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
       visited.erase(oid);
       return j;
     }
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   }
 
   case Variant::CALLABLE: {
     godot::Callable c = v.operator godot::Callable();
     godot::Object *obj = c.get_object();
     if (obj) {
-      mcp::JsonValue j(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
       j["object_id"] =
-          mcp::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
-      j["object_id_str"] = mcp::JsonValue(
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
+      j["object_id_str"] = godot_autopilot::util::JsonValue(
           std::to_string(static_cast<int64_t>(obj->get_instance_id())));
       j["method"] =
-          mcp::JsonValue(to_std_string(godot::String(c.get_method())));
+          godot_autopilot::util::JsonValue(to_std_string(godot::String(c.get_method())));
       return j;
     }
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   }
 
   case Variant::SIGNAL: {
     godot::Signal sig = v.operator godot::Signal();
     godot::Object *obj = sig.get_object();
     if (obj) {
-      mcp::JsonValue j(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
       j["object_id"] =
-          mcp::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
-      j["object_id_str"] = mcp::JsonValue(
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
+      j["object_id_str"] = godot_autopilot::util::JsonValue(
           std::to_string(static_cast<int64_t>(obj->get_instance_id())));
       j["signal"] =
-          mcp::JsonValue(to_std_string(godot::String(sig.get_name())));
+          godot_autopilot::util::JsonValue(to_std_string(godot::String(sig.get_name())));
       return j;
     }
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   }
 
   case Variant::DICTIONARY: {
     godot::Dictionary d = v.operator godot::Dictionary();
     auto keys = d.keys();
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
     for (int i = 0; i < keys.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
@@ -1621,187 +1621,187 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
           serialize_impl(d[key], depth + 1, visited);
     }
     if (static_cast<size_t>(keys.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j["truncated"] = mcp::JsonValue(true);
+      j["truncated"] = godot_autopilot::util::JsonValue(true);
     return j;
   }
 
   case Variant::ARRAY: {
     godot::Array a = v.operator godot::Array();
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
       j.PushBack(serialize_impl(a[i], depth + 1, visited));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_BYTE_ARRAY: {
     auto a = static_cast<PackedByteArray>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
-      j.PushBack(mcp::JsonValue(static_cast<int>(a[i])));
+      j.PushBack(godot_autopilot::util::JsonValue(static_cast<int>(a[i])));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_INT32_ARRAY: {
     auto a = static_cast<PackedInt32Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
-      j.PushBack(mcp::JsonValue(a[i]));
+      j.PushBack(godot_autopilot::util::JsonValue(a[i]));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_INT64_ARRAY: {
     auto a = static_cast<PackedInt64Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
-      j.PushBack(mcp::JsonValue(a[i]));
+      j.PushBack(godot_autopilot::util::JsonValue(a[i]));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_FLOAT32_ARRAY: {
     auto a = static_cast<PackedFloat32Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
-      j.PushBack(mcp::JsonValue(static_cast<double>(a[i])));
+      j.PushBack(godot_autopilot::util::JsonValue(static_cast<double>(a[i])));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_FLOAT64_ARRAY: {
     auto a = static_cast<PackedFloat64Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
-      j.PushBack(mcp::JsonValue(a[i]));
+      j.PushBack(godot_autopilot::util::JsonValue(a[i]));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_STRING_ARRAY: {
     auto a = static_cast<PackedStringArray>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
-      j.PushBack(mcp::JsonValue(bounded_variant_string(to_std_string(a[i]))));
+      j.PushBack(godot_autopilot::util::JsonValue(bounded_variant_string(to_std_string(a[i]))));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_VECTOR2_ARRAY: {
     auto a = static_cast<PackedVector2Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
       auto vec = a[i];
-      mcp::JsonValue elem(mcp::JsonValue::object_tag);
-      elem["x"] = mcp::JsonValue(vec.x);
-      elem["y"] = mcp::JsonValue(vec.y);
+      godot_autopilot::util::JsonValue elem(godot_autopilot::util::JsonValue::object_tag);
+      elem["x"] = godot_autopilot::util::JsonValue(vec.x);
+      elem["y"] = godot_autopilot::util::JsonValue(vec.y);
       j.PushBack(std::move(elem));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_VECTOR3_ARRAY: {
     auto a = static_cast<PackedVector3Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
       auto vec = a[i];
-      mcp::JsonValue elem(mcp::JsonValue::object_tag);
-      elem["x"] = mcp::JsonValue(vec.x);
-      elem["y"] = mcp::JsonValue(vec.y);
-      elem["z"] = mcp::JsonValue(vec.z);
+      godot_autopilot::util::JsonValue elem(godot_autopilot::util::JsonValue::object_tag);
+      elem["x"] = godot_autopilot::util::JsonValue(vec.x);
+      elem["y"] = godot_autopilot::util::JsonValue(vec.y);
+      elem["z"] = godot_autopilot::util::JsonValue(vec.z);
       j.PushBack(std::move(elem));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_COLOR_ARRAY: {
     auto a = static_cast<PackedColorArray>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
       auto c = a[i];
-      mcp::JsonValue elem(mcp::JsonValue::object_tag);
-      elem["r"] = mcp::JsonValue(static_cast<double>(c.r));
-      elem["g"] = mcp::JsonValue(static_cast<double>(c.g));
-      elem["b"] = mcp::JsonValue(static_cast<double>(c.b));
-      elem["a"] = mcp::JsonValue(static_cast<double>(c.a));
+      godot_autopilot::util::JsonValue elem(godot_autopilot::util::JsonValue::object_tag);
+      elem["r"] = godot_autopilot::util::JsonValue(static_cast<double>(c.r));
+      elem["g"] = godot_autopilot::util::JsonValue(static_cast<double>(c.g));
+      elem["b"] = godot_autopilot::util::JsonValue(static_cast<double>(c.b));
+      elem["a"] = godot_autopilot::util::JsonValue(static_cast<double>(c.a));
       j.PushBack(std::move(elem));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_VECTOR4_ARRAY: {
     auto a = static_cast<PackedVector4Array>(v);
-    mcp::JsonValue j(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < a.size() &&
                     static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
          i++) {
       auto vec = a[i];
-      mcp::JsonValue elem(mcp::JsonValue::object_tag);
-      elem["x"] = mcp::JsonValue(vec.x);
-      elem["y"] = mcp::JsonValue(vec.y);
-      elem["z"] = mcp::JsonValue(vec.z);
-      elem["w"] = mcp::JsonValue(vec.w);
+      godot_autopilot::util::JsonValue elem(godot_autopilot::util::JsonValue::object_tag);
+      elem["x"] = godot_autopilot::util::JsonValue(vec.x);
+      elem["y"] = godot_autopilot::util::JsonValue(vec.y);
+      elem["z"] = godot_autopilot::util::JsonValue(vec.z);
+      elem["w"] = godot_autopilot::util::JsonValue(vec.w);
       j.PushBack(std::move(elem));
     }
     if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
-      j.PushBack(mcp::JsonValue("...(truncated)"));
+      j.PushBack(godot_autopilot::util::JsonValue("...(truncated)"));
     return j;
   }
 
   default:
-    return mcp::JsonValue(str_from_variant(v));
+    return godot_autopilot::util::JsonValue(str_from_variant(v));
   }
 }
 
 } // namespace
 
-mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
+godot_autopilot::util::JsonValue VariantJson::serialize(const godot::Variant &v) {
   std::unordered_set<uint64_t> visited;
   return serialize_impl(v, 0, visited);
 }
 
-godot::Variant VariantJson::deserialize(const mcp::JsonValue &j,
+godot::Variant VariantJson::deserialize(const godot_autopilot::util::JsonValue &j,
                                         const std::string &type_hint) {
   if (!type_hint.empty()) {
     auto type = parse_type_hint(type_hint);
@@ -1833,7 +1833,7 @@ godot::Variant VariantJson::deserialize(const mcp::JsonValue &j,
   return deserialize_inferred(j);
 }
 
-godot::Variant VariantJson::deserialize_strict(const mcp::JsonValue &j,
+godot::Variant VariantJson::deserialize_strict(const godot_autopilot::util::JsonValue &j,
                                                const std::string &type_hint) {
   if (!type_hint.empty()) {
     auto type = parse_type_hint(type_hint);

@@ -56,7 +56,7 @@
 namespace godot_autopilot {
 namespace editor_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -119,12 +119,12 @@ struct DotnetUiLanguageGuard {
 };
 
 
-mcp::JsonValue probe_editor_assembly(const std::string &probe_script) {
-  mcp::JsonValue probe(mcp::JsonValue::object_tag);
-  probe["path"] = mcp::JsonValue(probe_script);
+godot_autopilot::util::JsonValue probe_editor_assembly(const std::string &probe_script) {
+  godot_autopilot::util::JsonValue probe(godot_autopilot::util::JsonValue::object_tag);
+  probe["path"] = godot_autopilot::util::JsonValue(probe_script);
   const dotnet_env::DotnetProbe env = dotnet_env::probe_current();
   const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(env);
-  probe["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
+  probe["is_dotnet_editor"] = godot_autopilot::util::JsonValue(is_dotnet_editor);
   bool can_instantiate = false;
   bool runtime_mountable = false;
   std::string probe_code = script_capability::code_name(
@@ -172,16 +172,16 @@ mcp::JsonValue probe_editor_assembly(const std::string &probe_script) {
       }
     }
   }
-  probe["state"] = mcp::JsonValue(state);
-  probe["can_instantiate"] = mcp::JsonValue(can_instantiate);
-  probe["editor_runnable"] = mcp::JsonValue(can_instantiate);
-  probe["runtime_mountable"] = mcp::JsonValue(runtime_mountable);
-  probe["code"] = mcp::JsonValue(probe_code);
-  probe["base_class"] = mcp::JsonValue(base_class);
+  probe["state"] = godot_autopilot::util::JsonValue(state);
+  probe["can_instantiate"] = godot_autopilot::util::JsonValue(can_instantiate);
+  probe["editor_runnable"] = godot_autopilot::util::JsonValue(can_instantiate);
+  probe["runtime_mountable"] = godot_autopilot::util::JsonValue(runtime_mountable);
+  probe["code"] = godot_autopilot::util::JsonValue(probe_code);
+  probe["base_class"] = godot_autopilot::util::JsonValue(base_class);
   if (!hint.empty())
-    probe["hint"] = mcp::JsonValue(hint);
+    probe["hint"] = godot_autopilot::util::JsonValue(hint);
   if (state == "unavailable")
-    probe["unavailable"] = mcp::JsonValue(true);
+    probe["unavailable"] = godot_autopilot::util::JsonValue(true);
   return probe;
 }
 
@@ -198,7 +198,7 @@ const char *kBuildCsharpNote =
     "用于判断编辑器已加载程序集是否已更新。";
 } // namespace
 
-mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_build_csharp_assembly(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_csharp_assembly called");
   bool wait = false;
@@ -282,34 +282,34 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     argv.append("--nologo");
     argv.append(godot::String(project_path.c_str()));
     int32_t pid = os->create_process("dotnet", argv);
-    mcp::JsonValue inner(mcp::JsonValue::object_tag);
-    inner["project_file"] = mcp::JsonValue(project_file);
-    inner["project_path"] = mcp::JsonValue(project_path);
-    inner["command"] = mcp::JsonValue(command);
-    inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
-    inner["note"] = mcp::JsonValue(kBuildCsharpNote);
-    inner["started"] = mcp::JsonValue(pid > 0);
+    godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+    inner["project_file"] = godot_autopilot::util::JsonValue(project_file);
+    inner["project_path"] = godot_autopilot::util::JsonValue(project_path);
+    inner["command"] = godot_autopilot::util::JsonValue(command);
+    inner["pid"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(pid));
+    inner["note"] = godot_autopilot::util::JsonValue(kBuildCsharpNote);
+    inner["started"] = godot_autopilot::util::JsonValue(pid > 0);
     const auto *editor = godot::EditorInterface::get_singleton();
-    inner["game_running"] = mcp::JsonValue(
+    inner["game_running"] = godot_autopilot::util::JsonValue(
         editor != nullptr && editor->is_playing_scene());
-    mcp::JsonValue next_action(mcp::JsonValue::array_tag);
-    next_action.PushBack(mcp::JsonValue(
+    godot_autopilot::util::JsonValue next_action(godot_autopilot::util::JsonValue::array_tag);
+    next_action.PushBack(godot_autopilot::util::JsonValue(
         "wait for the launch to finish, then call build_csharp_assembly again "
         "with wait=true to read exit_code, success and errors"));
     if (pid > 0) {
-      next_action.PushBack(mcp::JsonValue(
+      next_action.PushBack(godot_autopilot::util::JsonValue(
           "after the build succeeds, restart the running game process and "
           "click Build in the editor toolbar or restart the editor — the "
           "loaded assemblies are not hot-reloaded"));
     }
     inner["next_action"] = std::move(next_action);
-    inner["restart_required"] = mcp::JsonValue(pid > 0);
+    inner["restart_required"] = godot_autopilot::util::JsonValue(pid > 0);
     if (!probe_script.empty())
       inner["editor_assembly_probe"] = probe_editor_assembly(probe_script);
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(inner);
     if (pid <= 0) {
-      r["error"] = mcp::JsonValue(
+      r["error"] = godot_autopilot::util::JsonValue(
           "启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 "
           "dotnet 命令可用");
     }
@@ -323,7 +323,7 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   build_args.append(godot::String(project_path.c_str()));
   const auto *editor = godot::EditorInterface::get_singleton();
   const bool game_running = editor != nullptr && editor->is_playing_scene();
-  mcp::JsonValue probe;
+  godot_autopilot::util::JsonValue probe;
   if (!probe_script.empty())
     probe = probe_editor_assembly(probe_script);
   int64_t op_id = -1;
@@ -334,7 +334,7 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   if (op_id < 0) {
     return util::error_json("failed to start dotnet build process");
   }
-  mcp::JsonValue wait_meta(JV::object_tag);
+  godot_autopilot::util::JsonValue wait_meta(JV::object_tag);
   wait_meta["kind"] = JV("csharp_build");
   wait_meta["id"] = JV(op_id);
   wait_meta["timeout_ms"] = JV(timeout_ms);
@@ -344,12 +344,12 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   wait_meta["game_running"] = JV(game_running);
   wait_meta["probe"] = std::move(probe);
   wait_meta["has_probe"] = JV(!probe_script.empty());
-  mcp::JsonValue marker(JV::object_tag);
+  godot_autopilot::util::JsonValue marker(JV::object_tag);
   marker["__gda_wait"] = std::move(wait_meta);
   return marker;
 }
 
-mcp::JsonValue wait_csharp_build(const mcp::JsonValue &wait_ctx,
+godot_autopilot::util::JsonValue wait_csharp_build(const godot_autopilot::util::JsonValue &wait_ctx,
                                  int64_t timeout_ms) {
   const JV *id_p = wait_ctx.Find("id");
   const int64_t op_id = (id_p && id_p->IsInt()) ? id_p->GetInt() : 0;
@@ -444,7 +444,7 @@ mcp::JsonValue wait_csharp_build(const mcp::JsonValue &wait_ctx,
   return r;
 }
 
-mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_dotnet_environment(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "dotnet_environment called");
   std::string project_file;
@@ -486,43 +486,43 @@ mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
   dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
   const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(probe);
   const bool assembly_loaded = probe.csharp_script_class;
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["dotnet_available"] = mcp::JsonValue(true);
-  inner["dotnet_version"] = mcp::JsonValue(dotnet_version);
-  inner["project_file"] = mcp::JsonValue(project_file);
-  inner["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
-  inner["assembly_loaded"] = mcp::JsonValue(assembly_loaded);
-  inner["engine_version"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["dotnet_available"] = godot_autopilot::util::JsonValue(true);
+  inner["dotnet_version"] = godot_autopilot::util::JsonValue(dotnet_version);
+  inner["project_file"] = godot_autopilot::util::JsonValue(project_file);
+  inner["is_dotnet_editor"] = godot_autopilot::util::JsonValue(is_dotnet_editor);
+  inner["assembly_loaded"] = godot_autopilot::util::JsonValue(assembly_loaded);
+  inner["engine_version"] = godot_autopilot::util::JsonValue(
       std::to_string(probe.engine_major) + "." +
       std::to_string(probe.engine_minor));
-  inner["mono_feature"] = mcp::JsonValue(probe.mono_feature);
-  inner["dotnet_feature"] = mcp::JsonValue(probe.dotnet_feature);
-  inner["hint"] = mcp::JsonValue(
+  inner["mono_feature"] = godot_autopilot::util::JsonValue(probe.mono_feature);
+  inner["dotnet_feature"] = godot_autopilot::util::JsonValue(probe.dotnet_feature);
+  inner["hint"] = godot_autopilot::util::JsonValue(
       "is_dotnet_editor 由 CSharpScript 类注册（Godot 4.x 的 .NET 模块装载时"
       "注册该类）判定，并以 OS.has_feature(dotnet)（4.4+）或 OS.has_feature("
       "mono)（4.4 之前）按引擎版本兜底；Godot 4.x 未注册 mono/dotnet 特性"
       "标签，特性名探测在多数版本下恒为 false；assembly_loaded 同样源于 "
       "CSharpScript 类存在性，反映 .NET 模块已装载而非项目程序集已加载");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "dotnet_environment completed");
   return r;
 }
 
-mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_verify_scene_saved(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "verify_scene_saved called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *root = editor->get_edited_scene_root();
   if (!root) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("no scene open");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("no scene open");
     return e;
   }
   std::string target_path;
@@ -533,60 +533,60 @@ mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args) {
     target_path = util::to_std(root->get_scene_file_path());
   }
   if (target_path.empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "current scene has no file path — save it first (save_editor_scene), "
         "or provide scene_path");
     return e;
   }
   if (!godot::FileAccess::file_exists(godot::String(target_path.c_str()))) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("scene file not found on disk: " + target_path);
-    e["path"] = mcp::JsonValue(target_path);
+        godot_autopilot::util::JsonValue("scene file not found on disk: " + target_path);
+    e["path"] = godot_autopilot::util::JsonValue(target_path);
     return e;
   }
   bool disk_ok = false;
   const std::string text = scene_verify::read_text_file(target_path, disk_ok);
   if (!disk_ok) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("scene file could not be read: " + target_path);
-    e["path"] = mcp::JsonValue(target_path);
+        godot_autopilot::util::JsonValue("scene file could not be read: " + target_path);
+    e["path"] = godot_autopilot::util::JsonValue(target_path);
     return e;
   }
   const bool want_hash = save_receipt_flag(args, "include_hash");
   const scene_verify::VerifyResult vr =
       scene_verify::compare_tree_with_text(root, text, want_hash);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(vr.match ? "match" : "mismatch");
-  r["match"] = mcp::JsonValue(vr.match);
-  r["path"] = mcp::JsonValue(target_path);
-  r["memory_nodes"] = mcp::JsonValue(vr.memory_nodes);
-  r["disk_nodes"] = mcp::JsonValue(vr.disk_nodes);
-  r["memory_connections"] = mcp::JsonValue(vr.memory_connections);
-  r["disk_connections"] = mcp::JsonValue(vr.disk_connections);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue(vr.match ? "match" : "mismatch");
+  r["match"] = godot_autopilot::util::JsonValue(vr.match);
+  r["path"] = godot_autopilot::util::JsonValue(target_path);
+  r["memory_nodes"] = godot_autopilot::util::JsonValue(vr.memory_nodes);
+  r["disk_nodes"] = godot_autopilot::util::JsonValue(vr.disk_nodes);
+  r["memory_connections"] = godot_autopilot::util::JsonValue(vr.memory_connections);
+  r["disk_connections"] = godot_autopilot::util::JsonValue(vr.disk_connections);
   r["connections_match"] =
-      mcp::JsonValue(vr.memory_connections == vr.disk_connections);
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+      godot_autopilot::util::JsonValue(vr.memory_connections == vr.disk_connections);
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (const std::string &p : vr.missing_paths)
-    arr.PushBack(mcp::JsonValue(p));
+    arr.PushBack(godot_autopilot::util::JsonValue(p));
   r["missing_paths"] = std::move(arr);
   if (vr.missing_truncated)
-    r["missing_truncated"] = mcp::JsonValue(true);
-  r["inherited_nodes"] = mcp::JsonValue(vr.inherited_nodes);
-  r["inherited_connections"] = mcp::JsonValue(vr.inherited_connections);
+    r["missing_truncated"] = godot_autopilot::util::JsonValue(true);
+  r["inherited_nodes"] = godot_autopilot::util::JsonValue(vr.inherited_nodes);
+  r["inherited_connections"] = godot_autopilot::util::JsonValue(vr.inherited_connections);
   if (!vr.inherited_paths.empty()) {
-    mcp::JsonValue inherited_arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue inherited_arr(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &p : vr.inherited_paths)
-      inherited_arr.PushBack(mcp::JsonValue(p));
+      inherited_arr.PushBack(godot_autopilot::util::JsonValue(p));
     r["inherited_paths"] = std::move(inherited_arr);
   }
   if (vr.inherited_truncated)
-    r["inherited_truncated"] = mcp::JsonValue(true);
+    r["inherited_truncated"] = godot_autopilot::util::JsonValue(true);
   if (want_hash && vr.hash_computed) {
-    r["memory_hash"] = mcp::JsonValue(hash_hex(vr.memory_hash));
-    r["disk_hash"] = mcp::JsonValue(hash_hex(vr.disk_hash));
+    r["memory_hash"] = godot_autopilot::util::JsonValue(hash_hex(vr.memory_hash));
+    r["disk_hash"] = godot_autopilot::util::JsonValue(hash_hex(vr.disk_hash));
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "verify_scene_saved completed");

@@ -96,11 +96,11 @@ inline EditedSceneInfo edited_scene_info() {
   return info;
 }
 
-inline void add_scene_info_fields(mcp::JsonValue &target,
+inline void add_scene_info_fields(godot_autopilot::util::JsonValue &target,
                                   const EditedSceneInfo &info) {
-  target["scene_path"] = mcp::JsonValue(info.scene_path);
-  target["scene_unsaved"] = mcp::JsonValue(info.unsaved);
-  target["disk_persisted"] = mcp::JsonValue(false);
+  target["scene_path"] = godot_autopilot::util::JsonValue(info.scene_path);
+  target["scene_unsaved"] = godot_autopilot::util::JsonValue(info.unsaved);
+  target["disk_persisted"] = godot_autopilot::util::JsonValue(false);
 }
 
 } // namespace util

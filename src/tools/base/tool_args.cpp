@@ -8,9 +8,9 @@ namespace {
 constexpr double kInt64LowerBound = -9223372036854775808.0;
 constexpr double kInt64UpperBound = 9223372036854775808.0;
 
-const mcp::JsonValue *find_present(const mcp::JsonValue &raw,
+const godot_autopilot::util::JsonValue *find_present(const godot_autopilot::util::JsonValue &raw,
                                    const std::string &name) {
-  const mcp::JsonValue *value = raw.Find(name);
+  const godot_autopilot::util::JsonValue *value = raw.Find(name);
   if (!value || value->IsNull())
     return nullptr;
   return value;
@@ -32,7 +32,7 @@ bool fits_int64_range(double value) {
 
 } // namespace
 
-Args::Args(const mcp::JsonValue &raw,
+Args::Args(const godot_autopilot::util::JsonValue &raw,
            const std::vector<schema::ParamDef> &params)
     : raw_(raw), params_(params) {}
 
@@ -41,12 +41,12 @@ bool Args::has(const std::string &name) const {
 }
 
 bool Args::is_null(const std::string &name) const {
-  const mcp::JsonValue *value = raw_.Find(name);
+  const godot_autopilot::util::JsonValue *value = raw_.Find(name);
   return value != nullptr && value->IsNull();
 }
 
 std::optional<std::string> Args::opt_string(const std::string &name) const {
-  const mcp::JsonValue *value = find_present(raw_, name);
+  const godot_autopilot::util::JsonValue *value = find_present(raw_, name);
   if (!value)
     return std::nullopt;
   if (!value->IsString())
@@ -55,7 +55,7 @@ std::optional<std::string> Args::opt_string(const std::string &name) const {
 }
 
 std::optional<int64_t> Args::opt_int(const std::string &name) const {
-  const mcp::JsonValue *value = find_present(raw_, name);
+  const godot_autopilot::util::JsonValue *value = find_present(raw_, name);
   if (!value)
     return std::nullopt;
   if (value->IsInt())
@@ -69,7 +69,7 @@ std::optional<int64_t> Args::opt_int(const std::string &name) const {
 }
 
 std::optional<double> Args::opt_number(const std::string &name) const {
-  const mcp::JsonValue *value = find_present(raw_, name);
+  const godot_autopilot::util::JsonValue *value = find_present(raw_, name);
   if (!value)
     return std::nullopt;
   if (value->IsInt())
@@ -80,7 +80,7 @@ std::optional<double> Args::opt_number(const std::string &name) const {
 }
 
 std::optional<bool> Args::opt_bool(const std::string &name) const {
-  const mcp::JsonValue *value = find_present(raw_, name);
+  const godot_autopilot::util::JsonValue *value = find_present(raw_, name);
   if (!value)
     return std::nullopt;
   if (!value->IsBool())
@@ -88,8 +88,8 @@ std::optional<bool> Args::opt_bool(const std::string &name) const {
   return value->GetBool();
 }
 
-const mcp::JsonValue *Args::opt_object(const std::string &name) const {
-  const mcp::JsonValue *value = find_present(raw_, name);
+const godot_autopilot::util::JsonValue *Args::opt_object(const std::string &name) const {
+  const godot_autopilot::util::JsonValue *value = find_present(raw_, name);
   if (!value)
     return nullptr;
   if (!value->IsObject())
@@ -97,8 +97,8 @@ const mcp::JsonValue *Args::opt_object(const std::string &name) const {
   return value;
 }
 
-const mcp::JsonValue *Args::opt_array(const std::string &name) const {
-  const mcp::JsonValue *value = find_present(raw_, name);
+const godot_autopilot::util::JsonValue *Args::opt_array(const std::string &name) const {
+  const godot_autopilot::util::JsonValue *value = find_present(raw_, name);
   if (!value)
     return nullptr;
   if (!value->IsArray())
@@ -134,15 +134,15 @@ bool Args::require_bool(const std::string &name) const {
   return *value;
 }
 
-const mcp::JsonValue &Args::require_object(const std::string &name) const {
-  const mcp::JsonValue *value = opt_object(name);
+const godot_autopilot::util::JsonValue &Args::require_object(const std::string &name) const {
+  const godot_autopilot::util::JsonValue *value = opt_object(name);
   if (!value)
     throw_missing(name);
   return *value;
 }
 
-const mcp::JsonValue &Args::require_array(const std::string &name) const {
-  const mcp::JsonValue *value = opt_array(name);
+const godot_autopilot::util::JsonValue &Args::require_array(const std::string &name) const {
+  const godot_autopilot::util::JsonValue *value = opt_array(name);
   if (!value)
     throw_missing(name);
   return *value;
@@ -171,7 +171,7 @@ bool Args::get_bool(const std::string &name, bool fallback) const {
 
 void Args::validate_declared() const {
   for (const auto &param : params_) {
-    const mcp::JsonValue *value = find_present(raw_, param.name);
+    const godot_autopilot::util::JsonValue *value = find_present(raw_, param.name);
     if (!value) {
       if (param.required) {
         throw_missing(param.name);

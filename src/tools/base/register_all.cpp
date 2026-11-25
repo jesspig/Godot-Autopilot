@@ -7,6 +7,8 @@
 #include "core/observability/monitor.hpp"
 #include "core/transport/godot_transport.hpp"
 #include "util/input_guards.hpp"
+#include "adapters/mcp_error_bridge.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include <version.hpp>
 #include "tools/base/code_exec_ops.hpp"
 #include "tools/base/dispatch.hpp"
@@ -56,7 +58,7 @@
 #include "tools/base/tool_spec.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -80,7 +82,7 @@ static int g_port = 0;
 static mcp::McpServer *g_surface_server = nullptr;
 static ToolSurface g_tool_surface = ToolSurface::Meta;
 
-static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog);
+static godot_autopilot::util::JsonValue meta_categories_impl(ToolCatalog& catalog);
 
 static void audit_destructive_declarations(const ToolRegistry &registry) {
   std::vector<side_effect_policy::ToolDeclaration> declarations;
@@ -111,7 +113,7 @@ static void audit_destructive_declarations(const ToolRegistry &registry) {
       monitor::build_attrs({{"suspects", std::to_string(suspects.size())}}));
 }
 
-static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
+static godot_autopilot::util::JsonValue meta_search_tools_impl(const godot_autopilot::util::JsonValue& args,
                                              Bm25Index& index,
                                              ToolCatalog& catalog) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools called");
@@ -124,8 +126,8 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
     int64_t limit = 20;
     if (auto* limit_p = args.Find("limit"); limit_p && !limit_p->IsNull()) {
         if (!limit_p->IsInt() || limit_p->GetInt() < 0) {
-            mcp::JsonValue error(mcp::JsonValue::object_tag);
-            error["error"] = mcp::JsonValue("invalid parameter: limit must be a non-negative integer");
+            godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+            error["error"] = godot_autopilot::util::JsonValue("invalid parameter: limit must be a non-negative integer");
             return error;
         }
         limit = limit_p->GetInt();
@@ -134,8 +136,8 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
     bool categories = false;
     if (auto* categories_p = args.Find("categories"); categories_p && !categories_p->IsNull()) {
         if (!categories_p->IsBool()) {
-            mcp::JsonValue error(mcp::JsonValue::object_tag);
-            error["error"] = mcp::JsonValue("invalid parameter: categories must be a boolean");
+            godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+            error["error"] = godot_autopilot::util::JsonValue("invalid parameter: categories must be a boolean");
             return error;
         }
         categories = categories_p->GetBool();
@@ -175,12 +177,12 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
         if (limit > 0 && static_cast<int64_t>(count) > limit) {
             count = static_cast<std::size_t>(limit);
         }
-        mcp::JsonValue j(mcp::JsonValue::object_tag);
-        mcp::JsonValue arr(mcp::JsonValue::array_tag);
+        godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
         for (std::size_t i = 0; i < count; ++i) {
-            mcp::JsonValue item(mcp::JsonValue::object_tag);
-            item["name"] = mcp::JsonValue(all[i].name);
-            item["score"] = mcp::JsonValue(0.0);
+            godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+            item["name"] = godot_autopilot::util::JsonValue(all[i].name);
+            item["score"] = godot_autopilot::util::JsonValue(0.0);
             arr.PushBack(std::move(item));
         }
         j["results"] = std::move(arr);
@@ -193,12 +195,12 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
         : static_cast<int>(std::min<int64_t>(limit, std::numeric_limits<int>::max()));
     auto results = index.search(query);
 
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     for (auto& r : results) {
-        mcp::JsonValue item(mcp::JsonValue::object_tag);
-        item["name"] = mcp::JsonValue(r.name);
-        item["score"] = mcp::JsonValue(r.score);
+        godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+        item["name"] = godot_autopilot::util::JsonValue(r.name);
+        item["score"] = godot_autopilot::util::JsonValue(r.score);
         arr.PushBack(std::move(item));
     }
     j["results"] = std::move(arr);
@@ -206,32 +208,32 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
     return j;
 }
 
-static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog) {
+static godot_autopilot::util::JsonValue meta_categories_impl(ToolCatalog& catalog) {
     auto cats = catalog.get_categories();
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     for (auto& c : cats) {
-        mcp::JsonValue item(mcp::JsonValue::object_tag);
-        item["id"] = mcp::JsonValue(c);
-        item["name"] = mcp::JsonValue(c);
+        godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+        item["id"] = godot_autopilot::util::JsonValue(c);
+        item["name"] = godot_autopilot::util::JsonValue(c);
         int count = 0;
         for (const auto& t : catalog.get_all_tools()) {
             if (t.category == c) {
                 ++count;
             }
         }
-        item["tool_count"] = mcp::JsonValue(static_cast<int64_t>(count));
+        item["tool_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(count));
         arr.PushBack(std::move(item));
     }
     j["categories"] = std::move(arr);
     return j;
 }
 
-mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
+godot_autopilot::util::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
                                const std::shared_ptr<ToolRegistry> &registry) {
-    mcp::JsonValue err(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue err(godot_autopilot::util::JsonValue::object_tag);
     if (name.empty()) {
-        err["error"] = mcp::JsonValue("missing required parameter: name");
+        err["error"] = godot_autopilot::util::JsonValue("missing required parameter: name");
         return err;
     }
 
@@ -242,24 +244,24 @@ mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
     const std::string canonical = alias ? alias->canonical : name;
     auto info = catalog.get_tool(canonical);
     if (!info) {
-        err["error"] = mcp::JsonValue("tool not found: " + canonical);
+        err["error"] = godot_autopilot::util::JsonValue("tool not found: " + canonical);
         return err;
     }
 
-    mcp::JsonValue j(mcp::JsonValue::object_tag);
-    mcp::JsonValue t(mcp::JsonValue::object_tag);
-    t["name"] = mcp::JsonValue(info->name);
-    t["description"] = mcp::JsonValue(info->description);
-    t["category"] = mcp::JsonValue(info->category);
-    mcp::JsonValue tags(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue t(godot_autopilot::util::JsonValue::object_tag);
+    t["name"] = godot_autopilot::util::JsonValue(info->name);
+    t["description"] = godot_autopilot::util::JsonValue(info->description);
+    t["category"] = godot_autopilot::util::JsonValue(info->category);
+    godot_autopilot::util::JsonValue tags(godot_autopilot::util::JsonValue::array_tag);
     for (auto& tg : info->tags) {
-        tags.PushBack(mcp::JsonValue(tg));
+        tags.PushBack(godot_autopilot::util::JsonValue(tg));
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
-    mcp::JsonValue examples(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue examples(godot_autopilot::util::JsonValue::array_tag);
     for (const auto &example : info->examples) {
-        examples.PushBack(mcp::JsonValue(example));
+        examples.PushBack(godot_autopilot::util::JsonValue(example));
     }
     t["examples"] = std::move(examples);
     const char* se = "none";
@@ -271,17 +273,17 @@ mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
             flags = tool->tool_flags();
         }
     }
-    t["side_effect"] = mcp::JsonValue(se);
-    t["dynamic"] = mcp::JsonValue((flags & tool_flags::kDynamic) != 0);
-    t["mutating"] = mcp::JsonValue((flags & tool_flags::kMutating) != 0);
+    t["side_effect"] = godot_autopilot::util::JsonValue(se);
+    t["dynamic"] = godot_autopilot::util::JsonValue((flags & tool_flags::kDynamic) != 0);
+    t["mutating"] = godot_autopilot::util::JsonValue((flags & tool_flags::kMutating) != 0);
     if (alias) {
-        j["deprecated_alias"] = mcp::JsonValue(name);
-        j["canonical_name"] = mcp::JsonValue(canonical);
-        j["alias_removal_version"] = mcp::JsonValue(alias->removal_version);
+        j["deprecated_alias"] = godot_autopilot::util::JsonValue(name);
+        j["canonical_name"] = godot_autopilot::util::JsonValue(canonical);
+        j["alias_removal_version"] = godot_autopilot::util::JsonValue(alias->removal_version);
         if (!alias->deprecated_since.empty()) {
-            j["deprecated_since"] = mcp::JsonValue(alias->deprecated_since);
+            j["deprecated_since"] = godot_autopilot::util::JsonValue(alias->deprecated_since);
         }
-        t["canonical_name"] = mcp::JsonValue(canonical);
+        t["canonical_name"] = godot_autopilot::util::JsonValue(canonical);
         LogSystem::instance().log(
             LogLevel::Warning, LogCategory::Tools,
             "tool alias '" + name + "' resolved to '" + canonical + "'");
@@ -290,13 +292,13 @@ mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
     return j;
 }
 
-static mcp::JsonValue meta_get_tool_detail_impl(
-    const mcp::JsonValue& args, ToolCatalog& catalog,
+static godot_autopilot::util::JsonValue meta_get_tool_detail_impl(
+    const godot_autopilot::util::JsonValue& args, ToolCatalog& catalog,
     const std::shared_ptr<ToolRegistry>& registry) {
     const auto *name_p = args.Find("name");
     const std::string name =
         name_p != nullptr && name_p->IsString() ? name_p->GetString() : std::string();
-    mcp::JsonValue result = tool_detail_for(name, catalog, registry);
+    godot_autopilot::util::JsonValue result = tool_detail_for(name, catalog, registry);
     if (result.Find("error") == nullptr) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                                   "get_tool_detail completed");
@@ -304,38 +306,38 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     return result;
 }
 
-static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
+static godot_autopilot::util::JsonValue meta_call_tool_impl(godot_autopilot::util::JsonValue args) {
     auto *name_p = args.Find("name");
     if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: name " + util::received_keys_text(args, false));
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue("missing required parameter: name " + util::received_keys_text(args, false));
         return e;
     }
 
     std::string name = name_p->GetString();
-    mcp::JsonValue tool_args = [&]{
+    godot_autopilot::util::JsonValue tool_args = [&]{
         if (auto* a = args.Find("arguments")) return std::move(*a);
-        return mcp::JsonValue(mcp::JsonValue::object_tag);
+        return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     }();
 
     if (auto *a = args.Find("arguments"); a && !a->IsObject()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + util::received_keys_text(args, false));
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + util::received_keys_text(args, false));
         return e;
     }
     for (const auto &entry : args.GetObject()) {
         if (entry.first != "name" && entry.first != "arguments" &&
             entry.first != "confirm") {
-            mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + util::received_keys_text(args, false));
+            godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+            e["error"] = godot_autopilot::util::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + util::received_keys_text(args, false));
             return e;
         }
     }
     if (const auto *confirm = args.Find("confirm");
         confirm != nullptr && confirm->IsBool() && confirm->GetBool() &&
         tool_args.IsObject() && tool_args.Find("confirm") == nullptr) {
-        tool_args["confirm"] = mcp::JsonValue(true);
+        tool_args["confirm"] = godot_autopilot::util::JsonValue(true);
     }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
@@ -343,7 +345,7 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
                                   dispatch::capture_depth_context());
 }
 
-static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
+static godot_autopilot::util::JsonValue meta_call_tool_wait(const std::string& name, godot_autopilot::util::JsonValue result) {
     return dispatch::resolve_deferred_wait(name, std::move(result));
 }
 
@@ -365,13 +367,13 @@ void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
     dispatch::HandlerMap meta_handlers;
     for (const auto& t : registry->all()) {
         std::string name = t->meta().name;
-        handlers[name] = [name, registry](const mcp::JsonValue& a) -> mcp::JsonValue {
+        handlers[name] = [name, registry](const godot_autopilot::util::JsonValue& a) -> godot_autopilot::util::JsonValue {
             return registry->find(name)->execute(a);
         };
     }
     for (const auto& t : registry->all_meta()) {
         std::string name = t->meta().name;
-        meta_handlers[name] = [name, registry](const mcp::JsonValue& a) -> mcp::JsonValue {
+        meta_handlers[name] = [name, registry](const godot_autopilot::util::JsonValue& a) -> godot_autopilot::util::JsonValue {
             return registry->find_meta(name)->execute(a);
         };
     }
@@ -402,46 +404,46 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         ToolSpec spec{"system_status", "Get server status info", "System", {"status", "info"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kHealthProbe;
-        spec.handler = [port, registry, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
+        spec.handler = [port, registry, start = std::chrono::steady_clock::now()](const godot_autopilot::util::JsonValue&) -> godot_autopilot::util::JsonValue {
             auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::steady_clock::now() - start).count();
-            mcp::JsonValue status(mcp::JsonValue::object_tag);
-            status["version"] = mcp::JsonValue(GDA_VERSION);
-            status["port"] = mcp::JsonValue(static_cast<int64_t>(port));
-            status["uptime_seconds"] = mcp::JsonValue(static_cast<int64_t>(uptime));
-            status["running"] = mcp::JsonValue(true);
+            godot_autopilot::util::JsonValue status(godot_autopilot::util::JsonValue::object_tag);
+            status["version"] = godot_autopilot::util::JsonValue(GDA_VERSION);
+            status["port"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(port));
+            status["uptime_seconds"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(uptime));
+            status["running"] = godot_autopilot::util::JsonValue(true);
             status["tool_count"] =
-                mcp::JsonValue(static_cast<int64_t>(registry->all_any().size()));
-            mcp::JsonValue main_thread(mcp::JsonValue::object_tag);
+                godot_autopilot::util::JsonValue(static_cast<int64_t>(registry->all_any().size()));
+            godot_autopilot::util::JsonValue main_thread(godot_autopilot::util::JsonValue::object_tag);
             main_thread["last_drain_age_ms"] =
-                mcp::JsonValue(static_cast<int64_t>(-1));
-            main_thread["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(0));
+                godot_autopilot::util::JsonValue(static_cast<int64_t>(-1));
+            main_thread["queue_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
             main_thread["queue_cancelled"] =
-                mcp::JsonValue(static_cast<int64_t>(0));
+                godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
             main_thread["queue_rejected_full"] =
-                mcp::JsonValue(static_cast<int64_t>(0));
+                godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
             main_thread["oldest_pending_ms"] =
-                mcp::JsonValue(static_cast<int64_t>(-1));
+                godot_autopilot::util::JsonValue(static_cast<int64_t>(-1));
             if (runtime_ops::has_editor_queue()) {
                 CommandQueue &queue = get_editor_queue();
                 const CommandQueue::Stats queue_stats = queue.stats();
                 status["queue_depth"] =
-                    mcp::JsonValue(static_cast<int64_t>(queue_stats.pending));
+                    godot_autopilot::util::JsonValue(static_cast<int64_t>(queue_stats.pending));
                 main_thread["last_drain_age_ms"] =
-                    mcp::JsonValue(queue.last_drain_age_ms());
+                    godot_autopilot::util::JsonValue(queue.last_drain_age_ms());
                 main_thread["queue_depth"] =
-                    mcp::JsonValue(static_cast<int64_t>(queue_stats.pending));
+                    godot_autopilot::util::JsonValue(static_cast<int64_t>(queue_stats.pending));
                 main_thread["queue_cancelled"] =
-                    mcp::JsonValue(static_cast<int64_t>(queue_stats.cancelled));
-                main_thread["queue_rejected_full"] = mcp::JsonValue(
+                    godot_autopilot::util::JsonValue(static_cast<int64_t>(queue_stats.cancelled));
+                main_thread["queue_rejected_full"] = godot_autopilot::util::JsonValue(
                     static_cast<int64_t>(queue_stats.rejected_full));
                 main_thread["oldest_pending_ms"] =
-                    mcp::JsonValue(queue.oldest_pending_age_ms());
+                    godot_autopilot::util::JsonValue(queue.oldest_pending_age_ms());
             } else {
-                status["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(0));
+                status["queue_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
             }
             status["main_thread"] = std::move(main_thread);
-            mcp::JsonValue r(mcp::JsonValue::object_tag);
+            godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
             r["result"] = std::move(status);
             return r;
         };
@@ -449,9 +451,9 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         registry->add(make_spec_tool(with_aliases(
             std::move(spec),
             {ToolAlias{"ping", "system_status", {},
-                       [](const mcp::JsonValue &) {
-                         mcp::JsonValue out(mcp::JsonValue::object_tag);
-                         out["result"] = mcp::JsonValue("pong");
+                       [](const godot_autopilot::util::JsonValue &) {
+                         godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                         out["result"] = godot_autopilot::util::JsonValue("pong");
                          return out;
                        },
                        "0.4.0", "0.6.0"}})));
@@ -504,46 +506,46 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         ToolSpec spec{"search_tools", "Search available tools by query, category or tags; categories=true lists categories with tool counts", "Meta", {"search", "discovery"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;
-        spec.handler = [&index, &catalog](const mcp::JsonValue& args) { return meta_search_tools_impl(args, index, catalog); };
-        mcp::JsonValue s(mcp::JsonValue::object_tag);
-        s["type"] = mcp::JsonValue("object");
-        mcp::JsonValue props(mcp::JsonValue::object_tag);
-        mcp::JsonValue q_prop(mcp::JsonValue::object_tag);
-        q_prop["type"] = mcp::JsonValue("string");
-        q_prop["description"] = mcp::JsonValue("Search query; omit or pass an empty string to enumerate all tools");
+        spec.handler = [&index, &catalog](const godot_autopilot::util::JsonValue& args) { return meta_search_tools_impl(args, index, catalog); };
+        godot_autopilot::util::JsonValue s(godot_autopilot::util::JsonValue::object_tag);
+        s["type"] = godot_autopilot::util::JsonValue("object");
+        godot_autopilot::util::JsonValue props(godot_autopilot::util::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue q_prop(godot_autopilot::util::JsonValue::object_tag);
+        q_prop["type"] = godot_autopilot::util::JsonValue("string");
+        q_prop["description"] = godot_autopilot::util::JsonValue("Search query; omit or pass an empty string to enumerate all tools");
         props["query"] = std::move(q_prop);
-        mcp::JsonValue l_prop(mcp::JsonValue::object_tag);
-        l_prop["type"] = mcp::JsonValue("integer");
-        l_prop["description"] = mcp::JsonValue("Maximum number of results; 0 returns all tools");
-        l_prop["default"] = mcp::JsonValue(static_cast<int64_t>(20));
-        l_prop["minimum"] = mcp::JsonValue(static_cast<int64_t>(0));
+        godot_autopilot::util::JsonValue l_prop(godot_autopilot::util::JsonValue::object_tag);
+        l_prop["type"] = godot_autopilot::util::JsonValue("integer");
+        l_prop["description"] = godot_autopilot::util::JsonValue("Maximum number of results; 0 returns all tools");
+        l_prop["default"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(20));
+        l_prop["minimum"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
         props["limit"] = std::move(l_prop);
-        mcp::JsonValue c_prop(mcp::JsonValue::object_tag);
-        c_prop["type"] = mcp::JsonValue("string");
-        c_prop["description"] = mcp::JsonValue("Filter by category");
+        godot_autopilot::util::JsonValue c_prop(godot_autopilot::util::JsonValue::object_tag);
+        c_prop["type"] = godot_autopilot::util::JsonValue("string");
+        c_prop["description"] = godot_autopilot::util::JsonValue("Filter by category");
         props["category"] = std::move(c_prop);
-        mcp::JsonValue t_prop(mcp::JsonValue::object_tag);
-        t_prop["type"] = mcp::JsonValue("array");
-        mcp::JsonValue ti(mcp::JsonValue::object_tag);
-        ti["type"] = mcp::JsonValue("string");
+        godot_autopilot::util::JsonValue t_prop(godot_autopilot::util::JsonValue::object_tag);
+        t_prop["type"] = godot_autopilot::util::JsonValue("array");
+        godot_autopilot::util::JsonValue ti(godot_autopilot::util::JsonValue::object_tag);
+        ti["type"] = godot_autopilot::util::JsonValue("string");
         t_prop["items"] = std::move(ti);
-        t_prop["description"] = mcp::JsonValue("Filter by tags");
+        t_prop["description"] = godot_autopilot::util::JsonValue("Filter by tags");
         props["tags"] = std::move(t_prop);
-        mcp::JsonValue cat_prop(mcp::JsonValue::object_tag);
-        cat_prop["type"] = mcp::JsonValue("boolean");
-        cat_prop["description"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue cat_prop(godot_autopilot::util::JsonValue::object_tag);
+        cat_prop["type"] = godot_autopilot::util::JsonValue("boolean");
+        cat_prop["description"] = godot_autopilot::util::JsonValue(
             "When true return the category list with per-category tool counts instead of tool results");
         props["categories"] = std::move(cat_prop);
         s["properties"] = std::move(props);
-        s["required"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+        s["required"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
         spec.raw_schema = std::move(s);
         registry->add(make_spec_tool(with_aliases(
             std::move(spec),
             {ToolAlias{"list_categories", "search_tools",
-                       [](const mcp::JsonValue &) {
-                         mcp::JsonValue out(mcp::JsonValue::object_tag);
-                         out["categories"] = mcp::JsonValue(true);
-                         out["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
+                       [](const godot_autopilot::util::JsonValue &) {
+                         godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                         out["categories"] = godot_autopilot::util::JsonValue(true);
+                         out["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
                          return out;
                        },
                        {}, "0.4.0", "0.6.0"}})));
@@ -553,7 +555,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         ToolSpec spec{"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;
-        spec.handler = [&catalog](const mcp::JsonValue& args) {
+        spec.handler = [&catalog](const godot_autopilot::util::JsonValue& args) {
             return meta_get_tool_detail_impl(args, catalog, get_active_registry());
         };
         spec.raw_schema = schema::build_schema({
@@ -568,9 +570,9 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;
-        spec.handler = [](const mcp::JsonValue& args) -> mcp::JsonValue {
+        spec.handler = [](const godot_autopilot::util::JsonValue& args) -> godot_autopilot::util::JsonValue {
             std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
-            mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
+            godot_autopilot::util::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
             if (!name.empty()) {
                 LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
             }
@@ -590,58 +592,58 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
                       "System", {"batch", "execute", "multi"}};
         spec.side_effect = SideEffect::CodeExecute;
         spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
-        spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); };
-        mcp::JsonValue s(mcp::JsonValue::object_tag);
-        s["type"] = mcp::JsonValue("object");
-        mcp::JsonValue props(mcp::JsonValue::object_tag);
-        mcp::JsonValue item(mcp::JsonValue::object_tag);
-        item["type"] = mcp::JsonValue("object");
-        mcp::JsonValue iprops(mcp::JsonValue::object_tag);
-        mcp::JsonValue tp(mcp::JsonValue::object_tag);
-        tp["type"] = mcp::JsonValue("string");
-        tp["description"] = mcp::JsonValue("Tool name to execute");
+        spec.handler = [](const godot_autopilot::util::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); };
+        godot_autopilot::util::JsonValue s(godot_autopilot::util::JsonValue::object_tag);
+        s["type"] = godot_autopilot::util::JsonValue("object");
+        godot_autopilot::util::JsonValue props(godot_autopilot::util::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+        item["type"] = godot_autopilot::util::JsonValue("object");
+        godot_autopilot::util::JsonValue iprops(godot_autopilot::util::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue tp(godot_autopilot::util::JsonValue::object_tag);
+        tp["type"] = godot_autopilot::util::JsonValue("string");
+        tp["description"] = godot_autopilot::util::JsonValue("Tool name to execute");
         iprops["tool"] = std::move(tp);
-        mcp::JsonValue ap(mcp::JsonValue::object_tag);
-        ap["type"] = mcp::JsonValue("object");
-        ap["description"] = mcp::JsonValue("Tool arguments");
+        godot_autopilot::util::JsonValue ap(godot_autopilot::util::JsonValue::object_tag);
+        ap["type"] = godot_autopilot::util::JsonValue("object");
+        ap["description"] = godot_autopilot::util::JsonValue("Tool arguments");
         iprops["args"] = std::move(ap);
         item["properties"] = std::move(iprops);
-        mcp::JsonValue ireq(mcp::JsonValue::array_tag);
-        ireq.PushBack(mcp::JsonValue("tool"));
+        godot_autopilot::util::JsonValue ireq(godot_autopilot::util::JsonValue::array_tag);
+        ireq.PushBack(godot_autopilot::util::JsonValue("tool"));
         item["required"] = std::move(ireq);
-        mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
-        ops_prop["type"] = mcp::JsonValue("array");
+        godot_autopilot::util::JsonValue ops_prop(godot_autopilot::util::JsonValue::object_tag);
+        ops_prop["type"] = godot_autopilot::util::JsonValue("array");
         ops_prop["items"] = std::move(item);
-        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute; each result carries status 'ok'/'error'. An async game op (execute_game_script, queue_game_input, wait_game_input, sequence_game_inputs, get_game_ui_elements, click_game_ui_element, capture_game_viewport, capture_editor_viewport with target='game') is refused with status 'error' unless await_async=true; its pending record is always released. Response counts: 'total' = executed operations (succeeded+failed), 'skipped' = operations not run after stop_on_error truncation");
+        ops_prop["description"] = godot_autopilot::util::JsonValue("Ordered list of operations to execute; each result carries status 'ok'/'error'. An async game op (execute_game_script, queue_game_input, wait_game_input, sequence_game_inputs, get_game_ui_elements, click_game_ui_element, capture_game_viewport, capture_editor_viewport with target='game') is refused with status 'error' unless await_async=true; its pending record is always released. Response counts: 'total' = executed operations (succeeded+failed), 'skipped' = operations not run after stop_on_error truncation");
         props["operations"] = std::move(ops_prop);
-        mcp::JsonValue stop_prop(mcp::JsonValue::object_tag);
-        stop_prop["type"] = mcp::JsonValue("boolean");
-        stop_prop["description"] = mcp::JsonValue("Stop on first error");
-        stop_prop["default"] = mcp::JsonValue(true);
+        godot_autopilot::util::JsonValue stop_prop(godot_autopilot::util::JsonValue::object_tag);
+        stop_prop["type"] = godot_autopilot::util::JsonValue("boolean");
+        stop_prop["description"] = godot_autopilot::util::JsonValue("Stop on first error");
+        stop_prop["default"] = godot_autopilot::util::JsonValue(true);
         props["stop_on_error"] = std::move(stop_prop);
-        mcp::JsonValue rollback_prop(mcp::JsonValue::object_tag);
-        rollback_prop["type"] = mcp::JsonValue("boolean");
-        rollback_prop["description"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue rollback_prop(godot_autopilot::util::JsonValue::object_tag);
+        rollback_prop["type"] = godot_autopilot::util::JsonValue("boolean");
+        rollback_prop["description"] = godot_autopilot::util::JsonValue(
             "Only effective when stop_on_error is true; when the batch stops "
             "on an error the changes of already-executed operations are rolled "
             "back through the global undo history; the response carries "
             "rolled_back and rollback_partial; changes that never entered the "
             "global undo history are not rolled back");
-        rollback_prop["default"] = mcp::JsonValue(false);
+        rollback_prop["default"] = godot_autopilot::util::JsonValue(false);
         props["rollback_on_error"] = std::move(rollback_prop);
-        mcp::JsonValue await_prop(mcp::JsonValue::object_tag);
-        await_prop["type"] = mcp::JsonValue("boolean");
-        await_prop["description"] = mcp::JsonValue("Wait for async game ops instead of refusing them (default: false). With false an async game op is reported as an error telling you to use call_tool or await_async=true; with true batch_execute waits for the game response (bounded by the op's timeout_ms) and reports ok/error per response under result");
-        await_prop["default"] = mcp::JsonValue(false);
+        godot_autopilot::util::JsonValue await_prop(godot_autopilot::util::JsonValue::object_tag);
+        await_prop["type"] = godot_autopilot::util::JsonValue("boolean");
+        await_prop["description"] = godot_autopilot::util::JsonValue("Wait for async game ops instead of refusing them (default: false). With false an async game op is reported as an error telling you to use call_tool or await_async=true; with true batch_execute waits for the game response (bounded by the op's timeout_ms) and reports ok/error per response under result");
+        await_prop["default"] = godot_autopilot::util::JsonValue(false);
         props["await_async"] = std::move(await_prop);
-        mcp::JsonValue confirm_prop(mcp::JsonValue::object_tag);
-        confirm_prop["type"] = mcp::JsonValue("boolean");
-        confirm_prop["description"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue confirm_prop(godot_autopilot::util::JsonValue::object_tag);
+        confirm_prop["type"] = godot_autopilot::util::JsonValue("boolean");
+        confirm_prop["description"] = godot_autopilot::util::JsonValue(
             "Confirm high-risk batch execution after reviewing the operations");
         props["confirm"] = std::move(confirm_prop);
         s["properties"] = std::move(props);
-        mcp::JsonValue req(mcp::JsonValue::array_tag);
-        req.PushBack(mcp::JsonValue("operations"));
+        godot_autopilot::util::JsonValue req(godot_autopilot::util::JsonValue::array_tag);
+        req.PushBack(godot_autopilot::util::JsonValue("operations"));
         s["required"] = std::move(req);
         spec.raw_schema = std::move(s);
         registry->add(make_spec_tool(std::move(spec)));
@@ -653,42 +655,42 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
                       "System", {"code", "execute", "script", "gdscript"}};
         spec.side_effect = SideEffect::CodeExecute;
         spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
-        spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_code_execute(a); };
-        mcp::JsonValue s(mcp::JsonValue::object_tag);
-        s["type"] = mcp::JsonValue("object");
-        mcp::JsonValue props(mcp::JsonValue::object_tag);
-        mcp::JsonValue sc(mcp::JsonValue::object_tag);
-        sc["type"] = mcp::JsonValue("string");
-        sc["description"] = mcp::JsonValue("GDScript source code");
+        spec.handler = [](const godot_autopilot::util::JsonValue& a) { return code_exec_ops::handle_code_execute(a); };
+        godot_autopilot::util::JsonValue s(godot_autopilot::util::JsonValue::object_tag);
+        s["type"] = godot_autopilot::util::JsonValue("object");
+        godot_autopilot::util::JsonValue props(godot_autopilot::util::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue sc(godot_autopilot::util::JsonValue::object_tag);
+        sc["type"] = godot_autopilot::util::JsonValue("string");
+        sc["description"] = godot_autopilot::util::JsonValue("GDScript source code");
         props["source_code"] = std::move(sc);
-        mcp::JsonValue fn(mcp::JsonValue::object_tag);
-        fn["type"] = mcp::JsonValue("string");
-        fn["description"] = mcp::JsonValue("Function name to call (default: _run)");
+        godot_autopilot::util::JsonValue fn(godot_autopilot::util::JsonValue::object_tag);
+        fn["type"] = godot_autopilot::util::JsonValue("string");
+        fn["description"] = godot_autopilot::util::JsonValue("Function name to call (default: _run)");
         props["function_name"] = std::move(fn);
-        mcp::JsonValue tm(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue tm(godot_autopilot::util::JsonValue::object_tag);
         const int64_t code_exec_max_timeout_ms =
             static_cast<int64_t>(code_exec_ops::max_timeout_ms());
         const int64_t code_exec_default_timeout_ms =
             code_exec_max_timeout_ms < 5000 ? code_exec_max_timeout_ms : 5000;
-        tm["type"] = mcp::JsonValue("integer");
-        tm["description"] = mcp::JsonValue(
+        tm["type"] = godot_autopilot::util::JsonValue("integer");
+        tm["description"] = godot_autopilot::util::JsonValue(
             "Execution timeout in milliseconds (max " +
             std::to_string(code_exec_max_timeout_ms) + ")");
-        tm["default"] = mcp::JsonValue(code_exec_default_timeout_ms);
-        tm["maximum"] = mcp::JsonValue(code_exec_max_timeout_ms);
+        tm["default"] = godot_autopilot::util::JsonValue(code_exec_default_timeout_ms);
+        tm["maximum"] = godot_autopilot::util::JsonValue(code_exec_max_timeout_ms);
         props["timeout_ms"] = std::move(tm);
-        mcp::JsonValue ao(mcp::JsonValue::object_tag);
-        ao["type"] = mcp::JsonValue("boolean");
-        ao["description"] = mcp::JsonValue("Automatically set owner on nodes created during execution so they are saved with the scene (default true)");
+        godot_autopilot::util::JsonValue ao(godot_autopilot::util::JsonValue::object_tag);
+        ao["type"] = godot_autopilot::util::JsonValue("boolean");
+        ao["description"] = godot_autopilot::util::JsonValue("Automatically set owner on nodes created during execution so they are saved with the scene (default true)");
         props["auto_owner"] = std::move(ao);
-        mcp::JsonValue confirm_prop(mcp::JsonValue::object_tag);
-        confirm_prop["type"] = mcp::JsonValue("boolean");
-        confirm_prop["description"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue confirm_prop(godot_autopilot::util::JsonValue::object_tag);
+        confirm_prop["type"] = godot_autopilot::util::JsonValue("boolean");
+        confirm_prop["description"] = godot_autopilot::util::JsonValue(
             "Confirm arbitrary code execution after reviewing the source");
         props["confirm"] = std::move(confirm_prop);
         s["properties"] = std::move(props);
-        mcp::JsonValue req(mcp::JsonValue::array_tag);
-        req.PushBack(mcp::JsonValue("source_code"));
+        godot_autopilot::util::JsonValue req(godot_autopilot::util::JsonValue::array_tag);
+        req.PushBack(godot_autopilot::util::JsonValue("source_code"));
         s["required"] = std::move(req);
         spec.raw_schema = std::move(s);
         registry->add(make_spec_tool(std::move(spec)));
@@ -751,7 +753,7 @@ ToolSurface resolve_tool_surface() {
     return ToolSurface::Meta;
 }
 
-bool tool_result_is_error(const mcp::JsonValue &result) {
+bool tool_result_is_error(const godot_autopilot::util::JsonValue &result) {
     return !spec_detail::verdict_of(result).ok;
 }
 
@@ -790,7 +792,8 @@ static void register_surface_tool(
     const std::string tool_name = surface_tool->meta().name;
     mcp::ToolOptions opts;
     opts.Description(surface_tool->meta().description)
-        .InputSchema(surface_tool->input_schema());
+        .InputSchema(godot_autopilot::adapters::ToSdk(
+            surface_tool->input_schema()));
     const SideEffect effect = side_effect_of(*surface_tool);
     if (effect == SideEffect::None) {
         opts.read_only_hint = true;
@@ -830,13 +833,16 @@ static void register_surface_tool(
             if (godot_autopilot::ExportGuard::is_exporting()) {
                 return dispatch::export_blocked_result();
             }
-            mcp::JsonValue args = ctx.Params().arguments
-                ? *ctx.Params().arguments
-                : mcp::JsonValue(mcp::JsonValue::object_tag);
+            godot_autopilot::util::JsonValue args =
+                ctx.Params().arguments
+                    ? godot_autopilot::adapters::FromSdk(
+                          *ctx.Params().arguments)
+                    : godot_autopilot::util::JsonValue(
+                          godot_autopilot::util::JsonValue::object_tag);
             {
                 SideEffect effect = side_effect_of(*surface_tool);
                 if (tool_name == "call_tool") {
-                    const mcp::JsonValue *target_p = args.Find("name");
+                    const godot_autopilot::util::JsonValue *target_p = args.Find("name");
                     if (target_p != nullptr && target_p->IsString()) {
                         const std::string target_name = target_p->GetString();
                         if (auto registry = get_active_registry()) {
@@ -858,9 +864,12 @@ static void register_surface_tool(
                 if (auto capabilities = ctx.Server().GetClientCapabilities()) {
                     client_elicitation = capabilities->elicitation.has_value();
                 }
-                auto* responses = ctx.Params().input_responses
-                    ? &*ctx.Params().input_responses
-                    : nullptr;
+                const std::optional<godot_autopilot::util::JsonValue>
+                    responses_gda =
+                        godot_autopilot::adapters::FromSdkOptional(
+                            ctx.Params().input_responses);
+                const godot_autopilot::util::JsonValue *responses =
+                    responses_gda ? &*responses_gda : nullptr;
                 std::string confirm_error;
                 const confirmation::ConfirmationResolution resolution =
                     confirmation::resolve_confirmation(
@@ -870,10 +879,11 @@ static void register_surface_tool(
                     confirmation::ConfirmationDecision::kMalformed) {
                     mcp::CallToolResult invalid;
                     invalid.is_error = true;
-                    mcp::JsonValue structured(mcp::JsonValue::object_tag);
-                    structured["code"] = mcp::JsonValue("invalid_input_response");
-                    structured["message"] = mcp::JsonValue(confirm_error);
-                    invalid.structured_content = std::move(structured);
+                    godot_autopilot::util::JsonValue structured(godot_autopilot::util::JsonValue::object_tag);
+                    structured["code"] = godot_autopilot::util::JsonValue("invalid_input_response");
+                    structured["message"] = godot_autopilot::util::JsonValue(confirm_error);
+                    invalid.structured_content =
+                        godot_autopilot::adapters::ToSdk(structured);
                     invalid.content.push_back(mcp::TextContent{
                         "text", "invalid_input_response: " + confirm_error});
                     return invalid;
@@ -896,36 +906,36 @@ static void register_surface_tool(
                     required.input_required = mcp::InputRequiredResult{};
                     mcp::InputRequest request;
                     request.method = "elicitation/create";
-                    mcp::JsonValue params(mcp::JsonValue::object_tag);
-                    params["mode"] = mcp::JsonValue("form");
-                    params["message"] = mcp::JsonValue(
+                    godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+                    params["mode"] = godot_autopilot::util::JsonValue("form");
+                    params["message"] = godot_autopilot::util::JsonValue(
                         "This tool has a " +
                         std::string(side_effect_name(effect)) +
                         " side effect. Confirm to continue.");
-                    mcp::JsonValue schema(mcp::JsonValue::object_tag);
-                    schema["type"] = mcp::JsonValue("object");
-                    mcp::JsonValue properties(mcp::JsonValue::object_tag);
-                    mcp::JsonValue confirm_property(mcp::JsonValue::object_tag);
-                    confirm_property["type"] = mcp::JsonValue("boolean");
+                    godot_autopilot::util::JsonValue schema(godot_autopilot::util::JsonValue::object_tag);
+                    schema["type"] = godot_autopilot::util::JsonValue("object");
+                    godot_autopilot::util::JsonValue properties(godot_autopilot::util::JsonValue::object_tag);
+                    godot_autopilot::util::JsonValue confirm_property(godot_autopilot::util::JsonValue::object_tag);
+                    confirm_property["type"] = godot_autopilot::util::JsonValue("boolean");
                     confirm_property["description"] =
-                        mcp::JsonValue("Confirm the high-risk tool call");
+                        godot_autopilot::util::JsonValue("Confirm the high-risk tool call");
                     properties["confirm"] = std::move(confirm_property);
                     schema["properties"] = std::move(properties);
-                    mcp::JsonValue required_fields(mcp::JsonValue::array_tag);
-                    required_fields.PushBack(mcp::JsonValue("confirm"));
+                    godot_autopilot::util::JsonValue required_fields(godot_autopilot::util::JsonValue::array_tag);
+                    required_fields.PushBack(godot_autopilot::util::JsonValue("confirm"));
                     schema["required"] = std::move(required_fields);
                     params["requestedSchema"] = std::move(schema);
-                    request.params = std::move(params);
+                    request.params = godot_autopilot::adapters::ToSdk(params);
                     required.input_required->input_requests["confirm"] =
                         std::move(request);
                     return required;
                 }
                 if (decision_accepted) {
-                    args["confirm"] = mcp::JsonValue(true);
+                    args["confirm"] = godot_autopilot::util::JsonValue(true);
                     if (tool_name == "call_tool") {
-                        mcp::JsonValue *nested = args.Find("arguments");
+                        godot_autopilot::util::JsonValue *nested = args.Find("arguments");
                         if (nested != nullptr && nested->IsObject())
-                            (*nested)["confirm"] = mcp::JsonValue(true);
+                            (*nested)["confirm"] = godot_autopilot::util::JsonValue(true);
                     }
                 }
             }
@@ -960,7 +970,7 @@ static void register_surface_tool(
                     run_on_transport_thread = true;
                 }
             }
-            mcp::JsonValue res;
+            godot_autopilot::util::JsonValue res;
             if (run_on_transport_thread) {
                 dispatch::DepthContext depth_ctx =
                     dispatch::capture_depth_context();
@@ -988,7 +998,7 @@ static void register_surface_tool(
                 mcp_result.is_error = true;
             }
             if (res.IsObject()) {
-                res["new_errors_since_last_call"] = mcp::JsonValue(
+                res["new_errors_since_last_call"] = godot_autopilot::util::JsonValue(
                     error_watermark::consume_new_errors(gda_request_id));
             }
             std::vector<mcp::ContentVariant> image_content;
@@ -1025,6 +1035,12 @@ static void register_surface_tool(
 }
 
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port, ToolSurface surface) {
+
+    if (g_surface_server == &server) {
+        throw godot_autopilot::adapters::SdkError(
+            godot_autopilot::adapters::SdkErrorCode::InvalidParams,
+            "tools already registered on this server");
+    }
 
     (void)queue;
     g_catalog = &catalog;

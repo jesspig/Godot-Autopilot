@@ -28,21 +28,21 @@ TEST(RuntimeOpsTest, EditorQueueInjectionRoundTrip) {
 
 TEST(RuntimeOpsTest, PayloadIsPending) {
     int64_t request_id = 0;
-    mcp::JsonValue pending = mcp::JsonValue::Parse("{\"__gda_pending\": 7}");
+    godot_autopilot::util::JsonValue pending = godot_autopilot::util::JsonValue::Parse("{\"__gda_pending\": 7}");
     EXPECT_TRUE(payload_is_pending(pending, &request_id));
     EXPECT_EQ(request_id, 7);
 
-    mcp::JsonValue empty(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue empty(godot_autopilot::util::JsonValue::object_tag);
     EXPECT_FALSE(payload_is_pending(empty, &request_id));
 
-    mcp::JsonValue non_integer =
-        mcp::JsonValue::Parse("{\"__gda_pending\": \"x\"}");
+    godot_autopilot::util::JsonValue non_integer =
+        godot_autopilot::util::JsonValue::Parse("{\"__gda_pending\": \"x\"}");
     EXPECT_FALSE(payload_is_pending(non_integer, &request_id));
 
-    mcp::JsonValue string_value = mcp::JsonValue::Parse("\"not-an-object\"");
+    godot_autopilot::util::JsonValue string_value = godot_autopilot::util::JsonValue::Parse("\"not-an-object\"");
     EXPECT_FALSE(payload_is_pending(string_value, &request_id));
 
-    mcp::JsonValue array_value = mcp::JsonValue::Parse("[1, 2]");
+    godot_autopilot::util::JsonValue array_value = godot_autopilot::util::JsonValue::Parse("[1, 2]");
     EXPECT_FALSE(payload_is_pending(array_value, &request_id));
 }
 
@@ -111,33 +111,33 @@ TEST(RuntimeOpsTest, LateResultBufferAppendsFifoAndIgnoresZeroCap) {
 }
 
 TEST(RuntimeOpsTest, LateResultSummaryPrefersErrorText) {
-    mcp::JsonValue both = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue both = godot_autopilot::util::JsonValue::Parse(
         "{\"error\":\"boom\",\"result\":{\"x\":1}}");
     EXPECT_EQ(late_result_summary(both), "\"boom\"");
 
-    mcp::JsonValue only_result = mcp::JsonValue::Parse("{\"result\":{\"x\":1}}");
+    godot_autopilot::util::JsonValue only_result = godot_autopilot::util::JsonValue::Parse("{\"result\":{\"x\":1}}");
     EXPECT_EQ(late_result_summary(only_result), "{\"x\":1}");
 
-    mcp::JsonValue neither = mcp::JsonValue::Parse("{\"other\":1}");
+    godot_autopilot::util::JsonValue neither = godot_autopilot::util::JsonValue::Parse("{\"other\":1}");
     EXPECT_TRUE(late_result_summary(neither).empty());
 }
 
 TEST(RuntimeOpsTest, LateResultSummaryTruncatesAtTwoHundredChars) {
     const std::string exact_payload(198, 'a');
-    mcp::JsonValue exact =
-        mcp::JsonValue::Parse("{\"error\":\"" + exact_payload + "\"}");
+    godot_autopilot::util::JsonValue exact =
+        godot_autopilot::util::JsonValue::Parse("{\"error\":\"" + exact_payload + "\"}");
     EXPECT_EQ(late_result_summary(exact), "\"" + exact_payload + "\"");
     EXPECT_EQ(late_result_summary(exact).size(), 200u);
 
     const std::string over_payload(200, 'b');
-    mcp::JsonValue over =
-        mcp::JsonValue::Parse("{\"error\":\"" + over_payload + "\"}");
+    godot_autopilot::util::JsonValue over =
+        godot_autopilot::util::JsonValue::Parse("{\"error\":\"" + over_payload + "\"}");
     EXPECT_EQ(late_result_summary(over).size(), 200u);
     EXPECT_EQ(late_result_summary(over), "\"" + over_payload.substr(0, 199));
 
     const std::string long_result(300, 'c');
-    mcp::JsonValue long_result_json =
-        mcp::JsonValue::Parse("{\"result\":\"" + long_result + "\"}");
+    godot_autopilot::util::JsonValue long_result_json =
+        godot_autopilot::util::JsonValue::Parse("{\"result\":\"" + long_result + "\"}");
     EXPECT_EQ(late_result_summary(long_result_json).size(), 200u);
     EXPECT_EQ(late_result_summary(long_result_json),
               "\"" + long_result.substr(0, 199));

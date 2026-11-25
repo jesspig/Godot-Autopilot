@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <core/command_queue.hpp>
 #include <core/observability/log_persist.hpp>
 #include <core/observability/log_system.hpp>
@@ -46,12 +46,12 @@ constexpr uint32_t kLongBlocking = 1u << 8;
 struct ToolAlias {
   std::string name;
   std::string canonical;
-  std::function<mcp::JsonValue(const mcp::JsonValue &)> adapt_args;
-  std::function<mcp::JsonValue(const mcp::JsonValue &)> project_result;
+  std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> adapt_args;
+  std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> project_result;
   std::string deprecated_since;
   std::string removal_version;
-  std::function<mcp::JsonValue(const mcp::JsonValue &)> validate_args;
-  std::function<mcp::JsonValue(const mcp::JsonValue &, const mcp::JsonValue &)>
+  std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> validate_args;
+  std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &, const godot_autopilot::util::JsonValue &)>
       project_result_with_args;
 };
 
@@ -63,8 +63,8 @@ struct ToolSpec {
   SideEffect side_effect = SideEffect::None;
   uint32_t flags = tool_flags::kNone;
   std::vector<ParamSpec> params;
-  std::function<mcp::JsonValue(const mcp::JsonValue &)> handler;
-  mcp::JsonValue raw_schema;
+  std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> handler;
+  godot_autopilot::util::JsonValue raw_schema;
   std::vector<ToolAlias> aliases;
   std::vector<std::string> examples;
 };
@@ -75,17 +75,17 @@ constexpr int64_t kSlowToolMs = 2000;
 constexpr std::size_t kArgsDetailMax = 512;
 constexpr std::size_t kErrDetailMax = 256;
 
-inline std::string string_field(const mcp::JsonValue &object,
+inline std::string string_field(const godot_autopilot::util::JsonValue &object,
                                  const char *key) {
-  const mcp::JsonValue *value = object.Find(key);
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   if (value == nullptr || !value->IsString()) {
     return std::string();
   }
   return value->GetString();
 }
 
-inline bool bool_field(const mcp::JsonValue &object, const char *key) {
-  const mcp::JsonValue *value = object.Find(key);
+inline bool bool_field(const godot_autopilot::util::JsonValue &object, const char *key) {
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   return value != nullptr && value->IsBool() && value->GetBool();
 }
 
@@ -94,12 +94,12 @@ struct ToolVerdict {
   std::string error_code;
 };
 
-inline ToolVerdict verdict_of(const mcp::JsonValue &result) {
+inline ToolVerdict verdict_of(const godot_autopilot::util::JsonValue &result) {
   ToolVerdict verdict;
   if (!result.IsObject()) {
     return verdict;
   }
-  const mcp::JsonValue *structured = result.Find("structured_error");
+  const godot_autopilot::util::JsonValue *structured = result.Find("structured_error");
   const std::string structured_code =
       structured != nullptr && structured->IsObject()
           ? string_field(*structured, "code")
@@ -140,45 +140,45 @@ struct ImageHit {
 };
 
 inline void append_image_hit(std::vector<ImageHit> &hits,
-                             const mcp::JsonValue &scope, const char *key,
+                             const godot_autopilot::util::JsonValue &scope, const char *key,
                              const char *kind) {
-  const mcp::JsonValue *value = scope.Find(key);
+  const godot_autopilot::util::JsonValue *value = scope.Find(key);
   if (!value || !value->IsString()) {
     return;
   }
   ImageHit hit;
   hit.base64 = value->GetString();
   hit.kind = kind;
-  if (const mcp::JsonValue *width = scope.Find("width");
+  if (const godot_autopilot::util::JsonValue *width = scope.Find("width");
       width && width->IsInt()) {
     hit.width = static_cast<int>(width->GetInt());
   }
-  if (const mcp::JsonValue *height = scope.Find("height");
+  if (const godot_autopilot::util::JsonValue *height = scope.Find("height");
       height && height->IsInt()) {
     hit.height = static_cast<int>(height->GetInt());
   }
   hits.push_back(std::move(hit));
 }
 
-inline std::vector<ImageHit> collect_trace_images(const mcp::JsonValue &result) {
+inline std::vector<ImageHit> collect_trace_images(const godot_autopilot::util::JsonValue &result) {
   std::vector<ImageHit> hits;
-  const mcp::JsonValue *scopes[3] = {nullptr, nullptr, nullptr};
+  const godot_autopilot::util::JsonValue *scopes[3] = {nullptr, nullptr, nullptr};
   if (result.IsObject()) {
     scopes[0] = &result;
-    if (const mcp::JsonValue *inner = result.Find("result");
+    if (const godot_autopilot::util::JsonValue *inner = result.Find("result");
         inner && inner->IsObject()) {
       scopes[1] = inner;
     }
-    if (const mcp::JsonValue *inner = result.Find("data");
+    if (const godot_autopilot::util::JsonValue *inner = result.Find("data");
         inner && inner->IsObject()) {
       scopes[2] = inner;
     }
   }
-  for (const mcp::JsonValue *scope : scopes) {
+  for (const godot_autopilot::util::JsonValue *scope : scopes) {
     if (!scope) {
       continue;
     }
-    if (const mcp::JsonValue *format = scope->Find("format");
+    if (const godot_autopilot::util::JsonValue *format = scope->Find("format");
         format && format->IsString() && format->GetString() == "png") {
       append_image_hit(hits, *scope, "data", "cap");
     }
@@ -208,19 +208,19 @@ inline std::vector<std::string> &deferred_trace_order() {
   return order;
 }
 
-inline bool deferred_key_of(const mcp::JsonValue &result, std::string *key) {
+inline bool deferred_key_of(const godot_autopilot::util::JsonValue &result, std::string *key) {
   if (!result.IsObject()) {
     return false;
   }
-  if (const mcp::JsonValue *pending = result.Find("__gda_pending");
+  if (const godot_autopilot::util::JsonValue *pending = result.Find("__gda_pending");
       pending != nullptr && pending->IsInt()) {
     *key = "pending:" + std::to_string(pending->GetInt());
     return true;
   }
-  const mcp::JsonValue *wait = result.Find("__gda_wait");
+  const godot_autopilot::util::JsonValue *wait = result.Find("__gda_wait");
   if (wait != nullptr && wait->IsObject()) {
     const std::string kind = string_field(*wait, "kind");
-    const mcp::JsonValue *id = wait->Find("id");
+    const godot_autopilot::util::JsonValue *id = wait->Find("id");
     const std::string id_text =
         (id != nullptr && id->IsInt())
             ? std::to_string(id->GetInt())
@@ -260,12 +260,12 @@ inline bool take_deferred_trace(const std::string &key, DeferredTrace *record) {
   return true;
 }
 
-inline std::string error_text_of(const mcp::JsonValue &result) {
-  if (const mcp::JsonValue *error = result.Find("error");
+inline std::string error_text_of(const godot_autopilot::util::JsonValue &result) {
+  if (const godot_autopilot::util::JsonValue *error = result.Find("error");
       error != nullptr && error->IsString()) {
     return truncated_text(error->GetString(), kErrDetailMax);
   }
-  if (const mcp::JsonValue *details = result.Find("error_details");
+  if (const godot_autopilot::util::JsonValue *details = result.Find("error_details");
       details != nullptr && details->IsString()) {
     return truncated_text(details->GetString(), kErrDetailMax);
   }
@@ -299,7 +299,7 @@ inline void emit_tool_call(TraceEvent event, int64_t duration_ms,
 }
 
 inline bool finish_deferred_trace(const std::string &key,
-                                  const mcp::JsonValue &final_result) {
+                                  const godot_autopilot::util::JsonValue &final_result) {
   DeferredTrace record;
   if (!take_deferred_trace(key, &record)) {
     return false;
@@ -319,20 +319,20 @@ inline bool finish_deferred_trace(const std::string &key,
   return true;
 }
 
-inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue validate_dynamic_args(const godot_autopilot::util::JsonValue &args,
                                             const std::vector<ParamSpec> &params) {
-  mcp::JsonValue accepted(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue accepted(godot_autopilot::util::JsonValue::object_tag);
   if (!args.IsObject()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("tool arguments must be an object");
-    error["code"] = mcp::JsonValue("invalid_arguments");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("tool arguments must be an object");
+    error["code"] = godot_autopilot::util::JsonValue("invalid_arguments");
     return error;
   }
   std::string definition_error;
   if (!schema::validate_param_defs(params, definition_error)) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(definition_error);
-    error["code"] = mcp::JsonValue("invalid_tool_definition");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(definition_error);
+    error["code"] = godot_autopilot::util::JsonValue("invalid_tool_definition");
     return error;
   }
   if (params.empty()) {
@@ -346,8 +346,8 @@ inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
     Args strict(args, strict_params);
     strict.reject_unknown();
   } catch (const ToolArgError &ex) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(ex.what());
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(ex.what());
     return error;
   }
   return accepted;
@@ -357,8 +357,8 @@ inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
 
 namespace pipeline {
 
-mcp::JsonValue run_post(const ToolSpec &spec, const mcp::JsonValue &args,
-                        mcp::JsonValue result);
+godot_autopilot::util::JsonValue run_post(const ToolSpec &spec, const godot_autopilot::util::JsonValue &args,
+                        godot_autopilot::util::JsonValue result);
 
 } // namespace pipeline
 
@@ -367,8 +367,8 @@ public:
   explicit SpecTool(ToolSpec spec);
 
   const ToolMeta &meta() const override;
-  mcp::JsonValue execute(const mcp::JsonValue &args) override;
-  mcp::JsonValue input_schema() const override;
+  godot_autopilot::util::JsonValue execute(const godot_autopilot::util::JsonValue &args) override;
+  godot_autopilot::util::JsonValue input_schema() const override;
   SideEffect side_effects() const override;
   uint32_t tool_flags() const override;
   const ToolSpec &spec() const;
@@ -376,7 +376,7 @@ public:
 private:
   ToolSpec spec_;
   ToolMeta meta_;
-  mcp::JsonValue schema_;
+  godot_autopilot::util::JsonValue schema_;
 };
 
 inline SpecTool::SpecTool(ToolSpec spec) : spec_(std::move(spec)) {
@@ -387,7 +387,7 @@ inline SpecTool::SpecTool(ToolSpec spec) : spec_(std::move(spec)) {
 
 inline const ToolMeta &SpecTool::meta() const { return meta_; }
 
-inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
+inline godot_autopilot::util::JsonValue SpecTool::execute(const godot_autopilot::util::JsonValue &args) {
   const int64_t wall_start = TraceRecorder::wall_now_ms();
   const auto steady_start = std::chrono::steady_clock::now();
   const std::string parent_span = tools::current_span_id();
@@ -406,9 +406,9 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
       !confirmation::provided(args)) {
     return confirmation::error(spec_.name, spec_.side_effect);
   }
-  mcp::JsonValue call_args = args;
+  godot_autopilot::util::JsonValue call_args = args;
   if (confirmation::required_for(spec_.side_effect) && args.IsObject()) {
-    mcp::JsonValue clean(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue clean(godot_autopilot::util::JsonValue::object_tag);
     for (const auto &entry : args.GetObject()) {
       if (entry.first != "confirm") {
         clean[entry.first] = entry.second;
@@ -417,13 +417,13 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
     call_args = std::move(clean);
   }
   if ((spec_.flags & tool_flags::kDynamic) != 0) {
-    mcp::JsonValue validation =
+    godot_autopilot::util::JsonValue validation =
         spec_detail::validate_dynamic_args(call_args, spec_.params);
     if (validation.Find("error") != nullptr) {
       return validation;
     }
   }
-  mcp::JsonValue result = spec_.handler(call_args);
+  godot_autopilot::util::JsonValue result = spec_.handler(call_args);
   result = pipeline::run_post(spec_, call_args, std::move(result));
   const int64_t duration_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -501,7 +501,7 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
   return result;
 }
 
-inline mcp::JsonValue SpecTool::input_schema() const { return schema_; }
+inline godot_autopilot::util::JsonValue SpecTool::input_schema() const { return schema_; }
 
 inline SideEffect SpecTool::side_effects() const { return spec_.side_effect; }
 
@@ -509,11 +509,11 @@ inline uint32_t SpecTool::tool_flags() const { return spec_.flags; }
 
 inline const ToolSpec &SpecTool::spec() const { return spec_; }
 
-inline mcp::JsonValue apply_alias_args(const ToolAlias &alias,
-                                       const mcp::JsonValue &args) {
-  mcp::JsonValue adapted = alias.adapt_args ? alias.adapt_args(args) : args;
+inline godot_autopilot::util::JsonValue apply_alias_args(const ToolAlias &alias,
+                                       const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue adapted = alias.adapt_args ? alias.adapt_args(args) : args;
   if (args.IsObject() && adapted.IsObject()) {
-    const mcp::JsonValue *confirm = args.Find("confirm");
+    const godot_autopilot::util::JsonValue *confirm = args.Find("confirm");
     if (confirm != nullptr && adapted.Find("confirm") == nullptr) {
       adapted["confirm"] = *confirm;
     }
@@ -521,33 +521,33 @@ inline mcp::JsonValue apply_alias_args(const ToolAlias &alias,
   return adapted;
 }
 
-inline mcp::JsonValue annotate_alias_result(const ToolAlias &alias,
-                                            mcp::JsonValue result) {
+inline godot_autopilot::util::JsonValue annotate_alias_result(const ToolAlias &alias,
+                                            godot_autopilot::util::JsonValue result) {
   if (!result.IsObject()) {
-    mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue wrapped(godot_autopilot::util::JsonValue::object_tag);
     wrapped["result"] = std::move(result);
     result = std::move(wrapped);
   }
-  result["deprecated_alias"] = mcp::JsonValue(alias.name);
-  result["canonical_name"] = mcp::JsonValue(alias.canonical);
-  result["alias_removal_version"] = mcp::JsonValue(alias.removal_version);
+  result["deprecated_alias"] = godot_autopilot::util::JsonValue(alias.name);
+  result["canonical_name"] = godot_autopilot::util::JsonValue(alias.canonical);
+  result["alias_removal_version"] = godot_autopilot::util::JsonValue(alias.removal_version);
   if (!alias.deprecated_since.empty()) {
-    result["deprecated_since"] = mcp::JsonValue(alias.deprecated_since);
+    result["deprecated_since"] = godot_autopilot::util::JsonValue(alias.deprecated_since);
   }
   return result;
 }
 
-inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
-                                         mcp::JsonValue result) {
+inline godot_autopilot::util::JsonValue apply_alias_result(const ToolAlias &alias,
+                                         godot_autopilot::util::JsonValue result) {
   if (alias.project_result) {
     result = alias.project_result(result);
   }
   return annotate_alias_result(alias, std::move(result));
 }
 
-inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
-                                         mcp::JsonValue result,
-                                         const mcp::JsonValue &args) {
+inline godot_autopilot::util::JsonValue apply_alias_result(const ToolAlias &alias,
+                                         godot_autopilot::util::JsonValue result,
+                                         const godot_autopilot::util::JsonValue &args) {
   if (alias.project_result_with_args) {
     result = alias.project_result_with_args(result, args);
   } else if (alias.project_result) {

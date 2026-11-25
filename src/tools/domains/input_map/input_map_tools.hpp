@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <utility>
@@ -68,171 +68,171 @@ inline ToolSpec input_map_action_spec(
   return spec;
 }
 
-inline mcp::JsonValue input_map_args_with_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue input_map_args_with_action(const godot_autopilot::util::JsonValue &args,
                                                  const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue input_map_target_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue input_map_target_args(const godot_autopilot::util::JsonValue &args,
                                             const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   out.GetObject().erase("action");
-  const mcp::JsonValue *target = args.Find("action");
+  const godot_autopilot::util::JsonValue *target = args.Find("action");
   if (target != nullptr) {
     out["name"] = *target;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue input_map_add_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out = input_map_target_args(args, "set");
+inline godot_autopilot::util::JsonValue input_map_add_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = input_map_target_args(args, "set");
   if (out.Find("deadzone") == nullptr) {
-    out["deadzone"] = mcp::JsonValue(0.5);
+    out["deadzone"] = godot_autopilot::util::JsonValue(0.5);
   }
-  out["persist"] = mcp::JsonValue(true);
+  out["persist"] = godot_autopilot::util::JsonValue(true);
   return out;
 }
 
-inline mcp::JsonValue input_map_event_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out = input_map_target_args(args, "set");
-  mcp::JsonValue events(mcp::JsonValue::array_tag);
-  const mcp::JsonValue *event = args.Find("event");
+inline godot_autopilot::util::JsonValue input_map_event_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = input_map_target_args(args, "set");
+  godot_autopilot::util::JsonValue events(godot_autopilot::util::JsonValue::array_tag);
+  const godot_autopilot::util::JsonValue *event = args.Find("event");
   if (event != nullptr) {
     events.PushBack(*event);
   }
   out["events"] = std::move(events);
-  out["persist"] = mcp::JsonValue(true);
+  out["persist"] = godot_autopilot::util::JsonValue(true);
   return out;
 }
 
-inline mcp::JsonValue input_map_deadzone_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out = input_map_target_args(args, "set");
-  out["persist"] = mcp::JsonValue(true);
+inline godot_autopilot::util::JsonValue input_map_deadzone_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = input_map_target_args(args, "set");
+  out["persist"] = godot_autopilot::util::JsonValue(true);
   return out;
 }
 
-inline mcp::JsonValue input_map_has_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *target = args.Find("action");
+inline godot_autopilot::util::JsonValue input_map_has_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *target = args.Find("action");
   if (target != nullptr) {
     out["name"] = *target;
   }
-  out["action"] = mcp::JsonValue("has");
+  out["action"] = godot_autopilot::util::JsonValue("has");
   return out;
 }
 
-inline mcp::JsonValue input_map_erase_action_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *target = args.Find("action");
+inline godot_autopilot::util::JsonValue input_map_erase_action_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *target = args.Find("action");
   if (target != nullptr) {
     out["name"] = *target;
   }
-  out["action"] = mcp::JsonValue("action");
+  out["action"] = godot_autopilot::util::JsonValue("action");
   return out;
 }
 
-inline mcp::JsonValue input_map_erase_event_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *target = args.Find("action");
+inline godot_autopilot::util::JsonValue input_map_erase_event_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *target = args.Find("action");
   if (target != nullptr) {
     out["name"] = *target;
   }
-  const mcp::JsonValue *index = args.Find("event_index");
+  const godot_autopilot::util::JsonValue *index = args.Find("event_index");
   if (index != nullptr) {
     out["event_index"] = *index;
   }
-  out["action"] = mcp::JsonValue("event");
+  out["action"] = godot_autopilot::util::JsonValue("event");
   return out;
 }
 
-inline mcp::JsonValue validate_input_map_action(
-    const mcp::JsonValue &args, const char *missing_message) {
-  const mcp::JsonValue *action = args.Find("action");
+inline godot_autopilot::util::JsonValue validate_input_map_action(
+    const godot_autopilot::util::JsonValue &args, const char *missing_message) {
+  const godot_autopilot::util::JsonValue *action = args.Find("action");
   if (action == nullptr || !action->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(missing_message);
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(missing_message);
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue validate_input_map_event(const mcp::JsonValue &args) {
-  const mcp::JsonValue *event = args.Find("event");
-  mcp::JsonValue action_error =
+inline godot_autopilot::util::JsonValue validate_input_map_event(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *event = args.Find("event");
+  godot_autopilot::util::JsonValue action_error =
       validate_input_map_action(args, "missing required parameter: action");
   if (!action_error.IsNull()) return action_error;
   if (event == nullptr || !event->IsObject()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: event");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: event");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue validate_input_map_deadzone(
-    const mcp::JsonValue &args) {
-  mcp::JsonValue action_error =
+inline godot_autopilot::util::JsonValue validate_input_map_deadzone(
+    const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue action_error =
       validate_input_map_action(args, "missing required parameter: action");
   if (!action_error.IsNull()) return action_error;
-  const mcp::JsonValue *deadzone = args.Find("deadzone");
+  const godot_autopilot::util::JsonValue *deadzone = args.Find("deadzone");
   if (deadzone == nullptr || !deadzone->IsNumber()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: deadzone");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: deadzone");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue validate_input_map_erase_event(
-    const mcp::JsonValue &args) {
-  mcp::JsonValue action_error =
+inline godot_autopilot::util::JsonValue validate_input_map_erase_event(
+    const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue action_error =
       validate_input_map_action(args, "missing required parameter: action");
   if (!action_error.IsNull()) return action_error;
-  const mcp::JsonValue *index = args.Find("event_index");
+  const godot_autopilot::util::JsonValue *index = args.Find("event_index");
   if (index == nullptr || !index->IsInt()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: event_index");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: event_index");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline bool input_map_result_has_error(const mcp::JsonValue &result) {
+inline bool input_map_result_has_error(const godot_autopilot::util::JsonValue &result) {
   return result.IsObject() &&
          (result.Find("error") != nullptr ||
           result.Find("structured_error") != nullptr ||
           result.Find("runtime_error") != nullptr);
 }
 
-inline mcp::JsonValue project_input_map_ok(const mcp::JsonValue &result) {
+inline godot_autopilot::util::JsonValue project_input_map_ok(const godot_autopilot::util::JsonValue &result) {
   if (input_map_result_has_error(result)) {
     return result;
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue("ok");
   return out;
 }
 
-inline mcp::JsonValue project_input_map_has(const mcp::JsonValue &result) {
+inline godot_autopilot::util::JsonValue project_input_map_has(const godot_autopilot::util::JsonValue &result) {
   if (input_map_result_has_error(result)) {
     return result;
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *inner = result.Find("result");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
   bool found = false;
   if (inner != nullptr && inner->IsBool()) {
     found = inner->GetBool();
   } else if (inner != nullptr && inner->IsArray() && inner->Size() > 0) {
     found = true;
   }
-  out["result"] = mcp::JsonValue(found);
+  out["result"] = godot_autopilot::util::JsonValue(found);
   return out;
 }
 
@@ -241,7 +241,7 @@ inline ToolAlias input_map_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return input_map_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -272,31 +272,31 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
            "{\"action\":\"query\",\"name\":\"mario_jump\"}"}),
       {
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
-              mcp::JsonValue out(mcp::JsonValue::object_tag);
-              const mcp::JsonValue *name = args.Find("action");
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
+              godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+              const godot_autopilot::util::JsonValue *name = args.Find("action");
               if (name != nullptr) {
                 out["name"] = *name;
               }
-              out["action"] = mcp::JsonValue("list");
+              out["action"] = godot_autopilot::util::JsonValue("list");
               return out;
             };
-            alias.validate_args = [](const mcp::JsonValue &args) {
-              const mcp::JsonValue *action = args.Find("action");
+            alias.validate_args = [](const godot_autopilot::util::JsonValue &args) {
+              const godot_autopilot::util::JsonValue *action = args.Find("action");
               if (action != nullptr && !action->IsString()) {
-                mcp::JsonValue error(mcp::JsonValue::object_tag);
-                error["error"] = mcp::JsonValue(
+                godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+                error["error"] = godot_autopilot::util::JsonValue(
                     "invalid parameter: action must be a string");
                 return error;
               }
-              return mcp::JsonValue();
+              return godot_autopilot::util::JsonValue();
             };
             return alias;
           }(input_map_alias("get_input_map_actions", "get_input_map", "list")),
           [](ToolAlias alias) {
             alias.adapt_args = input_map_has_args;
             alias.project_result = project_input_map_has;
-            alias.validate_args = [](const mcp::JsonValue &args) {
+            alias.validate_args = [](const godot_autopilot::util::JsonValue &args) {
               return validate_input_map_action(
                   args, "missing required parameter: action");
             };
@@ -321,10 +321,10 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
            "{\"action\":\"set\",\"name\":\"mario_jump\",\"deadzone\":0.3}"}),
       {
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
               return input_map_target_args(args, "set");
             };
-            alias.validate_args = [](const mcp::JsonValue &args) {
+            alias.validate_args = [](const godot_autopilot::util::JsonValue &args) {
               return validate_input_map_action(
                   args, "missing required parameter: action");
             };
@@ -334,7 +334,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
           [](ToolAlias alias) {
             alias.adapt_args = input_map_add_args;
             alias.project_result = project_input_map_ok;
-            alias.validate_args = [](const mcp::JsonValue &args) {
+            alias.validate_args = [](const godot_autopilot::util::JsonValue &args) {
               return validate_input_map_action(
                   args, "missing required parameter: action");
             };
@@ -374,7 +374,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           [](ToolAlias alias) {
             alias.adapt_args = input_map_erase_action_args;
-            alias.validate_args = [](const mcp::JsonValue &args) {
+            alias.validate_args = [](const godot_autopilot::util::JsonValue &args) {
               return validate_input_map_action(
                   args, "missing required parameter: action");
             };

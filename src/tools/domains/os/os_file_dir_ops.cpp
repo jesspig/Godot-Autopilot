@@ -17,7 +17,7 @@
 namespace godot_autopilot {
 namespace file_dir_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

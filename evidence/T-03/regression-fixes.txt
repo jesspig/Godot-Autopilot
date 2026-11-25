@@ -1,0 +1,78 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-json/build/debug
+    Start 534: LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+1/6 Test #534: LogSystemTest.SdkLogBridgeRoutesStoreFailureReason ....................***Failed    0.97 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from LogSystemTest
+[ RUN      ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+unknown file: error: SEH exception with code 0xc0000005 thrown in the test body.
+Stack trace:
+
+
+[  FAILED  ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason (6 ms)
+[----------] 1 test from LogSystemTest (6 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (6 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+
+ 1 FAILED TEST
+
+    Start 539: McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid
+2/6 Test #539: McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid ...................Exit code 0xc0000374***Exception:   0.39 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpHttpDispatchTest
+[ RUN      ] McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid
+
+    Start 547: McpWireTest.RejectsMalformedBody
+3/6 Test #547: McpWireTest.RejectsMalformedBody ......................................Exit code 0xc0000374***Exception:   0.27 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpWireTest.RejectsMalformedBody
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpWireTest
+[ RUN      ] McpWireTest.RejectsMalformedBody
+
+    Start 574: McpHttpShimTest.RejectsUnparsableBody
+4/6 Test #574: McpHttpShimTest.RejectsUnparsableBody .................................Exit code 0xc0000374***Exception:   0.28 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpHttpShimTest.RejectsUnparsableBody
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpHttpShimTest
+[ RUN      ] McpHttpShimTest.RejectsUnparsableBody
+
+    Start 655: RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+5/6 Test #655: RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools ...Exit code 0xc0000374***Exception:   0.35 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RegisteredServerFixture
+[ RUN      ] RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+
+    Start 992: StableMcpErrorTest.PreservesShortMessageAcrossThrow
+6/6 Test #992: StableMcpErrorTest.PreservesShortMessageAcrossThrow ...................   Passed    1.23 sec
+
+17% tests passed, 5 tests failed out of 6
+
+Label Time Summary:
+boundary    =   1.23 sec*proc (1 test)
+unit        =   2.25 sec*proc (5 tests)
+
+Total Test time (real) =   3.59 sec
+
+The following tests FAILED:
+	534 - LogSystemTest.SdkLogBridgeRoutesStoreFailureReason (Failed) unit
+	539 - McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid (Exit code 0xc0000374) unit
+	547 - McpWireTest.RejectsMalformedBody (Exit code 0xc0000374) unit
+	574 - McpHttpShimTest.RejectsUnparsableBody (Exit code 0xc0000374) unit
+	655 - RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools (Exit code 0xc0000374) unit
+Errors while running CTest

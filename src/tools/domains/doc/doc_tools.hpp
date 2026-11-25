@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_DOC_TOOLS_HPP
 #define GODOT_AUTOPILOT_DOC_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,9 +22,9 @@ const std::vector<ParamSpec> kGetDocsClassParams = {
     {"exact", "boolean", "When true, 'member' must match the member name exactly; when false (default) it is a case-insensitive substring filter", false},
 };
 
-inline mcp::JsonValue find_docs_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *query = args.Find("query");
+inline godot_autopilot::util::JsonValue find_docs_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *query = args.Find("query");
   if (query != nullptr) {
     out["query"] = *query;
   }
@@ -44,67 +44,67 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "get_docs_method", "get_docs_class",
-              [](const mcp::JsonValue &args) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                const mcp::JsonValue *class_name = args.Find("class");
-                const mcp::JsonValue *method = args.Find("method");
+              [](const godot_autopilot::util::JsonValue &args) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                const godot_autopilot::util::JsonValue *class_name = args.Find("class");
+                const godot_autopilot::util::JsonValue *method = args.Find("method");
                 if (class_name != nullptr) out["class"] = *class_name;
                 if (method != nullptr) out["member"] = *method;
-                out["section"] = mcp::JsonValue("methods");
-                out["exact"] = mcp::JsonValue(true);
+                out["section"] = godot_autopilot::util::JsonValue("methods");
+                out["exact"] = godot_autopilot::util::JsonValue(true);
                 return out;
               },
-              [](const mcp::JsonValue &result) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                const mcp::JsonValue *inner = result.Find("result");
-                const mcp::JsonValue *methods =
+              [](const godot_autopilot::util::JsonValue &result) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                const godot_autopilot::util::JsonValue *inner = result.Find("result");
+                const godot_autopilot::util::JsonValue *methods =
                     inner != nullptr && inner->IsObject()
                         ? inner->Find("methods")
                         : nullptr;
                 if (methods != nullptr && methods->IsArray() &&
                     methods->Size() > 0) {
                   out["result"] = (*methods)[0];
-                  out["result"]["note"] = mcp::JsonValue(
+                  out["result"]["note"] = godot_autopilot::util::JsonValue(
                       "method signature without docstrings");
                 } else {
-                  out["error"] = mcp::JsonValue("method not found");
+                  out["error"] = godot_autopilot::util::JsonValue("method not found");
                 }
                 return out;
               },
               "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
-                const mcp::JsonValue *class_name = args.Find("class");
-                const mcp::JsonValue *method = args.Find("method");
+              [](const godot_autopilot::util::JsonValue &args) {
+                const godot_autopilot::util::JsonValue *class_name = args.Find("class");
+                const godot_autopilot::util::JsonValue *method = args.Find("method");
                 if (class_name == nullptr || !class_name->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: class");
+                      godot_autopilot::util::JsonValue("missing required parameter: class");
                   return error;
                 }
                 if (method == nullptr || !method->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: method");
+                      godot_autopilot::util::JsonValue("missing required parameter: method");
                   return error;
                 }
-                return mcp::JsonValue();
+                return godot_autopilot::util::JsonValue();
               }},
           ToolAlias{
               "get_docs_property", "get_docs_class",
-              [](const mcp::JsonValue &args) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                const mcp::JsonValue *class_name = args.Find("class");
-                const mcp::JsonValue *property = args.Find("property");
+              [](const godot_autopilot::util::JsonValue &args) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                const godot_autopilot::util::JsonValue *class_name = args.Find("class");
+                const godot_autopilot::util::JsonValue *property = args.Find("property");
                 if (class_name != nullptr) out["class"] = *class_name;
                 if (property != nullptr) out["member"] = *property;
-                out["section"] = mcp::JsonValue("properties");
-                out["exact"] = mcp::JsonValue(true);
+                out["section"] = godot_autopilot::util::JsonValue("properties");
+                out["exact"] = godot_autopilot::util::JsonValue(true);
                 return out;
               },
-              [](const mcp::JsonValue &result) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                const mcp::JsonValue *inner = result.Find("result");
-                const mcp::JsonValue *properties =
+              [](const godot_autopilot::util::JsonValue &result) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                const godot_autopilot::util::JsonValue *inner = result.Find("result");
+                const godot_autopilot::util::JsonValue *properties =
                     inner != nullptr && inner->IsObject()
                         ? inner->Find("properties")
                         : nullptr;
@@ -112,40 +112,40 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                     properties->Size() > 0) {
                   out["result"] = (*properties)[0];
                 } else {
-                  out["error"] = mcp::JsonValue("property not found");
+                  out["error"] = godot_autopilot::util::JsonValue("property not found");
                 }
                 return out;
               },
               "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
-                const mcp::JsonValue *class_name = args.Find("class");
-                const mcp::JsonValue *property = args.Find("property");
+              [](const godot_autopilot::util::JsonValue &args) {
+                const godot_autopilot::util::JsonValue *class_name = args.Find("class");
+                const godot_autopilot::util::JsonValue *property = args.Find("property");
                 if (class_name == nullptr || !class_name->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: class");
+                      godot_autopilot::util::JsonValue("missing required parameter: class");
                   return error;
                 }
                 if (property == nullptr || !property->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: property");
+                      godot_autopilot::util::JsonValue("missing required parameter: property");
                   return error;
                 }
-                return mcp::JsonValue();
+                return godot_autopilot::util::JsonValue();
               }},
           ToolAlias{
               "find_docs_class", "get_docs_class",
               find_docs_args, {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
-                const mcp::JsonValue *query = args.Find("query");
+              [](const godot_autopilot::util::JsonValue &args) {
+                const godot_autopilot::util::JsonValue *query = args.Find("query");
                 if (query == nullptr || !query->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: query");
+                      godot_autopilot::util::JsonValue("missing required parameter: query");
                   return error;
                 }
-                return mcp::JsonValue();
+                return godot_autopilot::util::JsonValue();
               }},
       })));
   return v;

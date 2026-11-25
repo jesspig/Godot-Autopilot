@@ -19,7 +19,7 @@ namespace display_ops {
 
 namespace {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 int window_id_from_args(const JV &args) {
   auto *wp = args.Find("window_id");
@@ -380,7 +380,7 @@ JV handle_window_popup(const JV &args) {
   JV inner(JV::object_tag);
   inner["window_id"] = JV(static_cast<int64_t>(window->get_window_id()));
   inner["visible"] = JV(window->is_visible());
-  inner["rect"] = JV(mcp::JsonValue::Object{
+  inner["rect"] = JV(godot_autopilot::util::JsonValue::Object{
       {"x", JV(static_cast<int64_t>(rect.position.x))},
       {"y", JV(static_cast<int64_t>(rect.position.y))},
       {"w", JV(static_cast<int64_t>(rect.size.x))},

@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <utility>
@@ -129,75 +129,75 @@ const std::vector<std::string> kResourceUidSetActions = {"set_uid"};
 const std::vector<std::string> kResourceImportActions = {"reimport",
                                                          "import_options"};
 
-inline mcp::JsonValue load_script_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *path = args.Find("path");
+inline godot_autopilot::util::JsonValue load_script_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
   if (path != nullptr) out["path"] = *path;
-  out["type_hint"] = mcp::JsonValue("Script");
+  out["type_hint"] = godot_autopilot::util::JsonValue("Script");
   bool fresh = false;
-  const mcp::JsonValue *fresh_p = args.Find("fresh");
+  const godot_autopilot::util::JsonValue *fresh_p = args.Find("fresh");
   if (fresh_p != nullptr && fresh_p->IsBool()) {
     fresh = fresh_p->GetBool();
   }
-  out["cache_mode"] = mcp::JsonValue(fresh ? "ignore" : "reuse");
+  out["cache_mode"] = godot_autopilot::util::JsonValue(fresh ? "ignore" : "reuse");
   return out;
 }
 
-inline mcp::JsonValue validate_load_script(const mcp::JsonValue &args) {
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *fresh = args.Find("fresh");
+inline godot_autopilot::util::JsonValue validate_load_script(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *fresh = args.Find("fresh");
   if (path == nullptr || !path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return error;
   }
   if (fresh != nullptr && !fresh->IsBool()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
     error["error"] =
-        mcp::JsonValue("invalid parameter: fresh must be a boolean");
+        godot_autopilot::util::JsonValue("invalid parameter: fresh must be a boolean");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue load_script_action_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out = load_script_args(args);
-  out["action"] = mcp::JsonValue("load");
+inline godot_autopilot::util::JsonValue load_script_action_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = load_script_args(args);
+  out["action"] = godot_autopilot::util::JsonValue("load");
   return out;
 }
 
-inline mcp::JsonValue dependency_query_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *dependency = args.Find("dependency");
+inline godot_autopilot::util::JsonValue dependency_query_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *dependency = args.Find("dependency");
   if (path != nullptr) out["path"] = *path;
   if (dependency != nullptr) out["dependency"] = *dependency;
-  out["action"] = mcp::JsonValue("deps");
+  out["action"] = godot_autopilot::util::JsonValue("deps");
   return out;
 }
 
-inline mcp::JsonValue validate_dependency_check(
-    const mcp::JsonValue &args) {
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *dependency = args.Find("dependency");
+inline godot_autopilot::util::JsonValue validate_dependency_check(
+    const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *dependency = args.Find("dependency");
   if (path == nullptr || !path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return error;
   }
   if (dependency == nullptr || !dependency->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: dependency");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: dependency");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue project_dependency_has(
-    const mcp::JsonValue &result, const mcp::JsonValue &args) {
-  const mcp::JsonValue *dependency = args.Find("dependency");
+inline godot_autopilot::util::JsonValue project_dependency_has(
+    const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *dependency = args.Find("dependency");
   bool found = false;
-  const mcp::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
   if (dependency != nullptr && inner != nullptr && inner->IsArray()) {
     for (const auto &item : inner->GetArray()) {
       if (item.IsString() && item.GetString() == dependency->GetString()) {
@@ -206,36 +206,36 @@ inline mcp::JsonValue project_dependency_has(
       }
     }
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue(found);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue(found);
   return out;
 }
 
-inline mcp::JsonValue resource_args_with_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue resource_args_with_action(const godot_autopilot::util::JsonValue &args,
                                                 const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline std::function<mcp::JsonValue(const mcp::JsonValue &)>
+inline std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)>
 resource_required_validator(std::initializer_list<const char *> required) {
   std::vector<std::string> names;
   names.reserve(required.size());
   for (const char *name : required) {
     names.emplace_back(name);
   }
-  return [names](const mcp::JsonValue &args) {
+  return [names](const godot_autopilot::util::JsonValue &args) {
     for (const std::string &name : names) {
       if (args.Find(name.c_str()) == nullptr) {
-        mcp::JsonValue error(mcp::JsonValue::object_tag);
-        error["error"] = mcp::JsonValue("missing required parameter: " + name);
+        godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+        error["error"] = godot_autopilot::util::JsonValue("missing required parameter: " + name);
         return error;
       }
     }
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   };
 }
 
@@ -244,7 +244,7 @@ inline ToolAlias resource_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return resource_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -262,10 +262,10 @@ inline ToolAlias resource_alias(const char *name, const char *canonical,
 
 inline ToolAlias resource_alias(
     const char *name, const char *canonical, const char *action,
-    std::function<mcp::JsonValue(const mcp::JsonValue &)> adapt_args,
-    std::function<mcp::JsonValue(const mcp::JsonValue &)> validate_args,
-    std::function<mcp::JsonValue(const mcp::JsonValue &)> project_result = {},
-    std::function<mcp::JsonValue(const mcp::JsonValue &, const mcp::JsonValue &)>
+    std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> adapt_args,
+    std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> validate_args,
+    std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> project_result = {},
+    std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &, const godot_autopilot::util::JsonValue &)>
         project_result_with_args = {}) {
   ToolAlias alias;
   alias.name = name;

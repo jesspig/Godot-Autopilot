@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "integration/harness.hpp"
 
@@ -13,11 +13,11 @@ class KeycodeAliasSuite : public IntegrationHarnessWithAllow {
   KeycodeAliasSuite() : IntegrationHarnessWithAllow("game_runtime") {}
 };
 
-mcp::JsonValue make_args() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue make_args() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-void assert_error_and_hint_non_empty(const mcp::JsonValue &result) {
+void assert_error_and_hint_non_empty(const godot_autopilot::util::JsonValue &result) {
   const auto *error = result.Find("error");
   ASSERT_NE(error, nullptr) << result.Dump();
   ASSERT_TRUE(error->IsString()) << result.Dump();
@@ -29,18 +29,18 @@ void assert_error_and_hint_non_empty(const mcp::JsonValue &result) {
 }
 
 TEST_F(KeycodeAliasSuite, QueueGameInputPrefixedKeycodeAcceptedToChannel) {
-  mcp::JsonValue args = make_args();
-  args["type"] = mcp::JsonValue("key");
-  args["keycode"] = mcp::JsonValue("KEY_P");
-  mcp::JsonValue result = call("queue_game_input", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["type"] = godot_autopilot::util::JsonValue("key");
+  args["keycode"] = godot_autopilot::util::JsonValue("KEY_P");
+  godot_autopilot::util::JsonValue result = call("queue_game_input", args);
   assert_error_and_hint_non_empty(result);
 }
 
 TEST_F(KeycodeAliasSuite, QueueGameInputBareKeycodeAcceptedToChannel) {
-  mcp::JsonValue args = make_args();
-  args["type"] = mcp::JsonValue("key");
-  args["keycode"] = mcp::JsonValue("P");
-  mcp::JsonValue result = call("queue_game_input", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["type"] = godot_autopilot::util::JsonValue("key");
+  args["keycode"] = godot_autopilot::util::JsonValue("P");
+  godot_autopilot::util::JsonValue result = call("queue_game_input", args);
   assert_error_and_hint_non_empty(result);
 }
 

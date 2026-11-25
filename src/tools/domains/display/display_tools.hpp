@@ -2,7 +2,7 @@
 #define GODOT_AUTOPILOT_DISPLAY_TOOLS_HPP
 
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -78,15 +78,15 @@ const std::vector<std::string> kDisplayMouseActions = {"mode", "warp"};
 const std::vector<std::string> kDisplayTtsActions = {
     "speak", "stop", "pause", "resume", "is_speaking"};
 
-inline mcp::JsonValue action_args(const mcp::JsonValue &args, const char *action,
+inline godot_autopilot::util::JsonValue action_args(const godot_autopilot::util::JsonValue &args, const char *action,
                                   std::initializer_list<const char *> keys) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   if (!args.IsObject()) {
     return out;
   }
   for (const char *key : keys) {
-    const mcp::JsonValue *value = args.Find(key);
+    const godot_autopilot::util::JsonValue *value = args.Find(key);
     if (value != nullptr) {
       out[key] = *value;
     }
@@ -94,21 +94,21 @@ inline mcp::JsonValue action_args(const mcp::JsonValue &args, const char *action
   return out;
 }
 
-inline const mcp::JsonValue *screen_entry(const mcp::JsonValue &result,
-                                          const mcp::JsonValue &args) {
-  const mcp::JsonValue *inner = result.Find("result");
-  const mcp::JsonValue *screens =
+inline const godot_autopilot::util::JsonValue *screen_entry(const godot_autopilot::util::JsonValue &result,
+                                          const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *screens =
       inner != nullptr && inner->IsObject() ? inner->Find("screens") : nullptr;
   if (screens == nullptr || !screens->IsArray()) {
     return nullptr;
   }
   int64_t requested = 0;
-  const mcp::JsonValue *screen = args.Find("screen");
+  const godot_autopilot::util::JsonValue *screen = args.Find("screen");
   if (screen != nullptr && screen->IsInt()) {
     requested = screen->GetInt();
   }
   for (const auto &entry : screens->GetArray()) {
-    const mcp::JsonValue *index = entry.Find("index");
+    const godot_autopilot::util::JsonValue *index = entry.Find("index");
     if (index != nullptr && index->IsInt() && index->GetInt() == requested) {
       return &entry;
     }
@@ -116,30 +116,30 @@ inline const mcp::JsonValue *screen_entry(const mcp::JsonValue &result,
   return nullptr;
 }
 
-inline mcp::JsonValue project_screen_count(const mcp::JsonValue &result) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *inner = result.Find("result");
-  const mcp::JsonValue *count =
+inline godot_autopilot::util::JsonValue project_screen_count(const godot_autopilot::util::JsonValue &result) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *count =
       inner != nullptr && inner->IsObject() ? inner->Find("count") : nullptr;
   if (count != nullptr) {
     out["result"] = *count;
   } else {
-    out["error"] = mcp::JsonValue("screen count not available");
+    out["error"] = godot_autopilot::util::JsonValue("screen count not available");
   }
   return out;
 }
 
-inline mcp::JsonValue project_screen_field(const mcp::JsonValue &result,
-                                           const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue project_screen_field(const godot_autopilot::util::JsonValue &result,
+                                           const godot_autopilot::util::JsonValue &args,
                                            const char *field) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *entry = screen_entry(result, args);
-  const mcp::JsonValue *value =
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *entry = screen_entry(result, args);
+  const godot_autopilot::util::JsonValue *value =
       entry != nullptr ? entry->Find(field) : nullptr;
   if (value != nullptr) {
     out["result"] = *value;
   } else {
-    out["error"] = mcp::JsonValue(
+    out["error"] = godot_autopilot::util::JsonValue(
         "screen index out of range: pass 0 to count-1 as reported by "
         "get_display_info action=screens");
   }
@@ -166,67 +166,67 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "get_display_screen_count", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "screens", {});
               },
               project_screen_count, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_display_screen_dpi", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "screens", {"screen"});
               },
               {}, "0.4.0", "0.6.0", {},
-              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
                 return project_screen_field(result, args, "dpi");
               }},
           ToolAlias{
               "get_display_screen_position", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "screens", {"screen"});
               },
               {}, "0.4.0", "0.6.0", {},
-              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
                 return project_screen_field(result, args, "position");
               }},
           ToolAlias{
               "get_display_screen_refresh_rate", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "screens", {"screen"});
               },
               {}, "0.4.0", "0.6.0", {},
-              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
                 return project_screen_field(result, args, "refresh_rate");
               }},
           ToolAlias{
               "get_display_screen_size", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "screens", {"screen"});
               },
               {}, "0.4.0", "0.6.0", {},
-              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
                 return project_screen_field(result, args, "size");
               }},
           ToolAlias{
               "get_display_clipboard", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "clipboard", {});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_display_mouse_position", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "mouse", {});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_display_tts_voices", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "voices", {});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_display_window_rect", "get_display_info",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "window", {"window_id"});
               },
               {}, "0.4.0", "0.6.0"},
@@ -268,51 +268,51 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "create_display_window", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "create", {"mode", "rect"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "move_display_window_to_foreground", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "foreground", {"window_id"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "request_display_window_attention", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "attention", {"window_id"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_display_window_flag", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "flag",
                                    {"flag", "enabled", "window_id"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_display_window_mode", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "mode", {"mode", "window_id"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_display_window_position", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "position", {"x", "y", "window_id"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_display_window_size", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "size",
                                    {"width", "height", "window_id"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_display_window_title", "display_window",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "title", {"title", "window_id"});
               },
               {}, "0.4.0", "0.6.0"},
@@ -332,13 +332,13 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "set_display_mouse_mode", "display_mouse",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "mode", {"mode"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "warp_display_mouse", "display_mouse",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "warp", {"x", "y"});
               },
               {}, "0.4.0", "0.6.0"},
@@ -359,14 +359,14 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "speak_display_tts", "display_tts",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "speak",
                                    {"text", "voice", "volume", "pitch", "rate"});
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "stop_display_tts", "display_tts",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return action_args(args, "stop", {});
               },
               {}, "0.4.0", "0.6.0"},

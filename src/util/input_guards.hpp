@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_INPUT_GUARDS_HPP
 #define GODOT_AUTOPILOT_INPUT_GUARDS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cctype>
 #include <cmath>
@@ -87,9 +87,9 @@ inline bool parse_signed_decimal_int64(const std::string &text, int64_t &out) {
   }
 }
 
-inline bool try_parse_json(const std::string &text, mcp::JsonValue &out) {
+inline bool try_parse_json(const std::string &text, godot_autopilot::util::JsonValue &out) {
   try {
-    out = mcp::JsonValue::Parse(text);
+    out = godot_autopilot::util::JsonValue::Parse(text);
     return true;
   } catch (...) {
     return false;
@@ -110,10 +110,10 @@ inline std::string ascii_lowercase(const std::string &text) {
 
 enum class StringArgStatus { Ok, Missing, WrongType, Empty };
 
-inline StringArgStatus string_arg_status(const mcp::JsonValue &args,
+inline StringArgStatus string_arg_status(const godot_autopilot::util::JsonValue &args,
                                          const char *key, std::string &out,
                                          bool require_nonempty) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     return StringArgStatus::Missing;
   }
@@ -127,7 +127,7 @@ inline StringArgStatus string_arg_status(const mcp::JsonValue &args,
   return StringArgStatus::Ok;
 }
 
-inline bool require_nonempty_string_arg(const mcp::JsonValue &args,
+inline bool require_nonempty_string_arg(const godot_autopilot::util::JsonValue &args,
                                         const char *key, std::string &out) {
   return string_arg_status(args, key, out, true) == StringArgStatus::Ok;
 }
@@ -142,7 +142,7 @@ struct ObjectLocatorFields {
 enum class LocatorFieldStatus { Ok, UnknownField, WrongType, OutOfRange };
 
 inline LocatorFieldStatus parse_object_locator(
-    const mcp::JsonValue &value, bool allow_path, ObjectLocatorFields &out,
+    const godot_autopilot::util::JsonValue &value, bool allow_path, ObjectLocatorFields &out,
     const char **bad_field = nullptr) {
   for (const auto &entry : value.GetObject()) {
     const bool known =
@@ -155,7 +155,7 @@ inline LocatorFieldStatus parse_object_locator(
       return LocatorFieldStatus::UnknownField;
     }
   }
-  const mcp::JsonValue *name_p = value.Find("name");
+  const godot_autopilot::util::JsonValue *name_p = value.Find("name");
   if (name_p != nullptr) {
     if (!name_p->IsString()) {
       if (bad_field != nullptr) *bad_field = "name";
@@ -163,7 +163,7 @@ inline LocatorFieldStatus parse_object_locator(
     }
     out.name = name_p->GetString();
   }
-  const mcp::JsonValue *path_p = value.Find("path");
+  const godot_autopilot::util::JsonValue *path_p = value.Find("path");
   if (allow_path && path_p != nullptr) {
     if (!path_p->IsString()) {
       if (bad_field != nullptr) *bad_field = "path";
@@ -171,7 +171,7 @@ inline LocatorFieldStatus parse_object_locator(
     }
     out.path = path_p->GetString();
   }
-  const mcp::JsonValue *oid_p = value.Find("object_id");
+  const godot_autopilot::util::JsonValue *oid_p = value.Find("object_id");
   if (oid_p != nullptr) {
     if (!oid_p->IsNumber()) {
       if (bad_field != nullptr) *bad_field = "object_id";
@@ -181,7 +181,7 @@ inline LocatorFieldStatus parse_object_locator(
     out.object_id = oid_p->IsInt() ? oid_p->GetInt()
                                    : static_cast<int64_t>(oid_p->GetDouble());
   }
-  const mcp::JsonValue *oid_str_p = value.Find("object_id_str");
+  const godot_autopilot::util::JsonValue *oid_str_p = value.Find("object_id_str");
   if (oid_str_p != nullptr) {
     if (!oid_str_p->IsString() ||
         !is_decimal_digits(oid_str_p->GetString())) {
@@ -225,7 +225,7 @@ inline std::string res_uri(const std::string &path) {
   return "res://" + path;
 }
 
-inline std::string received_keys_text(const mcp::JsonValue &args,
+inline std::string received_keys_text(const godot_autopilot::util::JsonValue &args,
                                       bool leading_space) {
   const std::string prefix = leading_space ? " " : "";
   if (!args.IsObject() || args.GetObject().empty()) {
@@ -244,7 +244,7 @@ inline std::string received_keys_text(const mcp::JsonValue &args,
   return text;
 }
 
-inline std::string received_keys_suffix(const mcp::JsonValue &args) {
+inline std::string received_keys_suffix(const godot_autopilot::util::JsonValue &args) {
   return received_keys_text(args, true);
 }
 

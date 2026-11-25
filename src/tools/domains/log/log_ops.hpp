@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_LOG_OPS_HPP
 #define GODOT_AUTOPILOT_LOG_OPS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstdint>
 #include <string>
@@ -14,7 +14,7 @@ std::vector<std::string> filter_log_lines(const std::vector<std::string> &lines,
                                           const std::string &filter,
                                           int64_t limit);
 
-mcp::JsonValue handle_log_get_game_entries(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_log_get_game_entries(const godot_autopilot::util::JsonValue &args);
 
 }
 } // namespace godot_autopilot

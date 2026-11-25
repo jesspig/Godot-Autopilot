@@ -10,13 +10,13 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace runtime {
 namespace game_bridge {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 void register_listener();
 
@@ -35,7 +35,7 @@ struct EvalErrorDelta {
 
 JV error_result(const std::string &message);
 
-JV ok_result(JV result);
+JV bridge_ok_result(JV result);
 
 godot::SceneTree *get_scene_tree();
 

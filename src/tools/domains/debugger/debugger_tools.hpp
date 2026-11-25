@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_DEBUGGER_TOOLS_HPP
 #define GODOT_AUTOPILOT_DEBUGGER_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -46,9 +46,9 @@ const std::vector<ParamSpec> kDebuggerBreakpointsParams = {
 const std::vector<std::string> kGetDebuggerStreamActions = {
     "log", "output", "errors", "session"};
 
-inline mcp::JsonValue stream_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue stream_args(const godot_autopilot::util::JsonValue &args,
                                   const char *action, const char *source) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     for (const auto &entry : args.GetObject()) {
       if (entry.first != "action" && entry.first != "source" &&
@@ -57,8 +57,8 @@ inline mcp::JsonValue stream_args(const mcp::JsonValue &args,
       }
     }
   }
-  out["action"] = mcp::JsonValue(action);
-  out["source"] = mcp::JsonValue(source);
+  out["action"] = godot_autopilot::util::JsonValue(action);
+  out["source"] = godot_autopilot::util::JsonValue(source);
   return out;
 }
 
@@ -83,25 +83,25 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "get_debugger_log", "get_debugger_stream",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return stream_args(args, "log", "editor");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debugger_output", "get_debugger_stream",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return stream_args(args, "output", "game");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debugger_errors", "get_debugger_stream",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return stream_args(args, "errors", "game");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debugger_session_info", "get_debugger_stream",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return stream_args(args, "session", "editor");
               },
               {}, "0.4.0", "0.6.0"},

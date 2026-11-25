@@ -1,0 +1,98 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-protocol/build/debug
+      Start  153: ControlCatalogTest.AddDescribeAndAliasResolution
+ 1/44 Test  #153: ControlCatalogTest.AddDescribeAndAliasResolution .........................   Passed    1.91 sec
+      Start  154: ControlCatalogTest.ListFiltersCategoryAndPaginates
+ 2/44 Test  #154: ControlCatalogTest.ListFiltersCategoryAndPaginates .......................   Passed    0.03 sec
+      Start  155: ControlCatalogTest.SearchScoresAndRespectsFilters
+ 3/44 Test  #155: ControlCatalogTest.SearchScoresAndRespectsFilters ........................   Passed    0.02 sec
+      Start  156: ControlCatalogTest.ReplaceRemoveAndCategories
+ 4/44 Test  #156: ControlCatalogTest.ReplaceRemoveAndCategories ............................   Passed    0.02 sec
+      Start  157: ControlConfirmationTest.IssueCarriesDigestTtlAndNonce
+ 5/44 Test  #157: ControlConfirmationTest.IssueCarriesDigestTtlAndNonce ....................   Passed    0.02 sec
+      Start  158: ControlConfirmationTest.AcceptRequiresFreshMatchingParams
+ 6/44 Test  #158: ControlConfirmationTest.AcceptRequiresFreshMatchingParams ................   Passed    0.02 sec
+      Start  159: ControlConfirmationTest.DeclineAndExpirePrunePending
+ 7/44 Test  #159: ControlConfirmationTest.DeclineAndExpirePrunePending .....................   Passed    0.02 sec
+      Start  160: ControlEventTest.PublishSeqIsMonotonicAndCursorValidation
+ 8/44 Test  #160: ControlEventTest.PublishSeqIsMonotonicAndCursorValidation ................   Passed    0.02 sec
+      Start  161: ControlEventTest.SubscribePollAdvancesCursor
+ 9/44 Test  #161: ControlEventTest.SubscribePollAdvancesCursor .............................   Passed    0.02 sec
+      Start  162: ControlEventTest.BackpressureHardBlocksPoll
+10/44 Test  #162: ControlEventTest.BackpressureHardBlocksPoll ..............................   Passed    0.02 sec
+      Start  163: ControlEventTest.SinceAndFloorExpiresCursor
+11/44 Test  #163: ControlEventTest.SinceAndFloorExpiresCursor ..............................   Passed    0.02 sec
+      Start  164: ControlInvocationTest.NormalizeParamsAndAliasResolution
+12/44 Test  #164: ControlInvocationTest.NormalizeParamsAndAliasResolution ..................   Passed    0.02 sec
+      Start  165: ControlInvocationTest.ExportTimeRejectsBeforeDispatch
+13/44 Test  #165: ControlInvocationTest.ExportTimeRejectsBeforeDispatch ....................   Passed    0.02 sec
+      Start  166: ControlInvocationTest.HighRiskRequiresConfirmationAndConfirmDispatches
+14/44 Test  #166: ControlInvocationTest.HighRiskRequiresConfirmationAndConfirmDispatches ...   Passed    0.02 sec
+      Start  167: ControlInvocationTest.DeferredWaitAndDesensitizedArtifact
+15/44 Test  #167: ControlInvocationTest.DeferredWaitAndDesensitizedArtifact ................   Passed    0.02 sec
+      Start  168: ControlInvocationTest.CancelAndErrorWatermark
+16/44 Test  #168: ControlInvocationTest.CancelAndErrorWatermark ............................   Passed    0.02 sec
+      Start  169: ControlJobTest.CreateGetAndGenerationIsolation
+17/44 Test  #169: ControlJobTest.CreateGetAndGenerationIsolation ...........................   Passed    0.02 sec
+      Start  170: ControlJobTest.ProgressResultAndTerminalGuard
+18/44 Test  #170: ControlJobTest.ProgressResultAndTerminalGuard ............................   Passed    0.02 sec
+      Start  171: ControlJobTest.CancellationStagesAdvanceMonotonically
+19/44 Test  #171: ControlJobTest.CancellationStagesAdvanceMonotonically ....................   Passed    0.03 sec
+      Start  172: ControlJobTest.TtlExpiryAndSnapshotRestore
+20/44 Test  #172: ControlJobTest.TtlExpiryAndSnapshotRestore ...............................   Passed    0.03 sec
+      Start  173: ControlServiceTest.FacadeSharesCatalogAndConfirmationWithInvocation
+21/44 Test  #173: ControlServiceTest.FacadeSharesCatalogAndConfirmationWithInvocation ......   Passed    0.02 sec
+      Start  174: ControlServiceTest.FacadeExposesJobsEventsAndTrace
+22/44 Test  #174: ControlServiceTest.FacadeExposesJobsEventsAndTrace .......................   Passed    0.02 sec
+      Start  175: ControlTraceTest.ParseAndRebuildTraceparent
+23/44 Test  #175: ControlTraceTest.ParseAndRebuildTraceparent ..............................   Passed    0.03 sec
+      Start  176: ControlTraceTest.BeginEndPropagatesTraceAndSpan
+24/44 Test  #176: ControlTraceTest.BeginEndPropagatesTraceAndSpan ..........................   Passed    0.02 sec
+      Start  177: ControlTraceTest.InvalidIncomingStartsNewTrace
+25/44 Test  #177: ControlTraceTest.InvalidIncomingStartsNewTrace ...........................   Passed    0.02 sec
+      Start  379: HttpParseTest.RejectsControlCharInQueryValue
+26/44 Test  #379: HttpParseTest.RejectsControlCharInQueryValue .............................   Passed    0.03 sec
+      Start  945: ErrorPathLogTest.FormatEscapesControlCharacters
+27/44 Test  #945: ErrorPathLogTest.FormatEscapesControlCharacters ..........................   Passed    1.61 sec
+      Start 1285: GcpContractTest.RequestResponseCorrelationAndStatusContract
+28/44 Test #1285: GcpContractTest.RequestResponseCorrelationAndStatusContract ..............   Passed    0.84 sec
+      Start 1286: GcpContractTest.ConfirmationRoundTripUsesChallengeDigest
+29/44 Test #1286: GcpContractTest.ConfirmationRoundTripUsesChallengeDigest .................   Passed    0.02 sec
+      Start 1287: GcpContractTest.TaskLifecycleAndCancellationStagesAreMachineAssertable
+30/44 Test #1287: GcpContractTest.TaskLifecycleAndCancellationStagesAreMachineAssertable ...   Passed    0.03 sec
+      Start 1288: GcpContractTest.EventStreamSeqMonotonicAcrossResume
+31/44 Test #1288: GcpContractTest.EventStreamSeqMonotonicAcrossResume ......................   Passed    0.84 sec
+      Start 1289: GcpContractTest.TracePropagatesAcrossEnvelopeKinds
+32/44 Test #1289: GcpContractTest.TracePropagatesAcrossEnvelopeKinds .......................   Passed    0.04 sec
+      Start 1290: GcpContractTest.BackpressureAndTaskNotFoundAreMapped
+33/44 Test #1290: GcpContractTest.BackpressureAndTaskNotFoundAreMapped .....................   Passed    0.02 sec
+      Start 1291: GcpEnvelopeTest.EnvelopeVersionAndKindMapping
+34/44 Test #1291: GcpEnvelopeTest.EnvelopeVersionAndKindMapping ............................   Passed    0.02 sec
+      Start 1292: GcpEnvelopeTest.ResponseStatusSetAndTerminality
+35/44 Test #1292: GcpEnvelopeTest.ResponseStatusSetAndTerminality ..........................   Passed    0.02 sec
+      Start 1293: GcpEnvelopeTest.ErrorCodesE06ThroughE15
+36/44 Test #1293: GcpEnvelopeTest.ErrorCodesE06ThroughE15 ..................................   Passed    0.03 sec
+      Start 1294: GcpEnvelopeTest.MethodSetCoversAllContractFamilies
+37/44 Test #1294: GcpEnvelopeTest.MethodSetCoversAllContractFamilies .......................   Passed    0.03 sec
+      Start 1295: GcpEnvelopeTest.CapabilityNegotiationIsIntersection
+38/44 Test #1295: GcpEnvelopeTest.CapabilityNegotiationIsIntersection ......................   Passed    0.03 sec
+      Start 1296: GcpEnvelopeTest.ChallengeCarriesTtlAndParamDigest
+39/44 Test #1296: GcpEnvelopeTest.ChallengeCarriesTtlAndParamDigest ........................   Passed    0.02 sec
+      Start 1297: GcpEnvelopeTest.TaskStateMachineTransitions
+40/44 Test #1297: GcpEnvelopeTest.TaskStateMachineTransitions ..............................   Passed    0.02 sec
+      Start 1298: GcpEnvelopeTest.CancelStagesAdvanceMonotonically
+41/44 Test #1298: GcpEnvelopeTest.CancelStagesAdvanceMonotonically .........................   Passed    0.02 sec
+      Start 1299: GcpEnvelopeTest.EventSeqCursorAndBackpressure
+42/44 Test #1299: GcpEnvelopeTest.EventSeqCursorAndBackpressure ............................   Passed    0.03 sec
+      Start 1300: GcpEnvelopeTest.TraceParentFormatValidation
+43/44 Test #1300: GcpEnvelopeTest.TraceParentFormatValidation ..............................   Passed    0.03 sec
+      Start 1301: GcpEnvelopeTest.ValidationByKind
+44/44 Test #1301: GcpEnvelopeTest.ValidationByKind .........................................   Passed    0.02 sec
+
+100% tests passed out of 44
+
+Label Time Summary:
+boundary        =   1.61 sec*proc (1 test)
+gcp_contract    =   2.06 sec*proc (17 tests)
+unit            =   2.48 sec*proc (26 tests)
+
+Total Test time (real) =   6.32 sec

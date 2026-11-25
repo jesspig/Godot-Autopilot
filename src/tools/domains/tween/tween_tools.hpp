@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TWEEN_TOOLS_HPP
 #define GODOT_AUTOPILOT_TWEEN_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -61,20 +61,20 @@ const std::vector<ParamSpec> kTweenEditorPropertyParams = {
     {"loops", "integer", "Loop count, an integer >= 0 (0 means infinite loop; default 1)", false},
 };
 
-inline mcp::JsonValue tween_alias_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue tween_alias_action(const godot_autopilot::util::JsonValue &args,
                                          const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue tween_alias_rename(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue tween_alias_rename(const godot_autopilot::util::JsonValue &args,
                                          const char *from, const char *to,
                                          const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
@@ -85,7 +85,7 @@ inline mcp::JsonValue tween_alias_rename(const mcp::JsonValue &args,
   if (out.IsObject()) {
     out.GetObject().erase(from);
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -105,12 +105,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Tween action: create|control|callback|method|interval"),
       {
           ToolAlias{"create_game_tween", "game_tween",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return tween_alias_action(args, "create");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"control_game_tween", "game_tween",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return tween_alias_rename(args, "action", "tween_action",
                                                "control");
                     },

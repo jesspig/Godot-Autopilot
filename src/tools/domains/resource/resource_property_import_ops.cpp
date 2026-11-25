@@ -53,26 +53,26 @@ namespace resource_ops {
 
 
 
-mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_reimport(const godot_autopilot::util::JsonValue &args) {
   auto *engine = godot::Engine::get_singleton();
   if (engine && engine->is_editor_hint() == false) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("resource_reimport is only available in editor mode");
+        godot_autopilot::util::JsonValue("resource_reimport is only available in editor mode");
     return e;
   }
 
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
 
   auto *efs = editor->get_resource_filesystem();
   if (!efs) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorFileSystem not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorFileSystem not available");
     return e;
   }
 
@@ -139,23 +139,23 @@ mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("reimport queued for " + std::to_string(count) +
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("reimport queued for " + std::to_string(count) +
                                " file(s)");
   return r;
 }
 
-mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_import_options(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   auto *it_opts = args.Find("options");
   if (!it_opts || !it_opts->IsObject() || it_opts->GetObject().empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "missing required parameter: options (non-empty object of import "
         "option keys to values)");
     return e;
@@ -167,36 +167,36 @@ mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args) {
                               "set import options only inside res://");
   auto *engine = godot::Engine::get_singleton();
   if (engine && engine->is_editor_hint() == false) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "set_resource_import_options is only available in editor mode");
     return e;
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *efs = editor->get_resource_filesystem();
   if (!efs) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorFileSystem not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorFileSystem not available");
     return e;
   }
   if (is_import_in_progress()) {
     return busy_error();
   }
   if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("source does not exist: " + path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("source does not exist: " + path +
                                 " — check the path with get_resource_dir_files");
     return e;
   }
   const std::string import_path = path + ".import";
   if (!godot::FileAccess::file_exists(godot::String(import_path.c_str()))) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "no .import sidecar for " + path +
         ": file is not imported — refresh text resources with reload_resource "
         "instead of setting import options");
@@ -235,8 +235,8 @@ mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args) {
         }
         allowed_list += a;
       }
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("unsupported import option: '" + key +
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("unsupported import option: '" + key +
                                   "' — allowed keys: " + allowed_list);
       return e;
     }
@@ -245,49 +245,49 @@ mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args) {
   cfg.instantiate();
   godot::String import_gs(import_path.c_str());
   if (cfg->load(import_gs) != godot::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to read .import file: " + import_path +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("failed to read .import file: " + import_path +
                                 " — check the file with read_file");
     return e;
   }
   for (const std::string &key : keys) {
-    const mcp::JsonValue *val = it_opts->Find(key.c_str());
+    const godot_autopilot::util::JsonValue *val = it_opts->Find(key.c_str());
     godot::Variant v = VariantJson::deserialize_strict(*val, "");
     cfg->set_value(godot::String("params"), godot::String(key.c_str()), v);
   }
   if (cfg->save(import_gs) != godot::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to write .import file: " + import_path);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("failed to write .import file: " + import_path);
     return e;
   }
   godot::PackedStringArray files;
   files.append(godot::String(path.c_str()));
   efs->reimport_files(files);
-  mcp::JsonValue applied(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue applied(godot_autopilot::util::JsonValue::array_tag);
   for (const std::string &key : keys) {
-    applied.PushBack(mcp::JsonValue(key));
+    applied.PushBack(godot_autopilot::util::JsonValue(key));
   }
-  mcp::JsonValue ro(mcp::JsonValue::object_tag);
-  ro["result"] = mcp::JsonValue("ok");
-  ro["path"] = mcp::JsonValue(path);
+  godot_autopilot::util::JsonValue ro(godot_autopilot::util::JsonValue::object_tag);
+  ro["result"] = godot_autopilot::util::JsonValue("ok");
+  ro["path"] = godot_autopilot::util::JsonValue(path);
   ro["applied"] = std::move(applied);
-  ro["reimport"] = mcp::JsonValue("queued");
-  ro["poll"] = mcp::JsonValue(
+  ro["reimport"] = godot_autopilot::util::JsonValue("queued");
+  ro["poll"] = godot_autopilot::util::JsonValue(
       "poll get_editor_file_system_status until scanning is false, then verify "
       "with get_resource_type or read_file on the .import [params]");
   return ro;
 }
 
-mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_property(const godot_autopilot::util::JsonValue &args) {
   auto *it_prop = args.Find("property");
   if (!it_prop || !it_prop->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: property");
     return e;
   }
   if (!args.Contains("value")) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: value");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: value");
     return e;
   }
   std::string prop = it_prop->GetString();
@@ -303,10 +303,10 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   godot::Ref<godot::Resource> res =
       resolve_resource(args, has_oid, obj_id, resolve_err);
   if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     std::string desc =
         resolve_err.empty() ? describe_target(args) : resolve_err;
-    e["error"] = mcp::JsonValue("resource not found: " + desc);
+    e["error"] = godot_autopilot::util::JsonValue("resource not found: " + desc);
     return e;
   }
 
@@ -323,8 +323,8 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   }
   for (const std::string &part : prop_parts) {
     if (part.empty()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "invalid property path: '" + prop +
           "' contains an empty segment — use dot-separated names like 'a.b.c'");
       return e;
@@ -340,9 +340,9 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
       next_obj = seg_val.operator godot::Object *();
     }
     if (next_obj == nullptr) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
       std::string at = walked.empty() ? seg : walked + "." + seg;
-      e["error"] = mcp::JsonValue(
+      e["error"] = godot_autopilot::util::JsonValue(
           "property path '" + prop + "' failed at '" + at +
           "': value is null or not an object on " +
           util::to_std(target_obj->get_class()) +
@@ -365,8 +365,8 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
     }
   }
   if (!found) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "property not found: " + prop + " on " + util::to_std(res->get_class()) +
         " — use resource_get_property_list or check the property name");
     return e;
@@ -377,8 +377,8 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   bool resource_attached = false;
   if (try_resolve_resource_value(*args.Find("value"), value, resource_error)) {
     if (!resource_error.empty()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(resource_error);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(resource_error);
       return e;
     }
     resource_attached = true;
@@ -401,12 +401,12 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   util::ReadbackStatus readback =
       util::check_readback(value, old_val, new_val, readback_detail, true);
 
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["result"] = mcp::JsonValue("ok");
-  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
-  j["path"] = mcp::JsonValue(util::to_std(res->get_path()));
-  j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-  j["resource_attached"] = mcp::JsonValue(resource_attached);
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["result"] = godot_autopilot::util::JsonValue("ok");
+  j["class"] = godot_autopilot::util::JsonValue(util::to_std(res->get_class()));
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(res->get_path()));
+  j["object_id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+  j["resource_attached"] = godot_autopilot::util::JsonValue(resource_attached);
   if (readback == util::ReadbackStatus::REJECTED) {
     return util::error_detail(
         "property rejected: '" + prop + "' on " + util::to_std(res->get_path()),
@@ -415,16 +415,16 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
         "resource_get_property_list");
   }
   if (readback == util::ReadbackStatus::CONVERTED) {
-    j["warning"] = mcp::JsonValue("set applied; " + readback_detail);
+    j["warning"] = godot_autopilot::util::JsonValue("set applied; " + readback_detail);
   }
   return j;
 }
 
-mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_property(const godot_autopilot::util::JsonValue &args) {
   auto *it_prop = args.Find("property");
   if (!it_prop || !it_prop->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: property");
     return e;
   }
   std::string prop = it_prop->GetString();
@@ -435,10 +435,10 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
   godot::Ref<godot::Resource> res =
       resolve_resource(args, has_oid, obj_id, resolve_err);
   if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     std::string desc =
         resolve_err.empty() ? describe_target(args) : resolve_err;
-    e["error"] = mcp::JsonValue("resource not found: " + desc);
+    e["error"] = godot_autopilot::util::JsonValue("resource not found: " + desc);
     return e;
   }
 
@@ -447,7 +447,7 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
                             "resource_get_property: read " + prop + " on " +
                                 util::to_std(res->get_class()));
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(value);
   return r;
 }

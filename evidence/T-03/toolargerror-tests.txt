@@ -1,0 +1,26 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-json/build/debug
+    Start  94: CodeQualityC4Test.ValidateDeclaredChecksRequiredAndTypes
+1/9 Test  #94: CodeQualityC4Test.ValidateDeclaredChecksRequiredAndTypes .................   Passed    0.72 sec
+    Start  95: CodeQualityC4Test.DynamicToolRuntimeMatchesSchemaDeclaration
+2/9 Test  #95: CodeQualityC4Test.DynamicToolRuntimeMatchesSchemaDeclaration .............   Passed    0.14 sec
+    Start  96: CodeQualityC4Test.DynamicToolRejectsUndeclaredParameter
+3/9 Test  #96: CodeQualityC4Test.DynamicToolRejectsUndeclaredParameter ..................   Passed    0.15 sec
+    Start  97: CodeQualityC4Test.DynamicToolAllowsConfirmMetaField
+4/9 Test  #97: CodeQualityC4Test.DynamicToolAllowsConfirmMetaField ......................   Passed    0.18 sec
+    Start  98: CodeQualityC4Test.DynamicToolWithoutParamsRejectsNonObjectArguments
+5/9 Test  #98: CodeQualityC4Test.DynamicToolWithoutParamsRejectsNonObjectArguments ......   Passed    0.16 sec
+    Start  99: CodeQualityC4Test.DynamicToolRejectsDuplicateAndUnsupportedParamDefs
+6/9 Test  #99: CodeQualityC4Test.DynamicToolRejectsDuplicateAndUnsupportedParamDefs .....   Passed    0.15 sec
+    Start 100: CodeQualityC4Test.DynamicToolWithoutParamsStillRequiresObjectArguments
+7/9 Test #100: CodeQualityC4Test.DynamicToolWithoutParamsStillRequiresObjectArguments ...   Passed    0.14 sec
+    Start 101: CodeQualityC4Test.NullTreatedAsAbsentForDeclaredParam
+8/9 Test #101: CodeQualityC4Test.NullTreatedAsAbsentForDeclaredParam ....................   Passed    0.14 sec
+    Start 671: RegisterAllSurfaceTest.FullSurfaceSendsListChangedOnDynamicRefresh
+9/9 Test #671: RegisterAllSurfaceTest.FullSurfaceSendsListChangedOnDynamicRefresh .......   Passed    2.59 sec
+
+100% tests passed out of 9
+
+Label Time Summary:
+unit    =   4.37 sec*proc (9 tests)
+
+Total Test time (real) =   5.03 sec

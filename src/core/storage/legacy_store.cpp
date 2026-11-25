@@ -90,32 +90,32 @@ bool LegacyStore::should_fallback_to_legacy(bool primary_present,
 
 bool LegacyStore::select_config_value(const std::string &primary_json,
                                       const std::string &legacy_json,
-                                      const char *key, mcp::JsonValue &out,
+                                      const char *key, godot_autopilot::util::JsonValue &out,
                                       bool &from_legacy, std::string &error) {
   error.clear();
   from_legacy = false;
   if (!primary_json.empty()) {
-    mcp::JsonValue::Object primary_object;
+    godot_autopilot::util::JsonValue::Object primary_object;
     bool primary_parsed = false;
     try {
-      mcp::JsonValue parsed = mcp::JsonValue::Parse(primary_json);
+      godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(primary_json);
       if (parsed.IsObject()) {
         primary_object = std::move(parsed.GetObject());
         primary_parsed = true;
       } else {
         error = "primary config root is not a JSON object";
       }
-    } catch (const mcp::McpError &e) {
+    } catch (const godot_autopilot::util::JsonError &e) {
       error = std::string("primary config parse failed: ") +
-              std::string(e.ErrorMessage());
+              std::string(e.what());
     } catch (const std::exception &e) {
       error = std::string("primary config parse failed: ") + e.what();
     } catch (...) {
       error = "primary config parse failed: unknown exception";
     }
     if (primary_parsed) {
-      const mcp::JsonValue document(std::move(primary_object));
-      const mcp::JsonValue *found = document.Find(key);
+      const godot_autopilot::util::JsonValue document(std::move(primary_object));
+      const godot_autopilot::util::JsonValue *found = document.Find(key);
       if (found != nullptr) {
         out = *found;
         return true;
@@ -126,7 +126,7 @@ bool LegacyStore::select_config_value(const std::string &primary_json,
     return false;
   }
   try {
-    mcp::JsonValue parsed = mcp::JsonValue::Parse(legacy_json);
+    godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(legacy_json);
     if (!parsed.IsObject()) {
       if (!error.empty()) {
         error += "; ";
@@ -134,20 +134,20 @@ bool LegacyStore::select_config_value(const std::string &primary_json,
       error += "legacy config root is not a JSON object";
       return false;
     }
-    const mcp::JsonValue document(std::move(parsed.GetObject()));
-    const mcp::JsonValue *found = document.Find(key);
+    const godot_autopilot::util::JsonValue document(std::move(parsed.GetObject()));
+    const godot_autopilot::util::JsonValue *found = document.Find(key);
     if (found == nullptr) {
       return false;
     }
     out = *found;
     from_legacy = true;
     return true;
-  } catch (const mcp::McpError &e) {
+  } catch (const godot_autopilot::util::JsonError &e) {
     if (!error.empty()) {
       error += "; ";
     }
     error += std::string("legacy config parse failed: ") +
-            std::string(e.ErrorMessage());
+            std::string(e.what());
   } catch (const std::exception &e) {
     if (!error.empty()) {
       error += "; ";

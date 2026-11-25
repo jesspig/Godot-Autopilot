@@ -47,4 +47,13 @@ gda_require_submodule(mcp-cpp-sdk)
 set(MCP_WITH_OPENSSL "OFF" CACHE STRING "OpenSSL integration: AUTO/ON/OFF" FORCE)
 add_subdirectory("${GDA_THIRD_PARTY_DIR}/mcp-cpp-sdk" "${GDA_SUBMODULE_BIN_DIR}/mcp-cpp-sdk")
 
-message(STATUS "[gda] Dependencies: godot-cpp + mcp-cpp-sdk (third_party submodule)")
+# rapidjson — 头文件 JSON codec (297637bc0a0f00dc504dbc1a47ebdaa577f8ae19, MIT)
+# 仅使用 include/rapidjson 头文件，不 add_subdirectory、不编译 bin/jsonchecker (JSON License)
+if(NOT EXISTS "${GDA_THIRD_PARTY_DIR}/rapidjson/include/rapidjson/reader.h")
+    message(FATAL_ERROR
+        "[gda] third_party/rapidjson 缺失。请先初始化子模块:\n"
+        "  git submodule update --init --recursive")
+endif()
+include_directories("${GDA_THIRD_PARTY_DIR}/rapidjson/include")
+
+message(STATUS "[gda] Dependencies: godot-cpp + mcp-cpp-sdk + rapidjson (third_party submodule)")

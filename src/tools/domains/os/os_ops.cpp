@@ -28,7 +28,7 @@
 namespace godot_autopilot {
 namespace os_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -936,7 +936,7 @@ JV handle_os_shell_open(const JV &args) {
 
 namespace {
 
-mcp::JsonValue os_action_error(const std::string &message) {
+godot_autopilot::util::JsonValue os_action_error(const std::string &message) {
   JV error(JV::object_tag);
   error["error"] = JV(message);
   return error;

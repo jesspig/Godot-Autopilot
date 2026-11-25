@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TOOLS_CSHARP_PROJECT_SETUP_HPP
 #define GODOT_AUTOPILOT_TOOLS_CSHARP_PROJECT_SETUP_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
@@ -88,34 +88,34 @@ inline std::string project_template(const std::string &target_framework_value) {
   return out;
 }
 
-inline mcp::JsonValue missing_project_error(const std::string &dotnet_version) {
+inline godot_autopilot::util::JsonValue missing_project_error(const std::string &dotnet_version) {
   const std::string assembly = assembly_name();
   const std::string tfm = target_framework(dotnet_version);
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
   const std::string project_file = "res://" + project_file_name();
-  error["error"] = mcp::JsonValue(
+  error["error"] = godot_autopilot::util::JsonValue(
       "当前项目不是 C# 工程，未发现 res:// 根 .csproj/.sln");
-  error["hint"] = mcp::JsonValue(
+  error["hint"] = godot_autopilot::util::JsonValue(
       "用 write_file 创建 " + project_file +
       "，并把 project.godot 的 [dotnet] project/assembly_name 设为 \"" +
       assembly + "\"；随后重试 dotnet_environment，再执行 create_csharp_script"
       " 与 build_csharp_assembly。");
-  mcp::JsonValue template_info(mcp::JsonValue::object_tag);
-  template_info["path"] = mcp::JsonValue(project_file);
+  godot_autopilot::util::JsonValue template_info(godot_autopilot::util::JsonValue::object_tag);
+  template_info["path"] = godot_autopilot::util::JsonValue(project_file);
   template_info["content"] =
-      mcp::JsonValue(project_template(tfm.empty() ? "net8.0" : tfm));
+      godot_autopilot::util::JsonValue(project_template(tfm.empty() ? "net8.0" : tfm));
   template_info["target_framework"] =
-      mcp::JsonValue(tfm.empty() ? "net8.0" : tfm);
-  template_info["assembly_name"] = mcp::JsonValue(assembly);
+      godot_autopilot::util::JsonValue(tfm.empty() ? "net8.0" : tfm);
+  template_info["assembly_name"] = godot_autopilot::util::JsonValue(assembly);
   error["template"] = std::move(template_info);
   return error;
 }
 
-inline mcp::JsonValue missing_project_short_error() {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue(
+inline godot_autopilot::util::JsonValue missing_project_short_error() {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue(
       "当前项目不是 C# 工程，未发现 res:// 根 .csproj/.sln");
-  error["hint"] = mcp::JsonValue(
+  error["hint"] = godot_autopilot::util::JsonValue(
       "先运行 dotnet_environment：它会根据已安装的 .NET SDK 返回可直接写入的 "
       "csproj 模板（path/content/target_framework/assembly_name）。");
   return error;

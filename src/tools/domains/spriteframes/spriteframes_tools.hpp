@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace spriteframes_tools {
@@ -29,10 +29,10 @@ const std::vector<ParamSpec> kUpdateSpriteframesParams = {
 const std::vector<std::string> kUpdateSpriteframesActions = {
     "create", "add_animation", "add_frame"};
 
-inline mcp::JsonValue spriteframes_action_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue spriteframes_action_args(const godot_autopilot::util::JsonValue &args,
                                                const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   if (!args.IsObject()) {
     return out;
   }
@@ -64,19 +64,19 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "create_spriteframes", "update_spriteframes",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return spriteframes_action_args(args, "create");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "add_spriteframes_animation", "update_spriteframes",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return spriteframes_action_args(args, "add_animation");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "add_spriteframes_frame", "update_spriteframes",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return spriteframes_action_args(args, "add_frame");
               },
               {}, "0.4.0", "0.6.0"},

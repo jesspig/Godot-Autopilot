@@ -1,0 +1,475 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.250 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+CommandLine: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests\gda_unit_tests.exe --gtest_filter=McpWireTest.RejectsMalformedBody
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Symbol search path is: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff6`85fd0000 00007ff6`88041000   gda_unit_tests.exe
+ModLoad: 00007ffd`2a770000 00007ffd`2a9dc000   ntdll.dll
+ModLoad: 00007ffc`4bd20000 00007ffc`4bd92000   C:\WINDOWS\System32\verifier.dll
+Page heap: pid 0x2E24: page heap enabled with flags 0x3.
+AVRF: gda_unit_tests.exe: pid 0x2E24: flags 0x80000001: application verifier enabled
+ModLoad: 00007ffc`93620000 00007ffc`93661000   C:\WINDOWS\SYSTEM32\vrfcore.dll
+AVRF: Failed to create logging directory C:\Users\jesspig\AppVerifierLogs (status C0000022)
+ModLoad: 00007ffd`28e10000 00007ffd`28edb000   C:\WINDOWS\System32\KERNEL32.DLL
+ModLoad: 00007ffd`28020000 00007ffd`28429000   C:\WINDOWS\System32\KERNELBASE.dll
+ModLoad: 00007ffd`2a4b0000 00007ffd`2a530000   C:\WINDOWS\System32\WS2_32.dll
+ModLoad: 00007ffd`27b10000 00007ffd`27c5c000   C:\WINDOWS\System32\ucrtbase.dll
+ModLoad: 00007ffd`29a80000 00007ffd`29b98000   C:\WINDOWS\System32\RPCRT4.dll
+ModLoad: 00007ffd`27e60000 00007ffd`27fde000   C:\WINDOWS\System32\CRYPT32.dll
+ModLoad: 00007ffd`277f0000 00007ffd`2781a000   C:\WINDOWS\SYSTEM32\bcrypt.dll
+ModLoad: 00007ffd`2a160000 00007ffd`2a21c000   C:\WINDOWS\System32\ADVAPI32.dll
+ModLoad: 00007ffd`28430000 00007ffd`284d9000   C:\WINDOWS\System32\msvcrt.dll
+ModLoad: 00007ffd`297b0000 00007ffd`29858000   C:\WINDOWS\System32\sechost.dll
+(2e24.6ee0): Break instruction exception - code 80000003 (first chance)
+ntdll!RtlGetReturnAddressHijackTarget+0xa45:
+00007ffd`2a895245 cc              int     3
+0:000> cdb: Reading initial command 'g; !analyze -v; kPn; q'
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpWireTest.RejectsMalformedBody
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpWireTest
+[ RUN      ] McpWireTest.RejectsMalformedBody
+(2e24.6ee0): C++ EH exception - code e06d7363 (first chance)
+(2e24.6ee0): Access violation - code c0000005 (first chance)
+First chance exceptions are reported before any exception handling.
+This exception may be expected and handled.
+Reloading current modules
+..............
+
+************* Symbol Loading Error Summary **************
+Module name            Error
+verifier               The system cannot find the file specified
+
+You can troubleshoot most symbol related issues by turning on symbol loading diagnostics (!sym noisy) and repeating the command that caused symbols to be loaded.
+You should also verify that your symbol search path (.sympath) is correct.
+*******************************************************************************
+*                                                                             *
+*                        Exception Analysis                                   *
+*                                                                             *
+*******************************************************************************
+
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: ntdll!_PEB                                    ***
+***                                                                   ***
+*************************************************************************
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: ntdll!_TEB                                    ***
+***                                                                   ***
+*************************************************************************
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: nt!_KUSER_SHARED_DATA                         ***
+***                                                                   ***
+*************************************************************************
+*** WARNING: Unable to verify checksum for gda_unit_tests.exe
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: $ntdllsym!_CONTEXT                            ***
+***                                                                   ***
+*************************************************************************
+***** OS symbols are WRONG. Please fix symbols to do analysis.
+
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: nt!_KTHREAD                                   ***
+***                                                                   ***
+*************************************************************************
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: ntdll!_CONTEXT                                ***
+***                                                                   ***
+*************************************************************************
+
+************* Symbol Loading Error Summary **************
+Module name            Error
+KERNELBASE             The system cannot find the file specified
+
+You can troubleshoot most symbol related issues by turning on symbol loading diagnostics (!sym noisy) and repeating the command that caused symbols to be loaded.
+You should also verify that your symbol search path (.sympath) is correct.
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: nt!_KUSER_SHARED_DATA                         ***
+***                                                                   ***
+*************************************************************************
+
+KEY_VALUES_STRING: 1
+
+    Key  : Analysis.CPU.mSec
+    Value: 171
+
+    Key  : Analysis.Elapsed.mSec
+    Value: 200
+
+    Key  : Analysis.IO.Other.Mb
+    Value: 0
+
+    Key  : Analysis.IO.Read.Mb
+    Value: 1
+
+    Key  : Analysis.IO.Write.Mb
+    Value: 0
+
+    Key  : Analysis.Init.CPU.mSec
+    Value: 171
+
+    Key  : Analysis.Init.Elapsed.mSec
+    Value: 857
+
+    Key  : Analysis.Memory.CommitPeak.Mb
+    Value: 117
+
+    Key  : Analysis.Version.DbgEng
+    Value: 10.0.29680.1004
+
+    Key  : Analysis.Version.Description
+    Value: 10.2608.26.1 amd64fre
+
+    Key  : Analysis.Version.Ext
+    Value: 1.2608.26.1
+
+    Key  : Failure.Bucket
+    Value: WRONG_SYMBOLS_X64_26100.1.amd64fre.ge_release.240331-1435_TIMESTAMP_560705-010214_a2b84216_ntdll.wrong.symbols.dll!A2B8421626C000
+
+    Key  : Failure.Exception.Code
+    Value: 0xa2b84216
+
+    Key  : Failure.Hash
+    Value: {b97fb0d8-416a-97c2-44ab-c42338ab18b5}
+
+    Key  : Failure.ProblemClass.Primary
+    Value: APPLICATION_FAULT
+
+    Key  : Faulting.IP.Type
+    Value: Paged
+
+    Key  : Timeline.OS.Boot.DeltaSec
+    Value: 25750
+
+    Key  : WER.OS.Branch
+    Value: ge_release
+
+    Key  : WER.OS.Platform
+    Value: Windows
+
+    Key  : WER.OS.Version
+    Value: 10.0.26300.1
+
+    Key  : WER.Process.Name
+    Value: gda_unit_tests.exe
+
+
+APPLICATION_VERIFIER_LOADED: 1
+
+EXCEPTION_RECORD:  (.exr -1)
+ExceptionAddress: 00007ffc4bd247ae (verifier!VerifierSetFaultInjectionProbability+0x000000000000252e)
+   ExceptionCode: c0000005 (Access violation)
+  ExceptionFlags: 00000000
+NumberParameters: 2
+   Parameter[0]: 0000000000000000
+   Parameter[1]: 00000000ffff8004
+Attempt to read from address 00000000ffff8004
+
+FAULTING_THREAD:  6ee0
+
+PROCESS_NAME:  ntdll.wrong.symbols.dll
+
+ADDITIONAL_DEBUG_TEXT:  
+You can run '.symfix; .reload' to try to fix the symbol path and load symbols.
+
+WRONG_SYMBOLS_TIMESTAMP: a2b84216
+
+WRONG_SYMBOLS_SIZE: 26c000
+
+FAULTING_MODULE: 00007ffd2a770000 ntdll
+
+STACK_TEXT:  
+00000000`00000000 00000000`00000000 WRONG_SYMBOLS!WRONG_SYMBOLS+0x0
+
+
+STACK_COMMAND: ** Pseudo Context ** ManagedPseudo ** Value: ffffffff ** ; kb
+
+IP_IN_PAGED_CODE: 
+verifier!VerifierSetFaultInjectionProbability+252e
+00007ffc`4bd247ae 817ac0bbbbcdab  cmp     dword ptr [rdx-40h],0ABCDBBBBh
+
+BUGCHECK_CODE:  a2b84216
+
+EXCEPTION_CODE: (HRESULT) 0xa2b84216 (2729984534) - <Unable to get error code text>
+
+EXCEPTION_CODE_STR:  a2b84216
+
+EXCEPTION_STR:  WRONG_SYMBOLS
+
+IMAGE_NAME:  ntdll.wrong.symbols.dll
+
+MODULE_NAME: ntdll_wrong_symbols
+
+SYMBOL_NAME:  ntdll_wrong_symbols!A2B8421626C000
+
+ERROR_CODE: (NTSTATUS) 0xa2b84216 - <Unable to get error code text>
+
+FAILURE_BUCKET_ID:  WRONG_SYMBOLS_X64_26100.1.amd64fre.ge_release.240331-1435_TIMESTAMP_560705-010214_a2b84216_ntdll.wrong.symbols.dll!A2B8421626C000
+
+OS_VERSION:  10.0.26300.1
+
+BUILDLAB_STR:  ge_release
+
+OSPLATFORM_TYPE:  x64
+
+OSNAME:  Windows 10
+
+FAILURE_ID_HASH:  {b97fb0d8-416a-97c2-44ab-c42338ab18b5}
+
+Followup:     MachineOwner
+---------
+
+ # Child-SP          RetAddr               Call Site
+00 00000074`6befbb90 00007ffc`4bd24598     verifier!VerifierSetFaultInjectionProbability+0x252e
+01 00000074`6befbbf0 00007ffc`4bd2468f     verifier!VerifierSetFaultInjectionProbability+0x2318
+02 00000074`6befbc30 00007ffc`4bd22f7d     verifier!VerifierSetFaultInjectionProbability+0x240f
+03 00000074`6befbc60 00007ffd`2a7c0ec3     verifier!VerifierSetFaultInjectionProbability+0xcfd
+04 00000074`6befbcc0 00007ffd`2a7c46f7     ntdll!RtlGetUserInfoHeap+0xd33
+05 00000074`6befbd20 00007ffd`2a797850     ntdll!RtlSizeHeap+0x10a7
+06 00000074`6befbdf0 00007ffc`9362d491     ntdll!RtlFreeHeap+0x5c0
+07 00000074`6befbee0 00007ff6`87573d7c     vrfcore!VerifierSuspendFaultInjection+0x131
+08 00000074`6befbf30 00007ff6`85fd7467     gda_unit_tests!_free_base(
+			void * block = <Value unavailable error>)+0x1c
+09 00000074`6befbf60 00007ff6`85fd88e6     gda_unit_tests!std::_Deallocate<16>(
+			void * _Ptr = 0x00000000`ffff8044, 
+			unsigned int64 _Bytes = 0x38)+0x37
+0a 00000074`6befbfa0 00007ff6`85fd885b     gda_unit_tests!std::allocator<char>::deallocate(
+			char * _Ptr = 0x00000000`ffff8044 "--- memory read error at address 0x00000000`ffff8044 ---", 
+			unsigned int64 _Count = 0x38)+0x26
+0b 00000074`6befbfe0 00007ff6`85fd876b     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Deallocate_for_capacity(
+			class std::allocator<char> * _Al = 0x00000074`6befe2b0 allocator, 
+			char * _Old_ptr = 0x00000000`ffff8044 "--- memory read error at address 0x00000000`ffff8044 ---", 
+			unsigned int64 _Capacity = 0x37)+0x2b
+0c 00000074`6befc020 00007ff6`85fd8508     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Tidy_deallocate(void)+0x6b
+0d 00000074`6befc080 00007ff6`869529f4     gda_unit_tests!std::basic_string<char,std::char_traits<char>,std::allocator<char> >::~basic_string(void)+0x18
+0e 00000074`6befc0c0 00007ff6`87505646     gda_unit_tests!mcp::McpError::~McpError(void)+0x34
+0f 00000074`6befc100 00007ff6`8755a8bd     gda_unit_tests!__DestructExceptionObject(
+			struct EHExceptionRecord * pExcept = 0x00007ff6`8695e318, 
+			unsigned char fThrowNotAllowed = 0x01 '')+0x46
+10 00000074`6befc150 00007ffd`2a8971e6     gda_unit_tests!__FrameHandler3::CxxCallCatchBlock(
+			struct _EXCEPTION_RECORD * pExcept = <Value unavailable error>)+0x1cd
+11 00000074`6befc220 00007ff6`8695e2e1     ntdll!RtlCaptureContext2+0x4a6
+12 00000074`6beff000 00007ff6`8626b743     gda_unit_tests!godot_autopilot::mcp_wire::parse_request(
+			class std::basic_string<char,std::char_traits<char>,std::allocator<char> > * body = 0x00000000`00000027)+0x61
+13 00000074`6beff200 00007ff6`87463c50     gda_unit_tests!McpWireTest_RejectsMalformedBody_Test::TestBody(void)+0x43
+14 00000074`6beff460 00007ff6`874485f8     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x00000208`ed57aff0, 
+			<function> * method = 0x00007ff6`874487a0, 
+			char * location = 0x00007ff6`8781b7b0 "the test body")+0x20
+15 00000074`6beff4c0 00007ff6`8742b5b3     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x00000208`e535eda0, 
+			<function> * method = 0x00000074`6beff7e0, 
+			char * location = 0x00007ff6`8742b5b3 "H???")+0x48
+16 00000074`6beff570 00007ff6`8742c0f9     gda_unit_tests!testing::Test::Run(void)+0x93
+17 00000074`6beff5b0 00007ff6`8742c99f     gda_unit_tests!testing::TestInfo::Run(void)+0x119
+18 00000074`6beff620 00007ff6`8743ae80     gda_unit_tests!testing::TestSuite::Run(void)+0x18f
+19 00000074`6beff6a0 00007ff6`874673a0     gda_unit_tests!testing::internal::UnitTestImpl::RunAllTests(void)+0x3f0
+1a 00000074`6beff790 00007ff6`8744a6f8     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x00000208`e535eda0, 
+			<function> * method = 0x00007ff6`8743aa90, 
+			char * location = 0x00007ff6`8781c145 "auxiliary test code (environments or event listeners)")+0x20
+1b 00000074`6beff7f0 00007ff6`8743aa39     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x00000074`6beff920, 
+			<function> * method = 0x00007ff6`8743aa39, 
+			char * location = 0x00000074`00000000 "--- memory read error at address 0x00000074`00000000 ---")+0x48
+1c 00000074`6beff8b0 00007ff6`87490f41     gda_unit_tests!testing::UnitTest::Run(void)+0xe9
+1d 00000074`6beff930 00007ff6`87490efb     gda_unit_tests!RUN_ALL_TESTS(void)+0x11
+1e 00000074`6beff960 00007ff6`875051af     gda_unit_tests!main(
+			int argc = 0n1, 
+			char ** argv = 0x00000208`e528cf20)+0x4b
+1f (Inline Function) --------`--------     gda_unit_tests!invoke_main(void)+0x22
+20 00000074`6beff9b0 00007ffd`28e3dda7     gda_unit_tests!__scrt_common_main_seh(void)+0x10f
+21 00000074`6beff9f0 00007ffd`2a839c5c     KERNEL32!BaseThreadInitThunk+0x17
+22 00000074`6beffa20 00000000`00000000     ntdll!RtlUserThreadStart+0x2c
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

@@ -24,11 +24,11 @@ godot::Node *find_node(const std::string &path_str) {
 
 } // namespace
 
-mcp::JsonValue handle_node_group(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_node_group(const godot_autopilot::util::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "missing required parameter: action (one of: add, remove)");
     return e;
   }
@@ -37,24 +37,24 @@ mcp::JsonValue handle_node_group(const mcp::JsonValue &args) {
     return handle_add_node_to_group(args);
   if (action == "remove")
     return handle_remove_node_from_group(args);
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("unknown action '" + action +
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue("unknown action '" + action +
                               "' for node_group — expected add or remove");
   return e;
 }
 
-mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_add_node_to_group(const godot_autopilot::util::JsonValue &args) {
   auto *np = args.Find("node_path");
   auto *gp = args.Find("group_name");
 
   if (!np || !np->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   if (!gp || !gp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: group_name");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: group_name");
     return e;
   }
 
@@ -63,8 +63,8 @@ mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue &args) {
 
   auto *node = find_node(node_path);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path);
     return e;
   }
 
@@ -88,18 +88,18 @@ mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue &args) {
   }
 
   if (!node->is_in_group(group)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "add_to_group failed: node is not in group after operation: " +
         node_path + " group=" + group_name);
     return e;
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("added");
-  r["node_path"] = mcp::JsonValue(node_path);
-  r["group"] = mcp::JsonValue(group_name);
-  r["persistent"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("added");
+  r["node_path"] = godot_autopilot::util::JsonValue(node_path);
+  r["group"] = godot_autopilot::util::JsonValue(group_name);
+  r["persistent"] = godot_autopilot::util::JsonValue(true);
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "group_add_node_to_group: " + node_path + " -> " +
@@ -107,18 +107,18 @@ mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_remove_node_from_group(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_remove_node_from_group(const godot_autopilot::util::JsonValue &args) {
   auto *np = args.Find("node_path");
   auto *gp = args.Find("group_name");
 
   if (!np || !np->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   if (!gp || !gp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: group_name");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: group_name");
     return e;
   }
 
@@ -127,8 +127,8 @@ mcp::JsonValue handle_remove_node_from_group(const mcp::JsonValue &args) {
 
   auto *node = find_node(node_path);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path);
     return e;
   }
 
@@ -147,17 +147,17 @@ mcp::JsonValue handle_remove_node_from_group(const mcp::JsonValue &args) {
   }
 
   if (node->is_in_group(group)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "remove_from_group failed: node is still in group after operation: " +
         node_path + " group=" + group_name);
     return e;
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("removed");
-  r["node_path"] = mcp::JsonValue(node_path);
-  r["group"] = mcp::JsonValue(group_name);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("removed");
+  r["node_path"] = godot_autopilot::util::JsonValue(node_path);
+  r["group"] = godot_autopilot::util::JsonValue(group_name);
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "group_remove_node_from_group: " + node_path +

@@ -13,9 +13,9 @@ using godot_autopilot::schema::validate_param_defs;
 
 namespace {
 
-bool required_array_contains(const mcp::JsonValue &schema,
+bool required_array_contains(const godot_autopilot::util::JsonValue &schema,
                              const std::string &name) {
-  const mcp::JsonValue *req = schema.Find("required");
+  const godot_autopilot::util::JsonValue *req = schema.Find("required");
   if (!req || !req->IsArray()) {
     return false;
   }
@@ -35,7 +35,7 @@ TEST(SchemaBuilderTest, BuildSchemaPutsRequiredInTopLevelArray) {
       {"beta", "integer", "second param", false},
   });
   EXPECT_EQ(schema.At("type").GetString(), "object");
-  const mcp::JsonValue *props = schema.Find("properties");
+  const godot_autopilot::util::JsonValue *props = schema.Find("properties");
   ASSERT_NE(props, nullptr);
   EXPECT_TRUE(props->IsObject());
   EXPECT_EQ(props->GetObject().size(), 2u);
@@ -50,11 +50,11 @@ TEST(SchemaBuilderTest, BuildSchemaEmptyParams) {
   auto schema = build_schema({});
   ASSERT_TRUE(schema.IsObject());
   EXPECT_EQ(schema.At("type").GetString(), "object");
-  const mcp::JsonValue *props = schema.Find("properties");
+  const godot_autopilot::util::JsonValue *props = schema.Find("properties");
   ASSERT_NE(props, nullptr);
   EXPECT_TRUE(props->IsObject());
   EXPECT_TRUE(props->Empty());
-  const mcp::JsonValue *req = schema.Find("required");
+  const godot_autopilot::util::JsonValue *req = schema.Find("required");
   ASSERT_NE(req, nullptr);
   EXPECT_TRUE(req->IsArray());
   EXPECT_TRUE(req->Empty());
@@ -72,10 +72,10 @@ TEST(SchemaBuilderTest, BuildSchemaJsonTypeOmitsTypeField) {
       {"payload", "json", "any JSON value", true},
       {"path", "string", "node path", true},
   });
-  const mcp::JsonValue *props = schema.Find("properties");
+  const godot_autopilot::util::JsonValue *props = schema.Find("properties");
   ASSERT_NE(props, nullptr);
   ASSERT_TRUE(props->IsObject());
-  const mcp::JsonValue &payload = props->At("payload");
+  const godot_autopilot::util::JsonValue &payload = props->At("payload");
   EXPECT_EQ(payload.Find("type"), nullptr);
   EXPECT_EQ(payload.At("description").GetString(), "any JSON value");
   EXPECT_EQ(props->At("path").At("type").GetString(), "string");
@@ -85,11 +85,11 @@ TEST(SchemaBuilderTest, BuildSchemaJsonTypeOmitsTypeField) {
 TEST(SchemaBuilderTest, BuildActionSchemaAddsEnumAndRequiredAction) {
   auto schema = build_action_schema(
       {"get", "set"}, {{"path", "string", "node path", true}});
-  const mcp::JsonValue *props = schema.Find("properties");
+  const godot_autopilot::util::JsonValue *props = schema.Find("properties");
   ASSERT_NE(props, nullptr);
-  const mcp::JsonValue &action = props->At("action");
+  const godot_autopilot::util::JsonValue &action = props->At("action");
   EXPECT_EQ(action.At("type").GetString(), "string");
-  const mcp::JsonValue *values = action.Find("enum");
+  const godot_autopilot::util::JsonValue *values = action.Find("enum");
   ASSERT_NE(values, nullptr);
   ASSERT_TRUE(values->IsArray());
   ASSERT_EQ(values->Size(), 2u);
@@ -100,8 +100,8 @@ TEST(SchemaBuilderTest, BuildActionSchemaAddsEnumAndRequiredAction) {
 }
 
 TEST(SchemaBuilderTest, AddRequiredFlagIsIdempotent) {
-  mcp::JsonValue schema(mcp::JsonValue::object_tag);
-  schema["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue schema(godot_autopilot::util::JsonValue::object_tag);
+  schema["properties"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   add_required_flag(schema, "dup");
   add_required_flag(schema, "dup");
   add_required_flag(schema, "other");
