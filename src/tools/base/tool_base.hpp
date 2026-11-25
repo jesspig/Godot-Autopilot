@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <optional>
 #include <string>
 #include <string_view>
@@ -69,8 +69,8 @@ class ToolBase {
 public:
   virtual ~ToolBase() = default;
   virtual const ToolMeta &meta() const = 0;
-  virtual mcp::JsonValue execute(const mcp::JsonValue &args) = 0;
-  virtual mcp::JsonValue input_schema() const = 0;
+  virtual godot_autopilot::util::JsonValue execute(const godot_autopilot::util::JsonValue &args) = 0;
+  virtual godot_autopilot::util::JsonValue input_schema() const = 0;
   virtual uint32_t tool_flags() const { return 0; }
 };
 

@@ -33,27 +33,27 @@ TEST(DupHelpersTest, SignedDecimalParsing) {
 TEST(DupHelpersTest, StringArgStatus) {
   using godot_autopilot::util::StringArgStatus;
   using godot_autopilot::util::string_arg_status;
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   std::string out = "sentinel";
   EXPECT_EQ(string_arg_status(args, "k", out, true), StringArgStatus::Missing);
-  args["k"] = mcp::JsonValue(123);
+  args["k"] = godot_autopilot::util::JsonValue(123);
   EXPECT_EQ(string_arg_status(args, "k", out, true), StringArgStatus::WrongType);
-  args["k"] = mcp::JsonValue("");
+  args["k"] = godot_autopilot::util::JsonValue("");
   EXPECT_EQ(string_arg_status(args, "k", out, true), StringArgStatus::Empty);
   EXPECT_EQ(string_arg_status(args, "k", out, false), StringArgStatus::Ok);
-  args["k"] = mcp::JsonValue("value");
+  args["k"] = godot_autopilot::util::JsonValue("value");
   EXPECT_EQ(string_arg_status(args, "k", out, true), StringArgStatus::Ok);
   EXPECT_EQ(out, "value");
 }
 
 TEST(DupHelpersTest, RequireNonemptyStringArg) {
   using godot_autopilot::util::require_nonempty_string_arg;
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   std::string out;
   EXPECT_FALSE(require_nonempty_string_arg(args, "k", out));
-  args["k"] = mcp::JsonValue("");
+  args["k"] = godot_autopilot::util::JsonValue("");
   EXPECT_FALSE(require_nonempty_string_arg(args, "k", out));
-  args["k"] = mcp::JsonValue("x");
+  args["k"] = godot_autopilot::util::JsonValue("x");
   EXPECT_TRUE(require_nonempty_string_arg(args, "k", out));
   EXPECT_EQ(out, "x");
 }
@@ -68,10 +68,10 @@ TEST(DupHelpersTest, ResUri) {
 TEST(DupHelpersTest, ReceivedKeys) {
   using godot_autopilot::util::received_keys_suffix;
   using godot_autopilot::util::received_keys_text;
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   EXPECT_EQ(received_keys_suffix(args), " (received no parameters)");
   EXPECT_EQ(received_keys_text(args, false), "(received no parameters)");
-  args["name"] = mcp::JsonValue("x");
+  args["name"] = godot_autopilot::util::JsonValue("x");
   EXPECT_EQ(received_keys_suffix(args), " (received keys: name)");
   EXPECT_EQ(received_keys_text(args, false), "(received keys: name)");
 }
@@ -113,15 +113,15 @@ TEST(DupHelpersTest, ObjectLocatorFields) {
   EXPECT_EQ(fields.name, "-1");
   EXPECT_FALSE(fields.has_object_id);
 
-  mcp::JsonValue obj(mcp::JsonValue::object_tag);
-  obj["path"] = mcp::JsonValue("res://a.tres");
-  obj["object_id_str"] = mcp::JsonValue("456");
+  godot_autopilot::util::JsonValue obj(godot_autopilot::util::JsonValue::object_tag);
+  obj["path"] = godot_autopilot::util::JsonValue("res://a.tres");
+  obj["object_id_str"] = godot_autopilot::util::JsonValue("456");
   fields = ObjectLocatorFields();
   EXPECT_EQ(parse_object_locator(obj, true, fields), LocatorFieldStatus::Ok);
   EXPECT_EQ(fields.path, "res://a.tres");
   EXPECT_TRUE(fields.has_object_id);
   EXPECT_EQ(fields.object_id, 456);
-  obj["bogus"] = mcp::JsonValue(1);
+  obj["bogus"] = godot_autopilot::util::JsonValue(1);
   EXPECT_EQ(parse_object_locator(obj, true, fields),
             LocatorFieldStatus::UnknownField);
 }

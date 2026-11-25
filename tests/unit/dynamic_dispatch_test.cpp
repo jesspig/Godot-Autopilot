@@ -24,8 +24,8 @@ using godot_autopilot::ToolCatalog;
 using godot_autopilot::ToolSpec;
 using godot_autopilot::ToolSurface;
 
-std::string code_of(const mcp::JsonValue &value) {
-  const mcp::JsonValue *code = value.Find("code");
+std::string code_of(const godot_autopilot::util::JsonValue &value) {
+  const godot_autopilot::util::JsonValue *code = value.Find("code");
   return code != nullptr && code->IsString() ? code->GetString()
                                              : std::string();
 }
@@ -59,7 +59,7 @@ protected:
 
   void add_dynamic(
       const std::string &name,
-      std::function<mcp::JsonValue(const mcp::JsonValue &)> handler) {
+      std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> handler) {
     ToolSpec spec{name, "Dynamic test tool", "Testing", {"dynamic"}};
     spec.side_effect = godot_autopilot::SideEffect::None;
     spec.flags = godot_autopilot::tool_flags::kDynamic;
@@ -78,36 +78,36 @@ protected:
 } // namespace
 
 TEST_F(DynamicDispatchFixture, CallToolRecursionUsesUnifiedDispatchDepth) {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   for (int i = 0; i < 10; ++i) {
-    mcp::JsonValue wrapper(mcp::JsonValue::object_tag);
-    wrapper["name"] = mcp::JsonValue("call_tool");
+    godot_autopilot::util::JsonValue wrapper(godot_autopilot::util::JsonValue::object_tag);
+    wrapper["name"] = godot_autopilot::util::JsonValue("call_tool");
     wrapper["arguments"] = std::move(args);
     args = std::move(wrapper);
   }
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
       "call_tool", args, godot_autopilot::dispatch::capture_depth_context());
   EXPECT_EQ(code_of(result), "depth_exceeded");
   EXPECT_EQ(godot_autopilot::tools::invoke_depth(), 0);
 }
 
 TEST_F(DynamicDispatchFixture, BatchRecursionUsesUnifiedDispatchDepth) {
-  mcp::JsonValue args = mcp::JsonValue::Parse(
+  godot_autopilot::util::JsonValue args = godot_autopilot::util::JsonValue::Parse(
       R"({"operations":[],"confirm":true})");
   for (int i = 0; i < 10; ++i) {
-    mcp::JsonValue operation(mcp::JsonValue::object_tag);
-    operation["tool"] = mcp::JsonValue("batch_execute");
+    godot_autopilot::util::JsonValue operation(godot_autopilot::util::JsonValue::object_tag);
+    operation["tool"] = godot_autopilot::util::JsonValue("batch_execute");
     operation["args"] = std::move(args);
-    mcp::JsonValue wrapper(mcp::JsonValue::object_tag);
-    mcp::JsonValue operations(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue wrapper(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue operations(godot_autopilot::util::JsonValue::array_tag);
     operations.PushBack(std::move(operation));
     wrapper["operations"] = std::move(operations);
-    wrapper["confirm"] = mcp::JsonValue(true);
+    wrapper["confirm"] = godot_autopilot::util::JsonValue(true);
     args = std::move(wrapper);
   }
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
       "batch_execute", args,
       godot_autopilot::dispatch::capture_depth_context());
   EXPECT_NE(result.Dump().find("tool invoke depth exceeded"), std::string::npos);
@@ -115,24 +115,24 @@ TEST_F(DynamicDispatchFixture, BatchRecursionUsesUnifiedDispatchDepth) {
 }
 
 TEST_F(DynamicDispatchFixture, DynamicHandlerRecursionUsesUnifiedDispatchDepth) {
-  add_dynamic("dynamic_recursive", [](const mcp::JsonValue &args) {
+  add_dynamic("dynamic_recursive", [](const godot_autopilot::util::JsonValue &args) {
     return godot_autopilot::dispatch::call_handler(
         "dynamic_recursive", args,
         godot_autopilot::dispatch::capture_depth_context());
   });
   godot_autopilot::refresh_dynamic_tools();
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
-      "dynamic_recursive", mcp::JsonValue::Parse("{}"),
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "dynamic_recursive", godot_autopilot::util::JsonValue::Parse("{}"),
       godot_autopilot::dispatch::capture_depth_context());
   EXPECT_EQ(code_of(result), "depth_exceeded");
 }
 
 TEST_F(DynamicDispatchFixture, DisabledToolsDisappearAndCallsAreRejected) {
   std::atomic<int> calls{0};
-  add_dynamic("toggle_tool", [&calls](const mcp::JsonValue &) {
+  add_dynamic("toggle_tool", [&calls](const godot_autopilot::util::JsonValue &) {
     calls.fetch_add(1);
-    return mcp::JsonValue::Parse(R"({"result":"ok"})");
+    return godot_autopilot::util::JsonValue::Parse(R"({"result":"ok"})");
   });
   godot_autopilot::refresh_dynamic_tools();
 
@@ -140,7 +140,7 @@ TEST_F(DynamicDispatchFixture, DisabledToolsDisappearAndCallsAreRejected) {
   ASSERT_NE(godot_autopilot::get_active_registry()->find("toggle_tool"),
             nullptr);
   EXPECT_EQ(code_of(godot_autopilot::dispatch::call_handler(
-                "toggle_tool", mcp::JsonValue::Parse("{}"))),
+                "toggle_tool", godot_autopilot::util::JsonValue::Parse("{}"))),
             std::string());
   EXPECT_EQ(calls.load(), 1);
 
@@ -150,8 +150,8 @@ TEST_F(DynamicDispatchFixture, DisabledToolsDisappearAndCallsAreRejected) {
   EXPECT_FALSE(catalog_.get_tool("toggle_tool").has_value());
   EXPECT_EQ(godot_autopilot::get_active_registry()->find("toggle_tool"),
             nullptr);
-  const mcp::JsonValue disabled = godot_autopilot::dispatch::call_handler(
-      "toggle_tool", mcp::JsonValue::Parse("{}"));
+  const godot_autopilot::util::JsonValue disabled = godot_autopilot::dispatch::call_handler(
+      "toggle_tool", godot_autopilot::util::JsonValue::Parse("{}"));
   EXPECT_NE(disabled.Dump().find("not found"), std::string::npos);
   EXPECT_EQ(calls.load(), 1);
 
@@ -159,19 +159,19 @@ TEST_F(DynamicDispatchFixture, DisabledToolsDisappearAndCallsAreRejected) {
   godot_autopilot::refresh_dynamic_tools();
   EXPECT_TRUE(catalog_.get_tool("toggle_tool").has_value());
   EXPECT_EQ(code_of(godot_autopilot::dispatch::call_handler(
-                "toggle_tool", mcp::JsonValue::Parse("{}"))),
+                "toggle_tool", godot_autopilot::util::JsonValue::Parse("{}"))),
             std::string());
   EXPECT_EQ(calls.load(), 2);
 }
 
 TEST_F(DynamicDispatchFixture, ZeroParamDynamicToolRejectsNonObjectArguments) {
-  add_dynamic("zero_param", [](const mcp::JsonValue &) {
-    return mcp::JsonValue::Parse(R"({"result":"ok"})");
+  add_dynamic("zero_param", [](const godot_autopilot::util::JsonValue &) {
+    return godot_autopilot::util::JsonValue::Parse(R"({"result":"ok"})");
   });
   godot_autopilot::refresh_dynamic_tools();
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
-      "zero_param", mcp::JsonValue::Parse("[]"));
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "zero_param", godot_autopilot::util::JsonValue::Parse("[]"));
   EXPECT_EQ(code_of(result), "invalid_arguments");
 }
 
@@ -181,8 +181,8 @@ TEST_F(DynamicDispatchFixture, InvalidDynamicDefinitionsFailClosedAtRuntime) {
   duplicate.flags = godot_autopilot::tool_flags::kDynamic;
   duplicate.params = {{"value", "string", "", false},
                       {"value", "integer", "", false}};
-  duplicate.handler = [](const mcp::JsonValue &) {
-    return mcp::JsonValue::Parse(R"({"result":"ok"})");
+  duplicate.handler = [](const godot_autopilot::util::JsonValue &) {
+    return godot_autopilot::util::JsonValue::Parse(R"({"result":"ok"})");
   };
 
   ToolSpec unsupported{"unsupported_param", "d", "Testing", {}};
@@ -199,9 +199,9 @@ TEST_F(DynamicDispatchFixture, InvalidDynamicDefinitionsFailClosedAtRuntime) {
   godot_autopilot::refresh_dynamic_tools();
 
   EXPECT_EQ(code_of(godot_autopilot::dispatch::call_handler(
-                "duplicate_params", mcp::JsonValue::Parse("{}"))),
+                "duplicate_params", godot_autopilot::util::JsonValue::Parse("{}"))),
             "invalid_tool_definition");
   EXPECT_EQ(code_of(godot_autopilot::dispatch::call_handler(
-                "unsupported_param", mcp::JsonValue::Parse("{}"))),
+                "unsupported_param", godot_autopilot::util::JsonValue::Parse("{}"))),
             "invalid_tool_definition");
 }

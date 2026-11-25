@@ -1,5 +1,5 @@
 #pragma once
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <vector>
 
@@ -10,7 +10,7 @@ struct StepExpect {
     struct FieldCheck {
         std::string key;
         bool has_value = false;
-        mcp::JsonValue value;
+        godot_autopilot::util::JsonValue value;
         bool not_empty = false;
         bool has_not_contains = false;
         std::string not_contains;
@@ -22,7 +22,7 @@ struct StepExpect {
 struct Step {
     std::string id;
     std::string tool;
-    mcp::JsonValue args;
+    godot_autopilot::util::JsonValue args;
     StepExpect expect;
     std::string traverse_kind;
     std::string traverse_mode;
@@ -42,6 +42,6 @@ struct TestCase {
 
 TestCase load_test_case(const std::string& json_path);
 
-void RequireType(const mcp::JsonValue& v, const std::string& path, const std::string& expected);
+void RequireType(const godot_autopilot::util::JsonValue& v, const std::string& path, const std::string& expected);
 
 }

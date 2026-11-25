@@ -10,7 +10,10 @@ add_executable(gda_mcp_transport_probe
     ${CMAKE_SOURCE_DIR}/src/core/transport/godot_transport.cpp
     ${CMAKE_SOURCE_DIR}/src/core/observability/log_system.cpp
     ${CMAKE_SOURCE_DIR}/src/core/transport/http_stream_registry.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/transport/mcp_http_shim.cpp)
+    ${CMAKE_SOURCE_DIR}/src/core/transport/mcp_http_shim.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp
+    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_json_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_error_bridge.cpp)
 
 target_include_directories(gda_mcp_transport_probe PRIVATE
     ${CMAKE_SOURCE_DIR}/src)

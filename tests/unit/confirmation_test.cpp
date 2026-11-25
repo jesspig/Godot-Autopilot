@@ -23,28 +23,28 @@ TEST(ConfirmationTest, RequiredForHighRiskSideEffects) {
 }
 
 TEST(ConfirmationTest, ProvidedReadsBooleanConfirm) {
-  mcp::JsonValue missing(mcp::JsonValue::object_tag);
-  mcp::JsonValue false_value(mcp::JsonValue::object_tag);
-  false_value["confirm"] = mcp::JsonValue(false);
-  mcp::JsonValue true_value(mcp::JsonValue::object_tag);
-  true_value["confirm"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue missing(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue false_value(godot_autopilot::util::JsonValue::object_tag);
+  false_value["confirm"] = godot_autopilot::util::JsonValue(false);
+  godot_autopilot::util::JsonValue true_value(godot_autopilot::util::JsonValue::object_tag);
+  true_value["confirm"] = godot_autopilot::util::JsonValue(true);
   EXPECT_FALSE(provided(missing));
   EXPECT_FALSE(provided(false_value));
   EXPECT_TRUE(provided(true_value));
-  EXPECT_FALSE(provided(mcp::JsonValue("confirm")));
+  EXPECT_FALSE(provided(godot_autopilot::util::JsonValue("confirm")));
 }
 
 TEST(ConfirmationTest, ErrorCarriesStructuredCodeAndTier) {
-  const mcp::JsonValue result = error("delete_scene_node", SideEffect::Destructive);
-  const mcp::JsonValue *code = result.Find("code");
+  const godot_autopilot::util::JsonValue result = error("delete_scene_node", SideEffect::Destructive);
+  const godot_autopilot::util::JsonValue *code = result.Find("code");
   ASSERT_NE(code, nullptr);
   ASSERT_TRUE(code->IsString());
   EXPECT_EQ(code->GetString(), "confirmation_required");
-  const mcp::JsonValue *required = result.Find("confirm_required");
+  const godot_autopilot::util::JsonValue *required = result.Find("confirm_required");
   ASSERT_NE(required, nullptr);
   ASSERT_TRUE(required->IsBool());
   EXPECT_TRUE(required->GetBool());
-  const mcp::JsonValue *effect = result.Find("side_effect");
+  const godot_autopilot::util::JsonValue *effect = result.Find("side_effect");
   ASSERT_NE(effect, nullptr);
   ASSERT_TRUE(effect->IsString());
   EXPECT_EQ(effect->GetString(), "destructive");

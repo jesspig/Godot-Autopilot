@@ -5,4 +5,6 @@
 # 不改根 CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_API_CONTRACT_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp)
+    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp
+    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_json_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_error_bridge.cpp)

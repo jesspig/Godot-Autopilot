@@ -33,7 +33,7 @@ namespace csharp_bridge_ops {
 
 namespace {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -44,7 +44,7 @@ JV missing_bridge_error(const std::string &message) {
                                ? "csharp_script_not_compiled"
                                : "missing_csharp_runtime";
   err["code"] = JV(code);
-  err["structured_error"] = JV(mcp::JsonValue::object_tag);
+  err["structured_error"] = JV(godot_autopilot::util::JsonValue::object_tag);
   (*err.Find("structured_error"))["code"] = JV(code);
   (*err.Find("structured_error"))["reason"] = JV(probe.reason);
   err["next_action"] = JV(
@@ -741,7 +741,7 @@ std::string emit_list_filter_source(const std::string &kind,
 
 } // namespace
 
-mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_get(const godot_autopilot::util::JsonValue &args) {
   const std::string tool = "csharp_get_property";
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_get_property called");
@@ -811,7 +811,7 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_csharp_set(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_set(const godot_autopilot::util::JsonValue &args) {
   const std::string tool = "csharp_set_property";
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_set_property called");
@@ -888,7 +888,7 @@ mcp::JsonValue handle_csharp_set(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_csharp_call(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_call(const godot_autopilot::util::JsonValue &args) {
   const std::string tool = "csharp_call_method";
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_call_method called");
@@ -963,7 +963,7 @@ mcp::JsonValue handle_csharp_call(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_csharp_subscribe(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_subscribe(const godot_autopilot::util::JsonValue &args) {
   const std::string tool = "csharp_subscribe_event";
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_subscribe_event called");
@@ -1061,7 +1061,7 @@ mcp::JsonValue handle_csharp_subscribe(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_unsubscribe(const godot_autopilot::util::JsonValue &args) {
   const std::string tool = "csharp_unsubscribe_event";
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_unsubscribe_event called");
@@ -1119,7 +1119,7 @@ mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_list(const godot_autopilot::util::JsonValue &args) {
   const std::string tool = "csharp_list_members";
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_list_members called");
@@ -1200,7 +1200,7 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
   return lr;
 }
 
-mcp::JsonValue handle_csharp_member(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_member(const godot_autopilot::util::JsonValue &args) {
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     return util::error_json("missing required parameter: action");
@@ -1223,7 +1223,7 @@ mcp::JsonValue handle_csharp_member(const mcp::JsonValue &args) {
                           "': expected get, set, call or list");
 }
 
-mcp::JsonValue handle_csharp_event(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_csharp_event(const godot_autopilot::util::JsonValue &args) {
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     return util::error_json("missing required parameter: action");

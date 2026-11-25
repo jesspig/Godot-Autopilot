@@ -8,7 +8,8 @@
 #include <variant>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include <mcp/ProtocolVersion.hpp>
 
 #include "core/transport/http_stream_registry.hpp"
@@ -32,6 +33,17 @@ std::string make_pending_key(const std::string &connection_id,
 
 ParsedRequest parse_request(const std::string &body) {
   ParsedRequest parsed;
+  try {
+    const godot_autopilot::util::JsonValue validated =
+        godot_autopilot::util::JsonValue::Parse(body);
+    if (!validated.IsObject()) {
+      parsed.error = "message parse failed: root is not an object";
+      return parsed;
+    }
+  } catch (const godot_autopilot::util::JsonError &e) {
+    parsed.error = std::string("message parse failed: ") + e.what();
+    return parsed;
+  }
   try {
     parsed.message = mcp::DeserializeMessage(body);
   } catch (const std::exception &e) {
@@ -63,11 +75,11 @@ std::string build_response_text(const mcp::JsonRpcMessage &message) {
 }
 
 std::string build_error_response_text(int code, const std::string &message) {
-  mcp::JsonValue root(mcp::JsonValue::object_tag);
-  root["jsonrpc"] = mcp::JsonValue("2.0");
-  mcp::JsonValue failure(mcp::JsonValue::object_tag);
-  failure["code"] = mcp::JsonValue(static_cast<int64_t>(code));
-  failure["message"] = mcp::JsonValue(message);
+  godot_autopilot::util::JsonValue root(godot_autopilot::util::JsonValue::object_tag);
+  root["jsonrpc"] = godot_autopilot::util::JsonValue("2.0");
+  godot_autopilot::util::JsonValue failure(godot_autopilot::util::JsonValue::object_tag);
+  failure["code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(code));
+  failure["message"] = godot_autopilot::util::JsonValue(message);
   root["error"] = std::move(failure);
   return root.Dump();
 }
@@ -75,17 +87,18 @@ std::string build_error_response_text(int code, const std::string &message) {
 std::string build_timeout_response_text(const mcp::RequestId &id,
                                         const std::string &method,
                                         bool cancellation_sent) {
-  mcp::JsonValue root(mcp::JsonValue::object_tag);
-  root["jsonrpc"] = mcp::JsonValue("2.0");
-  root["id"] = mcp::RequestIdToJson(id);
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["code"] = mcp::JsonValue(static_cast<int64_t>(-32000));
+  godot_autopilot::util::JsonValue root(godot_autopilot::util::JsonValue::object_tag);
+  root["jsonrpc"] = godot_autopilot::util::JsonValue("2.0");
+  root["id"] =
+      godot_autopilot::adapters::FromSdk(mcp::RequestIdToJson(id));
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(-32000));
   error["message"] =
-      mcp::JsonValue("mcp request timed out: " + method +
+      godot_autopilot::util::JsonValue("mcp request timed out: " + method +
                      "; the task may still be running");
-  mcp::JsonValue data(mcp::JsonValue::object_tag);
-  data["still_running"] = mcp::JsonValue(true);
-  data["cancellation_sent"] = mcp::JsonValue(cancellation_sent);
+  godot_autopilot::util::JsonValue data(godot_autopilot::util::JsonValue::object_tag);
+  data["still_running"] = godot_autopilot::util::JsonValue(true);
+  data["cancellation_sent"] = godot_autopilot::util::JsonValue(cancellation_sent);
   error["data"] = std::move(data);
   root["error"] = std::move(error);
   return root.Dump();
@@ -342,7 +355,8 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
              parsed.method == kCancelledNotificationMethod) {
     auto *notification = std::get_if<mcp::JsonRpcNotification>(&message);
     if (notification && notification->params) {
-      mcp::JsonValue *target = notification->params->Find(kRequestIdParam);
+      godot_autopilot::adapters::SdkJson *target =
+          notification->params->Find(kRequestIdParam);
       if (target != nullptr && (target->IsInt() || target->IsString())) {
         const mcp::RequestId client_id =
             target->IsInt() ? mcp::RequestId{target->GetInt()}
@@ -435,12 +449,13 @@ bool GodotTransport::await_response(const std::string &connection_id,
 
 bool GodotTransport::send_cancel_notification(
     const mcp::RequestId &internal_id) {
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params[kRequestIdParam] = mcp::RequestIdToJson(internal_id);
-  params["reason"] = mcp::JsonValue("timeout");
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+  params[kRequestIdParam] =
+      godot_autopilot::adapters::FromSdk(mcp::RequestIdToJson(internal_id));
+  params["reason"] = godot_autopilot::util::JsonValue("timeout");
   mcp::JsonRpcNotification notification;
   notification.method = kCancelledNotificationMethod;
-  notification.params = std::move(params);
+  notification.params = godot_autopilot::adapters::ToSdk(params);
   return GetMessageChannel().TrySend(
       mcp::JsonRpcMessage(std::move(notification)));
 }

@@ -1,6 +1,7 @@
 #include "prompts/debugger_prompts.hpp"
 #include "prompts/prompt_export_guard.hpp"
 #include "core/observability/log_system.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include <mcp/Content.hpp>
 
 namespace godot_autopilot {
@@ -26,7 +27,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
       PromptOptions{}.Description(
           "Analyze a runtime error with full context. Use get_debugger_stream "
           "(action=log) and get_debugger_stream (action=errors) first to gather data."),
-      [](const std::string &name, const std::optional<mcp::JsonValue> &args) {
+      [](const std::string &name, const std::optional<godot_autopilot::adapters::SdkJson> &args) {
         prompts_detail::reject_if_exporting();
         std::string text =
             R"TEMPLATE(You have encountered a runtime error in the Godot game. Follow these steps to diagnose:
@@ -69,7 +70,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
           "Analyze the current breakpoint context: stack trace, scene tree, "
           "and variable state."),
       [](const std::string &name,
-         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+         const std::optional<godot_autopilot::adapters::SdkJson> &args) -> mcp::GetPromptResult {
         prompts_detail::reject_if_exporting();
         std::string text =
             R"TEMPLATE(The debugger has paused at a breakpoint. Follow these steps:
@@ -95,7 +96,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
       PromptOptions{}.Description("Review the game's output log for issues, "
                                   "errors, and unexpected behavior."),
       [](const std::string &name,
-         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+         const std::optional<godot_autopilot::adapters::SdkJson> &args) -> mcp::GetPromptResult {
         prompts_detail::reject_if_exporting();
         std::string text =
             R"TEMPLATE(Review the game output to understand the current state:
@@ -134,7 +135,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
       PromptOptions{}.Description(
           "Review performance monitor data to identify bottlenecks."),
       [](const std::string &name,
-         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+         const std::optional<godot_autopilot::adapters::SdkJson> &args) -> mcp::GetPromptResult {
         prompts_detail::reject_if_exporting();
         std::string text = R"TEMPLATE(Review game performance:
 
@@ -166,7 +167,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
       PromptOptions{}.Description(
           "Quick summary of the current debug session state."),
       [](const std::string &name,
-         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+         const std::optional<godot_autopilot::adapters::SdkJson> &args) -> mcp::GetPromptResult {
         prompts_detail::reject_if_exporting();
         std::string text = R"TEMPLATE(Check the current debug session:
 

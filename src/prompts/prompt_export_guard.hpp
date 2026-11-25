@@ -4,7 +4,7 @@
 #include "core/export_guard.hpp"
 #include "tools/base/dispatch.hpp"
 
-#include <mcp/McpError.hpp>
+#include "adapters/mcp_error_bridge.hpp"
 
 #include <string>
 
@@ -17,8 +17,9 @@ inline bool should_block_prompt(bool exporting) {
 
 inline void reject_if_exporting() {
   if (should_block_prompt(godot_autopilot::ExportGuard::is_exporting())) {
-    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
-                        dispatch::export_blocked_error_text());
+    godot_autopilot::adapters::ThrowSdkError(
+        godot_autopilot::adapters::SdkErrorCode::HandlerError,
+        dispatch::export_blocked_error_text());
   }
 }
 

@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <utility>
@@ -86,17 +86,17 @@ inline ToolSpec config_action_spec(ToolSpec spec,
 inline ToolSpec config_optional_action_spec(
     ToolSpec spec, std::initializer_list<const char *> actions,
     std::initializer_list<const char *> examples) {
-  mcp::JsonValue raw = schema::build_schema(spec.params);
-  mcp::JsonValue action(mcp::JsonValue::object_tag);
-  action["type"] = mcp::JsonValue("string");
-  action["description"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue raw = schema::build_schema(spec.params);
+  godot_autopilot::util::JsonValue action(godot_autopilot::util::JsonValue::object_tag);
+  action["type"] = godot_autopilot::util::JsonValue("string");
+  action["description"] = godot_autopilot::util::JsonValue(
       "Action to perform; defaults to 'get' when omitted");
-  mcp::JsonValue values(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::array_tag);
   for (const char *value : actions) {
-    values.PushBack(mcp::JsonValue(value));
+    values.PushBack(godot_autopilot::util::JsonValue(value));
   }
   action["enum"] = std::move(values);
-  mcp::JsonValue *properties = raw.Find("properties");
+  godot_autopilot::util::JsonValue *properties = raw.Find("properties");
   if (properties != nullptr && properties->IsObject()) {
     (*properties)["action"] = std::move(action);
   }
@@ -105,16 +105,16 @@ inline ToolSpec config_optional_action_spec(
   return spec;
 }
 
-inline mcp::JsonValue config_args_with_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue config_args_with_action(const godot_autopilot::util::JsonValue &args,
                                               const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline bool config_result_has_error(const mcp::JsonValue &result) {
+inline bool config_result_has_error(const godot_autopilot::util::JsonValue &result) {
   return result.IsObject() &&
          (result.Find("error") != nullptr ||
           result.Find("structured_error") != nullptr ||
@@ -126,7 +126,7 @@ inline ToolAlias config_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return config_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -134,15 +134,15 @@ inline ToolAlias config_alias(const char *name, const char *canonical,
   return alias;
 }
 
-inline mcp::JsonValue project_config_found(const mcp::JsonValue &result) {
+inline godot_autopilot::util::JsonValue project_config_found(const godot_autopilot::util::JsonValue &result) {
   if (config_result_has_error(result)) {
     return result;
   }
-  const mcp::JsonValue *found = result.Find("result");
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *found = result.Find("result");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   out["result"] = found != nullptr && found->IsBool()
                       ? *found
-                      : mcp::JsonValue(false);
+                      : godot_autopilot::util::JsonValue(false);
   return out;
 }
 

@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_SCRIPT_OPS_HPP
 #define GODOT_AUTOPILOT_SCRIPT_OPS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstdint>
 #include <string>
@@ -19,16 +19,16 @@ bool try_compile_source(const std::string &source_code,
 
 bool refresh_script_cache(const std::string &path, std::string &error_out);
 
-mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args);
-mcp::JsonValue handle_load(const mcp::JsonValue &args);
-mcp::JsonValue handle_create(const mcp::JsonValue &args);
-mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args);
-mcp::JsonValue handle_detach_from_node(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_property(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_property(const mcp::JsonValue &args);
-mcp::JsonValue handle_call_function(const mcp::JsonValue &args);
-mcp::JsonValue handle_reload(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_execute_gdscript(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_load(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_create(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_attach_to_node(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_detach_from_node(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_property(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_property(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_call_function(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_reload(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_variable_list(const godot_autopilot::util::JsonValue &args);
 
 } // namespace script_ops
 } // namespace godot_autopilot

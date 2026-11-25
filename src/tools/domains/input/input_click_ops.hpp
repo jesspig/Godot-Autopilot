@@ -3,7 +3,7 @@
 
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/variant/vector2.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 
 namespace godot_autopilot {
@@ -20,12 +20,12 @@ bool inject_wheel(godot::Vector2 pos, godot::MouseButton wheel, int amount,
                   int window_id = 0);
 bool inject_key(godot::Key key, bool pressed, bool ctrl, bool shift, bool alt,
                 int window_id = 0);
-mcp::JsonValue handle_input_mouse(const mcp::JsonValue &args);
-mcp::JsonValue handle_input_text(const mcp::JsonValue &args);
-mcp::JsonValue handle_click_mouse(const mcp::JsonValue &args);
-mcp::JsonValue handle_scroll_mouse(const mcp::JsonValue &args);
-mcp::JsonValue handle_drag_mouse(const mcp::JsonValue &args);
-mcp::JsonValue handle_type_text(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_input_mouse(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_input_text(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_click_mouse(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_scroll_mouse(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_drag_mouse(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_type_text(const godot_autopilot::util::JsonValue &args);
 
 } // namespace input_click_ops
 } // namespace godot_autopilot

@@ -20,7 +20,7 @@
 namespace godot_autopilot {
 namespace input_map_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

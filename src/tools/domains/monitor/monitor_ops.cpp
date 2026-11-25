@@ -8,7 +8,7 @@
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "core/observability/game_monitor.hpp"
 #include "core/observability/monitor_analysis.hpp"
@@ -84,54 +84,48 @@ bool read_text(const std::string &path, std::string *out) {
   return true;
 }
 
-mcp::JsonValue parse_json_object(const std::string &text) {
-  mcp::JsonValue value;
+godot_autopilot::util::JsonValue parse_json_object(const std::string &text) {
+  godot_autopilot::util::JsonValue value;
   if (!util::try_parse_json(text, value) || !value.IsObject()) {
-    return mcp::JsonValue(mcp::JsonValue::object_tag);
+    return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   }
   return value;
 }
 
-mcp::JsonValue error_result(const std::string &message) {
+godot_autopilot::util::JsonValue error_result(const std::string &message) {
   return util::error_json(message);
-}
-
-mcp::JsonValue ok_result(mcp::JsonValue value) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = std::move(value);
-  return out;
 }
 
 } // namespace
 
-mcp::JsonValue handle_game_monitor(const mcp::JsonValue &args) {
-  const mcp::JsonValue *action_p = args.Find("action");
+godot_autopilot::util::JsonValue handle_game_monitor(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *action_p = args.Find("action");
   const std::string action = action_p != nullptr && action_p->IsString()
                                  ? action_p->GetString()
                                  : std::string("status");
 
   if (action == "status") {
-    mcp::JsonValue value(mcp::JsonValue::object_tag);
-    value["supported_scope"] = mcp::JsonValue("editor_launched_game");
-    value["custom_discovery"] = mcp::JsonValue("Performance.add_custom_monitor");
-    value["sessions_dir"] = mcp::JsonValue(session_dir());
-    value["schema"] = mcp::JsonValue(static_cast<int64_t>(1));
+    godot_autopilot::util::JsonValue value(godot_autopilot::util::JsonValue::object_tag);
+    value["supported_scope"] = godot_autopilot::util::JsonValue("editor_launched_game");
+    value["custom_discovery"] = godot_autopilot::util::JsonValue("Performance.add_custom_monitor");
+    value["sessions_dir"] = godot_autopilot::util::JsonValue(session_dir());
+    value["schema"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(1));
     return ok_result(std::move(value));
   }
 
   if (action == "sessions") {
-    mcp::JsonValue value(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue value(godot_autopilot::util::JsonValue::object_tag);
     const std::vector<std::string> ids = list_sessions();
-    mcp::JsonValue array(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &id : ids) {
-      array.PushBack(mcp::JsonValue(id));
+      array.PushBack(godot_autopilot::util::JsonValue(id));
     }
     value["sessions"] = std::move(array);
-    value["count"] = mcp::JsonValue(static_cast<int64_t>(ids.size()));
+    value["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(ids.size()));
     return ok_result(std::move(value));
   }
 
-  const mcp::JsonValue *id_p = args.Find("session");
+  const godot_autopilot::util::JsonValue *id_p = args.Find("session");
   if (id_p == nullptr || !id_p->IsString() ||
       !valid_session_id(id_p->GetString())) {
     return error_result("invalid parameter: session must be a recorded session id");
@@ -149,7 +143,7 @@ mcp::JsonValue handle_game_monitor(const mcp::JsonValue &args) {
     std::vector<game_monitor_analysis::MonitorDef> custom;
     std::vector<game_monitor_analysis::FrameSample> frames;
     double slow_ms = 33.3;
-    if (const mcp::JsonValue *slow = args.Find("slow_ms")) {
+    if (const godot_autopilot::util::JsonValue *slow = args.Find("slow_ms")) {
       if (slow->IsNumber()) {
         slow_ms = slow->IsInt() ? static_cast<double>(slow->GetInt())
                                 : slow->GetDouble();
@@ -204,9 +198,9 @@ mcp::JsonValue handle_game_monitor(const mcp::JsonValue &args) {
     }
     file->store_string(godot::String::utf8(text.c_str()));
     file->close();
-    mcp::JsonValue value(mcp::JsonValue::object_tag);
-    value["path"] = mcp::JsonValue(target);
-    value["bytes"] = mcp::JsonValue(static_cast<int64_t>(text.size()));
+    godot_autopilot::util::JsonValue value(godot_autopilot::util::JsonValue::object_tag);
+    value["path"] = godot_autopilot::util::JsonValue(target);
+    value["bytes"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(text.size()));
     return ok_result(std::move(value));
   }
 

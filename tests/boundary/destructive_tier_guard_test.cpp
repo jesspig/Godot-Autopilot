@@ -254,8 +254,8 @@ TEST(DestructiveTierGuardTest, RegistrationAuditsUndeclaredDestructiveTools) {
     suspect.name = "wipe_all_records";
     suspect.description = "Wipe all records permanently.";
     suspect.category = "Test";
-    suspect.handler = [](const mcp::JsonValue &) {
-      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    suspect.handler = [](const godot_autopilot::util::JsonValue &) {
+      return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     };
     std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
     godot_autopilot::dynamic_specs::store().push_back(std::move(suspect));

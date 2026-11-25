@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 
@@ -16,7 +16,7 @@ struct ToolInfo {
   std::string description;
   std::string category;
   std::vector<std::string> tags;
-  mcp::JsonValue input_schema;
+  godot_autopilot::util::JsonValue input_schema;
   bool dynamic = false;
   bool mutating = false;
   std::vector<std::string> examples;

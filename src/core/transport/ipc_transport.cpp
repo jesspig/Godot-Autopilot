@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <system_error>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "core/transport/api_token.hpp"
 #include "core/transport/ipc_framing.hpp"
@@ -142,8 +142,8 @@ std::string error_frame(const std::string &id_text, int code,
          ",\"message\":\"" + message + "\"}}";
 }
 
-std::string request_id_text(const mcp::JsonValue &doc) {
-  const mcp::JsonValue *id = doc.Find("id");
+std::string request_id_text(const godot_autopilot::util::JsonValue &doc) {
+  const godot_autopilot::util::JsonValue *id = doc.Find("id");
   if (id != nullptr && id->IsInt()) {
     return std::to_string(id->GetInt());
   }
@@ -365,9 +365,9 @@ bool IpcTransport::authenticate(std::uint64_t connection_id,
                error_frame("null", -32003, "IPC token unavailable"));
     return false;
   }
-  mcp::JsonValue doc;
+  godot_autopilot::util::JsonValue doc;
   try {
-    doc = mcp::JsonValue::Parse(frame);
+    doc = godot_autopilot::util::JsonValue::Parse(frame);
   } catch (...) {
     return false;
   }
@@ -375,25 +375,25 @@ bool IpcTransport::authenticate(std::uint64_t connection_id,
     return false;
   }
   const std::string id_text = request_id_text(doc);
-  const mcp::JsonValue *method = doc.Find("method");
+  const godot_autopilot::util::JsonValue *method = doc.Find("method");
   if (method == nullptr || !method->IsString() ||
       method->GetString() != "initialize") {
     queue_line(connection_id,
                error_frame(id_text, -32002, "IPC initialize required"));
     return false;
   }
-  const mcp::JsonValue *params = doc.Find("params");
+  const godot_autopilot::util::JsonValue *params = doc.Find("params");
   std::string presented;
   if (params != nullptr && params->IsObject()) {
-    const mcp::JsonValue *meta = params->Find("_meta");
+    const godot_autopilot::util::JsonValue *meta = params->Find("_meta");
     if (meta != nullptr && meta->IsObject()) {
-      const mcp::JsonValue *token = meta->Find("gda_token");
+      const godot_autopilot::util::JsonValue *token = meta->Find("gda_token");
       if (token != nullptr && token->IsString()) {
         presented = token->GetString();
       }
     }
     if (presented.empty()) {
-      const mcp::JsonValue *token = params->Find("gda_token");
+      const godot_autopilot::util::JsonValue *token = params->Find("gda_token");
       if (token != nullptr && token->IsString()) {
         presented = token->GetString();
       }

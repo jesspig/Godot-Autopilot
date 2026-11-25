@@ -11,6 +11,7 @@
 #include "tools/base/dispatch.hpp"
 #include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include "core/observability/monitor.hpp"
 #include <cstdlib>
 #include <chrono>
@@ -320,8 +321,9 @@ bool ServerContext::start() {
           !request->params || !request->params->IsObject()) {
         return;
       }
-      mcp::JsonValue *params = &*request->params;
-      const mcp::JsonValue *name_value = params->Find("name");
+      godot_autopilot::adapters::SdkJson *params = &*request->params;
+      const godot_autopilot::adapters::SdkJson *name_value =
+          params->Find("name");
       if (name_value == nullptr || !name_value->IsString()) {
         return;
       }
@@ -330,17 +332,18 @@ bool ServerContext::start() {
       if (!canonical) {
         return;
       }
-      mcp::JsonValue inner(mcp::JsonValue::object_tag);
-      inner["name"] = mcp::JsonValue(name);
-      if (const mcp::JsonValue *arguments = params->Find("arguments")) {
-        inner["arguments"] = *arguments;
+      godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+      inner["name"] = godot_autopilot::util::JsonValue(name);
+      if (const godot_autopilot::adapters::SdkJson *arguments =
+              params->Find("arguments")) {
+        inner["arguments"] = godot_autopilot::adapters::FromSdk(*arguments);
       } else {
-        inner["arguments"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        inner["arguments"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
       }
-      mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
-      wrapped["name"] = mcp::JsonValue("call_tool");
+      godot_autopilot::util::JsonValue wrapped(godot_autopilot::util::JsonValue::object_tag);
+      wrapped["name"] = godot_autopilot::util::JsonValue("call_tool");
       wrapped["arguments"] = std::move(inner);
-      *params = std::move(wrapped);
+      *params = godot_autopilot::adapters::ToSdk(wrapped);
       LogSystem::instance().log(
           LogLevel::Debug, LogCategory::Tools,
           "direct tool alias '" + name + "' rewritten to call_tool wrapper");
@@ -491,7 +494,8 @@ bool ServerContext::start() {
       const std::string digest = req.params ? req.params->Dump() : std::string();
       std::string traceparent;
       if (req.meta) {
-        if (const mcp::JsonValue *tp = req.meta->Find("traceparent")) {
+        if (const godot_autopilot::adapters::SdkJson *tp =
+                req.meta->Find("traceparent")) {
           if (tp->IsString()) {
             traceparent = tp->GetString();
           }

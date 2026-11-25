@@ -124,7 +124,7 @@ std::string usage_name(int usage) {
 
 } // namespace
 
-mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_transform(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   auto *it_space = args.Find("space");
   auto *it_position = args.Find("position");
@@ -181,13 +181,13 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
         "use property_get_list to see available properties, or property_set "
         "for other properties");
   }
-  auto num_value = [](const mcp::JsonValue *v) -> double {
+  auto num_value = [](const godot_autopilot::util::JsonValue *v) -> double {
     return v->IsDouble() ? v->GetDouble() : static_cast<double>(v->GetInt());
   };
-  auto parse_vector = [&](const mcp::JsonValue *raw, const char *field,
+  auto parse_vector = [&](const godot_autopilot::util::JsonValue *raw, const char *field,
                           bool need_z,
-                          std::vector<double> &out) -> mcp::JsonValue {
-    mcp::JsonValue ok;
+                          std::vector<double> &out) -> godot_autopilot::util::JsonValue {
+    godot_autopilot::util::JsonValue ok;
     std::string want =
         need_z ? "{\"x\": number, \"y\": number, \"z\": number}"
                : "{\"x\": number, \"y\": number}";
@@ -213,7 +213,7 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
     const char *axes[3] = {"x", "y", "z"};
     size_t count = need_z ? 3 : 2;
     for (size_t i = 0; i < count; i++) {
-      const mcp::JsonValue *f = raw->Find(axes[i]);
+      const godot_autopilot::util::JsonValue *f = raw->Find(axes[i]);
       if (!f || !f->IsNumber()) {
         return util::error_detail(std::string("invalid '") + field + "': '" +
                                       axes[i] + "' must be a number, e.g. " +
@@ -230,13 +230,13 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
   std::vector<double> scale_vals;
   std::vector<double> rot_vals;
   if (has_pos) {
-    mcp::JsonValue err = parse_vector(it_position, "position", is_3d, pos_vals);
+    godot_autopilot::util::JsonValue err = parse_vector(it_position, "position", is_3d, pos_vals);
     if (!err.IsNull()) {
       return err;
     }
   }
   if (has_scale) {
-    mcp::JsonValue err = parse_vector(it_scale, "scale", is_3d, scale_vals);
+    godot_autopilot::util::JsonValue err = parse_vector(it_scale, "scale", is_3d, scale_vals);
     if (!err.IsNull()) {
       return err;
     }
@@ -263,7 +263,7 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
             "convert the value to radians and retry");
       }
       if (!is_3d) {
-        const mcp::JsonValue *rad = it_rotation->Find("radians");
+        const godot_autopilot::util::JsonValue *rad = it_rotation->Find("radians");
         if (!rad || !rad->IsNumber() || it_rotation->GetObject().size() != 1) {
           return util::error_detail(
               "invalid 'rotation': expected a radians number or {\"radians\": "
@@ -273,7 +273,7 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
         }
         rot_vals.push_back(num_value(rad));
       } else {
-        mcp::JsonValue err =
+        godot_autopilot::util::JsonValue err =
             parse_vector(it_rotation, "rotation", true, rot_vals);
         if (!err.IsNull()) {
           return err;
@@ -289,19 +289,19 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
     }
   }
   auto vec2_json = [](double x, double y) {
-    mcp::JsonValue o(mcp::JsonValue::object_tag);
-    o["x"] = mcp::JsonValue(x);
-    o["y"] = mcp::JsonValue(y);
+    godot_autopilot::util::JsonValue o(godot_autopilot::util::JsonValue::object_tag);
+    o["x"] = godot_autopilot::util::JsonValue(x);
+    o["y"] = godot_autopilot::util::JsonValue(y);
     return o;
   };
   auto vec3_json = [](double x, double y, double z) {
-    mcp::JsonValue o(mcp::JsonValue::object_tag);
-    o["x"] = mcp::JsonValue(x);
-    o["y"] = mcp::JsonValue(y);
-    o["z"] = mcp::JsonValue(z);
+    godot_autopilot::util::JsonValue o(godot_autopilot::util::JsonValue::object_tag);
+    o["x"] = godot_autopilot::util::JsonValue(x);
+    o["y"] = godot_autopilot::util::JsonValue(y);
+    o["z"] = godot_autopilot::util::JsonValue(z);
     return o;
   };
-  mcp::JsonValue batch_props(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue batch_props(godot_autopilot::util::JsonValue::object_tag);
   if (space == "local") {
     if (has_pos) {
       batch_props["position"] =
@@ -311,7 +311,7 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
     if (has_rot) {
       batch_props["rotation"] =
           is_3d ? vec3_json(rot_vals[0], rot_vals[1], rot_vals[2])
-                : mcp::JsonValue(rot_vals[0]);
+                : godot_autopilot::util::JsonValue(rot_vals[0]);
     }
     if (has_scale) {
       batch_props["scale"] =
@@ -344,7 +344,7 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
     }
     if (has_rot) {
       batch_props["rotation"] =
-          mcp::JsonValue(static_cast<double>(local.get_rotation()));
+          godot_autopilot::util::JsonValue(static_cast<double>(local.get_rotation()));
     }
     if (has_scale) {
       godot::Vector2 s = local.get_scale();
@@ -394,22 +394,22 @@ mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
                                        static_cast<double>(s.z));
     }
   }
-  mcp::JsonValue batch_args(mcp::JsonValue::object_tag);
-  batch_args["path"] = mcp::JsonValue(path_str);
+  godot_autopilot::util::JsonValue batch_args(godot_autopilot::util::JsonValue::object_tag);
+  batch_args["path"] = godot_autopilot::util::JsonValue(path_str);
   batch_args["properties"] = std::move(batch_props);
-  batch_args["atomic"] = mcp::JsonValue(true);
-  mcp::JsonValue result = handle_set_batch(batch_args);
+  batch_args["atomic"] = godot_autopilot::util::JsonValue(true);
+  godot_autopilot::util::JsonValue result = handle_set_batch(batch_args);
   if (result.IsObject() && !result.Find("error")) {
-    result["space"] = mcp::JsonValue(space);
+    result["space"] = godot_autopilot::util::JsonValue(space);
   }
   return result;
 }
 
-mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_list(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
 
@@ -430,13 +430,13 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
   godot::Node *node =
       util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + path_str + " — " + hint);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + path_str + " — " + hint);
     return e;
   }
 
   godot::TypedArray<godot::Dictionary> props = node->get_property_list();
-  mcp::JsonValue result(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::array_tag);
 
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
@@ -459,38 +459,38 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
       }
     }
 
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
 
     if (dict.has("name")) {
-      item["name"] = mcp::JsonValue(name);
+      item["name"] = godot_autopilot::util::JsonValue(name);
     }
     if (dict.has("type")) {
       int type_id = static_cast<int>(dict["type"]);
-      item["type_id"] = mcp::JsonValue(static_cast<int64_t>(type_id));
-      item["type"] = mcp::JsonValue(util::to_std(godot::Variant::get_type_name(
+      item["type_id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(type_id));
+      item["type"] = godot_autopilot::util::JsonValue(util::to_std(godot::Variant::get_type_name(
           static_cast<godot::Variant::Type>(type_id))));
     }
     if (dict.has("hint")) {
       int hint_val = static_cast<int>(dict["hint"]);
-      item["hint"] = mcp::JsonValue(hint_name(hint_val));
+      item["hint"] = godot_autopilot::util::JsonValue(hint_name(hint_val));
     }
     if (dict.has("hint_string")) {
-      item["hint_string"] = mcp::JsonValue(
+      item["hint_string"] = godot_autopilot::util::JsonValue(
           util::to_std(dict["hint_string"].operator godot::String()));
     }
     if (dict.has("usage")) {
       int usage_val = static_cast<int>(dict["usage"]);
-      item["usage"] = mcp::JsonValue(usage_name(usage_val));
+      item["usage"] = godot_autopilot::util::JsonValue(usage_name(usage_val));
     }
     if (dict.has("class_name")) {
-      item["class_name"] = mcp::JsonValue(
+      item["class_name"] = godot_autopilot::util::JsonValue(
           util::to_std(dict["class_name"].operator godot::String()));
     }
 
     result.PushBack(std::move(item));
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result);
   return r;
 }

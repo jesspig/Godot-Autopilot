@@ -54,7 +54,7 @@ TEST(InputValidationHardening, TimeScaleRange) {
 }
 
 TEST(InputValidationHardening, GameBridgeMalformedJsonDoesNotThrow) {
-  mcp::JsonValue parsed;
+  godot_autopilot::util::JsonValue parsed;
   EXPECT_TRUE(godot_autopilot::util::try_parse_json(R"({"op":"ping"})", parsed));
   EXPECT_TRUE(parsed.IsObject());
 

@@ -229,7 +229,7 @@ struct DottedTarget {
   godot::Object *owner = nullptr;
   std::string leaf;
   godot::Dictionary info;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
 };
 
 DottedTarget resolve_dotted_target(godot::Object *root,
@@ -360,21 +360,21 @@ DottedTarget resolve_dotted_target(godot::Object *root,
   return out;
 }
 
-mcp::JsonValue try_expand_property_family(godot::Object *node,
+godot_autopilot::util::JsonValue try_expand_property_family(godot::Object *node,
                                           const std::string &prop,
-                                          const mcp::JsonValue &value,
-                                          const mcp::JsonValue &args,
+                                          const godot_autopilot::util::JsonValue &value,
+                                          const godot_autopilot::util::JsonValue &args,
                                           const std::string &path_str) {
   if (prop.find('.') != std::string::npos || !value.IsObject() ||
       value.GetObject().empty())
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   std::vector<std::string> family = find_property_family(node, prop);
   if (family.empty())
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   std::vector<std::string> available;
   for (const std::string &full_name : family)
     available.push_back(full_name.substr(prop.size() + 1));
-  mcp::JsonValue expanded_props(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue expanded_props(godot_autopilot::util::JsonValue::object_tag);
   std::string invalid_item;
   for (const auto &entry : value.GetObject()) {
     std::string name = prop + "/" + entry.first;
@@ -402,16 +402,16 @@ mcp::JsonValue try_expand_property_family(godot::Object *node,
             "; pass the exact names (e.g. '" + prop + "/" + available[0] +
             "') or an object with these suffixes");
   }
-  mcp::JsonValue new_args(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *original_path = args.Find("path");
+  godot_autopilot::util::JsonValue new_args(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *original_path = args.Find("path");
   if (original_path && original_path->IsString())
     new_args["path"] = *original_path;
   else
-    new_args["path"] = mcp::JsonValue(path_str);
+    new_args["path"] = godot_autopilot::util::JsonValue(path_str);
   new_args["properties"] = std::move(expanded_props);
-  mcp::JsonValue result = handle_set(new_args);
+  godot_autopilot::util::JsonValue result = handle_set(new_args);
   if (result.IsObject() && !result.Find("error"))
-    result["expanded_from"] = mcp::JsonValue(prop);
+    result["expanded_from"] = godot_autopilot::util::JsonValue(prop);
   return result;
 }
 
@@ -518,7 +518,7 @@ bool load_element_script(const std::string &class_name,
 struct NodePathValueConversion {
   bool converted = false;
   bool has_error = false;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   godot::Variant value;
   std::string node_path;
 };
@@ -555,7 +555,7 @@ NodePathValueConversion
 convert_node_path_value(const godot::Dictionary &dict,
                         const std::string &prop_str,
                         const std::string &path_str,
-                        const mcp::JsonValue &raw_value) {
+                        const godot_autopilot::util::JsonValue &raw_value) {
   NodePathValueConversion result;
   bool node_typed_prop = false;
   if (!dict.is_empty() && dict.has("type") && dict.has("hint")) {
@@ -592,17 +592,17 @@ convert_node_path_value(const godot::Dictionary &dict,
 struct ArrayValueConversion {
   bool handled = false;
   bool has_error = false;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   godot::Variant value;
 };
 
-bool convert_array_element(const mcp::JsonValue &element,
+bool convert_array_element(const godot_autopilot::util::JsonValue &element,
                            const util::ArrayElementHint *element_hint,
                            std::size_t index,
                            const std::string &prop_str,
                            const std::string &path_str,
                            godot::Variant &out_value,
-                           mcp::JsonValue &out_error) {
+                           godot_autopilot::util::JsonValue &out_error) {
   const std::string element_label = "element " + std::to_string(index) +
                                     " of array property '" + prop_str +
                                     "' on " + path_str;
@@ -751,7 +751,7 @@ bool convert_array_element(const mcp::JsonValue &element,
 ArrayValueConversion
 convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
                     const std::string &path_str,
-                    const mcp::JsonValue &raw_value) {
+                    const godot_autopilot::util::JsonValue &raw_value) {
   ArrayValueConversion result;
   if (dict.is_empty() || !dict.has("type")) {
     return result;
@@ -779,10 +779,10 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
       (parsed.has_value() && parsed->known) ? &parsed.value() : nullptr;
 
   godot::Array out_array;
-  const mcp::JsonValue::Array &elements = raw_value.GetArray();
+  const godot_autopilot::util::JsonValue::Array &elements = raw_value.GetArray();
   for (std::size_t i = 0; i < elements.size(); i++) {
     godot::Variant converted;
-    mcp::JsonValue element_error;
+    godot_autopilot::util::JsonValue element_error;
     if (!convert_array_element(elements[i], element_hint, i, prop_str,
                                path_str, converted, element_error)) {
       result.has_error = true;
@@ -835,7 +835,7 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
           "pass elements matching the declared array element type, or use "
           "code_execute to build the array manually");
       result.error["element_script_loaded"] =
-          mcp::JsonValue(element_script_loaded);
+          godot_autopilot::util::JsonValue(element_script_loaded);
       return result;
     }
     out_array = typed_array;
@@ -848,7 +848,7 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
 struct DictionaryValueConversion {
   bool handled = false;
   bool has_error = false;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   godot::Variant value;
 };
 
@@ -856,7 +856,7 @@ DictionaryValueConversion
 convert_dictionary_value(const godot::Dictionary &dict,
                          const std::string &prop_str,
                          const std::string &path_str,
-                         const mcp::JsonValue &raw_value) {
+                         const godot_autopilot::util::JsonValue &raw_value) {
   DictionaryValueConversion result;
   if (dict.is_empty() || !dict.has("type")) {
     return result;
@@ -880,7 +880,7 @@ convert_dictionary_value(const godot::Dictionary &dict,
   return result;
 }
 
-double animations_number(const mcp::JsonValue &v, double fallback) {
+double animations_number(const godot_autopilot::util::JsonValue &v, double fallback) {
   if (v.IsInt())
     return static_cast<double>(v.GetInt());
   if (v.IsDouble())
@@ -888,13 +888,13 @@ double animations_number(const mcp::JsonValue &v, double fallback) {
   return fallback;
 }
 
-bool convert_animation_frame(const mcp::JsonValue &frame,
+bool convert_animation_frame(const godot_autopilot::util::JsonValue &frame,
                              const std::string &anim_name,
                              const std::string &full_prop,
                              const std::string &path_str,
                              const std::string &owner_desc,
                              godot::Variant &out_value,
-                             mcp::JsonValue &out_error) {
+                             godot_autopilot::util::JsonValue &out_error) {
   godot::Variant texture_value;
   double duration = 1.0;
   bool direct_ref = frame.IsString();
@@ -976,12 +976,12 @@ bool convert_animation_frame(const mcp::JsonValue &frame,
 }
 
 bool convert_single_animation(const std::string &anim_name,
-                              const mcp::JsonValue &def,
+                              const godot_autopilot::util::JsonValue &def,
                               const std::string &full_prop,
                               const std::string &path_str,
                               const std::string &owner_desc,
                               godot::Dictionary &out_dict,
-                              mcp::JsonValue &out_error) {
+                              godot_autopilot::util::JsonValue &out_error) {
   if (anim_name.empty()) {
     out_error = util::error_detail(
         "cannot convert property '" + full_prop + "' of " + owner_desc +
@@ -990,7 +990,7 @@ bool convert_single_animation(const std::string &anim_name,
         "use the animation name as the object key");
     return false;
   }
-  const mcp::JsonValue *frames_field = nullptr;
+  const godot_autopilot::util::JsonValue *frames_field = nullptr;
   double speed = 5.0;
   bool loop = true;
   if (def.IsArray()) {
@@ -1050,10 +1050,10 @@ bool convert_single_animation(const std::string &anim_name,
     return false;
   }
   godot::Array frames_array;
-  const mcp::JsonValue::Array &frames = frames_field->GetArray();
+  const godot_autopilot::util::JsonValue::Array &frames = frames_field->GetArray();
   for (size_t i = 0; i < frames.size(); i++) {
     godot::Variant converted;
-    mcp::JsonValue frame_error;
+    godot_autopilot::util::JsonValue frame_error;
     if (!convert_animation_frame(frames[i], anim_name, full_prop, path_str,
                                  owner_desc, converted, frame_error)) {
       out_error = std::move(frame_error);
@@ -1071,14 +1071,14 @@ bool convert_single_animation(const std::string &anim_name,
 struct SpriteFramesAnimationsConversion {
   bool handled = false;
   bool has_error = false;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   godot::Variant value;
 };
 
 SpriteFramesAnimationsConversion convert_spriteframes_animations(
     godot::Object *owner, const std::string &leaf,
     const std::string &full_prop, const std::string &path_str,
-    const mcp::JsonValue &raw_value) {
+    const godot_autopilot::util::JsonValue &raw_value) {
   SpriteFramesAnimationsConversion result;
   if (leaf != "animations") {
     return result;
@@ -1092,7 +1092,7 @@ SpriteFramesAnimationsConversion convert_spriteframes_animations(
   if (raw_value.IsObject()) {
     for (const auto &entry : raw_value.GetObject()) {
       godot::Dictionary anim_dict;
-      mcp::JsonValue item_error;
+      godot_autopilot::util::JsonValue item_error;
       if (!convert_single_animation(entry.first, entry.second, full_prop,
                                     path_str, owner_desc, anim_dict,
                                     item_error)) {
@@ -1106,9 +1106,9 @@ SpriteFramesAnimationsConversion convert_spriteframes_animations(
     return result;
   }
   if (raw_value.IsArray()) {
-    const mcp::JsonValue::Array &items = raw_value.GetArray();
+    const godot_autopilot::util::JsonValue::Array &items = raw_value.GetArray();
     for (size_t i = 0; i < items.size(); i++) {
-      const mcp::JsonValue &item = items[i];
+      const godot_autopilot::util::JsonValue &item = items[i];
       if (!item.IsObject()) {
         result.has_error = true;
         result.error = util::error_detail(
@@ -1133,7 +1133,7 @@ SpriteFramesAnimationsConversion convert_spriteframes_animations(
       }
       std::string anim_name = name_field->GetString();
       godot::Dictionary anim_dict;
-      mcp::JsonValue item_error;
+      godot_autopilot::util::JsonValue item_error;
       if (!convert_single_animation(anim_name, item, full_prop, path_str,
                                     owner_desc, anim_dict, item_error)) {
         result.has_error = true;
@@ -1157,7 +1157,7 @@ SpriteFramesAnimationsConversion convert_spriteframes_animations(
 bool memory_resource_assignment_blocked(const godot::Variant &value,
                                         const std::string &prop_str,
                                         const std::string &path_str,
-                                        mcp::JsonValue &out_error) {
+                                        godot_autopilot::util::JsonValue &out_error) {
   if (value.get_type() != godot::Variant::OBJECT) {
     return false;
   }
@@ -1171,8 +1171,8 @@ bool memory_resource_assignment_blocked(const godot::Variant &value,
     return false;
   }
   std::string res_name = res_path.substr(memory_prefix.size());
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue(
       "cannot assign memory resource '" + res_name +
       "' to node property '" + prop_str + "' on " + path_str +
       " — memory:// resources are not persistent and will corrupt the scene "
@@ -1186,7 +1186,7 @@ bool memory_resource_assignment_blocked(const godot::Variant &value,
   return true;
 }
 
-void add_camera2d_serialization_note(mcp::JsonValue &result,
+void add_camera2d_serialization_note(godot_autopilot::util::JsonValue &result,
                                      const std::string &prop_str,
                                      godot::Node *node) {
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
@@ -1196,14 +1196,14 @@ void add_camera2d_serialization_note(mcp::JsonValue &result,
   }
   if (prop_str == "enabled") {
     result["serialization_note"] =
-        mcp::JsonValue("Camera2D enabled defaults to true. If setting to "
+        godot_autopilot::util::JsonValue("Camera2D enabled defaults to true. If setting to "
                        "true (the default), it won't appear in .tscn. "
                        "If setting to false, it will serialize correctly. "
                        "To ensure initial enabled state, use code_execute: "
                        "get_node(\"Path/To/Camera2D\").set_enabled(true/"
                        "false) in _ready().");
   } else if (prop_str == "current") {
-    result["serialization_note"] = mcp::JsonValue(
+    result["serialization_note"] = godot_autopilot::util::JsonValue(
         "Camera2D current is not a registered property (no setter/getter). "
         "Cannot be set via property_set. "
         "Use code_execute: get_node(\"Path/To/Camera2D\").make_current()");
@@ -1265,8 +1265,8 @@ bool apply_inline_resource_property(godot::Resource *res,
                                     const std::string &sub_prop,
                                     const std::string &node_property,
                                     const std::string &path_str,
-                                    const mcp::JsonValue &raw_value, int depth,
-                                    mcp::JsonValue &out_error) {
+                                    const godot_autopilot::util::JsonValue &raw_value, int depth,
+                                    godot_autopilot::util::JsonValue &out_error) {
   DottedTarget target = resolve_dotted_target(res, sub_prop, path_str);
   if (!target.ok) {
     out_error = std::move(target.error);
@@ -1364,7 +1364,7 @@ bool apply_inline_resource_property(godot::Resource *res,
         }
       }
       if (resource_attached) {
-        mcp::JsonValue blocked_error;
+        godot_autopilot::util::JsonValue blocked_error;
         if (memory_resource_assignment_blocked(value, node_property, path_str,
                                                blocked_error)) {
           out_error = std::move(blocked_error);
@@ -1398,7 +1398,7 @@ bool apply_inline_resource_property(godot::Resource *res,
 
 InlineResourceBuild
 build_inline_resource_value(const godot::Dictionary &prop_info,
-                            const mcp::JsonValue &raw_value,
+                            const godot_autopilot::util::JsonValue &raw_value,
                             const std::string &node_property,
                             const std::string &path_str, int depth) {
   InlineResourceBuild result;
@@ -1474,10 +1474,10 @@ build_inline_resource_value(const godot::Dictionary &prop_info,
         INLINE_RESOURCE_ACTION_TEXT);
     return result;
   }
-  const mcp::JsonValue *properties = raw_value.Find("properties");
+  const godot_autopilot::util::JsonValue *properties = raw_value.Find("properties");
   if (properties != nullptr && properties->IsObject()) {
     for (const auto &entry : *properties) {
-      mcp::JsonValue property_error;
+      godot_autopilot::util::JsonValue property_error;
       if (!apply_inline_resource_property(res.ptr(), entry.first, node_property,
                                           path_str, entry.second, depth + 1,
                                           property_error)) {
@@ -1520,7 +1520,7 @@ bool validate_metadata_key(const std::string &key, std::string &reason) {
   return true;
 }
 
-mcp::JsonValue metadata_key_error(const std::string &prop_str,
+godot_autopilot::util::JsonValue metadata_key_error(const std::string &prop_str,
                                   const std::string &path_str,
                                   const std::string &reason) {
   std::string key = prop_str.substr(sizeof(kMetadataPrefix) - 1);
@@ -1531,7 +1531,7 @@ mcp::JsonValue metadata_key_error(const std::string &prop_str,
       "pass 'metadata/<key>' with a plain key, e.g. 'metadata/my_key'");
 }
 
-mcp::JsonValue apply_metadata_get(godot::Node *node,
+godot_autopilot::util::JsonValue apply_metadata_get(godot::Node *node,
                                   const std::string &prop_str,
                                   const std::string &path_str) {
   std::string key = prop_str.substr(sizeof(kMetadataPrefix) - 1);
@@ -1541,21 +1541,21 @@ mcp::JsonValue apply_metadata_get(godot::Node *node,
   }
   godot::StringName meta_key(key.c_str());
   if (!node->has_meta(meta_key)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("meta not found: '" + key + "' on node " +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("meta not found: '" + key + "' on node " +
                                 path_str);
     return e;
   }
   godot::Variant stored = node->get_meta(meta_key);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(stored);
   return r;
 }
 
-mcp::JsonValue apply_metadata_set(godot::Node *node,
+godot_autopilot::util::JsonValue apply_metadata_set(godot::Node *node,
                                   const std::string &prop_str,
                                   const std::string &path_str,
-                                  const mcp::JsonValue &raw_value) {
+                                  const godot_autopilot::util::JsonValue &raw_value) {
   std::string key = prop_str.substr(sizeof(kMetadataPrefix) - 1);
   std::string reason;
   if (!validate_metadata_key(key, reason)) {
@@ -1591,26 +1591,26 @@ mcp::JsonValue apply_metadata_set(godot::Node *node,
     undo_redo->commit_action(false);
     undoable = true;
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   if (had_old) {
     r["meta_old"] = VariantJson::serialize(old_val);
   } else {
-    r["meta_old"] = mcp::JsonValue(nullptr);
+    r["meta_old"] = godot_autopilot::util::JsonValue(nullptr);
   }
   r["meta_new"] = VariantJson::serialize(new_val);
-  mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
-  undo_info["path"] = mcp::JsonValue(path_str);
-  undo_info["property"] = mcp::JsonValue(prop_str);
+  godot_autopilot::util::JsonValue undo_info(godot_autopilot::util::JsonValue::object_tag);
+  undo_info["path"] = godot_autopilot::util::JsonValue(path_str);
+  undo_info["property"] = godot_autopilot::util::JsonValue(prop_str);
   if (had_old) {
     undo_info["old_value"] = VariantJson::serialize(old_val);
   } else {
-    undo_info["old_value"] = mcp::JsonValue(nullptr);
+    undo_info["old_value"] = godot_autopilot::util::JsonValue(nullptr);
   }
   r["undo"] = std::move(undo_info);
-  r["undoable"] = mcp::JsonValue(undoable);
+  r["undoable"] = godot_autopilot::util::JsonValue(undoable);
   if (!undoable) {
-    r["undo_skip_reason"] = mcp::JsonValue(undo_skip);
+    r["undo_skip_reason"] = godot_autopilot::util::JsonValue(undo_skip);
   }
   util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
@@ -1618,7 +1618,7 @@ mcp::JsonValue apply_metadata_set(godot::Node *node,
 
 bool batch_property_is_object_typed(godot::Node *node,
                                     const std::string &prop_name,
-                                    const mcp::JsonValue &raw_value) {
+                                    const godot_autopilot::util::JsonValue &raw_value) {
   std::string root_name = prop_name;
   size_t dot = prop_name.find('.');
   if (dot != std::string::npos)
@@ -1640,12 +1640,12 @@ bool batch_property_is_object_typed(godot::Node *node,
     return str.rfind("res://", 0) == 0 || str.rfind("memory://", 0) == 0;
   }
   if (raw_value.IsObject()) {
-    const mcp::JsonValue *ref = raw_value.Find("path");
+    const godot_autopilot::util::JsonValue *ref = raw_value.Find("path");
     if (!ref)
       ref = raw_value.Find("resource");
     if (ref && ref->IsString())
       return true;
-    const mcp::JsonValue *type_field = raw_value.Find("type");
+    const godot_autopilot::util::JsonValue *type_field = raw_value.Find("type");
     if (type_field && type_field->IsString() &&
         !type_field->GetString().empty())
       return true;
@@ -1653,21 +1653,21 @@ bool batch_property_is_object_typed(godot::Node *node,
   return false;
 }
 
-mcp::JsonValue read_single_property(godot::Node *node,
+godot_autopilot::util::JsonValue read_single_property(godot::Node *node,
                                     const std::string &path_str,
                                     const std::string &prop_str,
                                     godot::Variant &out_value) {
   godot::Dictionary prop_info = find_property_info(node, prop_str);
   if (prop_info.is_empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "property not found: " + prop_str + " on node " + path_str +
         " — use property_get_list to see available properties");
     return e;
   }
   out_value =
       node->get(godot::StringName(godot::String::utf8(prop_str.c_str())));
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
 } // namespace
@@ -1695,21 +1695,21 @@ std::vector<std::string> find_property_family(godot::Object *object,
   return names;
 }
 
-mcp::JsonValue handle_get(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   auto *it_prop = args.Find("property");
   auto *it_props = args.Find("properties");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   if (args.IsObject()) {
     for (const auto &entry : args.GetObject()) {
       if (entry.first != "path" && entry.first != "property" &&
           entry.first != "properties") {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("unknown parameter for property_get: " +
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue("unknown parameter for property_get: " +
                                     entry.first);
         return e;
       }
@@ -1718,38 +1718,38 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
   const bool has_single = it_prop != nullptr;
   const bool has_batch = it_props != nullptr;
   if (has_single && has_batch) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "property and properties are mutually exclusive — pass exactly one");
     return e;
   }
   std::vector<std::string> batch_names;
   if (has_batch) {
     if (!it_props->IsArray() || it_props->GetArray().empty()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "properties must be a non-empty array of property name strings");
       return e;
     }
     for (const auto &item : it_props->GetArray()) {
       if (!item.IsString() || item.GetString().empty()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue(
             "properties must contain non-empty property name strings");
         return e;
       }
       batch_names.push_back(item.GetString());
     }
     if (batch_names.size() > static_cast<size_t>(kPropertyBatchMax)) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("properties exceeds maximum of " +
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("properties exceeds maximum of " +
                                   std::to_string(kPropertyBatchMax) +
                                   " entries — split into smaller batches");
       return e;
     }
   } else if (!has_single || !it_prop->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: property");
     return e;
   }
 
@@ -1759,36 +1759,36 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
   godot::Node *node =
       util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + path_str + " — " + hint);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + path_str + " — " + hint);
     return e;
   }
 
   if (has_batch) {
-    mcp::JsonValue values(mcp::JsonValue::object_tag);
-    mcp::JsonValue missing(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue missing(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &name : batch_names) {
       if (is_metadata_property(name)) {
-        mcp::JsonValue meta_result = apply_metadata_get(node, name, path_str);
-        const mcp::JsonValue *meta_value = meta_result.Find("result");
+        godot_autopilot::util::JsonValue meta_result = apply_metadata_get(node, name, path_str);
+        const godot_autopilot::util::JsonValue *meta_value = meta_result.Find("result");
         if (meta_value) {
-          mcp::JsonValue value_copy = *meta_value;
+          godot_autopilot::util::JsonValue value_copy = *meta_value;
           values[name] = std::move(value_copy);
         } else {
-          missing.PushBack(mcp::JsonValue(name));
+          missing.PushBack(godot_autopilot::util::JsonValue(name));
         }
         continue;
       }
       godot::Variant value;
-      mcp::JsonValue item_error =
+      godot_autopilot::util::JsonValue item_error =
           read_single_property(node, path_str, name, value);
       if (!item_error.IsNull()) {
-        missing.PushBack(mcp::JsonValue(name));
+        missing.PushBack(godot_autopilot::util::JsonValue(name));
         continue;
       }
       values[name] = VariantJson::serialize(value);
     }
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(values);
     if (missing.Size() > 0)
       r["missing"] = std::move(missing);
@@ -1800,17 +1800,17 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
     return apply_metadata_get(node, prop_str, path_str);
   }
   godot::Variant value;
-  if (mcp::JsonValue item_error =
+  if (godot_autopilot::util::JsonValue item_error =
           read_single_property(node, path_str, prop_str, value);
       !item_error.IsNull())
     return item_error;
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(value);
   return r;
 }
 
-mcp::JsonValue handle_set(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   auto *it_prop = args.Find("property");
   auto *it_val = args.Find("value");
@@ -1818,8 +1818,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   auto *it_hint_early = args.Find("type_hint");
   auto *it_atomic_early = args.Find("atomic");
   if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   std::string path_str = it_path->GetString();
@@ -1827,26 +1827,26 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   bool has_single_val = it_val != nullptr;
   bool has_batch = it_batch != nullptr;
   if (has_batch && (has_single_prop || has_single_val)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "property/value and properties are mutually exclusive — pass exactly one form");
     return e;
   }
   if (has_batch && it_hint_early) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "type_hint cannot be used with properties — omit it to infer each property type");
     return e;
   }
   if (it_atomic_early != nullptr) {
     if (!it_atomic_early->IsBool()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("invalid parameter: atomic must be a boolean");
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("invalid parameter: atomic must be a boolean");
       return e;
     }
     if (!has_batch) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "atomic can only be used with the properties batch form");
       return e;
     }
@@ -1854,21 +1854,21 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
   if (!has_batch) {
     if (!it_prop || !it_prop->IsString()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("missing required parameter: property");
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("missing required parameter: property");
       return e;
     }
     if (!it_val) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("missing required parameter: value");
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("missing required parameter: value");
       return e;
     }
     if (args.IsObject()) {
       for (const auto &entry : args.GetObject()) {
         if (entry.first != "path" && entry.first != "property" &&
             entry.first != "value" && entry.first != "type_hint") {
-          mcp::JsonValue e(mcp::JsonValue::object_tag);
-          e["error"] = mcp::JsonValue("unknown parameter for property_set: " +
+          godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+          e["error"] = godot_autopilot::util::JsonValue("unknown parameter for property_set: " +
                                       entry.first);
           return e;
         }
@@ -1879,22 +1879,22 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       for (const auto &entry : args.GetObject()) {
         if (entry.first != "path" && entry.first != "properties" &&
             entry.first != "atomic") {
-          mcp::JsonValue e(mcp::JsonValue::object_tag);
-          e["error"] = mcp::JsonValue("unknown parameter for property_set: " +
+          godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+          e["error"] = godot_autopilot::util::JsonValue("unknown parameter for property_set: " +
                                       entry.first);
           return e;
         }
       }
     }
     if (!it_batch->IsObject() || it_batch->GetObject().empty()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "properties must be a non-empty object mapping property names to values");
       return e;
     }
     if (it_batch->GetObject().size() > static_cast<size_t>(kPropertyBatchMax)) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("properties exceeds maximum of " +
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("properties exceeds maximum of " +
                                   std::to_string(kPropertyBatchMax) +
                                   " entries — split into smaller batches");
       return e;
@@ -1910,16 +1910,16 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     if (path_str.compare(0, memory_prefix.size(), memory_prefix) == 0) {
       err += " memory:// is a resource namespace, not a node path; to reference a memory resource pass it as the value (e.g. {\"resource\": \"memory://name\"}) or create the resource inline with code_execute";
     }
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(err);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(err);
     return e;
   }
   if (has_batch) {
     std::vector<std::string> object_props;
     for (const auto &entry : it_batch->GetObject()) {
       if (entry.first.empty()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue(
             "properties must contain non-empty property name strings");
         return e;
       }
@@ -1928,11 +1928,11 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
         object_props.push_back(entry.first);
     }
     std::vector<std::string> applied;
-    std::vector<mcp::JsonValue> warnings;
-    std::vector<mcp::JsonValue> inlines;
-    mcp::JsonValue converted(mcp::JsonValue::object_tag);
+    std::vector<godot_autopilot::util::JsonValue> warnings;
+    std::vector<godot_autopilot::util::JsonValue> inlines;
+    godot_autopilot::util::JsonValue converted(godot_autopilot::util::JsonValue::object_tag);
     size_t converted_count = 0;
-    mcp::JsonValue undo_entries(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue undo_entries(godot_autopilot::util::JsonValue::array_tag);
     bool all_undoable = true;
     std::string undo_skip;
     for (int pass = 0; pass < 2; pass++) {
@@ -1941,25 +1941,25 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
                                    entry.first) != object_props.end();
         if (is_object != (pass == 0))
           continue;
-        mcp::JsonValue sub_args(mcp::JsonValue::object_tag);
-        sub_args["path"] = mcp::JsonValue(path_str);
-        sub_args["property"] = mcp::JsonValue(entry.first);
-        mcp::JsonValue value_copy = entry.second;
+        godot_autopilot::util::JsonValue sub_args(godot_autopilot::util::JsonValue::object_tag);
+        sub_args["path"] = godot_autopilot::util::JsonValue(path_str);
+        sub_args["property"] = godot_autopilot::util::JsonValue(entry.first);
+        godot_autopilot::util::JsonValue value_copy = entry.second;
         sub_args["value"] = std::move(value_copy);
-        mcp::JsonValue sub = handle_set(sub_args);
+        godot_autopilot::util::JsonValue sub = handle_set(sub_args);
         auto *sub_err = sub.Find("error");
         if (sub_err) {
           std::string sub_msg =
               sub_err->IsString() ? sub_err->GetString() : sub_err->Dump();
-          mcp::JsonValue e(mcp::JsonValue::object_tag);
-          e["error"] = mcp::JsonValue("failed to apply property '" +
+          godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+          e["error"] = godot_autopilot::util::JsonValue("failed to apply property '" +
                                       entry.first + "' on " + path_str + ": " +
                                       sub_msg);
-          e["failed_property"] = mcp::JsonValue(entry.first);
+          e["failed_property"] = godot_autopilot::util::JsonValue(entry.first);
           if (!applied.empty()) {
-            mcp::JsonValue ap(mcp::JsonValue::array_tag);
+            godot_autopilot::util::JsonValue ap(godot_autopilot::util::JsonValue::array_tag);
             for (const std::string &name : applied)
-              ap.PushBack(mcp::JsonValue(name));
+              ap.PushBack(godot_autopilot::util::JsonValue(name));
             e["applied_properties"] = std::move(ap);
           }
           return e;
@@ -1967,27 +1967,27 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
         applied.push_back(entry.first);
         auto *warn = sub.Find("warning");
         if (warn && warn->IsString()) {
-          mcp::JsonValue w(mcp::JsonValue::object_tag);
-          w["path"] = mcp::JsonValue(path_str);
-          w["property"] = mcp::JsonValue(entry.first);
-          w["warning"] = mcp::JsonValue(warn->GetString());
+          godot_autopilot::util::JsonValue w(godot_autopilot::util::JsonValue::object_tag);
+          w["path"] = godot_autopilot::util::JsonValue(path_str);
+          w["property"] = godot_autopilot::util::JsonValue(entry.first);
+          w["warning"] = godot_autopilot::util::JsonValue(warn->GetString());
           warnings.push_back(std::move(w));
         }
         auto *inline_rec = sub.Find("inline_resources");
         if (inline_rec && inline_rec->IsArray()) {
           for (const auto &inline_entry : inline_rec->GetArray()) {
-            mcp::JsonValue inline_copy = inline_entry;
+            godot_autopilot::util::JsonValue inline_copy = inline_entry;
             inlines.push_back(std::move(inline_copy));
           }
         }
         auto *conv = sub.Find("converted_node_path");
         if (conv && conv->IsString()) {
-          converted[entry.first] = mcp::JsonValue(conv->GetString());
+          converted[entry.first] = godot_autopilot::util::JsonValue(conv->GetString());
           converted_count++;
         }
         auto *undo_entry = sub.Find("undo");
         if (undo_entry) {
-          mcp::JsonValue undo_copy = *undo_entry;
+          godot_autopilot::util::JsonValue undo_copy = *undo_entry;
           undo_entries.PushBack(std::move(undo_copy));
         }
         auto *undoable_flag = sub.Find("undoable");
@@ -2000,20 +2000,20 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
         }
       }
     }
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("ok");
-    mcp::JsonValue ap(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["result"] = godot_autopilot::util::JsonValue("ok");
+    godot_autopilot::util::JsonValue ap(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &name : applied)
-      ap.PushBack(mcp::JsonValue(name));
+      ap.PushBack(godot_autopilot::util::JsonValue(name));
     r["applied_properties"] = std::move(ap);
     if (!warnings.empty()) {
-      mcp::JsonValue warr(mcp::JsonValue::array_tag);
+      godot_autopilot::util::JsonValue warr(godot_autopilot::util::JsonValue::array_tag);
       for (auto &w : warnings)
         warr.PushBack(std::move(w));
       r["property_warnings"] = std::move(warr);
     }
     if (!inlines.empty()) {
-      mcp::JsonValue iarr(mcp::JsonValue::array_tag);
+      godot_autopilot::util::JsonValue iarr(godot_autopilot::util::JsonValue::array_tag);
       for (auto &item : inlines)
         iarr.PushBack(std::move(item));
       r["inline_resources"] = std::move(iarr);
@@ -2021,9 +2021,9 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     if (converted_count > 0)
       r["converted_node_paths"] = std::move(converted);
     r["undo"] = std::move(undo_entries);
-    r["undoable"] = mcp::JsonValue(all_undoable);
+    r["undoable"] = godot_autopilot::util::JsonValue(all_undoable);
     if (!all_undoable && !undo_skip.empty())
-      r["undo_skip_reason"] = mcp::JsonValue(undo_skip);
+      r["undo_skip_reason"] = godot_autopilot::util::JsonValue(undo_skip);
     scene_dirty_tracker::mark_scene_modified();
     util::add_scene_info_fields(r, util::edited_scene_info());
     return r;
@@ -2035,7 +2035,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
 
   DottedTarget target = resolve_dotted_target(node, prop_str, path_str);
   if (!target.ok) {
-    mcp::JsonValue expanded =
+    godot_autopilot::util::JsonValue expanded =
         try_expand_property_family(node, prop_str, *it_val, args, path_str);
     if (!expanded.IsNull())
       return expanded;
@@ -2111,8 +2111,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     if (resource_ops::try_resolve_resource_value(*it_val, value,
                                                  resource_error)) {
       if (!resource_error.empty()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(resource_error);
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+        e["error"] = godot_autopilot::util::JsonValue(resource_error);
         return e;
       }
       resource_attached = true;
@@ -2132,7 +2132,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue blocked_error;
+  godot_autopilot::util::JsonValue blocked_error;
   if (resource_attached && memory_resource_assignment_blocked(
                                value, prop_str, path_str, blocked_error)) {
     return blocked_error;
@@ -2143,21 +2143,21 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
 
   godot::Variant new_val = target_owner->get(prop_name);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   if (resource_attached) {
-    r["resource_attached"] = mcp::JsonValue(true);
+    r["resource_attached"] = godot_autopilot::util::JsonValue(true);
   }
   if (inline_attached) {
-    mcp::JsonValue inline_array(mcp::JsonValue::array_tag);
-    mcp::JsonValue inline_entry(mcp::JsonValue::object_tag);
-    inline_entry["property"] = mcp::JsonValue(prop_str);
-    inline_entry["type"] = mcp::JsonValue(inline_type);
+    godot_autopilot::util::JsonValue inline_array(godot_autopilot::util::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue inline_entry(godot_autopilot::util::JsonValue::object_tag);
+    inline_entry["property"] = godot_autopilot::util::JsonValue(prop_str);
+    inline_entry["type"] = godot_autopilot::util::JsonValue(inline_type);
     inline_array.PushBack(std::move(inline_entry));
     r["inline_resources"] = std::move(inline_array);
   }
   if (converted_node_path) {
-    r["converted_node_path"] = mcp::JsonValue(value_node_path);
+    r["converted_node_path"] = godot_autopilot::util::JsonValue(value_node_path);
   }
 
   std::string readback_detail;
@@ -2177,16 +2177,16 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
                       : "old value could not be restored"));
   }
   if (readback == util::ReadbackStatus::CONVERTED) {
-    r["warning"] = mcp::JsonValue("set applied; " + readback_detail);
+    r["warning"] = godot_autopilot::util::JsonValue("set applied; " + readback_detail);
   }
 
   add_camera2d_serialization_note(r, prop_str, node);
   scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
 
-  mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
-  undo_info["path"] = mcp::JsonValue(path_str);
-  undo_info["property"] = mcp::JsonValue(prop_str);
+  godot_autopilot::util::JsonValue undo_info(godot_autopilot::util::JsonValue::object_tag);
+  undo_info["path"] = godot_autopilot::util::JsonValue(path_str);
+  undo_info["property"] = godot_autopilot::util::JsonValue(prop_str);
   undo_info["old_value"] = VariantJson::serialize(old_val);
   r["undo"] = std::move(undo_info);
 
@@ -2213,14 +2213,14 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       undoable = true;
     }
   }
-  r["undoable"] = mcp::JsonValue(undoable);
+  r["undoable"] = godot_autopilot::util::JsonValue(undoable);
   if (!undoable) {
-    r["undo_skip_reason"] = mcp::JsonValue(undo_skip_reason);
+    r["undo_skip_reason"] = godot_autopilot::util::JsonValue(undo_skip_reason);
   }
   return r;
 }
 
-mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_batch(const godot_autopilot::util::JsonValue &args) {
   auto *it_path = args.Find("path");
   auto *it_batch = args.Find("properties");
   auto *it_atomic = args.Find("atomic");
@@ -2275,7 +2275,7 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   }
   struct BatchWork {
     std::string name;
-    mcp::JsonValue value;
+    godot_autopilot::util::JsonValue value;
   };
   std::vector<BatchWork> work;
   work.reserve(it_batch->GetObject().size() * 2);
@@ -2409,14 +2409,14 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
     }
     return outcome;
   };
-  std::vector<mcp::JsonValue> warnings;
-  std::vector<mcp::JsonValue> inlines;
-  mcp::JsonValue converted(mcp::JsonValue::object_tag);
+  std::vector<godot_autopilot::util::JsonValue> warnings;
+  std::vector<godot_autopilot::util::JsonValue> inlines;
+  godot_autopilot::util::JsonValue converted(godot_autopilot::util::JsonValue::object_tag);
   size_t converted_count = 0;
-  mcp::JsonValue failed(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue failed(godot_autopilot::util::JsonValue::array_tag);
   std::vector<std::string> failed_names;
-  auto error_text_of = [](const mcp::JsonValue &err) -> std::string {
-    const mcp::JsonValue *msg = err.Find("error");
+  auto error_text_of = [](const godot_autopilot::util::JsonValue &err) -> std::string {
+    const godot_autopilot::util::JsonValue *msg = err.Find("error");
     if (msg && msg->IsString()) {
       return msg->GetString();
     }
@@ -2425,7 +2425,7 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   for (int pass = 0; pass < 2; pass++) {
     for (const auto &item : work) {
       const std::string &prop_str = item.name;
-      const mcp::JsonValue &raw_value = item.value;
+      const godot_autopilot::util::JsonValue &raw_value = item.value;
       bool is_object = std::find(object_names.begin(), object_names.end(),
                                  prop_str) != object_names.end();
       if (is_object != (pass == 0)) {
@@ -2459,38 +2459,38 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
               metadata_key_error(prop_str, path_str, meta_reason));
           if (atomic) {
             const property_ops_detail::RollbackOutcome rollback = verified_rollback();
-            mcp::JsonValue rolled(mcp::JsonValue::array_tag);
+            godot_autopilot::util::JsonValue rolled(godot_autopilot::util::JsonValue::array_tag);
             for (const std::string &name : rollback.rolled_back) {
-              rolled.PushBack(mcp::JsonValue(name));
+              rolled.PushBack(godot_autopilot::util::JsonValue(name));
             }
-            mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
-            mcp::JsonValue fitem(mcp::JsonValue::object_tag);
-            fitem["property"] = mcp::JsonValue(prop_str);
-            fitem["error"] = mcp::JsonValue(sub_msg);
+            godot_autopilot::util::JsonValue one_failed(godot_autopilot::util::JsonValue::array_tag);
+            godot_autopilot::util::JsonValue fitem(godot_autopilot::util::JsonValue::object_tag);
+            fitem["property"] = godot_autopilot::util::JsonValue(prop_str);
+            fitem["error"] = godot_autopilot::util::JsonValue(sub_msg);
             one_failed.PushBack(std::move(fitem));
-            mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("failed to apply property '" +
+            godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+            e["error"] = godot_autopilot::util::JsonValue("failed to apply property '" +
                                         prop_str + "' on " + path_str + ": " +
                                         sub_msg + " (atomic rollback: " +
                                         std::to_string(applied.size()) +
                                         " reverted)");
-            e["failed_property"] = mcp::JsonValue(prop_str);
+            e["failed_property"] = godot_autopilot::util::JsonValue(prop_str);
             e["failed"] = std::move(one_failed);
-            mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+            godot_autopilot::util::JsonValue empty_applied(godot_autopilot::util::JsonValue::array_tag);
             e["applied_properties"] = std::move(empty_applied);
             e["rolled_back"] = std::move(rolled);
             if (!rollback.unrestored.empty()) {
-              mcp::JsonValue unrestored(mcp::JsonValue::array_tag);
+              godot_autopilot::util::JsonValue unrestored(godot_autopilot::util::JsonValue::array_tag);
               for (const std::string &name : rollback.unrestored) {
-                unrestored.PushBack(mcp::JsonValue(name));
+                unrestored.PushBack(godot_autopilot::util::JsonValue(name));
               }
               e["unrestored"] = std::move(unrestored);
             }
             return e;
           }
-          mcp::JsonValue fitem(mcp::JsonValue::object_tag);
-          fitem["property"] = mcp::JsonValue(prop_str);
-          fitem["error"] = mcp::JsonValue(sub_msg);
+          godot_autopilot::util::JsonValue fitem(godot_autopilot::util::JsonValue::object_tag);
+          fitem["property"] = godot_autopilot::util::JsonValue(prop_str);
+          fitem["error"] = godot_autopilot::util::JsonValue(sub_msg);
           failed.PushBack(std::move(fitem));
           failed_names.push_back(prop_str);
           continue;
@@ -2519,38 +2519,38 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
         std::string sub_msg = error_text_of(target.error);
         if (atomic) {
           const property_ops_detail::RollbackOutcome rollback = verified_rollback();
-          mcp::JsonValue rolled(mcp::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue rolled(godot_autopilot::util::JsonValue::array_tag);
           for (const std::string &name : rollback.rolled_back) {
-            rolled.PushBack(mcp::JsonValue(name));
+            rolled.PushBack(godot_autopilot::util::JsonValue(name));
           }
-          mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
-          mcp::JsonValue fitem(mcp::JsonValue::object_tag);
-          fitem["property"] = mcp::JsonValue(prop_str);
-          fitem["error"] = mcp::JsonValue(sub_msg);
+          godot_autopilot::util::JsonValue one_failed(godot_autopilot::util::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue fitem(godot_autopilot::util::JsonValue::object_tag);
+          fitem["property"] = godot_autopilot::util::JsonValue(prop_str);
+          fitem["error"] = godot_autopilot::util::JsonValue(sub_msg);
           one_failed.PushBack(std::move(fitem));
-          mcp::JsonValue e(mcp::JsonValue::object_tag);
-          e["error"] = mcp::JsonValue("failed to apply property '" + prop_str +
+          godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+          e["error"] = godot_autopilot::util::JsonValue("failed to apply property '" + prop_str +
                                       "' on " + path_str + ": " + sub_msg +
                                       " (atomic rollback: " +
                                       std::to_string(rollback.rolled_back.size()) +
                                       " reverted)");
-          e["failed_property"] = mcp::JsonValue(prop_str);
+          e["failed_property"] = godot_autopilot::util::JsonValue(prop_str);
           e["failed"] = std::move(one_failed);
-          mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue empty_applied(godot_autopilot::util::JsonValue::array_tag);
           e["applied_properties"] = std::move(empty_applied);
           e["rolled_back"] = std::move(rolled);
           if (!rollback.unrestored.empty()) {
-            mcp::JsonValue unrestored(mcp::JsonValue::array_tag);
+            godot_autopilot::util::JsonValue unrestored(godot_autopilot::util::JsonValue::array_tag);
             for (const std::string &name : rollback.unrestored) {
-              unrestored.PushBack(mcp::JsonValue(name));
+              unrestored.PushBack(godot_autopilot::util::JsonValue(name));
             }
             e["unrestored"] = std::move(unrestored);
           }
           return e;
         }
-        mcp::JsonValue fitem(mcp::JsonValue::object_tag);
-        fitem["property"] = mcp::JsonValue(prop_str);
-        fitem["error"] = mcp::JsonValue(sub_msg);
+        godot_autopilot::util::JsonValue fitem(godot_autopilot::util::JsonValue::object_tag);
+        fitem["property"] = godot_autopilot::util::JsonValue(prop_str);
+        fitem["error"] = godot_autopilot::util::JsonValue(sub_msg);
         failed.PushBack(std::move(fitem));
         failed_names.push_back(prop_str);
         continue;
@@ -2647,7 +2647,7 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
         }
       }
       if (!item_failed && resource_attached) {
-        mcp::JsonValue blocked_error;
+        godot_autopilot::util::JsonValue blocked_error;
         if (memory_resource_assignment_blocked(value, prop_str, path_str,
                                                blocked_error)) {
           item_failed = true;
@@ -2678,38 +2678,38 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       if (item_failed) {
         if (atomic) {
           const property_ops_detail::RollbackOutcome rollback = verified_rollback();
-          mcp::JsonValue rolled(mcp::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue rolled(godot_autopilot::util::JsonValue::array_tag);
           for (const std::string &name : rollback.rolled_back) {
-            rolled.PushBack(mcp::JsonValue(name));
+            rolled.PushBack(godot_autopilot::util::JsonValue(name));
           }
-          mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
-          mcp::JsonValue fitem(mcp::JsonValue::object_tag);
-          fitem["property"] = mcp::JsonValue(prop_str);
-          fitem["error"] = mcp::JsonValue(item_error);
+          godot_autopilot::util::JsonValue one_failed(godot_autopilot::util::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue fitem(godot_autopilot::util::JsonValue::object_tag);
+          fitem["property"] = godot_autopilot::util::JsonValue(prop_str);
+          fitem["error"] = godot_autopilot::util::JsonValue(item_error);
           one_failed.PushBack(std::move(fitem));
-          mcp::JsonValue e(mcp::JsonValue::object_tag);
-          e["error"] = mcp::JsonValue("failed to apply property '" + prop_str +
+          godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+          e["error"] = godot_autopilot::util::JsonValue("failed to apply property '" + prop_str +
                                       "' on " + path_str + ": " + item_error +
                                       " (atomic rollback: " +
                                       std::to_string(rollback.rolled_back.size()) +
                                       " reverted)");
-          e["failed_property"] = mcp::JsonValue(prop_str);
+          e["failed_property"] = godot_autopilot::util::JsonValue(prop_str);
           e["failed"] = std::move(one_failed);
-          mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue empty_applied(godot_autopilot::util::JsonValue::array_tag);
           e["applied_properties"] = std::move(empty_applied);
           e["rolled_back"] = std::move(rolled);
           if (!rollback.unrestored.empty()) {
-            mcp::JsonValue unrestored(mcp::JsonValue::array_tag);
+            godot_autopilot::util::JsonValue unrestored(godot_autopilot::util::JsonValue::array_tag);
             for (const std::string &name : rollback.unrestored) {
-              unrestored.PushBack(mcp::JsonValue(name));
+              unrestored.PushBack(godot_autopilot::util::JsonValue(name));
             }
             e["unrestored"] = std::move(unrestored);
           }
           return e;
         }
-        mcp::JsonValue fitem(mcp::JsonValue::object_tag);
-        fitem["property"] = mcp::JsonValue(prop_str);
-        fitem["error"] = mcp::JsonValue(item_error);
+        godot_autopilot::util::JsonValue fitem(godot_autopilot::util::JsonValue::object_tag);
+        fitem["property"] = godot_autopilot::util::JsonValue(prop_str);
+        fitem["error"] = godot_autopilot::util::JsonValue(item_error);
         failed.PushBack(std::move(fitem));
         failed_names.push_back(prop_str);
         continue;
@@ -2722,30 +2722,30 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       rec.new_value = new_val;
       applied.push_back(rec);
       if (!readback_warning.empty()) {
-        mcp::JsonValue w(mcp::JsonValue::object_tag);
-        w["path"] = mcp::JsonValue(path_str);
-        w["property"] = mcp::JsonValue(prop_str);
-        w["warning"] = mcp::JsonValue(readback_warning);
+        godot_autopilot::util::JsonValue w(godot_autopilot::util::JsonValue::object_tag);
+        w["path"] = godot_autopilot::util::JsonValue(path_str);
+        w["property"] = godot_autopilot::util::JsonValue(prop_str);
+        w["warning"] = godot_autopilot::util::JsonValue(readback_warning);
         warnings.push_back(std::move(w));
       }
       if (inline_attached) {
-        mcp::JsonValue inline_entry(mcp::JsonValue::object_tag);
-        inline_entry["property"] = mcp::JsonValue(prop_str);
-        inline_entry["type"] = mcp::JsonValue(inline_type);
+        godot_autopilot::util::JsonValue inline_entry(godot_autopilot::util::JsonValue::object_tag);
+        inline_entry["property"] = godot_autopilot::util::JsonValue(prop_str);
+        inline_entry["type"] = godot_autopilot::util::JsonValue(inline_type);
         inlines.push_back(std::move(inline_entry));
       }
       if (converted_node_path) {
-        converted[prop_str] = mcp::JsonValue(value_node_path);
+        converted[prop_str] = godot_autopilot::util::JsonValue(value_node_path);
         converted_count++;
       }
     }
   }
   if (applied.empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     if (failed.Size() > 0) {
-      const mcp::JsonValue &first = failed.GetArray()[0];
-      const mcp::JsonValue *emsg = first.Find("error");
-      const mcp::JsonValue *pmsg = first.Find("property");
+      const godot_autopilot::util::JsonValue &first = failed.GetArray()[0];
+      const godot_autopilot::util::JsonValue *emsg = first.Find("error");
+      const godot_autopilot::util::JsonValue *pmsg = first.Find("property");
       std::string pname;
       std::string fmsg;
       if (pmsg && pmsg->IsString()) {
@@ -2756,19 +2756,19 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       } else {
         fmsg = first.Dump();
       }
-      e["error"] = mcp::JsonValue("failed to apply properties on " + path_str +
+      e["error"] = godot_autopilot::util::JsonValue("failed to apply properties on " + path_str +
                                   ": " + fmsg);
       if (!pname.empty()) {
-        e["failed_property"] = mcp::JsonValue(pname);
+        e["failed_property"] = godot_autopilot::util::JsonValue(pname);
       }
-      mcp::JsonValue failed_copy = failed;
+      godot_autopilot::util::JsonValue failed_copy = failed;
       e["failed"] = std::move(failed_copy);
     } else {
-      e["error"] = mcp::JsonValue("failed to apply properties on " + path_str +
+      e["error"] = godot_autopilot::util::JsonValue("failed to apply properties on " + path_str +
                                   ": no properties applied");
       e["failed"] = std::move(failed);
     }
-    mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue empty_applied(godot_autopilot::util::JsonValue::array_tag);
     e["applied_properties"] = std::move(empty_applied);
     return e;
   }
@@ -2816,24 +2816,24 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       undoable = true;
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["atomic"] = mcp::JsonValue(atomic);
-  mcp::JsonValue ap(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["atomic"] = godot_autopilot::util::JsonValue(atomic);
+  godot_autopilot::util::JsonValue ap(godot_autopilot::util::JsonValue::array_tag);
   for (const BatchApplied &done : applied) {
-    ap.PushBack(mcp::JsonValue(done.name));
+    ap.PushBack(godot_autopilot::util::JsonValue(done.name));
   }
   r["applied_properties"] = std::move(ap);
   r["failed"] = std::move(failed);
   if (!warnings.empty()) {
-    mcp::JsonValue warr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue warr(godot_autopilot::util::JsonValue::array_tag);
     for (auto &w : warnings) {
       warr.PushBack(std::move(w));
     }
     r["property_warnings"] = std::move(warr);
   }
   if (!inlines.empty()) {
-    mcp::JsonValue iarr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue iarr(godot_autopilot::util::JsonValue::array_tag);
     for (auto &item : inlines) {
       iarr.PushBack(std::move(item));
     }
@@ -2842,19 +2842,19 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   if (converted_count > 0) {
     r["converted_node_paths"] = std::move(converted);
   }
-  mcp::JsonValue undo_entries(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue undo_entries(godot_autopilot::util::JsonValue::array_tag);
   for (const BatchApplied &done : applied) {
-    mcp::JsonValue u(mcp::JsonValue::object_tag);
-    u["path"] = mcp::JsonValue(path_str);
-    u["property"] = mcp::JsonValue(done.name);
+    godot_autopilot::util::JsonValue u(godot_autopilot::util::JsonValue::object_tag);
+    u["path"] = godot_autopilot::util::JsonValue(path_str);
+    u["property"] = godot_autopilot::util::JsonValue(done.name);
     u["old_value"] = VariantJson::serialize(done.old_value);
     undo_entries.PushBack(std::move(u));
   }
   r["undo"] = std::move(undo_entries);
-  r["undo_action"] = mcp::JsonValue(undo_action);
-  r["undoable"] = mcp::JsonValue(undoable);
+  r["undo_action"] = godot_autopilot::util::JsonValue(undo_action);
+  r["undoable"] = godot_autopilot::util::JsonValue(undoable);
   if (!undoable) {
-    r["undo_skip_reason"] = mcp::JsonValue(undo_skip_reason);
+    r["undo_skip_reason"] = godot_autopilot::util::JsonValue(undo_skip_reason);
   }
   scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());

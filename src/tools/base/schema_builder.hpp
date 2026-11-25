@@ -2,7 +2,7 @@
 #define GODOT_AUTOPILOT_SCHEMA_BUILDER_HPP
 
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <vector>
 
@@ -16,18 +16,18 @@ struct ParamDef {
   bool required;
 };
 
-void add_required_flag(mcp::JsonValue &schema, const std::string &name);
+void add_required_flag(godot_autopilot::util::JsonValue &schema, const std::string &name);
 
 bool is_supported_param_type(const std::string &type);
 
 bool validate_param_defs(const std::vector<ParamDef> &params,
                          std::string &error);
 
-mcp::JsonValue build_schema(std::initializer_list<ParamDef> params);
+godot_autopilot::util::JsonValue build_schema(std::initializer_list<ParamDef> params);
 
-mcp::JsonValue build_schema(const std::vector<ParamDef> &params);
+godot_autopilot::util::JsonValue build_schema(const std::vector<ParamDef> &params);
 
-mcp::JsonValue build_action_schema(const std::vector<std::string> &actions,
+godot_autopilot::util::JsonValue build_action_schema(const std::vector<std::string> &actions,
                                    const std::vector<ParamDef> &params,
                                    const std::string &description = "");
 

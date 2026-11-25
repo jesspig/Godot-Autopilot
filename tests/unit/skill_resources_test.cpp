@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <set>
 #include <string>
@@ -125,24 +125,24 @@ TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
 TEST(SkillResourcesTest, CatalogJsonCarriesCountAndEntries) {
   const std::string json = godot_autopilot::skill_resources::catalog_to_json(
       godot_autopilot::skill_resources::build_catalog(skills()));
-  const mcp::JsonValue root = mcp::JsonValue::Parse(json);
+  const godot_autopilot::util::JsonValue root = godot_autopilot::util::JsonValue::Parse(json);
   ASSERT_TRUE(root.IsObject());
 
-  const mcp::JsonValue *count = root.Find("count");
+  const godot_autopilot::util::JsonValue *count = root.Find("count");
   ASSERT_NE(count, nullptr);
   EXPECT_EQ(count->GetInt(), static_cast<int64_t>(skills().size()));
 
-  const mcp::JsonValue *entries = root.Find("skills");
+  const godot_autopilot::util::JsonValue *entries = root.Find("skills");
   ASSERT_NE(entries, nullptr);
   ASSERT_TRUE(entries->IsArray());
   ASSERT_EQ(entries->Size(), skills().size());
 
   for (std::size_t i = 0; i < entries->Size(); ++i) {
-    const mcp::JsonValue &item = (*entries)[i];
+    const godot_autopilot::util::JsonValue &item = (*entries)[i];
     ASSERT_TRUE(item.IsObject());
-    const mcp::JsonValue *name = item.Find("name");
-    const mcp::JsonValue *description = item.Find("description");
-    const mcp::JsonValue *files = item.Find("files");
+    const godot_autopilot::util::JsonValue *name = item.Find("name");
+    const godot_autopilot::util::JsonValue *description = item.Find("description");
+    const godot_autopilot::util::JsonValue *files = item.Find("files");
     ASSERT_NE(name, nullptr);
     ASSERT_NE(description, nullptr);
     ASSERT_NE(files, nullptr);
@@ -199,8 +199,8 @@ TEST(SkillResourcesTest, ResolvesCatalogContent) {
   EXPECT_EQ(content.kind, UriKind::catalog);
   EXPECT_EQ(content.mime_type, "application/json");
 
-  const mcp::JsonValue root = mcp::JsonValue::Parse(content.text);
-  const mcp::JsonValue *count = root.Find("count");
+  const godot_autopilot::util::JsonValue root = godot_autopilot::util::JsonValue::Parse(content.text);
+  const godot_autopilot::util::JsonValue *count = root.Find("count");
   ASSERT_NE(count, nullptr);
   EXPECT_EQ(count->GetInt(), static_cast<int64_t>(skills().size()));
 }

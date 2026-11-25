@@ -22,7 +22,7 @@ namespace display_ops {
 
 namespace {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 JV capture_limit_error(const std::string &code, const std::string &message) {
   JV error = util::error_json(message);

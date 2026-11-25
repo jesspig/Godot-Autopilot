@@ -66,7 +66,7 @@ TEST(ConfigLoaderStrict, RejectsEmptyExpect) {
 }
 
 TEST(ConfigLoaderStrict, RequireTypeRejectsUnknownExpected) {
-  const mcp::JsonValue value = mcp::JsonValue::Parse(R"({"a":1})");
+  const godot_autopilot::util::JsonValue value = godot_autopilot::util::JsonValue::Parse(R"({"a":1})");
   EXPECT_THROW(gda_test::RequireType(value, "probe", "integer"), RuntimeError);
   EXPECT_NO_THROW(gda_test::RequireType(value, "probe", "object"));
 }

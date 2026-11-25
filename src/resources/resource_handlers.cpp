@@ -8,6 +8,7 @@
 #include "resources/skill_resources.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/tool_invoke.hpp"
+#include "adapters/mcp_json_bridge.hpp"
 #include "util/error_util.hpp"
 #include "util/input_guards.hpp"
 #include "util/variant_json.hpp"
@@ -62,8 +63,8 @@ struct ResourceTaskState {
 };
 
 void set_error(ResourceTaskState &state, const std::string &msg) {
-  mcp::JsonValue err(mcp::JsonValue::object_tag);
-  err["error"] = mcp::JsonValue(msg);
+  godot_autopilot::util::JsonValue err(godot_autopilot::util::JsonValue::object_tag);
+  err["error"] = godot_autopilot::util::JsonValue(msg);
   state.json_str = err.Dump(-1);
   state.error_text = msg;
 }
@@ -106,8 +107,8 @@ ResourceTaskResult run_resource_task(
       util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
                           state->error_text);
     }
-    mcp::JsonValue data(mcp::JsonValue::object_tag);
-    data["uri"] = mcp::JsonValue(uri);
+    godot_autopilot::util::JsonValue data(godot_autopilot::util::JsonValue::object_tag);
+    data["uri"] = godot_autopilot::util::JsonValue(uri);
     util::throw_mcp_error(resource_error_code(state->error_code),
                         state->error_text, data);
   }
@@ -161,16 +162,16 @@ std::string compute_relative_path(godot::Node *node,
 }
 
 void node_to_json(godot::Node *node, const std::string &root_prefix,
-                         mcp::JsonValue &j) {
-  j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
-  j["class"] = mcp::JsonValue(util::to_std(node->get_class()));
-  j["path"] = mcp::JsonValue(compute_relative_path(node, root_prefix));
-  j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+                         godot_autopilot::util::JsonValue &j) {
+  j["name"] = godot_autopilot::util::JsonValue(util::to_std(node->get_name()));
+  j["class"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
+  j["path"] = godot_autopilot::util::JsonValue(compute_relative_path(node, root_prefix));
+  j["children"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
   auto children = node->get_children();
   for (int i = 0; i < children.size(); i++) {
     auto *child = godot::Object::cast_to<godot::Node>(children[i]);
     if (child) {
-      mcp::JsonValue child_j(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue child_j(godot_autopilot::util::JsonValue::object_tag);
       node_to_json(child, root_prefix, child_j);
       j["children"].PushBack(std::move(child_j));
     }
@@ -209,15 +210,15 @@ std::map<std::string, std::string> property_metadata(
   return metadata;
 }
 
-mcp::JsonValue node_detail_to_json(godot::Node *node,
+godot_autopilot::util::JsonValue node_detail_to_json(godot::Node *node,
                                           const std::string &root_prefix) {
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
-  j["class"] = mcp::JsonValue(util::to_std(node->get_class()));
-  j["path"] = mcp::JsonValue(compute_relative_path(node, root_prefix));
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["name"] = godot_autopilot::util::JsonValue(util::to_std(node->get_name()));
+  j["class"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
+  j["path"] = godot_autopilot::util::JsonValue(compute_relative_path(node, root_prefix));
 
-  mcp::JsonValue props(mcp::JsonValue::object_tag);
-  mcp::JsonValue redacted_properties(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue props(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue redacted_properties(godot_autopilot::util::JsonValue::array_tag);
   auto prop_list = node->get_property_list();
   for (int i = 0; i < prop_list.size(); i++) {
     godot::Dictionary prop = prop_list[i];
@@ -234,8 +235,8 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
     const std::map<std::string, std::string> metadata = property_metadata(prop);
     if (resources::resource_value_is_sensitive(name_str, metadata)) {
       props[name_str] =
-          mcp::JsonValue(godot_autopilot::sanitize_policy::kRedactedValue);
-      redacted_properties.PushBack(mcp::JsonValue(name_str));
+          godot_autopilot::util::JsonValue(godot_autopilot::sanitize_policy::kRedactedValue);
+      redacted_properties.PushBack(godot_autopilot::util::JsonValue(name_str));
       continue;
     }
 
@@ -245,7 +246,7 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
             name_str, godot_autopilot::VariantJson::serialize(val), metadata);
     props[name_str] = redacted.value;
     if (redacted.redacted) {
-      redacted_properties.PushBack(mcp::JsonValue(name_str));
+      redacted_properties.PushBack(godot_autopilot::util::JsonValue(name_str));
     }
   }
   j["properties"] = std::move(props);
@@ -253,23 +254,23 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
     j["redacted_properties"] = std::move(redacted_properties);
   }
 
-  j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+  j["children"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
   auto children = node->get_children();
   for (int i = 0; i < children.size(); i++) {
     auto *child = godot::Object::cast_to<godot::Node>(children[i]);
     if (child) {
-      mcp::JsonValue child_j(mcp::JsonValue::object_tag);
-      child_j["name"] = mcp::JsonValue(util::to_std(child->get_name()));
-      child_j["class"] = mcp::JsonValue(util::to_std(child->get_class()));
+      godot_autopilot::util::JsonValue child_j(godot_autopilot::util::JsonValue::object_tag);
+      child_j["name"] = godot_autopilot::util::JsonValue(util::to_std(child->get_name()));
+      child_j["class"] = godot_autopilot::util::JsonValue(util::to_std(child->get_class()));
       j["children"].PushBack(std::move(child_j));
     }
   }
 
   auto groups = node->get_groups();
-  mcp::JsonValue groups_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue groups_arr(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < groups.size(); i++) {
     godot::String gs = godot::String(groups[i]);
-    groups_arr.PushBack(mcp::JsonValue(util::to_std(gs)));
+    groups_arr.PushBack(godot_autopilot::util::JsonValue(util::to_std(gs)));
   }
   j["groups"] = std::move(groups_arr);
 
@@ -277,11 +278,11 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
   if (script_var.get_type() != godot::Variant::NIL) {
     auto *obj = script_var.operator godot::Object *();
     if (obj) {
-      mcp::JsonValue script_j(mcp::JsonValue::object_tag);
-      script_j["class"] = mcp::JsonValue(util::to_std(obj->get_class()));
+      godot_autopilot::util::JsonValue script_j(godot_autopilot::util::JsonValue::object_tag);
+      script_j["class"] = godot_autopilot::util::JsonValue(util::to_std(obj->get_class()));
       auto *res = godot::Object::cast_to<godot::Resource>(obj);
       if (res && !res->get_path().is_empty()) {
-        script_j["path"] = mcp::JsonValue(util::to_std(res->get_path()));
+        script_j["path"] = godot_autopilot::util::JsonValue(util::to_std(res->get_path()));
       }
       j["script"] = std::move(script_j);
     }
@@ -291,29 +292,29 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
 }
 
 void dir_to_json(godot::EditorFileSystemDirectory *dir,
-                        mcp::JsonValue &j) {
-  j["name"] = mcp::JsonValue(util::to_std(dir->get_name()));
-  j["path"] = mcp::JsonValue(util::to_std(dir->get_path()));
+                        godot_autopilot::util::JsonValue &j) {
+  j["name"] = godot_autopilot::util::JsonValue(util::to_std(dir->get_name()));
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(dir->get_path()));
 
-  j["subdirs"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+  j["subdirs"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
   int subdir_count = dir->get_subdir_count();
   for (int i = 0; i < subdir_count; i++) {
     auto *subdir = dir->get_subdir(i);
     if (subdir) {
-      mcp::JsonValue subdir_j(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue subdir_j(godot_autopilot::util::JsonValue::object_tag);
       dir_to_json(subdir, subdir_j);
       j["subdirs"].PushBack(std::move(subdir_j));
     }
   }
 
-  j["files"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+  j["files"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
   int file_count = dir->get_file_count();
   for (int i = 0; i < file_count; i++) {
-    mcp::JsonValue file_j(mcp::JsonValue::object_tag);
-    file_j["name"] = mcp::JsonValue(util::to_std(dir->get_file(i)));
-    file_j["path"] = mcp::JsonValue(util::to_std(dir->get_file_path(i)));
+    godot_autopilot::util::JsonValue file_j(godot_autopilot::util::JsonValue::object_tag);
+    file_j["name"] = godot_autopilot::util::JsonValue(util::to_std(dir->get_file(i)));
+    file_j["path"] = godot_autopilot::util::JsonValue(util::to_std(dir->get_file_path(i)));
     godot::StringName type = dir->get_file_type(i);
-    file_j["type"] = mcp::JsonValue(util::to_std(godot::String(type)));
+    file_j["type"] = godot_autopilot::util::JsonValue(util::to_std(godot::String(type)));
     j["files"].PushBack(std::move(file_j));
   }
 }
@@ -333,8 +334,8 @@ int register_skill_resources(mcp::McpServer &server) {
         skill_resources::resolve_content(embedded_skills(), uri);
     if (!content.error.empty()) {
       monitor::error_event("resource_not_found", "resource", uri);
-      mcp::JsonValue data(mcp::JsonValue::object_tag);
-      data["uri"] = mcp::JsonValue(uri);
+      godot_autopilot::util::JsonValue data(godot_autopilot::util::JsonValue::object_tag);
+      data["uri"] = godot_autopilot::util::JsonValue(uri);
       util::throw_mcp_error(mcp::McpErrorCode::InvalidParams, content.error, data);
     }
     monitor::data_flow(
@@ -357,10 +358,10 @@ int register_skill_resources(mcp::McpServer &server) {
   for (const skill_gen::SkillSpec &spec : embedded_skills()) {
     mcp::Skill skill;
     skill.uri = "godot://skills/" + spec.name + "/SKILL.md";
-    mcp::JsonValue frontmatter(mcp::JsonValue::object_tag);
-    frontmatter["name"] = mcp::JsonValue(spec.name);
-    frontmatter["description"] = mcp::JsonValue(spec.description);
-    skill.frontmatter = std::move(frontmatter);
+    godot_autopilot::util::JsonValue frontmatter(godot_autopilot::util::JsonValue::object_tag);
+    frontmatter["name"] = godot_autopilot::util::JsonValue(spec.name);
+    frontmatter["description"] = godot_autopilot::util::JsonValue(spec.description);
+    skill.frontmatter = godot_autopilot::adapters::ToSdk(frontmatter);
     skill.resources = std::string("dynamic");
     server.RegisterSkill(std::move(skill));
 
@@ -452,7 +453,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 return;
               }
               std::string root_prefix = util::to_std(root->get_path());
-              mcp::JsonValue node_json(mcp::JsonValue::object_tag);
+              godot_autopilot::util::JsonValue node_json(godot_autopilot::util::JsonValue::object_tag);
               node_to_json(root, root_prefix, node_json);
               st.json_str = node_json.Dump(-1);
             });
@@ -563,7 +564,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 return;
               }
 
-              mcp::JsonValue dir_json(mcp::JsonValue::object_tag);
+              godot_autopilot::util::JsonValue dir_json(godot_autopilot::util::JsonValue::object_tag);
               dir_to_json(root_dir, dir_json);
               st.json_str = dir_json.Dump(-1);
             });
@@ -620,22 +621,22 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
 
               auto *dir = fs->get_filesystem_path(gd_path);
               if (dir) {
-                mcp::JsonValue dir_json(mcp::JsonValue::object_tag);
+                godot_autopilot::util::JsonValue dir_json(godot_autopilot::util::JsonValue::object_tag);
                 dir_to_json(dir, dir_json);
-                dir_json["path"] = mcp::JsonValue(path);
+                dir_json["path"] = godot_autopilot::util::JsonValue(path);
                 st.json_str = dir_json.Dump(-1);
                 return;
               }
 
               godot::String file_type = fs->get_file_type(gd_path);
               if (!file_type.is_empty()) {
-                mcp::JsonValue file_json(mcp::JsonValue::object_tag);
+                godot_autopilot::util::JsonValue file_json(godot_autopilot::util::JsonValue::object_tag);
                 auto pos = path.rfind('/');
                 std::string fname =
                     (pos != std::string::npos) ? path.substr(pos + 1) : path;
-                file_json["name"] = mcp::JsonValue(fname);
-                file_json["path"] = mcp::JsonValue(path);
-                file_json["type"] = mcp::JsonValue(util::to_std(file_type));
+                file_json["name"] = godot_autopilot::util::JsonValue(fname);
+                file_json["path"] = godot_autopilot::util::JsonValue(path);
+                file_json["type"] = godot_autopilot::util::JsonValue(util::to_std(file_type));
                 st.json_str = file_json.Dump(-1);
                 return;
               }
@@ -684,17 +685,17 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               if (root)
                 root_prefix = util::to_std(root->get_path());
 
-              mcp::JsonValue arr(mcp::JsonValue::array_tag);
+              godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
               for (int i = 0; i < nodes.size(); i++) {
                 auto *node = godot::Object::cast_to<godot::Node>(nodes[i]);
                 if (!node)
                   continue;
 
-                mcp::JsonValue item(mcp::JsonValue::object_tag);
-                item["name"] = mcp::JsonValue(util::to_std(node->get_name()));
-                item["class"] = mcp::JsonValue(util::to_std(node->get_class()));
+                godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+                item["name"] = godot_autopilot::util::JsonValue(util::to_std(node->get_name()));
+                item["class"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
                 item["path"] =
-                    mcp::JsonValue(compute_relative_path(node, root_prefix));
+                    godot_autopilot::util::JsonValue(compute_relative_path(node, root_prefix));
                 arr.PushBack(std::move(item));
               }
               st.json_str = arr.Dump(-1);
@@ -804,21 +805,21 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
 
               size_t count = entries.size();
 
-              mcp::JsonValue arr(mcp::JsonValue::array_tag);
+              godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
               for (size_t i = 0; i < count; i++) {
                 const auto &entry = entries[i];
-                mcp::JsonValue item(mcp::JsonValue::object_tag);
-                item["level"] = mcp::JsonValue(level_to_string(entry.level));
+                godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+                item["level"] = godot_autopilot::util::JsonValue(level_to_string(entry.level));
                 item["category"] =
-                    mcp::JsonValue(category_to_string(entry.category));
-                item["message"] = mcp::JsonValue(entry.message);
+                    godot_autopilot::util::JsonValue(category_to_string(entry.category));
+                item["message"] = godot_autopilot::util::JsonValue(entry.message);
 
                 std::time_t tt =
                     std::chrono::system_clock::to_time_t(entry.timestamp);
                 char buf[32] = {0};
                 std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ",
                               std::gmtime(&tt));
-                item["timestamp"] = mcp::JsonValue(buf);
+                item["timestamp"] = godot_autopilot::util::JsonValue(buf);
 
                 arr.PushBack(std::move(item));
               }

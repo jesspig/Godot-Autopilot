@@ -72,8 +72,8 @@ struct TempNodeGuard {
   }
 };
 
-mcp::JsonValue extract_structured_error(const std::string &err_text) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue extract_structured_error(const std::string &err_text) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
 
   std::string line = err_text.substr(0, err_text.find('\n'));
   if (line.empty())
@@ -103,14 +103,14 @@ mcp::JsonValue extract_structured_error(const std::string &err_text) {
            head[file_start - 1] != ']') {
       --file_start;
     }
-    out["file"] = mcp::JsonValue(head.substr(file_start, colon - file_start));
-    out["line"] = mcp::JsonValue(
+    out["file"] = godot_autopilot::util::JsonValue(head.substr(file_start, colon - file_start));
+    out["line"] = godot_autopilot::util::JsonValue(
         static_cast<int64_t>(std::stoi(head.substr(i, num_end - i))));
     break;
   }
 
   if (!message.empty()) {
-    out["message"] = mcp::JsonValue(message);
+    out["message"] = godot_autopilot::util::JsonValue(message);
   }
   return out;
 }
@@ -402,12 +402,12 @@ void reconcile_leaked_children(ExecContext &ctx) {
   }
 }
 
-mcp::JsonValue build_exec_result(ExecContext &ctx) {
+godot_autopilot::util::JsonValue build_exec_result(ExecContext &ctx) {
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::steady_clock::now() - ctx.start_time)
                      .count();
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
 
   if (ctx.result.get_type() == godot::Variant::OBJECT) {
     godot::Object *obj = ctx.result.operator godot::Object *();
@@ -415,44 +415,44 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
     if (res_obj) {
       godot::Ref<godot::Resource> res(res_obj);
       godot_autopilot::resource_registry::register_resource(res, "");
-      mcp::JsonValue reg(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue reg(godot_autopilot::util::JsonValue::object_tag);
       reg["object_id"] =
-          mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-      reg["object_id_str"] = mcp::JsonValue(
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+      reg["object_id_str"] = godot_autopilot::util::JsonValue(
           std::to_string(static_cast<int64_t>(res->get_instance_id())));
-      reg["class"] = mcp::JsonValue(util::to_std(res->get_class()));
-      reg["path"] = mcp::JsonValue(util::to_std(res->get_path()));
+      reg["class"] = godot_autopilot::util::JsonValue(util::to_std(res->get_class()));
+      reg["path"] = godot_autopilot::util::JsonValue(util::to_std(res->get_path()));
       r["registered_resource"] = std::move(reg);
     }
   }
 
   r["result"] = godot_autopilot::VariantJson::serialize(ctx.result);
-  r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
+  r["execution_time_ms"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(elapsed));
   r["auto_owner_set"] =
-      mcp::JsonValue(static_cast<int64_t>(ctx.auto_owner_set));
-  r["wrapped_source"] = mcp::JsonValue(ctx.wrapped);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(ctx.auto_owner_set));
+  r["wrapped_source"] = godot_autopilot::util::JsonValue(ctx.wrapped);
   if (!ctx.new_output_text.empty()) {
-    r["output"] = mcp::JsonValue(
+    r["output"] = godot_autopilot::util::JsonValue(
         gdscript_wrap::truncate_capture_text(ctx.new_output_text));
   }
   if (!ctx.new_error_text.empty()) {
-    r["runtime_error"] = mcp::JsonValue(true);
+    r["runtime_error"] = godot_autopilot::util::JsonValue(true);
     std::string error_details =
         gdscript_wrap::truncate_capture_text(ctx.new_error_text);
     if (ctx.new_error_text.find("Node not found") != std::string::npos) {
       error_details += gdscript_wrap::NODE_NOT_FOUND_HINT;
     }
-    r["error_details"] = mcp::JsonValue(error_details);
-    mcp::JsonValue structured = extract_structured_error(ctx.new_error_text);
+    r["error_details"] = godot_autopilot::util::JsonValue(error_details);
+    godot_autopilot::util::JsonValue structured = extract_structured_error(ctx.new_error_text);
     if (structured.IsObject() && !structured.Empty()) {
-      structured["code"] = mcp::JsonValue("tool_error");
+      structured["code"] = godot_autopilot::util::JsonValue("tool_error");
       r["structured_error"] = std::move(structured);
     }
-    r["error"] = mcp::JsonValue(error_details);
-    r["code"] = mcp::JsonValue("tool_error");
+    r["error"] = godot_autopilot::util::JsonValue(error_details);
+    r["code"] = godot_autopilot::util::JsonValue("tool_error");
   }
   if (!ctx.temp_added) {
-    r["note"] = mcp::JsonValue("temporary node was not added to any scene tree "
+    r["note"] = godot_autopilot::util::JsonValue("temporary node was not added to any scene tree "
                                "— get_tree() will be null");
   }
   return r;
@@ -574,7 +574,7 @@ bool batch_rollback_undo(godot::UndoRedo *history, uint64_t version_before,
   return true;
 }
 
-mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_batch_execute(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "batch_execute called");
   if (ExportGuard::is_exporting()) {
@@ -583,9 +583,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
   auto *ops = args.Find("operations");
   if (!ops || !ops->IsArray()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("missing required parameter: operations (array)");
+        godot_autopilot::util::JsonValue("missing required parameter: operations (array)");
     return e;
   }
   constexpr size_t BATCH_MAX_OPERATIONS = 256;
@@ -627,30 +627,30 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue results(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue results(godot_autopilot::util::JsonValue::array_tag);
   int succeeded = 0;
   int failed = 0;
   int pending_count = 0;
   bool stopped = false;
   size_t stopped_after = 0;
   int64_t undoable_successes = 0;
-  auto note_undoable = [&](const mcp::JsonValue &value) {
-    const mcp::JsonValue *undoable = value.Find("undoable");
+  auto note_undoable = [&](const godot_autopilot::util::JsonValue &value) {
+    const godot_autopilot::util::JsonValue *undoable = value.Find("undoable");
     if (undoable != nullptr && undoable->IsBool() && undoable->GetBool())
       ++undoable_successes;
   };
 
   const auto &arr = ops->GetArray();
-  std::vector<mcp::JsonValue> payloads;
+  std::vector<godot_autopilot::util::JsonValue> payloads;
   std::vector<bool> op_ok;
   payloads.reserve(arr.size());
   op_ok.reserve(arr.size());
-  auto push_payload = [&](const mcp::JsonValue &item) {
+  auto push_payload = [&](const godot_autopilot::util::JsonValue &item) {
     const auto *st = item.Find("status");
     const bool ok =
         st != nullptr && st->IsString() && st->GetString() == "ok";
     op_ok.push_back(ok);
-    const mcp::JsonValue *v = nullptr;
+    const godot_autopilot::util::JsonValue *v = nullptr;
     if (ok) {
       v = item.Find("data");
       if (v == nullptr)
@@ -662,21 +662,21 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     }
     if (v != nullptr) {
       if (ok && v->IsObject() && v->Size() == 1u) {
-        if (const mcp::JsonValue *unwrapped = v->Find("result")) {
+        if (const godot_autopilot::util::JsonValue *unwrapped = v->Find("result")) {
           payloads.push_back(*unwrapped);
           return;
         }
-        if (const mcp::JsonValue *unwrapped = v->Find("data")) {
+        if (const godot_autopilot::util::JsonValue *unwrapped = v->Find("data")) {
           payloads.push_back(*unwrapped);
           return;
         }
       }
       payloads.push_back(*v);
     } else
-      payloads.push_back(mcp::JsonValue());
+      payloads.push_back(godot_autopilot::util::JsonValue());
   };
-  std::function<bool(mcp::JsonValue &, size_t, std::string &)> resolve_refs =
-      [&](mcp::JsonValue &node, size_t cur, std::string &error_out) -> bool {
+  std::function<bool(godot_autopilot::util::JsonValue &, size_t, std::string &)> resolve_refs =
+      [&](godot_autopilot::util::JsonValue &node, size_t cur, std::string &error_out) -> bool {
     if (node.IsString()) {
       const std::string s = node.GetString();
       if (s == "$prev") {
@@ -765,13 +765,13 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     return true;
   };
   for (size_t i = 0; i < arr.size(); ++i) {
-    mcp::JsonValue result_item(mcp::JsonValue::object_tag);
-    result_item["index"] = mcp::JsonValue(static_cast<int64_t>(i));
+    godot_autopilot::util::JsonValue result_item(godot_autopilot::util::JsonValue::object_tag);
+    result_item["index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(i));
     if (ExportGuard::is_exporting()) {
-      result_item["status"] = mcp::JsonValue("error");
+      result_item["status"] = godot_autopilot::util::JsonValue("error");
       result_item["error"] =
-          mcp::JsonValue(dispatch::export_blocked_error_text());
-      result_item["code"] = mcp::JsonValue("export_in_progress");
+          godot_autopilot::util::JsonValue(dispatch::export_blocked_error_text());
+      result_item["code"] = godot_autopilot::util::JsonValue("export_in_progress");
       push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
@@ -785,8 +785,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
     const auto &op = arr[i];
     if (!op.IsObject()) {
-      result_item["status"] = mcp::JsonValue("error");
-      result_item["error"] = mcp::JsonValue("operation is not an object");
+      result_item["status"] = godot_autopilot::util::JsonValue("error");
+      result_item["error"] = godot_autopilot::util::JsonValue("operation is not an object");
       push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
@@ -800,8 +800,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
     auto *tool = op.Find("tool");
     if (!tool || !tool->IsString()) {
-      result_item["status"] = mcp::JsonValue("error");
-      result_item["error"] = mcp::JsonValue("missing required field: tool");
+      result_item["status"] = godot_autopilot::util::JsonValue("error");
+      result_item["error"] = godot_autopilot::util::JsonValue("missing required field: tool");
       push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
@@ -814,13 +814,13 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     }
 
     std::string tool_name = tool->GetString();
-    result_item["tool"] = mcp::JsonValue(tool_name);
+    result_item["tool"] = godot_autopilot::util::JsonValue(tool_name);
 
-    mcp::JsonValue tool_args(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue tool_args(godot_autopilot::util::JsonValue::object_tag);
     if (auto *a = op.Find("args")) {
       if (!a->IsObject()) {
-        result_item["status"] = mcp::JsonValue("error");
-        result_item["error"] = mcp::JsonValue("operation args must be an object");
+        result_item["status"] = godot_autopilot::util::JsonValue("error");
+        result_item["error"] = godot_autopilot::util::JsonValue("operation args must be an object");
         push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
@@ -852,8 +852,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
             "batch_execute step " + std::to_string(i) + " reference error",
             "step=" + std::to_string(i) + " tool=" + tool_name +
                 " variable=" + reference + " err=" + ref_error);
-        result_item["status"] = mcp::JsonValue("error");
-        result_item["error"] = mcp::JsonValue(ref_error);
+        result_item["status"] = godot_autopilot::util::JsonValue("error");
+        result_item["error"] = godot_autopilot::util::JsonValue(ref_error);
         push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
@@ -866,7 +866,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
     }
 
-    mcp::JsonValue handler_result = dispatch::call_handler(
+    godot_autopilot::util::JsonValue handler_result = dispatch::call_handler(
         tool_name, tool_args, dispatch::capture_depth_context());
 
     int64_t pending_id = 0;
@@ -878,15 +878,15 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     const bool is_deferred_wait = handler_result.Find("__gda_wait") != nullptr;
     if (is_game_job || is_deferred_wait || has_pending_marker) {
       if (!await_async && (is_game_job || has_pending_marker)) {
-        result_item["status"] = mcp::JsonValue("error");
-        result_item["error"] = mcp::JsonValue(
+        result_item["status"] = godot_autopilot::util::JsonValue("error");
+        result_item["error"] = godot_autopilot::util::JsonValue(
             "async game op '" + tool_name +
             "' is not awaited by batch_execute (await_async=false) — call it "
             "via call_tool to receive the response, or set await_async=true to "
             "wait inside the batch");
         std::string discard_detail;
         runtime_ops::discard_pending(pending_id, discard_detail);
-        result_item["detail"] = mcp::JsonValue(discard_detail);
+        result_item["detail"] = godot_autopilot::util::JsonValue(discard_detail);
         push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
@@ -901,17 +901,17 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         std::string discard_detail;
         if (has_pending_marker || is_game_job)
           runtime_ops::discard_pending(pending_id, discard_detail);
-        result_item["status"] = mcp::JsonValue("error");
-        result_item["error"] = mcp::JsonValue(
+        result_item["status"] = godot_autopilot::util::JsonValue("error");
+        result_item["error"] = godot_autopilot::util::JsonValue(
             "await_async cannot wait on the editor main thread — invoke "
             "batch_execute directly (not through call_tool) so the wait runs "
             "on the transport thread");
-        result_item["detail"] = mcp::JsonValue(discard_detail);
+        result_item["detail"] = godot_autopilot::util::JsonValue(discard_detail);
         if (is_deferred_wait) {
-          const mcp::JsonValue released = dispatch::resolve_deferred_wait(
+          const godot_autopilot::util::JsonValue released = dispatch::resolve_deferred_wait(
               tool_name, std::move(handler_result));
           if (released.Find("error") != nullptr)
-            result_item["detail"] = mcp::JsonValue(released.Dump());
+            result_item["detail"] = godot_autopilot::util::JsonValue(released.Dump());
         }
         push_payload(result_item);
         results.PushBack(std::move(result_item));
@@ -927,7 +927,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (auto *timeout_p = handler_result.Find("timeout_ms");
           timeout_p && timeout_p->IsInt() && timeout_p->GetInt() > 0)
         wait_ms = timeout_p->GetInt();
-      mcp::JsonValue awaited;
+      godot_autopilot::util::JsonValue awaited;
       if (is_game_job || is_deferred_wait) {
         awaited = dispatch::resolve_deferred_wait(tool_name,
                                                   std::move(handler_result));
@@ -941,7 +941,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
       const bool awaited_error =
           awaited.IsObject() && !batch_detail::op_succeeded(awaited);
-      result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
+      result_item["status"] = godot_autopilot::util::JsonValue(awaited_error ? "error" : "ok");
       if (awaited_error) {
         if (auto *awaited_err = awaited.Find("error");
             awaited_err && awaited_err->IsString())
@@ -967,15 +967,15 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
     const bool handler_failed = !batch_detail::op_succeeded(handler_result);
     if (handler_failed) {
-      const mcp::JsonValue *err = handler_result.Find("error");
-      const mcp::JsonValue fallback_error(mcp::JsonValue(
+      const godot_autopilot::util::JsonValue *err = handler_result.Find("error");
+      const godot_autopilot::util::JsonValue fallback_error(godot_autopilot::util::JsonValue(
           err != nullptr && err->IsString()
               ? err->GetString()
               : std::string("tool returned a structured or runtime error")));
-      const mcp::JsonValue &error_value = (err != nullptr && err->IsString()) ? *err : fallback_error;
-      result_item["status"] = mcp::JsonValue("error");
+      const godot_autopilot::util::JsonValue &error_value = (err != nullptr && err->IsString()) ? *err : fallback_error;
+      result_item["status"] = godot_autopilot::util::JsonValue("error");
       result_item["error"] = error_value;
-      mcp::JsonValue error_body(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue error_body(godot_autopilot::util::JsonValue::object_tag);
       error_body["error"] = error_value;
       result_item["result"] = std::move(error_body);
       push_payload(result_item);
@@ -988,7 +988,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
     } else {
       note_undoable(handler_result);
-      result_item["status"] = mcp::JsonValue("ok");
+      result_item["status"] = godot_autopilot::util::JsonValue("ok");
       result_item["data"] = handler_result;
       result_item["result"] = std::move(handler_result);
       push_payload(result_item);
@@ -997,18 +997,18 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     }
   }
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["results"] = std::move(results);
   int64_t executed = succeeded + failed + pending_count;
   int64_t skipped = static_cast<int64_t>(arr.size()) - executed;
-  r["total"] = mcp::JsonValue(executed);
-  r["succeeded"] = mcp::JsonValue(static_cast<int64_t>(succeeded));
-  r["failed"] = mcp::JsonValue(static_cast<int64_t>(failed));
-  r["pending"] = mcp::JsonValue(static_cast<int64_t>(pending_count));
-  r["skipped"] = mcp::JsonValue(skipped);
+  r["total"] = godot_autopilot::util::JsonValue(executed);
+  r["succeeded"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(succeeded));
+  r["failed"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(failed));
+  r["pending"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(pending_count));
+  r["skipped"] = godot_autopilot::util::JsonValue(skipped);
   if (stopped) {
     r["note"] =
-        mcp::JsonValue("stopped at operation " + std::to_string(stopped_after) +
+        godot_autopilot::util::JsonValue("stopped at operation " + std::to_string(stopped_after) +
                        "/" + std::to_string(arr.size()) +
                        " (stop_on_error=true); " + std::to_string(skipped) +
                        " remaining operations were not executed. Set "
@@ -1018,8 +1018,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (batch_rollback_undo(history, version_before, rollback)) {
         const BatchRollbackReport report = batch_rollback_report(
             rollback.actions_created, undoable_successes, rollback.rolled_back);
-        r["rolled_back"] = mcp::JsonValue(rollback.rolled_back);
-        r["rollback_partial"] = mcp::JsonValue(report.partial);
+        r["rolled_back"] = godot_autopilot::util::JsonValue(rollback.rolled_back);
+        r["rollback_partial"] = godot_autopilot::util::JsonValue(report.partial);
       }
     }
   }
@@ -1028,15 +1028,15 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_code_execute(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "code_execute called");
 
   ExecContext ctx;
   auto *src = args.Find("source_code");
   if (!src || !src->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: source_code");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: source_code");
     return e;
   }
   if (src->GetString().empty())
@@ -1103,7 +1103,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
   }
   reconcile_leaked_children(ctx);
 
-  mcp::JsonValue r = build_exec_result(ctx);
+  godot_autopilot::util::JsonValue r = build_exec_result(ctx);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "code_execute completed");
   return r;

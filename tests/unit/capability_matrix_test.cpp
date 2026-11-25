@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -19,7 +19,7 @@ constexpr std::size_t kHistoricalDomainToolFloor = 451;
 
 const char *const kAllowedStatuses[] = {"kept", "mapped", "alias", "merged"};
 
-mcp::JsonValue load_json(const std::filesystem::path &path) {
+godot_autopilot::util::JsonValue load_json(const std::filesystem::path &path) {
   std::ifstream input(path, std::ios::binary);
   if (!input) {
     throw std::runtime_error("failed to open " + path.generic_string());
@@ -27,7 +27,7 @@ mcp::JsonValue load_json(const std::filesystem::path &path) {
   const std::string text((std::istreambuf_iterator<char>(input)),
                          std::istreambuf_iterator<char>());
   try {
-    return mcp::JsonValue::Parse(text);
+    return godot_autopilot::util::JsonValue::Parse(text);
   } catch (const std::exception &ex) {
     throw std::runtime_error("failed to parse " + path.generic_string() +
                              ": " + ex.what());
@@ -65,28 +65,28 @@ std::filesystem::path require_data_file(const std::string &relative) {
   return *found;
 }
 
-const mcp::JsonValue *require_member(const mcp::JsonValue &object,
+const godot_autopilot::util::JsonValue *require_member(const godot_autopilot::util::JsonValue &object,
                                      const char *key,
                                      const std::string &context) {
-  const mcp::JsonValue *value = object.Find(key);
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   if (value == nullptr) {
     throw std::runtime_error(context + " is missing member: " + key);
   }
   return value;
 }
 
-std::string require_string(const mcp::JsonValue &object, const char *key,
+std::string require_string(const godot_autopilot::util::JsonValue &object, const char *key,
                            const std::string &context) {
-  const mcp::JsonValue *value = require_member(object, key, context);
+  const godot_autopilot::util::JsonValue *value = require_member(object, key, context);
   if (!value->IsString()) {
     throw std::runtime_error(context + " member is not a string: " + key);
   }
   return value->GetString();
 }
 
-int64_t require_int(const mcp::JsonValue &object, const char *key,
+int64_t require_int(const godot_autopilot::util::JsonValue &object, const char *key,
                     const std::string &context) {
-  const mcp::JsonValue *value = require_member(object, key, context);
+  const godot_autopilot::util::JsonValue *value = require_member(object, key, context);
   if (!value->IsInt()) {
     throw std::runtime_error(context + " member is not an integer: " + key);
   }
@@ -118,8 +118,8 @@ std::string join_tools(const std::vector<std::string> &tools) {
 TEST(CapabilityMatrixTest, HistoricalToolsStayMappedOrKept) {
   const std::filesystem::path matrix_path =
       require_data_file("tests/data/capability_matrix.json");
-  const mcp::JsonValue matrix = load_json(matrix_path);
-  const mcp::JsonValue *rows =
+  const godot_autopilot::util::JsonValue matrix = load_json(matrix_path);
+  const godot_autopilot::util::JsonValue *rows =
       require_member(matrix, "rows", matrix_path.generic_string());
   if (!rows->IsArray()) {
     throw std::runtime_error(matrix_path.generic_string() +
@@ -144,7 +144,7 @@ TEST(CapabilityMatrixTest, HistoricalToolsStayMappedOrKept) {
   std::vector<std::string> missing;
   std::vector<std::string> unknown;
 
-  for (const mcp::JsonValue &row : domain_rows) {
+  for (const godot_autopilot::util::JsonValue &row : domain_rows) {
     if (!row.IsObject()) {
       ADD_FAILURE() << "capability matrix row is not an object";
       continue;
@@ -170,13 +170,13 @@ TEST(CapabilityMatrixTest, HistoricalToolsStayMappedOrKept) {
 
   EXPECT_EQ(old_tools.size(), domain_rows.size())
       << "capability matrix old_tool values are not unique";
-  if (const mcp::JsonValue *meta_rows = matrix.Find("meta_rows");
+  if (const godot_autopilot::util::JsonValue *meta_rows = matrix.Find("meta_rows");
       meta_rows != nullptr) {
     if (!meta_rows->IsArray()) {
       throw std::runtime_error(matrix_path.generic_string() +
                                " member is not an array: meta_rows");
     }
-    for (const mcp::JsonValue &row : meta_rows->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &row : meta_rows->GetArray()) {
       if (!row.IsObject()) {
         ADD_FAILURE() << "capability matrix meta row is not an object";
         continue;
@@ -200,7 +200,7 @@ TEST(CapabilityMatrixTest, HistoricalToolsStayMappedOrKept) {
   RecordProperty("capability_matrix_rows", std::to_string(old_tools.size()));
   RecordProperty("capability_matrix_missing", std::to_string(missing.size()));
   RecordProperty("capability_matrix_unknown", std::to_string(unknown.size()));
-  if (const mcp::JsonValue *declared_missing = matrix.Find("domain_missing_count");
+  if (const godot_autopilot::util::JsonValue *declared_missing = matrix.Find("domain_missing_count");
       declared_missing != nullptr) {
     if (!declared_missing->IsInt()) {
       throw std::runtime_error(
@@ -213,15 +213,15 @@ TEST(CapabilityMatrixTest, HistoricalToolsStayMappedOrKept) {
 TEST(CapabilityMatrixTest, UniqueOldToolCountMatchesRowCount) {
   const std::filesystem::path matrix_path =
       require_data_file("tests/data/capability_matrix.json");
-  const mcp::JsonValue matrix = load_json(matrix_path);
-  const mcp::JsonValue *rows =
+  const godot_autopilot::util::JsonValue matrix = load_json(matrix_path);
+  const godot_autopilot::util::JsonValue *rows =
       require_member(matrix, "rows", matrix_path.generic_string());
   if (!rows->IsArray()) {
     throw std::runtime_error(matrix_path.generic_string() +
                              " member is not an array: rows");
   }
   std::unordered_set<std::string> old_tools;
-  for (const mcp::JsonValue &row : rows->GetArray()) {
+  for (const godot_autopilot::util::JsonValue &row : rows->GetArray()) {
     if (!row.IsObject()) {
       ADD_FAILURE() << "capability matrix row is not an object";
       continue;

@@ -159,7 +159,7 @@ public:
     return oss.str();
   }
 
-  mcp::JsonValue get_grouped_errors(size_t group_limit) {
+  godot_autopilot::util::JsonValue get_grouped_errors(size_t group_limit) {
     std::lock_guard<std::mutex> lock(mtx_);
     struct Group {
       size_t count = 0;
@@ -202,39 +202,39 @@ public:
     });
     if (group_limit < order.size())
       order.resize(group_limit);
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     for (size_t gi : order) {
       const ErrorEntry &sample = errors_[groups[gi].sample];
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["count"] = mcp::JsonValue(static_cast<int64_t>(groups[gi].count));
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+      item["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(groups[gi].count));
       item["first_time"] =
-          mcp::JsonValue(time_text(errors_[groups[gi].first_index]));
+          godot_autopilot::util::JsonValue(time_text(errors_[groups[gi].first_index]));
       item["last_time"] =
-          mcp::JsonValue(time_text(errors_[groups[gi].last_index]));
-      item["file"] = mcp::JsonValue(sample.source_file);
-      item["func"] = mcp::JsonValue(sample.source_func);
-      item["line"] = mcp::JsonValue(static_cast<int64_t>(sample.source_line));
-      item["error"] = mcp::JsonValue(sample.error);
-      item["descr"] = mcp::JsonValue(sample.error_descr);
-      item["is_warning"] = mcp::JsonValue(sample.is_warning);
-      mcp::JsonValue stack(mcp::JsonValue::array_tag);
+          godot_autopilot::util::JsonValue(time_text(errors_[groups[gi].last_index]));
+      item["file"] = godot_autopilot::util::JsonValue(sample.source_file);
+      item["func"] = godot_autopilot::util::JsonValue(sample.source_func);
+      item["line"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(sample.source_line));
+      item["error"] = godot_autopilot::util::JsonValue(sample.error);
+      item["descr"] = godot_autopilot::util::JsonValue(sample.error_descr);
+      item["is_warning"] = godot_autopilot::util::JsonValue(sample.is_warning);
+      godot_autopilot::util::JsonValue stack(godot_autopilot::util::JsonValue::array_tag);
       const size_t frames =
           std::min<size_t>(sample.stack_files.size(), 8);
       for (size_t j = 0; j < frames; j++) {
-        stack.PushBack(mcp::JsonValue(sample.stack_files[j] + ":" +
+        stack.PushBack(godot_autopilot::util::JsonValue(sample.stack_files[j] + ":" +
                                       std::to_string(sample.stack_lines[j]) +
                                       " @ " + sample.stack_funcs[j] + "()"));
       }
       item["stack"] = std::move(stack);
       arr.PushBack(std::move(item));
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["grouped"] = mcp::JsonValue(true);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["grouped"] = godot_autopilot::util::JsonValue(true);
     result["groups"] = std::move(arr);
     result["total_errors"] =
-        mcp::JsonValue(static_cast<int64_t>(errors_.size()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(errors_.size()));
     result["total_groups"] =
-        mcp::JsonValue(static_cast<int64_t>(groups.size()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(groups.size()));
     return result;
   }
 
@@ -652,8 +652,8 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
     if (p_data.size() >= 1) {
       const std::string ready_text =
           std::string(godot::String(p_data[0]).utf8().ptr());
-      const mcp::JsonValue ready_body = mcp::JsonValue::Parse(ready_text);
-      if (const mcp::JsonValue *flag =
+      const godot_autopilot::util::JsonValue ready_body = godot_autopilot::util::JsonValue::Parse(ready_text);
+      if (const godot_autopilot::util::JsonValue *flag =
               ready_body.Find(godot_autopilot::GDA_FIELD_SCENE_READY)) {
         if (flag->IsBool()) {
           scene_ready = flag->GetBool();
@@ -673,9 +673,9 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
       entry.ready = true;
       entry.scene_ready = scene_ready;
       if (p_data.size() >= 1) {
-        const mcp::JsonValue ready_body =
-            mcp::JsonValue::Parse(util::to_std(godot::String(p_data[0])));
-        if (const mcp::JsonValue *bridge =
+        const godot_autopilot::util::JsonValue ready_body =
+            godot_autopilot::util::JsonValue::Parse(util::to_std(godot::String(p_data[0])));
+        if (const godot_autopilot::util::JsonValue *bridge =
                 ready_body.Find(std::string("csharp_bridge"))) {
           if (bridge->IsString())
             entry.csharp_bridge = bridge->GetString();
@@ -706,8 +706,8 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
 
 namespace {
 
-mcp::JsonValue capture_note_for_empty_result() {
-  return mcp::JsonValue(
+godot_autopilot::util::JsonValue capture_note_for_empty_result() {
+  return godot_autopilot::util::JsonValue(
       capture_session_active()
           ? "session active but the game reported no data — verify the game "
             "project loads the godot-autopilot extension; fall back to "
@@ -772,7 +772,7 @@ bool plugin_log_entry_matches(const godot_autopilot::LogEntry &entry,
 
 } // namespace
 
-mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_output_get_log(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_log called");
   size_t limit = 50;
@@ -780,14 +780,14 @@ mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args) {
     if (l->IsInt())
       limit = static_cast<size_t>(l->GetInt());
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(DebuggerCapture::instance().get_log_text(limit));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue(DebuggerCapture::instance().get_log_text(limit));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_log completed");
   return r;
 }
 
-mcp::JsonValue handle_plugin_log_get(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_plugin_log_get(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_plugin_log called");
   constexpr int64_t DEFAULT_LIMIT = 100;
@@ -874,32 +874,32 @@ mcp::JsonValue handle_plugin_log_get(const mcp::JsonValue &args) {
       next_index = entries.back().serial + 1;
   }
 
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (const auto &entry : entries) {
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["serial"] = mcp::JsonValue(static_cast<int64_t>(entry.serial));
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["serial"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(entry.serial));
     std::time_t tt = std::chrono::system_clock::to_time_t(entry.timestamp);
     char buf[32] = {0};
     std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&tt));
-    item["timestamp"] = mcp::JsonValue(buf);
-    item["level"] = mcp::JsonValue(plugin_log_level_name(entry.level));
-    item["category"] = mcp::JsonValue(plugin_log_category_name(entry.category));
-    item["message"] = mcp::JsonValue(entry.message);
+    item["timestamp"] = godot_autopilot::util::JsonValue(buf);
+    item["level"] = godot_autopilot::util::JsonValue(plugin_log_level_name(entry.level));
+    item["category"] = godot_autopilot::util::JsonValue(plugin_log_category_name(entry.category));
+    item["message"] = godot_autopilot::util::JsonValue(entry.message);
     arr.PushBack(std::move(item));
   }
 
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   result["entries"] = std::move(arr);
-  result["count"] = mcp::JsonValue(static_cast<int64_t>(entries.size()));
-  result["next_index"] = mcp::JsonValue(static_cast<int64_t>(next_index));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  result["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(entries.size()));
+  result["next_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(next_index));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_plugin_log completed");
   return r;
 }
 
-mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_debugger_get_errors(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_errors called");
   size_t limit = 20;
@@ -923,24 +923,24 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
     has_since_seq = true;
   }
   if (capture_session_active()) {
-    mcp::JsonValue params(mcp::JsonValue::object_tag);
-    params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
+    godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+    params["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(limit));
     if (grouped)
-      params["group"] = mcp::JsonValue(true);
+      params["group"] = godot_autopilot::util::JsonValue(true);
     if (has_since_seq)
-      params["since_seq"] = mcp::JsonValue(since_seq);
+      params["since_seq"] = godot_autopilot::util::JsonValue(since_seq);
     return runtime_ops::handle_gda_send("get_errors", params, 5000);
   }
   if (grouped) {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = DebuggerCapture::instance().get_grouped_errors(limit);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "get_debugger_errors completed (grouped)");
     return r;
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   std::string errors_text = DebuggerCapture::instance().get_errors_text(limit);
-  r["result"] = mcp::JsonValue(errors_text);
+  r["result"] = godot_autopilot::util::JsonValue(errors_text);
   if (errors_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -948,7 +948,7 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_debugger_get_output(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_output called");
   size_t limit = 50;
@@ -957,14 +957,14 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
       limit = static_cast<size_t>(l->GetInt());
   }
   if (capture_session_active()) {
-    mcp::JsonValue params(mcp::JsonValue::object_tag);
-    params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
+    godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+    params["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(limit));
     return runtime_ops::handle_gda_send("get_output", params, 5000);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   std::string output_text =
       DebuggerCapture::instance().get_game_output_text(limit);
-  r["result"] = mcp::JsonValue(output_text);
+  r["result"] = godot_autopilot::util::JsonValue(output_text);
   if (output_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -972,17 +972,17 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_debugger_get_scene_tree(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_scene_tree called");
   if (capture_session_active()) {
-    mcp::JsonValue params(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
     return runtime_ops::handle_gda_send("get_tree", params, 5000);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   std::string scene_tree_text =
       DebuggerCapture::instance().get_scene_tree_text();
-  r["result"] = mcp::JsonValue(scene_tree_text);
+  r["result"] = godot_autopilot::util::JsonValue(scene_tree_text);
   if (scene_tree_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -990,18 +990,18 @@ mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
   return r;
 }
 
-mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_debugger_get_session_info(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_session_info called");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] =
-      mcp::JsonValue(DebuggerCapture::instance().get_session_info_text());
+      godot_autopilot::util::JsonValue(DebuggerCapture::instance().get_session_info_text());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_session_info completed");
   return r;
 }
 
-mcp::JsonValue handle_debugger_stream(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_debugger_stream(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_stream called");
   auto *ap = args.Find("action");
@@ -1060,11 +1060,11 @@ mcp::JsonValue handle_debugger_stream(const mcp::JsonValue &args) {
 
 namespace {
 
-mcp::JsonValue no_debugger_session_error() {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue("no active debugger session");
-  error["code"] = mcp::JsonValue("no_active_debugger_session");
-  error["hint"] = mcp::JsonValue(
+godot_autopilot::util::JsonValue no_debugger_session_error() {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue("no active debugger session");
+  error["code"] = godot_autopilot::util::JsonValue("no_active_debugger_session");
+  error["hint"] = godot_autopilot::util::JsonValue(
       "start the game from the editor (editor_session action=play_main or "
       "editor_scene_control action=play) and retry");
   return error;
@@ -1086,31 +1086,31 @@ godot::Ref<godot::EditorDebuggerSession> find_active_debugger_session(
   return {};
 }
 
-mcp::JsonValue script_breakpoints_json(godot::ScriptEditor *script_editor) {
+godot_autopilot::util::JsonValue script_breakpoints_json(godot::ScriptEditor *script_editor) {
   godot::PackedStringArray raw = script_editor->get_breakpoints();
-  mcp::JsonValue entries(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue entries(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < raw.size(); i++) {
     const godot::String entry = raw[i];
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["raw"] = mcp::JsonValue(util::to_std(entry));
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["raw"] = godot_autopilot::util::JsonValue(util::to_std(entry));
     const int colon = entry.rfind(":");
     if (colon > 0) {
-      item["path"] = mcp::JsonValue(util::to_std(entry.substr(0, colon)));
-      item["line"] = mcp::JsonValue(
+      item["path"] = godot_autopilot::util::JsonValue(util::to_std(entry.substr(0, colon)));
+      item["line"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(entry.substr(colon + 1).to_int()));
-      item["enabled"] = mcp::JsonValue(true);
+      item["enabled"] = godot_autopilot::util::JsonValue(true);
     }
     entries.PushBack(std::move(item));
   }
-  mcp::JsonValue payload(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue payload(godot_autopilot::util::JsonValue::object_tag);
   payload["breakpoints"] = std::move(entries);
-  payload["count"] = mcp::JsonValue(static_cast<int64_t>(raw.size()));
+  payload["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(raw.size()));
   return payload;
 }
 
 } // namespace
 
-mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_debugger_breakpoints(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "debugger_breakpoints called");
   auto *ap = args.Find("action");
@@ -1127,7 +1127,7 @@ mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args) {
     return util::error_json("ScriptEditor not available");
   }
   if (action == "list") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = script_breakpoints_json(script_editor);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "debugger_breakpoints list completed");
@@ -1161,12 +1161,12 @@ mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args) {
   const bool enabled = action == "set";
   session->set_breakpoint(godot::String(path.c_str()),
                           static_cast<int32_t>(line), enabled);
-  mcp::JsonValue info = script_breakpoints_json(script_editor);
-  info["path"] = mcp::JsonValue(path);
-  info["line"] = mcp::JsonValue(line);
-  info["enabled"] = mcp::JsonValue(enabled);
-  info["session_id"] = mcp::JsonValue(static_cast<int64_t>(session_id));
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue info = script_breakpoints_json(script_editor);
+  info["path"] = godot_autopilot::util::JsonValue(path);
+  info["line"] = godot_autopilot::util::JsonValue(line);
+  info["enabled"] = godot_autopilot::util::JsonValue(enabled);
+  info["session_id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(session_id));
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   result["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "debugger_breakpoints " + action + " completed: " +

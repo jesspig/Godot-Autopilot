@@ -14,13 +14,13 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <limits>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 
 namespace godot_autopilot {
 namespace tilemap_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

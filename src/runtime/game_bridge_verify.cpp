@@ -36,7 +36,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector2.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -191,7 +191,7 @@ public:
       godot::Variant value = node->get(prop_);
       samples_.PushBack(VariantJson::serialize(value));
       if (samples_.Size() >= static_cast<size_t>(frames_)) {
-        JV body = ok_result(sample_payload(false));
+        JV body = bridge_ok_result(sample_payload(false));
         finish(std::move(body));
         return;
       }
@@ -441,7 +441,7 @@ JV op_eval_with_assert(const JV &params, int64_t request_id) {
     verdict["pass"] = JV(pass);
     verdict["expression"] = JV(assert_expr);
     inner["assert"] = std::move(verdict);
-    JV body = ok_result(std::move(inner));
+    JV body = bridge_ok_result(std::move(inner));
     append_eval_runtime_errors(body, seq_before);
     return body;
   }
@@ -481,7 +481,7 @@ JV op_eval_with_assert(const JV &params, int64_t request_id) {
   verdict["pass"] = JV(pass);
   verdict["expression"] = JV(assert_expr);
   inner["assert"] = std::move(verdict);
-  return ok_result(std::move(inner));
+  return bridge_ok_result(std::move(inner));
 }
 
 JV op_sample_property(const JV &params, int64_t request_id) {
@@ -611,7 +611,7 @@ JV op_collect_evidence(const JV &params, int64_t request_id) {
   out["note"] = JV("read-only evidence bundle without verdict; sections fail "
                    "in isolation and mirror the stepwise calls "
                    "(get_game_status/get_debugger_errors/capture_game_viewport)");
-  return ok_result(std::move(out));
+  return bridge_ok_result(std::move(out));
 }
 
 JV op_validate_ui_layout(const JV &params) {
@@ -843,7 +843,7 @@ JV op_validate_ui_layout(const JV &params) {
                  "effective z_index then document order (canvas_layer "
                  "ignored), and mouse_filter=IGNORE controls never count as "
                  "occluders");
-  return ok_result(std::move(r));
+  return bridge_ok_result(std::move(r));
 }
 
 void register_verify_bridge_classes() {

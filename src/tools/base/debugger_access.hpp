@@ -4,14 +4,14 @@
 #include <cstdint>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace godot_autopilot {
 
-mcp::JsonValue build_cancel_request_body(int64_t request_id);
+godot_autopilot::util::JsonValue build_cancel_request_body(int64_t request_id);
 
 bool debugger_capture_initialized();
 

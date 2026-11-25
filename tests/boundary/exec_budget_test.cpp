@@ -28,7 +28,7 @@ TEST(ExecBudgetTest, TimeoutSentinelTextMatchesDeclaredConstant) {
 }
 
 TEST(ExecBudgetTest, ExecTimeoutResultCarriesStructuredContract) {
-  const mcp::JsonValue result = exec_timeout_result(300, 351);
+  const godot_autopilot::util::JsonValue result = exec_timeout_result(300, 351);
   ASSERT_TRUE(result.Find("error") != nullptr);
   EXPECT_EQ(result["error"].GetString(),
             "execution timed out after 300 ms");

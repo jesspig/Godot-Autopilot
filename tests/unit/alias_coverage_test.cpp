@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <mcp/Capabilities.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mcp/client/McpClient.hpp>
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
@@ -30,7 +30,7 @@
 
 namespace {
 
-mcp::JsonValue load_json(const std::filesystem::path &path) {
+godot_autopilot::util::JsonValue load_json(const std::filesystem::path &path) {
   std::ifstream input(path, std::ios::binary);
   if (!input) {
     throw std::runtime_error("failed to open " + path.generic_string());
@@ -38,7 +38,7 @@ mcp::JsonValue load_json(const std::filesystem::path &path) {
   const std::string text((std::istreambuf_iterator<char>(input)),
                          std::istreambuf_iterator<char>());
   try {
-    return mcp::JsonValue::Parse(text);
+    return godot_autopilot::util::JsonValue::Parse(text);
   } catch (const std::exception &ex) {
     throw std::runtime_error("failed to parse " + path.generic_string() +
                              ": " + ex.what());
@@ -76,39 +76,39 @@ std::filesystem::path require_data_file(const std::string &relative) {
   return *found;
 }
 
-const mcp::JsonValue *require_member(const mcp::JsonValue &object,
+const godot_autopilot::util::JsonValue *require_member(const godot_autopilot::util::JsonValue &object,
                                      const char *key,
                                      const std::string &context) {
-  const mcp::JsonValue *value = object.Find(key);
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   if (value == nullptr) {
     throw std::runtime_error(context + " is missing member: " + key);
   }
   return value;
 }
 
-std::string require_string(const mcp::JsonValue &object, const char *key,
+std::string require_string(const godot_autopilot::util::JsonValue &object, const char *key,
                            const std::string &context) {
-  const mcp::JsonValue *value = require_member(object, key, context);
+  const godot_autopilot::util::JsonValue *value = require_member(object, key, context);
   if (!value->IsString()) {
     throw std::runtime_error(context + " member is not a string: " + key);
   }
   return value->GetString();
 }
 
-std::optional<std::string> row_status(const mcp::JsonValue &row) {
-  const mcp::JsonValue *status = row.Find("status");
+std::optional<std::string> row_status(const godot_autopilot::util::JsonValue &row) {
+  const godot_autopilot::util::JsonValue *status = row.Find("status");
   if (status == nullptr || !status->IsString()) {
     return std::nullopt;
   }
   return status->GetString();
 }
 
-bool is_alias_row(const mcp::JsonValue &row) {
+bool is_alias_row(const godot_autopilot::util::JsonValue &row) {
   const std::optional<std::string> status = row_status(row);
   if (status.has_value() && *status == "alias") {
     return true;
   }
-  const mcp::JsonValue *flag = row.Find("alias");
+  const godot_autopilot::util::JsonValue *flag = row.Find("alias");
   return flag != nullptr && flag->IsBool() && flag->GetBool();
 }
 
@@ -167,26 +167,26 @@ struct AliasCoverageTest : ::testing::Test {
 TEST_F(AliasCoverageTest, CapabilityMatrixAliasRowsResolveWithoutConflicts) {
   const std::filesystem::path matrix_path =
       require_data_file("tests/data/capability_matrix.json");
-  const mcp::JsonValue matrix = load_json(matrix_path);
-  const mcp::JsonValue *rows =
+  const godot_autopilot::util::JsonValue matrix = load_json(matrix_path);
+  const godot_autopilot::util::JsonValue *rows =
       require_member(matrix, "rows", matrix_path.generic_string());
   if (!rows->IsArray()) {
     throw std::runtime_error(matrix_path.generic_string() +
                              " member is not an array: rows");
   }
 
-  std::vector<const mcp::JsonValue *> all_rows;
+  std::vector<const godot_autopilot::util::JsonValue *> all_rows;
   all_rows.reserve(rows->GetArray().size());
-  for (const mcp::JsonValue &row : rows->GetArray()) {
+  for (const godot_autopilot::util::JsonValue &row : rows->GetArray()) {
     all_rows.push_back(&row);
   }
-  if (const mcp::JsonValue *meta_rows = matrix.Find("meta_rows");
+  if (const godot_autopilot::util::JsonValue *meta_rows = matrix.Find("meta_rows");
       meta_rows != nullptr) {
     if (!meta_rows->IsArray()) {
       throw std::runtime_error(matrix_path.generic_string() +
                                " member is not an array: meta_rows");
     }
-    for (const mcp::JsonValue &row : meta_rows->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &row : meta_rows->GetArray()) {
       all_rows.push_back(&row);
     }
   }
@@ -197,7 +197,7 @@ TEST_F(AliasCoverageTest, CapabilityMatrixAliasRowsResolveWithoutConflicts) {
 
   std::size_t alias_rows = 0;
   std::unordered_set<std::string> seen_aliases;
-  for (const mcp::JsonValue *row : all_rows) {
+  for (const godot_autopilot::util::JsonValue *row : all_rows) {
     if (!row->IsObject()) {
       ADD_FAILURE() << "capability matrix row is not an object";
       continue;

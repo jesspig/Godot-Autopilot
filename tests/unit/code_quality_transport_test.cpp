@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstdint>
 #include <string>
@@ -16,8 +16,8 @@ using godot_autopilot::error_watermark::count_response_errors;
 using godot_autopilot::error_watermark::record_error;
 using godot_autopilot::TraceRecorder;
 
-mcp::JsonValue parse(const std::string &text) {
-  return mcp::JsonValue::Parse(text);
+godot_autopilot::util::JsonValue parse(const std::string &text) {
+  return godot_autopilot::util::JsonValue::Parse(text);
 }
 
 } // namespace
@@ -51,13 +51,13 @@ TEST(CodeQualityA5Test, CountsStructuredAndRuntimeError) {
 }
 
 TEST(CodeQualityA5Test, CountsObjectErrorsInsideResults) {
-  const mcp::JsonValue response = parse(
+  const godot_autopilot::util::JsonValue response = parse(
       R"({"results":[{"error":{"code":"E1"}},{"error":"boom"},{"result":1}]})");
   EXPECT_EQ(count_response_errors(response), 2);
 }
 
 TEST(CodeQualityA5Test, IgnoresNonObjects) {
-  EXPECT_EQ(count_response_errors(mcp::JsonValue("boom")), 0);
+  EXPECT_EQ(count_response_errors(godot_autopilot::util::JsonValue("boom")), 0);
   EXPECT_EQ(count_response_errors(parse(R"({"result":1})")), 0);
 }
 

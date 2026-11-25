@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace capture_tools {
@@ -51,22 +51,22 @@ const std::vector<ParamSpec> kReviewSceneVisuallyParams = {
     {"node_viewport", "string", "Nodes table viewport: 'auto' (default), '2d' or '3d'", false},
 };
 
-mcp::JsonValue capture_game_alias_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue capture_game_alias_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["target"] = mcp::JsonValue("game");
+  out["target"] = godot_autopilot::util::JsonValue("game");
   return out;
 }
 
-mcp::JsonValue capture_alias_error(const std::string &message) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["error"] = mcp::JsonValue(message);
+godot_autopilot::util::JsonValue capture_alias_error(const std::string &message) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["error"] = godot_autopilot::util::JsonValue(message);
   return out;
 }
 
-mcp::JsonValue capture_game_alias_validate(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue capture_game_alias_validate(const godot_autopilot::util::JsonValue &args) {
   const char *allowed[] = {"timeout_ms",        "region",
                            "max_dimension",     "annotate",
                            "after_frames",      "when",
@@ -89,15 +89,15 @@ mcp::JsonValue capture_game_alias_validate(const mcp::JsonValue &args) {
       }
     }
   }
-  if (const mcp::JsonValue *region = args.Find("region")) {
+  if (const godot_autopilot::util::JsonValue *region = args.Find("region")) {
     if (!region->IsObject()) {
       return capture_alias_error(
           "region must be an object with numeric x, y, width and height");
     }
-    const mcp::JsonValue *rx = region->Find("x");
-    const mcp::JsonValue *ry = region->Find("y");
-    const mcp::JsonValue *rw = region->Find("width");
-    const mcp::JsonValue *rh = region->Find("height");
+    const godot_autopilot::util::JsonValue *rx = region->Find("x");
+    const godot_autopilot::util::JsonValue *ry = region->Find("y");
+    const godot_autopilot::util::JsonValue *rw = region->Find("width");
+    const godot_autopilot::util::JsonValue *rh = region->Find("height");
     if (rx == nullptr || ry == nullptr || rw == nullptr || rh == nullptr ||
         !rx->IsNumber() || !ry->IsNumber() || !rw->IsNumber() ||
         !rh->IsNumber()) {
@@ -115,19 +115,19 @@ mcp::JsonValue capture_game_alias_validate(const mcp::JsonValue &args) {
           "(width/height greater than 0)");
     }
   }
-  if (const mcp::JsonValue *max_dimension = args.Find("max_dimension")) {
+  if (const godot_autopilot::util::JsonValue *max_dimension = args.Find("max_dimension")) {
     if (!max_dimension->IsInt() || max_dimension->GetInt() < 64 ||
         max_dimension->GetInt() > 4096) {
       return capture_alias_error(
           "max_dimension must be an integer between 64 and 4096");
     }
   }
-  if (const mcp::JsonValue *annotate = args.Find("annotate")) {
+  if (const godot_autopilot::util::JsonValue *annotate = args.Find("annotate")) {
     if (!annotate->IsBool()) {
       return capture_alias_error("annotate must be a boolean");
     }
   }
-  if (const mcp::JsonValue *nodes = args.Find("annotate_nodes")) {
+  if (const godot_autopilot::util::JsonValue *nodes = args.Find("annotate_nodes")) {
     if (!nodes->IsArray() || nodes->GetArray().empty() ||
         nodes->GetArray().size() > 50) {
       return capture_alias_error(
@@ -140,36 +140,36 @@ mcp::JsonValue capture_game_alias_validate(const mcp::JsonValue &args) {
       }
     }
   }
-  if (const mcp::JsonValue *nodes_max = args.Find("annotate_nodes_max")) {
+  if (const godot_autopilot::util::JsonValue *nodes_max = args.Find("annotate_nodes_max")) {
     if (!nodes_max->IsInt() || nodes_max->GetInt() < 1 ||
         nodes_max->GetInt() > 50) {
       return capture_alias_error(
           "annotate_nodes_max must be an integer between 1 and 50");
     }
   }
-  if (const mcp::JsonValue *after_frames = args.Find("after_frames")) {
+  if (const godot_autopilot::util::JsonValue *after_frames = args.Find("after_frames")) {
     if (!after_frames->IsInt() || after_frames->GetInt() < 0) {
       return capture_alias_error(
           "after_frames must be an integer greater than or equal to 0");
     }
   }
-  if (const mcp::JsonValue *when = args.Find("when")) {
+  if (const godot_autopilot::util::JsonValue *when = args.Find("when")) {
     if (!when->IsString()) {
       return capture_alias_error("when must be a string");
     }
   }
-  if (const mcp::JsonValue *scale = args.Find("scale")) {
+  if (const godot_autopilot::util::JsonValue *scale = args.Find("scale")) {
     if (!scale->IsInt() || scale->GetInt() < 1 || scale->GetInt() > 8) {
       return capture_alias_error(
           "scale must be an integer between 1 and 8");
     }
   }
-  if (const mcp::JsonValue *wait_ready = args.Find("wait_ready")) {
+  if (const godot_autopilot::util::JsonValue *wait_ready = args.Find("wait_ready")) {
     if (!wait_ready->IsBool()) {
       return capture_alias_error("wait_ready must be a boolean");
     }
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
 } // namespace

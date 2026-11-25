@@ -115,15 +115,15 @@ protected:
     }
   }
 
-  int64_t pending_id(const mcp::JsonValue &result) const {
+  int64_t pending_id(const godot_autopilot::util::JsonValue &result) const {
     const auto *value = result.Find("__gda_pending");
     return value != nullptr && value->IsInt() ? value->GetInt() : 0;
   }
 
-  mcp::JsonValue start_job_args() const {
-    mcp::JsonValue params = mcp::JsonValue::Parse(
+  godot_autopilot::util::JsonValue start_job_args() const {
+    godot_autopilot::util::JsonValue params = godot_autopilot::util::JsonValue::Parse(
         R"({"action":"get_property","property":"position"})");
-    mcp::JsonValue args = mcp::JsonValue::Parse(
+    godot_autopilot::util::JsonValue args = godot_autopilot::util::JsonValue::Parse(
         R"({"op":"eval","session_id":1,"timeout_ms":1000})");
     args["params"] = std::move(params);
     return args;
@@ -137,8 +137,8 @@ protected:
 
 TEST_F(GameSessionDispatchFixture, SingleReadySessionIsAutoSelected) {
   backend_->set_sessions({{7, true, true, true}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000);
   const int64_t request_id = pending_id(result);
   ASSERT_GT(request_id, 0);
   const auto sent = backend_->sent();
@@ -150,8 +150,8 @@ TEST_F(GameSessionDispatchFixture, SingleReadySessionIsAutoSelected) {
 
 TEST_F(GameSessionDispatchFixture, MultipleReadySessionsRejectBeforeAnySend) {
   backend_->set_sessions({{7, true, true, true}, {8, true, true, true}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000);
   ASSERT_NE(result.Find("error"), nullptr);
   ASSERT_NE(result.Find("code"), nullptr);
   EXPECT_EQ(result["code"].GetString(), "ambiguous_session");
@@ -161,8 +161,8 @@ TEST_F(GameSessionDispatchFixture, MultipleReadySessionsRejectBeforeAnySend) {
 
 TEST_F(GameSessionDispatchFixture, ExplicitSessionTargetsOnlyRequestedSession) {
   backend_->set_sessions({{7, true, true, true}, {8, true, true, true}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000, false, true, 8);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000, false, true, 8);
   const int64_t request_id = pending_id(result);
   ASSERT_GT(request_id, 0);
   const auto sent = backend_->sent();
@@ -174,8 +174,8 @@ TEST_F(GameSessionDispatchFixture, ExplicitSessionTargetsOnlyRequestedSession) {
 
 TEST_F(GameSessionDispatchFixture, InvalidSessionIsRejectedBeforeSend) {
   backend_->set_sessions({{7, true, true, true}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000, false, true, 99);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000, false, true, 99);
   ASSERT_NE(result.Find("code"), nullptr);
   EXPECT_EQ(result["code"].GetString(), "invalid_session");
   EXPECT_TRUE(backend_->sent().empty());
@@ -183,8 +183,8 @@ TEST_F(GameSessionDispatchFixture, InvalidSessionIsRejectedBeforeSend) {
 
 TEST_F(GameSessionDispatchFixture, GameToolRejectsNonIntegerSessionId) {
   backend_->set_sessions({{7, true, true, true}});
-  const mcp::JsonValue result = handle_game_status(
-      mcp::JsonValue::Parse(R"({"session_id":"7"})"));
+  const godot_autopilot::util::JsonValue result = handle_game_status(
+      godot_autopilot::util::JsonValue::Parse(R"({"session_id":"7"})"));
   ASSERT_NE(result.Find("error"), nullptr);
   EXPECT_EQ(result["error"].GetString(), "session_id must be an integer");
   EXPECT_TRUE(backend_->sent().empty());
@@ -192,11 +192,11 @@ TEST_F(GameSessionDispatchFixture, GameToolRejectsNonIntegerSessionId) {
 
 TEST_F(GameSessionDispatchFixture, TimeoutCancelsOnlyTheSelectedSession) {
   backend_->set_sessions({{3, true, true, true}, {4, true, true, true}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000, false, true, 3);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000, false, true, 3);
   const int64_t request_id = pending_id(result);
   ASSERT_GT(request_id, 0);
-  const mcp::JsonValue timeout = wait_pending_response(request_id, 1);
+  const godot_autopilot::util::JsonValue timeout = wait_pending_response(request_id, 1);
   ASSERT_NE(timeout.Find("error"), nullptr);
   const auto cancels = backend_->cancels();
   ASSERT_EQ(cancels.size(), 1u);
@@ -206,8 +206,8 @@ TEST_F(GameSessionDispatchFixture, TimeoutCancelsOnlyTheSelectedSession) {
 
 TEST_F(GameSessionDispatchFixture, QueuedExplicitRequestWaitsForTargetReady) {
   backend_->set_sessions({{1, true, false, false}, {2, true, true, true}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000, false, true, 1);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000, false, true, 1);
   const int64_t request_id = pending_id(result);
   ASSERT_GT(request_id, 0);
   EXPECT_TRUE(backend_->sent().empty());
@@ -226,14 +226,14 @@ TEST_F(GameSessionDispatchFixture, QueuedExplicitRequestWaitsForTargetReady) {
 
 TEST_F(GameSessionDispatchFixture, QueuedImplicitRequestFailsIfMultipleBecomeReady) {
   backend_->set_sessions({{1, true, false, false}, {2, true, false, false}});
-  const mcp::JsonValue result = handle_gda_send(
-      "status", mcp::JsonValue(mcp::JsonValue::object_tag), 1000);
+  const godot_autopilot::util::JsonValue result = handle_gda_send(
+      "status", godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), 1000);
   const int64_t request_id = pending_id(result);
   ASSERT_GT(request_id, 0);
   backend_->set_sessions({{1, true, true, true}, {2, true, true, true}});
   on_session_ready(1);
   EXPECT_TRUE(backend_->sent().empty());
-  const mcp::JsonValue response = wait_pending_response(request_id, 10);
+  const godot_autopilot::util::JsonValue response = wait_pending_response(request_id, 10);
   ASSERT_NE(response.Find("code"), nullptr);
   EXPECT_EQ(response["code"].GetString(), "ambiguous_session");
 }
@@ -249,7 +249,7 @@ TEST_F(GameSessionDispatchFixture, FullJobTableRejectsBeforeSend) {
     }
   }
   backend_->set_sessions({{1, true, true, true}});
-  const mcp::JsonValue result = handle_game_job_start(start_job_args());
+  const godot_autopilot::util::JsonValue result = handle_game_job_start(start_job_args());
   ASSERT_NE(result.Find("error"), nullptr);
   EXPECT_NE(result["error"].GetString().find("job table is full"),
             std::string::npos);
@@ -260,7 +260,7 @@ TEST_F(GameSessionDispatchFixture, FullJobTableRejectsBeforeSend) {
 TEST_F(GameSessionDispatchFixture, SendFailureReleasesReservedJobSlot) {
   backend_->set_sessions({{1, true, true, true}});
   backend_->set_send_ok(false);
-  const mcp::JsonValue result = handle_game_job_start(start_job_args());
+  const godot_autopilot::util::JsonValue result = handle_game_job_start(start_job_args());
   ASSERT_NE(result.Find("error"), nullptr);
   EXPECT_EQ(result["code"].GetString(), "send_failed");
   EXPECT_EQ(backend_->attempts(), 1);
@@ -270,7 +270,7 @@ TEST_F(GameSessionDispatchFixture, SendFailureReleasesReservedJobSlot) {
 
 TEST_F(GameSessionDispatchFixture, SuccessfulSendBindsReservedJobToRequest) {
   backend_->set_sessions({{1, true, true, true}});
-  const mcp::JsonValue result = handle_game_job_start(start_job_args());
+  const godot_autopilot::util::JsonValue result = handle_game_job_start(start_job_args());
   ASSERT_EQ(result.Find("error"), nullptr);
   ASSERT_NE(result.Find("result"), nullptr);
   const int64_t job_id = result["result"]["job_id"].GetInt();

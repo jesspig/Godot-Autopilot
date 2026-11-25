@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "core/storage/project_store.hpp"
 
@@ -23,8 +23,8 @@ struct InstanceRecord {
   std::string port_source;
 };
 
-mcp::JsonValue record_to_json(const InstanceRecord &record);
-bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out);
+godot_autopilot::util::JsonValue record_to_json(const InstanceRecord &record);
+bool record_from_json(const godot_autopilot::util::JsonValue &doc, InstanceRecord &out);
 bool record_from_json_text(const std::string &json_text, InstanceRecord &out);
 
 class InstanceRegistry {

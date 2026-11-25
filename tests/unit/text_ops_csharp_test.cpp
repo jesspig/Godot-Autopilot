@@ -93,32 +93,32 @@ TEST(TextOpsCSharpParsing, PartialDetectionNeedsModifierBeforeClass) {
 }
 
 TEST(TextOpsCSharpDiagnostics, LoadedButNotInstantiableKeepsOkTrue) {
-  const mcp::JsonValue diag = script_load_diagnostics(true, false);
-  const mcp::JsonValue *ok = diag.Find("ok");
+  const godot_autopilot::util::JsonValue diag = script_load_diagnostics(true, false);
+  const godot_autopilot::util::JsonValue *ok = diag.Find("ok");
   ASSERT_NE(ok, nullptr);
   ASSERT_TRUE(ok->IsBool());
   EXPECT_TRUE(ok->GetBool());
-  const mcp::JsonValue *instantiable = diag.Find("instantiable");
+  const godot_autopilot::util::JsonValue *instantiable = diag.Find("instantiable");
   ASSERT_NE(instantiable, nullptr);
   ASSERT_TRUE(instantiable->IsBool());
   EXPECT_FALSE(instantiable->GetBool());
 }
 
 TEST(TextOpsCSharpDiagnostics, LoadedAndInstantiableReportsBothTrue) {
-  const mcp::JsonValue diag = script_load_diagnostics(true, true);
-  const mcp::JsonValue *ok = diag.Find("ok");
+  const godot_autopilot::util::JsonValue diag = script_load_diagnostics(true, true);
+  const godot_autopilot::util::JsonValue *ok = diag.Find("ok");
   ASSERT_NE(ok, nullptr);
   ASSERT_TRUE(ok->IsBool());
   EXPECT_TRUE(ok->GetBool());
-  const mcp::JsonValue *instantiable = diag.Find("instantiable");
+  const godot_autopilot::util::JsonValue *instantiable = diag.Find("instantiable");
   ASSERT_NE(instantiable, nullptr);
   ASSERT_TRUE(instantiable->IsBool());
   EXPECT_TRUE(instantiable->GetBool());
 }
 
 TEST(TextOpsCSharpDiagnostics, LoadFailureOmitsInstantiable) {
-  const mcp::JsonValue diag = script_load_diagnostics(false, false);
-  const mcp::JsonValue *ok = diag.Find("ok");
+  const godot_autopilot::util::JsonValue diag = script_load_diagnostics(false, false);
+  const godot_autopilot::util::JsonValue *ok = diag.Find("ok");
   ASSERT_NE(ok, nullptr);
   ASSERT_TRUE(ok->IsBool());
   EXPECT_FALSE(ok->GetBool());

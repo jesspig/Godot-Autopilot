@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <tools/base/tool_spec.hpp>
 
 namespace {
 
-mcp::JsonValue parse(const char *text) {
-  mcp::JsonValue value = mcp::JsonValue::Parse(text);
+godot_autopilot::util::JsonValue parse(const char *text) {
+  godot_autopilot::util::JsonValue value = godot_autopilot::util::JsonValue::Parse(text);
   EXPECT_TRUE(value.IsObject()) << text;
   return value;
 }
@@ -89,7 +89,7 @@ TEST(ToolVerdictTest, NormalResultIsSuccess) {
 }
 
 TEST(ToolVerdictTest, NonObjectResultIsSuccess) {
-  const auto v = godot_autopilot::spec_detail::verdict_of(mcp::JsonValue("text"));
+  const auto v = godot_autopilot::spec_detail::verdict_of(godot_autopilot::util::JsonValue("text"));
   EXPECT_TRUE(v.ok);
   EXPECT_TRUE(v.error_code.empty());
 }

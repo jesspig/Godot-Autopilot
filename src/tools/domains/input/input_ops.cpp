@@ -36,7 +36,7 @@ godot::MouseButton parse_mouse_button(const std::string &button_str) {
   return godot::MOUSE_BUTTON_NONE;
 }
 
-bool extract_vec2(const mcp::JsonValue &obj, double &x, double &y) {
+bool extract_vec2(const godot_autopilot::util::JsonValue &obj, double &x, double &y) {
   auto *xp = obj.Find("x");
   auto *yp = obj.Find("y");
   if (!xp || !xp->IsNumber())
@@ -50,14 +50,14 @@ bool extract_vec2(const mcp::JsonValue &obj, double &x, double &y) {
 
 } // namespace
 
-mcp::JsonValue handle_action_press(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_action_press(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "press_input_action called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: action");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: action");
     return e;
   }
 
@@ -71,86 +71,86 @@ mcp::JsonValue handle_action_press(const mcp::JsonValue &args) {
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
   std::string action_str = action_p->GetString();
   input->action_press(godot::StringName(action_str.c_str()), strength);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_action_release(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_action_release(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "release_input_action called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: action");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: action");
     return e;
   }
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
   std::string action_str = action_p->GetString();
   input->action_release(godot::StringName(action_str.c_str()));
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_is_action_pressed(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_is_action_pressed(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "is_input_action_pressed called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: action");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: action");
     return e;
   }
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
   std::string action_str = action_p->GetString();
   bool result = input->is_action_pressed(godot::StringName(action_str.c_str()));
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(result);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue(result);
   return r;
 }
 
-mcp::JsonValue handle_is_action_just_pressed(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_is_action_just_pressed(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "is_input_action_just_pressed called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: action");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: action");
     return e;
   }
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -158,34 +158,34 @@ mcp::JsonValue handle_is_action_just_pressed(const mcp::JsonValue &args) {
   bool result =
       input->is_action_just_pressed(godot::StringName(action_str.c_str()));
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(result);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue(result);
   return r;
 }
 
-mcp::JsonValue handle_key_press(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_key_press(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "press_input_key called");
 
   auto *key_p = args.Find("key");
   if (!key_p || !key_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: key");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: key");
     return e;
   }
 
   std::string key_str = key_p->GetString();
   godot::Key k = parse_key(key_str);
   if (k == godot::KEY_NONE) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("invalid key: " + key_str);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("invalid key: " + key_str);
     return e;
   }
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -196,34 +196,34 @@ mcp::JsonValue handle_key_press(const mcp::JsonValue &args) {
 
   input->parse_input_event(ev);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_key_release(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_key_release(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "release_input_key called");
 
   auto *key_p = args.Find("key");
   if (!key_p || !key_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: key");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: key");
     return e;
   }
 
   std::string key_str = key_p->GetString();
   godot::Key k = parse_key(key_str);
   if (k == godot::KEY_NONE) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("invalid key: " + key_str);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("invalid key: " + key_str);
     return e;
   }
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -234,26 +234,26 @@ mcp::JsonValue handle_key_release(const mcp::JsonValue &args) {
 
   input->parse_input_event(ev);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_mouse_move(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_mouse_move(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "move_input_mouse called");
 
   auto *pos_p = args.Find("position");
   if (!pos_p || !pos_p->IsObject()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: position");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: position");
     return e;
   }
 
   double px = 0.0, py = 0.0;
   if (!extract_vec2(*pos_p, px, py)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("position must have numeric x and y fields");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("position must have numeric x and y fields");
     return e;
   }
 
@@ -265,8 +265,8 @@ mcp::JsonValue handle_mouse_move(const mcp::JsonValue &args) {
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -278,27 +278,27 @@ mcp::JsonValue handle_mouse_move(const mcp::JsonValue &args) {
 
   input->parse_input_event(ev);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_mouse_button_press(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_mouse_button_press(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "press_input_mouse_button called");
 
   auto *button_p = args.Find("button");
   if (!button_p || !button_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: button");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: button");
     return e;
   }
 
   std::string button_str = button_p->GetString();
   godot::MouseButton mb = parse_mouse_button(button_str);
   if (mb == godot::MOUSE_BUTTON_NONE) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("invalid mouse button: " + button_str);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("invalid mouse button: " + button_str);
     return e;
   }
 
@@ -310,8 +310,8 @@ mcp::JsonValue handle_mouse_button_press(const mcp::JsonValue &args) {
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -324,27 +324,27 @@ mcp::JsonValue handle_mouse_button_press(const mcp::JsonValue &args) {
 
   input->parse_input_event(ev);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_mouse_button_release(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "release_input_mouse_button called");
 
   auto *button_p = args.Find("button");
   if (!button_p || !button_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: button");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: button");
     return e;
   }
 
   std::string button_str = button_p->GetString();
   godot::MouseButton mb = parse_mouse_button(button_str);
   if (mb == godot::MOUSE_BUTTON_NONE) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("invalid mouse button: " + button_str);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("invalid mouse button: " + button_str);
     return e;
   }
 
@@ -356,8 +356,8 @@ mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args) {
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -370,19 +370,19 @@ mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args) {
 
   input->parse_input_event(ev);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_gamepad_vibration_start(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_gamepad_vibration_start(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "start_input_gamepad_vibration called");
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -414,19 +414,19 @@ mcp::JsonValue handle_gamepad_vibration_start(const mcp::JsonValue &args) {
 
   input->start_joy_vibration(device, weak, strong, duration);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
-mcp::JsonValue handle_gamepad_vibration_stop(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_gamepad_vibration_stop(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "stop_input_gamepad_vibration called");
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Input singleton not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("Input singleton not available");
     return e;
   }
 
@@ -437,22 +437,22 @@ mcp::JsonValue handle_gamepad_vibration_stop(const mcp::JsonValue &args) {
 
   input->stop_joy_vibration(device);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   return r;
 }
 
 namespace {
 
-mcp::JsonValue input_action_error(const std::string &message) {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue(message);
+godot_autopilot::util::JsonValue input_action_error(const std::string &message) {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue(message);
   return error;
 }
 
-bool read_input_action(const mcp::JsonValue &args, std::string &out,
-                       mcp::JsonValue &error) {
-  const mcp::JsonValue *action = args.Find("action");
+bool read_input_action(const godot_autopilot::util::JsonValue &args, std::string &out,
+                       godot_autopilot::util::JsonValue &error) {
+  const godot_autopilot::util::JsonValue *action = args.Find("action");
   if (action == nullptr) {
     error = input_action_error("missing required parameter: action");
     return false;
@@ -465,35 +465,35 @@ bool read_input_action(const mcp::JsonValue &args, std::string &out,
   return true;
 }
 
-mcp::JsonValue legacy_input_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out = args.IsObject()
+godot_autopilot::util::JsonValue legacy_input_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   out.GetObject().erase("action");
-  const mcp::JsonValue *name = args.Find("name");
+  const godot_autopilot::util::JsonValue *name = args.Find("name");
   if (name != nullptr) {
     out["action"] = *name;
   }
   return out;
 }
 
-mcp::JsonValue strip_input_action(const mcp::JsonValue &args) {
-  mcp::JsonValue out = args.IsObject()
+godot_autopilot::util::JsonValue strip_input_action(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   out.GetObject().erase("action");
   return out;
 }
 
 } // namespace
 
-mcp::JsonValue handle_get_input_state(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_input_state(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_input_action(args, action, error)) {
     return error;
   }
-  const mcp::JsonValue legacy = legacy_input_args(args);
+  const godot_autopilot::util::JsonValue legacy = legacy_input_args(args);
   if (action == "action_pressed") {
     return handle_is_action_pressed(legacy);
   }
@@ -505,13 +505,13 @@ mcp::JsonValue handle_get_input_state(const mcp::JsonValue &args) {
       "' for get_input_state (expected action_pressed, action_just_pressed)");
 }
 
-mcp::JsonValue handle_input_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_input_action(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_input_action(args, action, error)) {
     return error;
   }
-  const mcp::JsonValue legacy = legacy_input_args(args);
+  const godot_autopilot::util::JsonValue legacy = legacy_input_args(args);
   if (action == "press") {
     return handle_action_press(legacy);
   }
@@ -523,13 +523,13 @@ mcp::JsonValue handle_input_action(const mcp::JsonValue &args) {
       "' for input_action (expected press, release)");
 }
 
-mcp::JsonValue handle_input_key(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_input_key(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_input_action(args, action, error)) {
     return error;
   }
-  const mcp::JsonValue legacy = strip_input_action(args);
+  const godot_autopilot::util::JsonValue legacy = strip_input_action(args);
   if (action == "press") {
     return handle_key_press(legacy);
   }
@@ -541,13 +541,13 @@ mcp::JsonValue handle_input_key(const mcp::JsonValue &args) {
       "' for input_key (expected press, release)");
 }
 
-mcp::JsonValue handle_input_gamepad(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_input_gamepad(const godot_autopilot::util::JsonValue &args) {
   std::string action;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!read_input_action(args, action, error)) {
     return error;
   }
-  const mcp::JsonValue legacy = strip_input_action(args);
+  const godot_autopilot::util::JsonValue legacy = strip_input_action(args);
   if (action == "start_vibration") {
     return handle_gamepad_vibration_start(legacy);
   }
