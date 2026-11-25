@@ -66,6 +66,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
 # ====================================================================
 file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp")
+list(FILTER GDA_UNIT_SOURCES EXCLUDE REGEX "/unit/gcp_envelope_test.cpp")
 
 if(GDA_UNIT_SOURCES)
     set(GDA_UNIT_ALL_SOURCES ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
@@ -136,6 +137,7 @@ endif()
 # ====================================================================
 file(GLOB GDA_INTEGRATION_TEST_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/integration/*_test.cpp")
+list(FILTER GDA_INTEGRATION_TEST_SOURCES EXCLUDE REGEX "/integration/gcp_contract_test.cpp")
 
 if(GDA_INTEGRATION_TEST_SOURCES)
     set(GDA_INTEGRATION_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
@@ -161,6 +163,26 @@ if(GDA_INTEGRATION_TEST_SOURCES)
         LINK_SEARCH_END_STATIC ON)
 
     gtest_discover_tests(gda_integration_tests PROPERTIES LABELS "integration")
+endif()
+
+# ====================================================================
+# gda_gcp_contract_tests — GCP 原生协议契约层 (纯 C++ 骨架, 独立链接)
+# ====================================================================
+file(GLOB GDA_GCP_CONTRACT_TEST_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/unit/gcp_envelope_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/integration/gcp_contract_test.cpp")
+
+if(GDA_GCP_CONTRACT_TEST_SOURCES)
+    add_executable(gda_gcp_contract_tests
+        ${GDA_GCP_CONTRACT_TEST_SOURCES}
+        ${GDA_GCP_CONTRACT_SOURCES})
+    target_include_directories(gda_gcp_contract_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+    target_link_libraries(gda_gcp_contract_tests PRIVATE GTest::gtest_main)
+    set_target_properties(gda_gcp_contract_tests PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON)
+    gtest_discover_tests(gda_gcp_contract_tests PROPERTIES LABELS "gcp_contract")
 endif()
 
 

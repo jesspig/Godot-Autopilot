@@ -1,0 +1,42 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-protocol/build/debug
+      Start 1260: GcpContractTest.RequestResponseCorrelationAndStatusContract
+ 1/17 Test #1260: GcpContractTest.RequestResponseCorrelationAndStatusContract ..............   Passed    0.54 sec
+      Start 1261: GcpContractTest.ConfirmationRoundTripUsesChallengeDigest
+ 2/17 Test #1261: GcpContractTest.ConfirmationRoundTripUsesChallengeDigest .................   Passed    0.02 sec
+      Start 1262: GcpContractTest.TaskLifecycleAndCancellationStagesAreMachineAssertable
+ 3/17 Test #1262: GcpContractTest.TaskLifecycleAndCancellationStagesAreMachineAssertable ...   Passed    0.14 sec
+      Start 1263: GcpContractTest.EventStreamSeqMonotonicAcrossResume
+ 4/17 Test #1263: GcpContractTest.EventStreamSeqMonotonicAcrossResume ......................   Passed    0.02 sec
+      Start 1264: GcpContractTest.TracePropagatesAcrossEnvelopeKinds
+ 5/17 Test #1264: GcpContractTest.TracePropagatesAcrossEnvelopeKinds .......................   Passed    0.02 sec
+      Start 1265: GcpContractTest.BackpressureAndTaskNotFoundAreMapped
+ 6/17 Test #1265: GcpContractTest.BackpressureAndTaskNotFoundAreMapped .....................   Passed    0.02 sec
+      Start 1266: GcpEnvelopeTest.EnvelopeVersionAndKindMapping
+ 7/17 Test #1266: GcpEnvelopeTest.EnvelopeVersionAndKindMapping ............................   Passed    0.01 sec
+      Start 1267: GcpEnvelopeTest.ResponseStatusSetAndTerminality
+ 8/17 Test #1267: GcpEnvelopeTest.ResponseStatusSetAndTerminality ..........................   Passed    0.02 sec
+      Start 1268: GcpEnvelopeTest.ErrorCodesE06ThroughE15
+ 9/17 Test #1268: GcpEnvelopeTest.ErrorCodesE06ThroughE15 ..................................   Passed    0.02 sec
+      Start 1269: GcpEnvelopeTest.MethodSetCoversAllContractFamilies
+10/17 Test #1269: GcpEnvelopeTest.MethodSetCoversAllContractFamilies .......................   Passed    0.02 sec
+      Start 1270: GcpEnvelopeTest.CapabilityNegotiationIsIntersection
+11/17 Test #1270: GcpEnvelopeTest.CapabilityNegotiationIsIntersection ......................   Passed    0.02 sec
+      Start 1271: GcpEnvelopeTest.ChallengeCarriesTtlAndParamDigest
+12/17 Test #1271: GcpEnvelopeTest.ChallengeCarriesTtlAndParamDigest ........................   Passed    0.02 sec
+      Start 1272: GcpEnvelopeTest.TaskStateMachineTransitions
+13/17 Test #1272: GcpEnvelopeTest.TaskStateMachineTransitions ..............................   Passed    0.02 sec
+      Start 1273: GcpEnvelopeTest.CancelStagesAdvanceMonotonically
+14/17 Test #1273: GcpEnvelopeTest.CancelStagesAdvanceMonotonically .........................   Passed    0.02 sec
+      Start 1274: GcpEnvelopeTest.EventSeqCursorAndBackpressure
+15/17 Test #1274: GcpEnvelopeTest.EventSeqCursorAndBackpressure ............................   Passed    0.02 sec
+      Start 1275: GcpEnvelopeTest.TraceParentFormatValidation
+16/17 Test #1275: GcpEnvelopeTest.TraceParentFormatValidation ..............................   Passed    0.02 sec
+      Start 1276: GcpEnvelopeTest.ValidationByKind
+17/17 Test #1276: GcpEnvelopeTest.ValidationByKind .........................................   Passed    0.02 sec
+
+100% tests passed out of 17
+
+Label Time Summary:
+gcp_contract    =   0.95 sec*proc (17 tests)
+
+Total Test time (real) =   1.12 sec

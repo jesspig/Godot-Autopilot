@@ -1,0 +1,16 @@
+command: cmake --preset debug
+exit_code: 0
+
+command: cmake --build --preset debug
+initial_exit_code: 2
+initial_cause: parallel builds saturated sccache and the server reset compile connections
+final_exit_code: 0
+final_progress: 474/474
+artifacts:
+  - build/debug/godot-autopilot.dll
+  - build/debug/tests/gda_gcp_contract_tests.exe
+  - build/debug/tests/gda_unit_tests.exe
+  - build/debug/tests/gda_boundary_tests.exe
+  - build/debug/tests/gda_integration_tests.exe
+
+resolution: serial rebuild after the JSON branch completed; no source change required
