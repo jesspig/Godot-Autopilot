@@ -50,14 +50,14 @@ TEST(UidValidationTest, SchemaExposesReassignGuards) {
     if (tool->meta().name != "resource_uid_set") {
       continue;
     }
-    const mcp::JsonValue schema = tool->input_schema();
-    const mcp::JsonValue *properties = schema.Find("properties");
+    const godot_autopilot::util::JsonValue schema = tool->input_schema();
+    const godot_autopilot::util::JsonValue *properties = schema.Find("properties");
     EXPECT_NE(properties, nullptr);
     ASSERT_NE(properties, nullptr);
     ASSERT_TRUE(properties->IsObject());
-    const mcp::JsonValue *overwrite = properties->Find("overwrite");
-    const mcp::JsonValue *confirm = properties->Find("confirm");
-    const mcp::JsonValue *uid = properties->Find("uid");
+    const godot_autopilot::util::JsonValue *overwrite = properties->Find("overwrite");
+    const godot_autopilot::util::JsonValue *confirm = properties->Find("confirm");
+    const godot_autopilot::util::JsonValue *uid = properties->Find("uid");
     ASSERT_NE(overwrite, nullptr);
     ASSERT_NE(confirm, nullptr);
     ASSERT_NE(uid, nullptr);

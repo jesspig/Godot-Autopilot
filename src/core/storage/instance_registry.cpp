@@ -56,12 +56,12 @@ bool read_registry_file(const std::string &path, std::string &content) {
   return true;
 }
 
-bool read_registry_endpoint(const mcp::JsonValue &doc, EndpointEntry &out) {
-  const mcp::JsonValue *host = doc.Find("host");
-  const mcp::JsonValue *port = doc.Find("port");
-  const mcp::JsonValue *path = doc.Find("path");
-  const mcp::JsonValue *protocol = doc.Find("protocol");
-  const mcp::JsonValue *auth = doc.Find("auth");
+bool read_registry_endpoint(const godot_autopilot::util::JsonValue &doc, EndpointEntry &out) {
+  const godot_autopilot::util::JsonValue *host = doc.Find("host");
+  const godot_autopilot::util::JsonValue *port = doc.Find("port");
+  const godot_autopilot::util::JsonValue *path = doc.Find("path");
+  const godot_autopilot::util::JsonValue *protocol = doc.Find("protocol");
+  const godot_autopilot::util::JsonValue *auth = doc.Find("auth");
   if (host == nullptr || !host->IsString()) {
     return false;
   }
@@ -85,18 +85,18 @@ bool read_registry_endpoint(const mcp::JsonValue &doc, EndpointEntry &out) {
   return true;
 }
 
-mcp::JsonValue registry_endpoint_to_json(const EndpointEntry &entry) {
-  mcp::JsonValue::Object doc;
+godot_autopilot::util::JsonValue registry_endpoint_to_json(const EndpointEntry &entry) {
+  godot_autopilot::util::JsonValue::Object doc;
   doc["host"] = entry.host;
   doc["port"] = static_cast<int64_t>(entry.port);
   doc["path"] = entry.path;
   doc["protocol"] = entry.protocol;
   doc["auth"] = entry.auth;
-  return mcp::JsonValue(std::move(doc));
+  return godot_autopilot::util::JsonValue(std::move(doc));
 }
 
-mcp::JsonValue registry_ipc_endpoint_to_json(const IpcEndpointEntry &entry) {
-  mcp::JsonValue::Object doc;
+godot_autopilot::util::JsonValue registry_ipc_endpoint_to_json(const IpcEndpointEntry &entry) {
+  godot_autopilot::util::JsonValue::Object doc;
   doc["kind"] = entry.kind;
   if (!entry.path.empty()) {
     doc["path"] = entry.path;
@@ -115,21 +115,21 @@ mcp::JsonValue registry_ipc_endpoint_to_json(const IpcEndpointEntry &entry) {
   doc["framing"] = entry.framing;
   doc["auth"] = entry.auth;
   doc["version"] = static_cast<int64_t>(entry.version);
-  return mcp::JsonValue(std::move(doc));
+  return godot_autopilot::util::JsonValue(std::move(doc));
 }
 
-bool read_registry_ipc_endpoint(const mcp::JsonValue &doc,
+bool read_registry_ipc_endpoint(const godot_autopilot::util::JsonValue &doc,
                                 IpcEndpointEntry &out) {
-  const mcp::JsonValue *kind = doc.Find("kind");
-  const mcp::JsonValue *path = doc.Find("path");
-  const mcp::JsonValue *name = doc.Find("name");
-  const mcp::JsonValue *host = doc.Find("host");
-  const mcp::JsonValue *port = doc.Find("port");
-  const mcp::JsonValue *token = doc.Find("token");
-  const mcp::JsonValue *protocol = doc.Find("protocol");
-  const mcp::JsonValue *framing = doc.Find("framing");
-  const mcp::JsonValue *auth = doc.Find("auth");
-  const mcp::JsonValue *version = doc.Find("version");
+  const godot_autopilot::util::JsonValue *kind = doc.Find("kind");
+  const godot_autopilot::util::JsonValue *path = doc.Find("path");
+  const godot_autopilot::util::JsonValue *name = doc.Find("name");
+  const godot_autopilot::util::JsonValue *host = doc.Find("host");
+  const godot_autopilot::util::JsonValue *port = doc.Find("port");
+  const godot_autopilot::util::JsonValue *token = doc.Find("token");
+  const godot_autopilot::util::JsonValue *protocol = doc.Find("protocol");
+  const godot_autopilot::util::JsonValue *framing = doc.Find("framing");
+  const godot_autopilot::util::JsonValue *auth = doc.Find("auth");
+  const godot_autopilot::util::JsonValue *version = doc.Find("version");
   const std::string kind_text =
       kind != nullptr && kind->IsString() ? kind->GetString() : "unix";
   if (kind_text == "unix") {
@@ -210,8 +210,8 @@ std::vector<std::string> registry_instance_file_paths(const std::string &root) {
 
 } // namespace
 
-mcp::JsonValue record_to_json(const InstanceRecord &record) {
-  mcp::JsonValue::Object endpoints;
+godot_autopilot::util::JsonValue record_to_json(const InstanceRecord &record) {
+  godot_autopilot::util::JsonValue::Object endpoints;
   endpoints["mcp"] = registry_endpoint_to_json(record.endpoints.mcp);
   if (!record.endpoints.api.path.empty()) {
     endpoints["api"] = registry_endpoint_to_json(record.endpoints.api);
@@ -220,32 +220,32 @@ mcp::JsonValue record_to_json(const InstanceRecord &record) {
     endpoints["ipc"] = registry_ipc_endpoint_to_json(record.endpoints.ipc);
   }
 
-  mcp::JsonValue::Object doc;
+  godot_autopilot::util::JsonValue::Object doc;
   doc["instance_id"] = record.instance_id;
   doc["port"] = static_cast<int64_t>(record.port);
   doc["pid"] = static_cast<int64_t>(record.pid);
   doc["project_path"] = record.project_path;
-  doc["endpoints"] = mcp::JsonValue(std::move(endpoints));
+  doc["endpoints"] = godot_autopilot::util::JsonValue(std::move(endpoints));
   doc["gda_home"] = record.gda_home;
   doc["started_at"] = static_cast<int64_t>(record.started_at);
   doc["version"] = record.version;
   doc["port_source"] = record.port_source;
-  return mcp::JsonValue(std::move(doc));
+  return godot_autopilot::util::JsonValue(std::move(doc));
 }
 
-bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
+bool record_from_json(const godot_autopilot::util::JsonValue &doc, InstanceRecord &out) {
   if (!doc.IsObject()) {
     return false;
   }
-  const mcp::JsonValue *instance_id = doc.Find("instance_id");
-  const mcp::JsonValue *port = doc.Find("port");
-  const mcp::JsonValue *pid = doc.Find("pid");
-  const mcp::JsonValue *project_path = doc.Find("project_path");
-  const mcp::JsonValue *endpoints = doc.Find("endpoints");
-  const mcp::JsonValue *gda_home = doc.Find("gda_home");
-  const mcp::JsonValue *started_at = doc.Find("started_at");
-  const mcp::JsonValue *version = doc.Find("version");
-  const mcp::JsonValue *port_source = doc.Find("port_source");
+  const godot_autopilot::util::JsonValue *instance_id = doc.Find("instance_id");
+  const godot_autopilot::util::JsonValue *port = doc.Find("port");
+  const godot_autopilot::util::JsonValue *pid = doc.Find("pid");
+  const godot_autopilot::util::JsonValue *project_path = doc.Find("project_path");
+  const godot_autopilot::util::JsonValue *endpoints = doc.Find("endpoints");
+  const godot_autopilot::util::JsonValue *gda_home = doc.Find("gda_home");
+  const godot_autopilot::util::JsonValue *started_at = doc.Find("started_at");
+  const godot_autopilot::util::JsonValue *version = doc.Find("version");
+  const godot_autopilot::util::JsonValue *port_source = doc.Find("port_source");
   if (instance_id == nullptr || !instance_id->IsString()) {
     return false;
   }
@@ -270,8 +270,8 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   if (version == nullptr || !version->IsString()) {
     return false;
   }
-  const mcp::JsonValue *mcp_endpoint = endpoints->Find("mcp");
-  const mcp::JsonValue *api_endpoint = endpoints->Find("api");
+  const godot_autopilot::util::JsonValue *mcp_endpoint = endpoints->Find("mcp");
+  const godot_autopilot::util::JsonValue *api_endpoint = endpoints->Find("api");
   if (mcp_endpoint == nullptr || !mcp_endpoint->IsObject()) {
     return false;
   }
@@ -296,7 +296,7 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   if (api_endpoint != nullptr && !read_registry_endpoint(*api_endpoint, parsed.endpoints.api)) {
     return false;
   }
-  if (const mcp::JsonValue *ipc_endpoint = endpoints->Find("ipc");
+  if (const godot_autopilot::util::JsonValue *ipc_endpoint = endpoints->Find("ipc");
       ipc_endpoint != nullptr) {
     if (!ipc_endpoint->IsObject()) {
       return false;
@@ -310,9 +310,9 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
 }
 
 bool record_from_json_text(const std::string &json_text, InstanceRecord &out) {
-  mcp::JsonValue doc;
+  godot_autopilot::util::JsonValue doc;
   try {
-    doc = mcp::JsonValue::Parse(json_text);
+    doc = godot_autopilot::util::JsonValue::Parse(json_text);
   } catch (const std::exception &) {
     return false;
   } catch (...) {
@@ -409,13 +409,13 @@ bool InstanceRegistry::update_global_index() {
     return false;
   }
   const std::vector<InstanceRecord> records = list_all();
-  mcp::JsonValue::Array items;
+  godot_autopilot::util::JsonValue::Array items;
   for (const InstanceRecord &record : records) {
     items.push_back(record_to_json(record));
   }
-  mcp::JsonValue::Object doc;
-  doc["instances"] = mcp::JsonValue(std::move(items));
-  return write_registry_file(path, mcp::JsonValue(std::move(doc)).Dump(2));
+  godot_autopilot::util::JsonValue::Object doc;
+  doc["instances"] = godot_autopilot::util::JsonValue(std::move(items));
+  return write_registry_file(path, godot_autopilot::util::JsonValue(std::move(doc)).Dump(2));
 }
 
 } // namespace godot_autopilot

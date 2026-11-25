@@ -1,0 +1,60 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.016 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+CommandLine: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests\gda_unit_tests.exe --gtest_filter=McpWireTest.RejectsMalformedBody
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Symbol search path is: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff6`09ec0000 00007ff6`0bf31000   gda_unit_tests.exe
+ModLoad: 00007ffd`2a770000 00007ffd`2a9dc000   ntdll.dll
+ModLoad: 00007ffc`43cf0000 00007ffc`43d62000   C:\WINDOWS\System32\verifier.dll
+Page heap: pid 0xBC8: page heap enabled with flags 0x3.
+AVRF: gda_unit_tests.exe: pid 0xBC8: flags 0x80000001: application verifier enabled
+ModLoad: 00007ffc`93620000 00007ffc`93661000   C:\WINDOWS\SYSTEM32\vrfcore.dll
+AVRF: Failed to create logging directory C:\Users\jesspig\AppVerifierLogs (status C0000022)
+ModLoad: 00007ffd`28e10000 00007ffd`28edb000   C:\WINDOWS\System32\KERNEL32.DLL
+ModLoad: 00007ffd`28020000 00007ffd`28429000   C:\WINDOWS\System32\KERNELBASE.dll
+ModLoad: 00007ffd`2a4b0000 00007ffd`2a530000   C:\WINDOWS\System32\WS2_32.dll
+ModLoad: 00007ffd`27b10000 00007ffd`27c5c000   C:\WINDOWS\System32\ucrtbase.dll
+ModLoad: 00007ffd`29a80000 00007ffd`29b98000   C:\WINDOWS\System32\RPCRT4.dll
+ModLoad: 00007ffd`27e60000 00007ffd`27fde000   C:\WINDOWS\System32\CRYPT32.dll
+ModLoad: 00007ffd`2a160000 00007ffd`2a21c000   C:\WINDOWS\System32\ADVAPI32.dll
+ModLoad: 00007ffd`277f0000 00007ffd`2781a000   C:\WINDOWS\SYSTEM32\bcrypt.dll

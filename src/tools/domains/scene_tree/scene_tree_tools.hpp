@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_SCENE_TREE_TOOLS_HPP
 #define GODOT_AUTOPILOT_SCENE_TREE_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -31,13 +31,13 @@ const std::vector<ParamSpec> kGameSceneTreeParams = {
     {"paused", "boolean", "set_pause: pause state: true pauses the scene tree, false resumes (boolean)", false},
 };
 
-inline mcp::JsonValue scene_tree_alias_args_with_action(
-    const mcp::JsonValue &args, const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+inline godot_autopilot::util::JsonValue scene_tree_alias_args_with_action(
+    const godot_autopilot::util::JsonValue &args, const char *action) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -47,7 +47,7 @@ inline ToolAlias scene_tree_action_alias(const char *name,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return scene_tree_alias_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";

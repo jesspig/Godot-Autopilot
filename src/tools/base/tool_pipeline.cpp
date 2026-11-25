@@ -10,41 +10,41 @@ namespace pipeline {
 
 namespace {
 
-void merge_observe_result(mcp::JsonValue &inner) {
-  mcp::JsonValue capture = capture_ops::handle_capture_viewport(
-      mcp::JsonValue::Parse(R"({"target":"editor"})"));
-  const mcp::JsonValue *capture_result = util::find_result_or_data(capture);
+void merge_observe_result(godot_autopilot::util::JsonValue &inner) {
+  godot_autopilot::util::JsonValue capture = capture_ops::handle_capture_viewport(
+      godot_autopilot::util::JsonValue::Parse(R"({"target":"editor"})"));
+  const godot_autopilot::util::JsonValue *capture_result = util::find_result_or_data(capture);
   if (capture_result && capture_result->IsObject()) {
     const char *keys[] = {"data", "format", "width", "height", "path"};
     for (const char *key : keys) {
-      if (const mcp::JsonValue *value = capture_result->Find(key)) {
+      if (const godot_autopilot::util::JsonValue *value = capture_result->Find(key)) {
         inner[key] = *value;
       }
     }
     return;
   }
-  const mcp::JsonValue *error = capture.Find("error");
+  const godot_autopilot::util::JsonValue *error = capture.Find("error");
   if (error && error->IsString()) {
     inner["observe_error"] = *error;
   } else {
-    inner["observe_error"] = mcp::JsonValue("capture failed");
+    inner["observe_error"] = godot_autopilot::util::JsonValue("capture failed");
   }
 }
 
 } // namespace
 
-mcp::JsonValue run_post(const ToolSpec &spec, const mcp::JsonValue &args,
-                        mcp::JsonValue result) {
+godot_autopilot::util::JsonValue run_post(const ToolSpec &spec, const godot_autopilot::util::JsonValue &args,
+                        godot_autopilot::util::JsonValue result) {
   if ((spec.flags & tool_flags::kObserve) != 0 && args.IsObject() &&
       result.IsObject()) {
-    const mcp::JsonValue *observe = args.Find("observe");
+    const godot_autopilot::util::JsonValue *observe = args.Find("observe");
     if (observe && observe->IsBool() && observe->GetBool()) {
-      mcp::JsonValue *target = util::find_result_or_data(result);
+      godot_autopilot::util::JsonValue *target = util::find_result_or_data(result);
       if (!target || !target->IsObject()) {
         target = &result;
       }
       merge_observe_result(*target);
-      mcp::JsonValue *mirror = nullptr;
+      godot_autopilot::util::JsonValue *mirror = nullptr;
       if (target == result.Find("result")) {
         mirror = result.Find("data");
       } else if (target == result.Find("data")) {
@@ -54,7 +54,7 @@ mcp::JsonValue run_post(const ToolSpec &spec, const mcp::JsonValue &args,
         const char *keys[] = {"data",         "format", "width",
                               "height",       "path",   "observe_error"};
         for (const char *key : keys) {
-          if (const mcp::JsonValue *value = target->Find(key)) {
+          if (const godot_autopilot::util::JsonValue *value = target->Find(key)) {
             (*mirror)[key] = *value;
           }
         }
@@ -65,7 +65,7 @@ mcp::JsonValue run_post(const ToolSpec &spec, const mcp::JsonValue &args,
       result.Find("error") == nullptr) {
     const char *envelopes[] = {"result", "data"};
     for (const char *key : envelopes) {
-      mcp::JsonValue *target = result.Find(key);
+      godot_autopilot::util::JsonValue *target = result.Find(key);
       if (target && target->IsObject() &&
           target->Find("scene_path") == nullptr) {
         util::add_scene_info_fields(*target, util::edited_scene_info());

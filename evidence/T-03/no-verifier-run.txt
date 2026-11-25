@@ -1,0 +1,6 @@
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpWireTest.RejectsMalformedBody
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpWireTest
+[ RUN      ] McpWireTest.RejectsMalformedBody

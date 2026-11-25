@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstdint>
 #include <stdexcept>
@@ -15,8 +15,8 @@ namespace {
 
 using godot_autopilot::TraceRecorder;
 
-mcp::JsonValue parse(const std::string &text) {
-  return mcp::JsonValue::Parse(text);
+godot_autopilot::util::JsonValue parse(const std::string &text) {
+  return godot_autopilot::util::JsonValue::Parse(text);
 }
 
 } // namespace
@@ -67,7 +67,7 @@ TEST(CodeQualityC3Test, DeferredTraceIsEmittedWhenResolved) {
   record.event.wall_start_ms = TraceRecorder::wall_now_ms();
   detail::stash_deferred_trace("pending:c3_probe", std::move(record));
 
-  const mcp::JsonValue final_result =
+  const godot_autopilot::util::JsonValue final_result =
       parse(R"({"result":{"ok":true},"new_errors_since_last_call":0})");
   EXPECT_TRUE(detail::finish_deferred_trace("pending:c3_probe", final_result));
   EXPECT_FALSE(detail::finish_deferred_trace("pending:c3_probe", final_result));
@@ -86,8 +86,8 @@ TEST(CodeQualityC6Test, AddRejectsDuplicateToolName) {
     spec.name = name;
     spec.description = "desc";
     spec.category = "Test";
-    spec.handler = [](const mcp::JsonValue &) {
-      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    spec.handler = [](const godot_autopilot::util::JsonValue &) {
+      return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     };
     return godot_autopilot::make_spec_tool(std::move(spec));
   };
@@ -104,8 +104,8 @@ TEST(CodeQualityC6Test, AddRejectsNameCollidingWithMetaTool) {
     spec.description = "desc";
     spec.category = "Test";
     spec.flags = flags;
-    spec.handler = [](const mcp::JsonValue &) {
-      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    spec.handler = [](const godot_autopilot::util::JsonValue &) {
+      return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     };
     return godot_autopilot::make_spec_tool(std::move(spec));
   };
@@ -119,11 +119,11 @@ TEST(CodeQualityC6Test, AddRejectsNameCollidingWithMetaTool) {
 namespace {
 
 std::string dynamic_validation_error(
-    const mcp::JsonValue &args,
+    const godot_autopilot::util::JsonValue &args,
     const std::vector<godot_autopilot::ParamSpec> &params) {
-  const mcp::JsonValue result =
+  const godot_autopilot::util::JsonValue result =
       godot_autopilot::spec_detail::validate_dynamic_args(args, params);
-  const mcp::JsonValue *error = result.Find("error");
+  const godot_autopilot::util::JsonValue *error = result.Find("error");
   return error != nullptr && error->IsString() ? error->GetString()
                                                : std::string("<no error>");
 }

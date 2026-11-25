@@ -20,4 +20,22 @@ set(GDA_UNIT_CONTRACT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/prompts/prompt_tool_usage.cpp
     ${CMAKE_SOURCE_DIR}/src/prompts/prompt_keycode_reference.cpp
     ${CMAKE_SOURCE_DIR}/tests/boundary/authorization_policy_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/boundary/dispatch_semantics_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/boundary/dispatch_semantics_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/protocol/gcp_envelope.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/gcp_dispatcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/control_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/confirmation_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/catalog_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/invocation_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/job_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/event_service.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/control/trace_service.cpp
+    ${CMAKE_SOURCE_DIR}/tests/support/control_fixture.cpp
+    ${CMAKE_SOURCE_DIR}/tests/support/gcp_dispatcher_fixture.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp
+    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_json_bridge.cpp
+    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_error_bridge.cpp)
+
+set(GDA_GCP_CONTRACT_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/core/protocol/gcp_envelope.cpp
+    ${CMAKE_SOURCE_DIR}/tests/support/gcp_contract_fixture.cpp)

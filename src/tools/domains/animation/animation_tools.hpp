@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -117,29 +117,29 @@ const std::vector<std::string> kAnimationTreeActions = {
     "create", "inspect", "add_node", "remove_node", "rename_node", "connect",
     "remove_transition", "set_transition"};
 
-inline mcp::JsonValue animation_optional_action_schema(
+inline godot_autopilot::util::JsonValue animation_optional_action_schema(
     const std::vector<ParamSpec> &params,
     std::initializer_list<const char *> actions, const char *description) {
-  mcp::JsonValue raw = schema::build_schema(params);
-  mcp::JsonValue action(mcp::JsonValue::object_tag);
-  action["type"] = mcp::JsonValue("string");
-  action["description"] = mcp::JsonValue(description);
-  mcp::JsonValue values(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue raw = schema::build_schema(params);
+  godot_autopilot::util::JsonValue action(godot_autopilot::util::JsonValue::object_tag);
+  action["type"] = godot_autopilot::util::JsonValue("string");
+  action["description"] = godot_autopilot::util::JsonValue(description);
+  godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::array_tag);
   for (const char *value : actions)
-    values.PushBack(mcp::JsonValue(value));
+    values.PushBack(godot_autopilot::util::JsonValue(value));
   action["enum"] = std::move(values);
-  mcp::JsonValue *properties = raw.Find("properties");
+  godot_autopilot::util::JsonValue *properties = raw.Find("properties");
   if (properties != nullptr && properties->IsObject())
     (*properties)["action"] = std::move(action);
   return raw;
 }
 
-inline mcp::JsonValue animation_alias_args_with_action(
-    const mcp::JsonValue &args, const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+inline godot_autopilot::util::JsonValue animation_alias_args_with_action(
+    const godot_autopilot::util::JsonValue &args, const char *action) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject())
     out = args;
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -148,7 +148,7 @@ inline ToolAlias animation_action_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return animation_alias_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";

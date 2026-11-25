@@ -43,14 +43,14 @@ namespace {
 constexpr int kMaxDimension = 4096;
 constexpr int kDefaultDimension = 256;
 
-mcp::JsonValue make_result(mcp::JsonValue value) {
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue make_result(godot_autopilot::util::JsonValue value) {
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(value);
   return r;
 }
 
-std::string action_of(const mcp::JsonValue &args) {
-  const mcp::JsonValue *value = args.Find("action");
+std::string action_of(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *value = args.Find("action");
   if (value == nullptr || !value->IsString()) {
     return std::string();
   }
@@ -65,7 +65,7 @@ std::string invalid_param(const char *name, const std::string &expected) {
   return std::string("invalid parameter: ") + name + " must be " + expected;
 }
 
-bool read_required_string(const mcp::JsonValue &args, const char *key,
+bool read_required_string(const godot_autopilot::util::JsonValue &args, const char *key,
                           const std::string &action, std::string &out,
                           std::string &error) {
   const util::StringArgStatus status =
@@ -81,9 +81,9 @@ bool read_required_string(const mcp::JsonValue &args, const char *key,
   return true;
 }
 
-bool read_optional_string(const mcp::JsonValue &args, const char *key,
+bool read_optional_string(const godot_autopilot::util::JsonValue &args, const char *key,
                           std::string &out, std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     return true;
   }
@@ -95,10 +95,10 @@ bool read_optional_string(const mcp::JsonValue &args, const char *key,
   return true;
 }
 
-bool read_required_int(const mcp::JsonValue &args, const char *key,
+bool read_required_int(const godot_autopilot::util::JsonValue &args, const char *key,
                        const std::string &action, int64_t &out,
                        std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     error = missing_param(action, key);
     return false;
@@ -112,9 +112,9 @@ bool read_required_int(const mcp::JsonValue &args, const char *key,
   return true;
 }
 
-bool read_int_or(const mcp::JsonValue &args, const char *key, int64_t fallback,
+bool read_int_or(const godot_autopilot::util::JsonValue &args, const char *key, int64_t fallback,
                  int64_t &out, std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     out = fallback;
     return true;
@@ -128,9 +128,9 @@ bool read_int_or(const mcp::JsonValue &args, const char *key, int64_t fallback,
   return true;
 }
 
-bool read_double_or(const mcp::JsonValue &args, const char *key,
+bool read_double_or(const godot_autopilot::util::JsonValue &args, const char *key,
                     double fallback, double &out, std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     out = fallback;
     return true;
@@ -144,9 +144,9 @@ bool read_double_or(const mcp::JsonValue &args, const char *key,
   return true;
 }
 
-bool read_bool_or(const mcp::JsonValue &args, const char *key, bool fallback,
+bool read_bool_or(const godot_autopilot::util::JsonValue &args, const char *key, bool fallback,
                   bool &out, std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     out = fallback;
     return true;
@@ -167,7 +167,7 @@ bool check_dimension(int64_t value, const char *name, std::string &error) {
   return true;
 }
 
-bool read_color(const mcp::JsonValue &value, const char *name,
+bool read_color(const godot_autopilot::util::JsonValue &value, const char *name,
                 godot::Color &out, std::string &error) {
   if (!value.IsObject()) {
     error = invalid_param(name, "an object {r, g, b, a}");
@@ -189,7 +189,7 @@ bool read_color(const mcp::JsonValue &value, const char *name,
     }
   }
   for (const char *channel : channels) {
-    const mcp::JsonValue *component = value.Find(channel);
+    const godot_autopilot::util::JsonValue *component = value.Find(channel);
     if (component != nullptr && !component->IsNumber()) {
       error = std::string("invalid parameter: ") + name + "." + channel +
               " must be a number";
@@ -200,10 +200,10 @@ bool read_color(const mcp::JsonValue &value, const char *name,
   return true;
 }
 
-bool read_optional_color(const mcp::JsonValue &args, const char *key,
+bool read_optional_color(const godot_autopilot::util::JsonValue &args, const char *key,
                          godot::Color &out, bool &present,
                          std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   present = value != nullptr;
   if (value == nullptr) {
     return true;
@@ -211,21 +211,21 @@ bool read_optional_color(const mcp::JsonValue &args, const char *key,
   return read_color(*value, key, out, error);
 }
 
-mcp::JsonValue color_to_json(const godot::Color &color) {
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["r"] = mcp::JsonValue(static_cast<double>(color.r));
-  j["g"] = mcp::JsonValue(static_cast<double>(color.g));
-  j["b"] = mcp::JsonValue(static_cast<double>(color.b));
-  j["a"] = mcp::JsonValue(static_cast<double>(color.a));
+godot_autopilot::util::JsonValue color_to_json(const godot::Color &color) {
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["r"] = godot_autopilot::util::JsonValue(static_cast<double>(color.r));
+  j["g"] = godot_autopilot::util::JsonValue(static_cast<double>(color.g));
+  j["b"] = godot_autopilot::util::JsonValue(static_cast<double>(color.b));
+  j["a"] = godot_autopilot::util::JsonValue(static_cast<double>(color.a));
   return j;
 }
 
-mcp::JsonValue rect2i_to_json(const godot::Rect2i &rect) {
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["x"] = mcp::JsonValue(static_cast<int64_t>(rect.position.x));
-  j["y"] = mcp::JsonValue(static_cast<int64_t>(rect.position.y));
-  j["width"] = mcp::JsonValue(static_cast<int64_t>(rect.size.x));
-  j["height"] = mcp::JsonValue(static_cast<int64_t>(rect.size.y));
+godot_autopilot::util::JsonValue rect2i_to_json(const godot::Rect2i &rect) {
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["x"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(rect.position.x));
+  j["y"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(rect.position.y));
+  j["width"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(rect.size.x));
+  j["height"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(rect.size.y));
   return j;
 }
 
@@ -428,7 +428,7 @@ bool load_image_file(const std::string &path, godot::Ref<godot::Image> &out,
   return true;
 }
 
-bool resolve_image_locator(const mcp::JsonValue &value,
+bool resolve_image_locator(const godot_autopilot::util::JsonValue &value,
                            godot::Ref<godot::Image> &out,
                            std::string &error) {
   util::ObjectLocatorFields fields;
@@ -520,11 +520,11 @@ bool resolve_image_locator(const mcp::JsonValue &value,
   return true;
 }
 
-bool resolve_required_image(const mcp::JsonValue &args,
+bool resolve_required_image(const godot_autopilot::util::JsonValue &args,
                             const std::string &action, const char *key,
                             godot::Ref<godot::Image> &out,
                             std::string &error) {
-  const mcp::JsonValue *value = args.Find(key);
+  const godot_autopilot::util::JsonValue *value = args.Find(key);
   if (value == nullptr) {
     error = missing_param(action, key);
     return false;
@@ -552,39 +552,39 @@ std::string effective_name(const godot::Ref<godot::Resource> &res,
   return util::to_std(res->get_name());
 }
 
-mcp::JsonValue image_to_json(const godot::Ref<godot::Image> &image,
+godot_autopilot::util::JsonValue image_to_json(const godot::Ref<godot::Image> &image,
                              const std::string &name) {
   const std::string effective = effective_name(image, name);
   const int64_t object_id =
       static_cast<int64_t>(image->get_instance_id());
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue("Image");
-  j["object_id"] = mcp::JsonValue(object_id);
-  j["object_id_str"] = mcp::JsonValue(std::to_string(object_id));
-  j["name"] = mcp::JsonValue(effective);
-  j["path"] = mcp::JsonValue(util::to_std(image->get_path()));
-  j["width"] = mcp::JsonValue(static_cast<int64_t>(image->get_width()));
-  j["height"] = mcp::JsonValue(static_cast<int64_t>(image->get_height()));
-  j["format"] = mcp::JsonValue(format_name_of(image->get_format()));
-  j["image_ref"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["class"] = godot_autopilot::util::JsonValue("Image");
+  j["object_id"] = godot_autopilot::util::JsonValue(object_id);
+  j["object_id_str"] = godot_autopilot::util::JsonValue(std::to_string(object_id));
+  j["name"] = godot_autopilot::util::JsonValue(effective);
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(image->get_path()));
+  j["width"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(image->get_width()));
+  j["height"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(image->get_height()));
+  j["format"] = godot_autopilot::util::JsonValue(format_name_of(image->get_format()));
+  j["image_ref"] = godot_autopilot::util::JsonValue(
       effective.empty() ? std::to_string(object_id) : "memory://" + effective);
   return j;
 }
 
-mcp::JsonValue texture_to_json(const godot::Ref<godot::Texture2D> &texture,
+godot_autopilot::util::JsonValue texture_to_json(const godot::Ref<godot::Texture2D> &texture,
                                const std::string &name) {
   const std::string effective = effective_name(texture, name);
   const int64_t object_id =
       static_cast<int64_t>(texture->get_instance_id());
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue(util::to_std(texture->get_class()));
-  j["object_id"] = mcp::JsonValue(object_id);
-  j["object_id_str"] = mcp::JsonValue(std::to_string(object_id));
-  j["name"] = mcp::JsonValue(effective);
-  j["path"] = mcp::JsonValue(util::to_std(texture->get_path()));
-  j["width"] = mcp::JsonValue(static_cast<int64_t>(texture->get_width()));
-  j["height"] = mcp::JsonValue(static_cast<int64_t>(texture->get_height()));
-  j["texture_ref"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["class"] = godot_autopilot::util::JsonValue(util::to_std(texture->get_class()));
+  j["object_id"] = godot_autopilot::util::JsonValue(object_id);
+  j["object_id_str"] = godot_autopilot::util::JsonValue(std::to_string(object_id));
+  j["name"] = godot_autopilot::util::JsonValue(effective);
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(texture->get_path()));
+  j["width"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(texture->get_width()));
+  j["height"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(texture->get_height()));
+  j["texture_ref"] = godot_autopilot::util::JsonValue(
       effective.empty() ? std::to_string(object_id) : "memory://" + effective);
   return j;
 }
@@ -768,7 +768,7 @@ std::string fractal_type_name_of(godot::FastNoiseLite::FractalType type) {
   return "unknown";
 }
 
-bool build_noise(const mcp::JsonValue &args,
+bool build_noise(const godot_autopilot::util::JsonValue &args,
                  godot::Ref<godot::FastNoiseLite> &out, std::string &error) {
   out.instantiate();
   int64_t seed = 0;
@@ -839,9 +839,9 @@ bool build_noise(const mcp::JsonValue &args,
   return true;
 }
 
-bool build_gradient(const mcp::JsonValue &args, bool default_preset,
+bool build_gradient(const godot_autopilot::util::JsonValue &args, bool default_preset,
                     godot::Ref<godot::Gradient> &out, std::string &error) {
-  const mcp::JsonValue *points = args.Find("gradient");
+  const godot_autopilot::util::JsonValue *points = args.Find("gradient");
   if (points == nullptr && !default_preset) {
     out = godot::Ref<godot::Gradient>();
     return true;
@@ -856,7 +856,7 @@ bool build_gradient(const mcp::JsonValue &args, bool default_preset,
           "gradient", "a non-empty array of {offset, color} objects");
       return false;
     }
-    for (const mcp::JsonValue &entry : points->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &entry : points->GetArray()) {
       if (!entry.IsObject()) {
         error = invalid_param("gradient entry", "an object {offset, color}");
         return false;
@@ -868,7 +868,7 @@ bool build_gradient(const mcp::JsonValue &args, bool default_preset,
           return false;
         }
       }
-      const mcp::JsonValue *offset = entry.Find("offset");
+      const godot_autopilot::util::JsonValue *offset = entry.Find("offset");
       if (offset == nullptr || !offset->IsNumber()) {
         error = invalid_param("gradient entry.offset", "a number in 0..1");
         return false;
@@ -880,7 +880,7 @@ bool build_gradient(const mcp::JsonValue &args, bool default_preset,
         error = invalid_param("gradient entry.offset", "a number in 0..1");
         return false;
       }
-      const mcp::JsonValue *color = entry.Find("color");
+      const godot_autopilot::util::JsonValue *color = entry.Find("color");
       if (color == nullptr) {
         error = "missing required parameter for gradient entry: color";
         return false;
@@ -924,7 +924,7 @@ godot::Ref<godot::Image> render_noise_image(
   return noise->get_image(width, height, invert, false, normalize);
 }
 
-bool resolve_generation_size(const mcp::JsonValue &args, int &width,
+bool resolve_generation_size(const godot_autopilot::util::JsonValue &args, int &width,
                              int &height, std::string &error) {
   int64_t width_value = kDefaultDimension;
   int64_t height_value = kDefaultDimension;
@@ -945,7 +945,7 @@ bool resolve_generation_size(const mcp::JsonValue &args, int &width,
   return true;
 }
 
-mcp::JsonValue handle_noise_image(const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue handle_noise_image(const godot_autopilot::util::JsonValue &args,
                                   bool as_texture) {
   std::string error;
   int width = kDefaultDimension;
@@ -998,21 +998,21 @@ mcp::JsonValue handle_noise_image(const mcp::JsonValue &args,
   if (as_texture) {
     image = apply_color_ramp(image, color_ramp);
   }
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["mode"] = mcp::JsonValue(as_texture ? "noise_texture" : "noise");
-  result["width"] = mcp::JsonValue(width);
-  result["height"] = mcp::JsonValue(height);
-  result["seed"] = mcp::JsonValue(static_cast<int64_t>(noise->get_seed()));
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["mode"] = godot_autopilot::util::JsonValue(as_texture ? "noise_texture" : "noise");
+  result["width"] = godot_autopilot::util::JsonValue(width);
+  result["height"] = godot_autopilot::util::JsonValue(height);
+  result["seed"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(noise->get_seed()));
   result["frequency"] =
-      mcp::JsonValue(static_cast<double>(noise->get_frequency()));
+      godot_autopilot::util::JsonValue(static_cast<double>(noise->get_frequency()));
   result["noise_type"] =
-      mcp::JsonValue(noise_type_name_of(noise->get_noise_type()));
+      godot_autopilot::util::JsonValue(noise_type_name_of(noise->get_noise_type()));
   result["fractal_type"] =
-      mcp::JsonValue(fractal_type_name_of(noise->get_fractal_type()));
-  result["seamless"] = mcp::JsonValue(seamless);
-  result["normalize"] = mcp::JsonValue(normalize);
-  result["invert"] = mcp::JsonValue(invert);
-  result["skirt"] = mcp::JsonValue(skirt);
+      godot_autopilot::util::JsonValue(fractal_type_name_of(noise->get_fractal_type()));
+  result["seamless"] = godot_autopilot::util::JsonValue(seamless);
+  result["normalize"] = godot_autopilot::util::JsonValue(normalize);
+  result["invert"] = godot_autopilot::util::JsonValue(invert);
+  result["skirt"] = godot_autopilot::util::JsonValue(skirt);
   if (as_texture) {
     godot::Ref<godot::NoiseTexture2D> texture;
     texture.instantiate();
@@ -1039,7 +1039,7 @@ mcp::JsonValue handle_noise_image(const mcp::JsonValue &args,
   return make_result(std::move(result));
 }
 
-mcp::JsonValue handle_gradient_image(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_gradient_image(const godot_autopilot::util::JsonValue &args) {
   std::string error;
   int width = kDefaultDimension;
   int height = kDefaultDimension;
@@ -1070,16 +1070,16 @@ mcp::JsonValue handle_gradient_image(const mcp::JsonValue &args) {
                       std::to_string(width) + "x" + std::to_string(height));
   }
   register_named_resource(image, name);
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["mode"] = mcp::JsonValue("gradient");
-  result["axis"] = mcp::JsonValue(axis);
-  result["width"] = mcp::JsonValue(width);
-  result["height"] = mcp::JsonValue(height);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["mode"] = godot_autopilot::util::JsonValue("gradient");
+  result["axis"] = godot_autopilot::util::JsonValue(axis);
+  result["width"] = godot_autopilot::util::JsonValue(width);
+  result["height"] = godot_autopilot::util::JsonValue(height);
   result["image"] = image_to_json(image, name);
   return make_result(std::move(result));
 }
 
-mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_gradient_texture(const godot_autopilot::util::JsonValue &args) {
   std::string error;
   int width = kDefaultDimension;
   int height = kDefaultDimension;
@@ -1110,10 +1110,10 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     image_name = name + "_image";
   }
   godot::Ref<godot::Image> image;
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["mode"] = mcp::JsonValue("gradient_texture");
-  result["dimension"] = mcp::JsonValue(dimension);
-  result["width"] = mcp::JsonValue(width);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["mode"] = godot_autopilot::util::JsonValue("gradient_texture");
+  result["dimension"] = godot_autopilot::util::JsonValue(dimension);
+  result["width"] = godot_autopilot::util::JsonValue(width);
   if (dimension == "1d") {
     godot::Ref<godot::GradientTexture1D> texture;
     texture.instantiate();
@@ -1121,7 +1121,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     texture->set_width(width);
     register_named_resource(texture, name);
     image = render_gradient_image(gradient, width, 1, "horizontal");
-    result["height"] = mcp::JsonValue(1);
+    result["height"] = godot_autopilot::util::JsonValue(1);
     result["texture"] = texture_to_json(texture, name);
   } else {
     std::string fill = "linear";
@@ -1145,7 +1145,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     }
     godot::Vector2 fill_from(0.0f, 0.0f);
     godot::Vector2 fill_to(1.0f, 0.0f);
-    const mcp::JsonValue *from_p = args.Find("fill_from");
+    const godot_autopilot::util::JsonValue *from_p = args.Find("fill_from");
     if (from_p != nullptr) {
       if (!from_p->IsObject()) {
         error = invalid_param("fill_from", "an object {x, y}");
@@ -1153,7 +1153,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
       }
       fill_from = util::json_to_vec2(*from_p);
     }
-    const mcp::JsonValue *to_p = args.Find("fill_to");
+    const godot_autopilot::util::JsonValue *to_p = args.Find("fill_to");
     if (to_p != nullptr) {
       if (!to_p->IsObject()) {
         error = invalid_param("fill_to", "an object {x, y}");
@@ -1187,9 +1187,9 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
     register_named_resource(texture, name);
     image = render_fill_image(gradient, width, height, fill, fill_from,
                               fill_to, repeat);
-    result["height"] = mcp::JsonValue(height);
-    result["fill"] = mcp::JsonValue(fill);
-    result["repeat"] = mcp::JsonValue(repeat);
+    result["height"] = godot_autopilot::util::JsonValue(height);
+    result["fill"] = godot_autopilot::util::JsonValue(fill);
+    result["repeat"] = godot_autopilot::util::JsonValue(repeat);
     result["texture"] = texture_to_json(texture, name);
   }
   if (image.is_null() || image->is_empty()) {
@@ -1202,7 +1202,7 @@ mcp::JsonValue handle_gradient_texture(const mcp::JsonValue &args) {
 
 } // namespace
 
-mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_edit_action(const godot_autopilot::util::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
     return util::error_json("missing required parameter: action");
@@ -1271,8 +1271,8 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
     }
     register_named_resource(image, name);
     resource_registry::register_resource(image, normalized);
-    mcp::JsonValue result = image_to_json(image, name);
-    result["source_path"] = mcp::JsonValue(normalized);
+    godot_autopilot::util::JsonValue result = image_to_json(image, name);
+    result["source_path"] = godot_autopilot::util::JsonValue(normalized);
     return make_result(std::move(result));
   }
   if (action == "info") {
@@ -1280,12 +1280,12 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
     if (!resolve_required_image(args, action, "image", image, error)) {
       return util::error_json(error);
     }
-    mcp::JsonValue result = image_to_json(image, "");
+    godot_autopilot::util::JsonValue result = image_to_json(image, "");
     result["data_size"] =
-        mcp::JsonValue(static_cast<int64_t>(image->get_data_size()));
-    result["is_empty"] = mcp::JsonValue(image->is_empty());
-    result["is_compressed"] = mcp::JsonValue(image->is_compressed());
-    result["has_mipmaps"] = mcp::JsonValue(image->has_mipmaps());
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(image->get_data_size()));
+    result["is_empty"] = godot_autopilot::util::JsonValue(image->is_empty());
+    result["is_compressed"] = godot_autopilot::util::JsonValue(image->is_compressed());
+    result["has_mipmaps"] = godot_autopilot::util::JsonValue(image->has_mipmaps());
     result["used_rect"] = rect2i_to_json(image->get_used_rect());
     return make_result(std::move(result));
   }
@@ -1412,7 +1412,7 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
     if (!resolve_required_image(args, action, "image", image, error)) {
       return util::error_json(error);
     }
-    const mcp::JsonValue *color_p = args.Find("color");
+    const godot_autopilot::util::JsonValue *color_p = args.Find("color");
     if (color_p == nullptr) {
       return util::error_json(missing_param(action, "color"));
     }
@@ -1426,7 +1426,7 @@ mcp::JsonValue handle_edit_action(const mcp::JsonValue &args) {
   return util::error_json("unknown action: " + action);
 }
 
-mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_pixel_action(const godot_autopilot::util::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
     return util::error_json("missing required parameter: action");
@@ -1482,12 +1482,12 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
     } else {
       image->blit_rect(prepared, src_rect, dest);
     }
-    mcp::JsonValue result = image_to_json(image, "");
-    result["operation"] = mcp::JsonValue(action);
+    godot_autopilot::util::JsonValue result = image_to_json(image, "");
+    result["operation"] = godot_autopilot::util::JsonValue(action);
     result["src_rect"] = rect2i_to_json(src_rect);
-    result["dest"] = mcp::JsonValue(
-        mcp::JsonValue::Object{{"x", mcp::JsonValue(static_cast<int64_t>(x))},
-                               {"y", mcp::JsonValue(static_cast<int64_t>(y))}});
+    result["dest"] = godot_autopilot::util::JsonValue(
+        godot_autopilot::util::JsonValue::Object{{"x", godot_autopilot::util::JsonValue(static_cast<int64_t>(x))},
+                               {"y", godot_autopilot::util::JsonValue(static_cast<int64_t>(y))}});
     return make_result(std::move(result));
   }
   if (action == "get_pixel" || action == "set_pixel") {
@@ -1511,13 +1511,13 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
     if (action == "get_pixel") {
       const godot::Color color = image->get_pixel(static_cast<int32_t>(x),
                                                   static_cast<int32_t>(y));
-      mcp::JsonValue result(mcp::JsonValue::object_tag);
-      result["x"] = mcp::JsonValue(x);
-      result["y"] = mcp::JsonValue(y);
+      godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+      result["x"] = godot_autopilot::util::JsonValue(x);
+      result["y"] = godot_autopilot::util::JsonValue(y);
       result["color"] = color_to_json(color);
       return make_result(std::move(result));
     }
-    const mcp::JsonValue *color_p = args.Find("color");
+    const godot_autopilot::util::JsonValue *color_p = args.Find("color");
     if (color_p == nullptr) {
       return util::error_json(missing_param(action, "color"));
     }
@@ -1526,9 +1526,9 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
       return util::error_json(error);
     }
     image->set_pixel(static_cast<int32_t>(x), static_cast<int32_t>(y), color);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["x"] = mcp::JsonValue(x);
-    result["y"] = mcp::JsonValue(y);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["x"] = godot_autopilot::util::JsonValue(x);
+    result["y"] = godot_autopilot::util::JsonValue(y);
     result["color"] = color_to_json(color);
     return make_result(std::move(result));
   }
@@ -1566,8 +1566,8 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
                         std::to_string(static_cast<int>(save_error)) +
                         " (the image may already be compressed)");
     }
-    mcp::JsonValue result = image_to_json(image, "");
-    result["compressed"] = mcp::JsonValue(true);
+    godot_autopilot::util::JsonValue result = image_to_json(image, "");
+    result["compressed"] = godot_autopilot::util::JsonValue(true);
     return make_result(std::move(result));
   }
   if (action == "decompress") {
@@ -1581,8 +1581,8 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
                         std::to_string(static_cast<int>(decompress_error)) +
                         " (the image may not be compressed)");
     }
-    mcp::JsonValue result = image_to_json(image, "");
-    result["compressed"] = mcp::JsonValue(false);
+    godot_autopilot::util::JsonValue result = image_to_json(image, "");
+    result["compressed"] = godot_autopilot::util::JsonValue(false);
     return make_result(std::move(result));
   }
   if (action == "to_texture") {
@@ -1600,7 +1600,7 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
       return util::error_json("failed to create ImageTexture from image");
     }
     register_named_resource(texture, name);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["texture"] = texture_to_json(texture, name);
     result["image"] = image_to_json(image, "");
     return make_result(std::move(result));
@@ -1608,7 +1608,7 @@ mcp::JsonValue handle_pixel_action(const mcp::JsonValue &args) {
   return util::error_json("unknown action: " + action);
 }
 
-mcp::JsonValue handle_save_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_save_action(const godot_autopilot::util::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
     return util::error_json("missing required parameter: action");
@@ -1655,19 +1655,19 @@ mcp::JsonValue handle_save_action(const mcp::JsonValue &args) {
         godot::FileAccess::get_file_as_bytes(target);
     bytes = data.size();
   }
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["path"] = mcp::JsonValue(project_path.value);
-  result["bytes"] = mcp::JsonValue(bytes);
-  result["width"] = mcp::JsonValue(static_cast<int64_t>(image->get_width()));
-  result["height"] = mcp::JsonValue(static_cast<int64_t>(image->get_height()));
-  result["verified"] = mcp::JsonValue(verified);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["path"] = godot_autopilot::util::JsonValue(project_path.value);
+  result["bytes"] = godot_autopilot::util::JsonValue(bytes);
+  result["width"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(image->get_width()));
+  result["height"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(image->get_height()));
+  result["verified"] = godot_autopilot::util::JsonValue(verified);
   if (!dir_created.empty()) {
-    result["directories_created"] = mcp::JsonValue(dir_created);
+    result["directories_created"] = godot_autopilot::util::JsonValue(dir_created);
   }
   return make_result(std::move(result));
 }
 
-mcp::JsonValue handle_texture_gen_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_texture_gen_action(const godot_autopilot::util::JsonValue &args) {
   const std::string action = action_of(args);
   if (action.empty()) {
     return util::error_json("missing required parameter: action");

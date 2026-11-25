@@ -34,14 +34,14 @@ TEST_F(DispatchQueueUnavailableTest, MissingEditorQueueReturnsStructuredError) {
   bool handler_called = false;
   godot_autopilot::dispatch::replace_handlers(
       {{"gda_queue_probe",
-        [&handler_called](const mcp::JsonValue &) {
+        [&handler_called](const godot_autopilot::util::JsonValue &) {
           handler_called = true;
-          return mcp::JsonValue::Parse(R"({"result": 1})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result": 1})");
         }}},
       {});
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
-      "gda_queue_probe", mcp::JsonValue::Parse("{}"));
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "gda_queue_probe", godot_autopilot::util::JsonValue::Parse("{}"));
 
   EXPECT_FALSE(handler_called);
   ASSERT_NE(result.Find("error"), nullptr);
@@ -58,8 +58,8 @@ TEST_F(DispatchQueueUnavailableTest, MissingEditorQueueReturnsStructuredError) {
 }
 
 TEST_F(DispatchQueueUnavailableTest, MissingEditorQueueSkipsUnknownToolLookup) {
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
-      "gda_queue_absent_tool", mcp::JsonValue::Parse("{}"));
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "gda_queue_absent_tool", godot_autopilot::util::JsonValue::Parse("{}"));
   EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
   const std::string message = result["error"].GetString();
   EXPECT_EQ(message.find("not found"), std::string::npos);
@@ -69,17 +69,17 @@ TEST_F(DispatchQueueUnavailableTest, MainThreadExecutesHandlerInPlace) {
   bool handler_called = false;
   godot_autopilot::dispatch::replace_handlers(
       {{"gda_queue_probe",
-        [&handler_called](const mcp::JsonValue &) {
+        [&handler_called](const godot_autopilot::util::JsonValue &) {
           handler_called = true;
-          return mcp::JsonValue::Parse(R"({"result": 7})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result": 7})");
         }}},
       {});
 
   queue.drain();
   godot_autopilot::runtime_ops::set_editor_queue(&queue);
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
-      "gda_queue_probe", mcp::JsonValue::Parse("{}"));
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "gda_queue_probe", godot_autopilot::util::JsonValue::Parse("{}"));
 
   EXPECT_TRUE(handler_called);
   EXPECT_EQ(result.Find("error"), nullptr);
@@ -91,9 +91,9 @@ TEST_F(DispatchQueueUnavailableTest, ClosedFormerMainQueueRejectsHandler) {
   bool handler_called = false;
   godot_autopilot::dispatch::replace_handlers(
       {{"gda_queue_probe",
-        [&handler_called](const mcp::JsonValue &) {
+        [&handler_called](const godot_autopilot::util::JsonValue &) {
           handler_called = true;
-          return mcp::JsonValue::Parse(R"({"result": 7})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result": 7})");
         }}},
       {});
 
@@ -101,8 +101,8 @@ TEST_F(DispatchQueueUnavailableTest, ClosedFormerMainQueueRejectsHandler) {
   queue.close();
   godot_autopilot::runtime_ops::set_editor_queue(&queue);
 
-  const mcp::JsonValue result = godot_autopilot::dispatch::call_handler(
-      "gda_queue_probe", mcp::JsonValue::Parse("{}"));
+  const godot_autopilot::util::JsonValue result = godot_autopilot::dispatch::call_handler(
+      "gda_queue_probe", godot_autopilot::util::JsonValue::Parse("{}"));
 
   EXPECT_FALSE(handler_called);
   EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
@@ -113,9 +113,9 @@ TEST_F(DispatchQueueUnavailableTest,
   bool handler_called = false;
   godot_autopilot::dispatch::replace_handlers(
       {{"gda_queue_probe",
-        [&handler_called](const mcp::JsonValue &) {
+        [&handler_called](const godot_autopilot::util::JsonValue &) {
           handler_called = true;
-          return mcp::JsonValue::Parse(R"({"result": 7})");
+          return godot_autopilot::util::JsonValue::Parse(R"({"result": 7})");
         }}},
       {});
   queue.drain();
@@ -123,11 +123,11 @@ TEST_F(DispatchQueueUnavailableTest,
   godot_autopilot::ExportState export_state;
   std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
 
-  std::promise<mcp::JsonValue> completed;
+  std::promise<godot_autopilot::util::JsonValue> completed;
   auto completed_future = completed.get_future();
   std::thread worker([&] {
     completed.set_value(godot_autopilot::dispatch::call_handler(
-        "gda_queue_probe", mcp::JsonValue::Parse("{}")));
+        "gda_queue_probe", godot_autopilot::util::JsonValue::Parse("{}")));
   });
 
   const auto deadline = std::chrono::steady_clock::now() +
@@ -144,7 +144,7 @@ TEST_F(DispatchQueueUnavailableTest,
 
   const auto completed_status =
       completed_future.wait_for(std::chrono::seconds(2));
-  mcp::JsonValue result;
+  godot_autopilot::util::JsonValue result;
   if (completed_status == std::future_status::ready) {
     result = completed_future.get();
   }

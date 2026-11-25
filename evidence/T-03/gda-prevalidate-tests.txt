@@ -1,0 +1,54 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-json/build/debug
+    Start 534: LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+1/6 Test #534: LogSystemTest.SdkLogBridgeRoutesStoreFailureReason ....................***Failed    0.73 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from LogSystemTest
+[ RUN      ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+unknown file: error: SEH exception with code 0xc0000005 thrown in the test body.
+Stack trace:
+
+
+[  FAILED  ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason (3 ms)
+[----------] 1 test from LogSystemTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+
+ 1 FAILED TEST
+
+    Start 539: McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid
+2/6 Test #539: McpHttpDispatchTest.ClassifiesUnusableBodyAsInvalid ...................   Passed    0.17 sec
+    Start 547: McpWireTest.RejectsMalformedBody
+3/6 Test #547: McpWireTest.RejectsMalformedBody ......................................   Passed    0.15 sec
+    Start 574: McpHttpShimTest.RejectsUnparsableBody
+4/6 Test #574: McpHttpShimTest.RejectsUnparsableBody .................................   Passed    0.15 sec
+    Start 655: RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+5/6 Test #655: RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools ...***Failed    0.93 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RegisteredServerFixture
+[ RUN      ] RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools
+
+    Start 992: StableMcpErrorTest.PreservesShortMessageAcrossThrow
+6/6 Test #992: StableMcpErrorTest.PreservesShortMessageAcrossThrow ...................   Passed    0.13 sec
+
+67% tests passed, 2 tests failed out of 6
+
+Label Time Summary:
+boundary    =   0.13 sec*proc (1 test)
+unit        =   2.13 sec*proc (5 tests)
+
+Total Test time (real) =   2.90 sec
+
+The following tests FAILED:
+	534 - LogSystemTest.SdkLogBridgeRoutesStoreFailureReason (Failed) unit
+	655 - RegisteredServerFixture.ReRegisterOnSameServerRejectsDuplicateTools (Failed) unit
+Errors while running CTest

@@ -8,6 +8,9 @@
 
 #include <gtest/gtest.h>
 
+#include "adapters/mcp_json_bridge.hpp"
+#include "util/json_value.hpp"
+
 #include <mcp/client/McpClient.hpp>
 #include <mcp/McpError.hpp>
 #include <mcp/server/McpServer.hpp>
@@ -79,13 +82,15 @@ protected:
 
 TEST_F(ExportExecutionBoundaryTest,
        ResourceStartingExportAfterSubmissionIsRejectedAtFinalBoundary) {
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params["uri"] = mcp::JsonValue("godot://engine/version");
-  std::promise<mcp::JsonValue> completed;
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+  params["uri"] = godot_autopilot::util::JsonValue("godot://engine/version");
+  std::promise<godot_autopilot::util::JsonValue> completed;
   auto completed_future = completed.get_future();
   std::thread worker([&] {
     try {
-      completed.set_value(client->SendRequest("resources/read", params).get());
+      completed.set_value(godot_autopilot::adapters::FromSdk(
+          client->SendRequest("resources/read",
+                              godot_autopilot::adapters::ToSdk(params)).get()));
     } catch (...) {
       completed.set_exception(std::current_exception());
     }
@@ -164,13 +169,15 @@ TEST_F(ExportExecutionBoundaryTest,
 
 TEST_F(ExportExecutionBoundaryTest,
        PromptStartingExportAfterSubmissionIsRejectedAtFinalBoundary) {
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params["name"] = mcp::JsonValue("create-3d-scene");
-  std::promise<mcp::JsonValue> completed;
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+  params["name"] = godot_autopilot::util::JsonValue("create-3d-scene");
+  std::promise<godot_autopilot::util::JsonValue> completed;
   auto completed_future = completed.get_future();
   std::thread worker([&] {
     try {
-      completed.set_value(client->SendRequest("prompts/get", params).get());
+      completed.set_value(godot_autopilot::adapters::FromSdk(
+          client->SendRequest("prompts/get",
+                              godot_autopilot::adapters::ToSdk(params)).get()));
     } catch (...) {
       completed.set_exception(std::current_exception());
     }

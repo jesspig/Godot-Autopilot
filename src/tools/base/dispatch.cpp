@@ -52,16 +52,16 @@ std::string truncate_utf8_prefix(const std::string &text,
   return text.substr(0, cut);
 }
 
-std::string sanitized_args_preview(const mcp::JsonValue &args) {
+std::string sanitized_args_preview(const godot_autopilot::util::JsonValue &args) {
   const SanitizeResult sanitized =
       TraceRecorder::sanitize_args(args.Dump(), sanitize_policy::enabled());
-  return mcp::JsonValue::SanitizeUtf8(
+  return godot_autopilot::util::JsonValue::SanitizeUtf8(
       truncate_utf8_prefix(sanitized.text, kErrorArgsPreviewBytes));
 }
 
 void record_dispatch_exception(const std::string &name,
-                               const mcp::JsonValue &args,
-                               const mcp::JsonValue &result) {
+                               const godot_autopilot::util::JsonValue &args,
+                               const godot_autopilot::util::JsonValue &result) {
   std::string trace = tools::current_trace_id();
   if (trace.empty()) {
     trace = TraceRecorder::new_trace_id();
@@ -114,23 +114,23 @@ std::optional<ToolAlias> resolve_tool_alias(const std::string &name) {
   return registry->resolve_alias(name);
 }
 
-mcp::JsonValue call_handler_impl(const std::string &name,
-                                 const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue call_handler_impl(const std::string &name,
+                                 const godot_autopilot::util::JsonValue &args) {
   if (godot_autopilot::ExportGuard::is_exporting()) {
     return export_blocked_json_result();
   }
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   std::optional<ToolAlias> alias;
   if (auto registry = get_active_registry()) {
     alias = registry->resolve_alias(name);
   }
-  mcp::JsonValue alias_error;
+  godot_autopilot::util::JsonValue alias_error;
   if (alias && alias->validate_args) {
     alias_error = alias->validate_args(args);
   }
   const bool has_alias_error = alias && !alias_error.IsNull();
   const std::string lookup_name = alias ? alias->canonical : name;
-  const mcp::JsonValue call_args =
+  const godot_autopilot::util::JsonValue call_args =
       alias && !has_alias_error ? apply_alias_args(*alias, args) : args;
   HandlerFn handler;
   {
@@ -152,20 +152,20 @@ mcp::JsonValue call_handler_impl(const std::string &name,
     try {
       result = handler(call_args);
     } catch (const std::exception &ex) {
-      result = mcp::JsonValue(mcp::JsonValue::object_tag);
+      result = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
       result["error"] =
-          mcp::JsonValue(dispatch_exception_message(name, ex.what(), call_args));
+          godot_autopilot::util::JsonValue(dispatch_exception_message(name, ex.what(), call_args));
       record_dispatch_exception(name, call_args, result);
     } catch (...) {
-      result = mcp::JsonValue(mcp::JsonValue::object_tag);
-      result["error"] = mcp::JsonValue(
+      result = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+      result["error"] = godot_autopilot::util::JsonValue(
           dispatch_exception_message(name, "unexpected C++ exception", call_args));
       record_dispatch_exception(name, call_args, result);
     }
   } else {
-    result = mcp::JsonValue(mcp::JsonValue::object_tag);
+    result = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     result["error"] =
-        mcp::JsonValue("domain tool '" + lookup_name +
+        godot_autopilot::util::JsonValue("domain tool '" + lookup_name +
                        "' not found" + util::received_keys_suffix(args) +
                        " — use search_tools to discover available "
                        "tools");
@@ -185,20 +185,20 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   return result;
 }
 
-mcp::JsonValue depth_exceeded_result(const std::string &name) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(
+godot_autopilot::util::JsonValue depth_exceeded_result(const std::string &name) {
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["error"] = godot_autopilot::util::JsonValue(
       "tool invoke depth exceeded (max " +
       std::to_string(tools::kMaxInvokeDepth) + "): '" + name + "'");
-  result["code"] = mcp::JsonValue("depth_exceeded");
-  result["retryable"] = mcp::JsonValue(false);
-  result["tool"] = mcp::JsonValue(name);
-  result["depth"] = mcp::JsonValue(tools::kMaxInvokeDepth);
+  result["code"] = godot_autopilot::util::JsonValue("depth_exceeded");
+  result["retryable"] = godot_autopilot::util::JsonValue(false);
+  result["tool"] = godot_autopilot::util::JsonValue(name);
+  result["depth"] = godot_autopilot::util::JsonValue(tools::kMaxInvokeDepth);
   return result;
 }
 
-mcp::JsonValue call_handler_with_context(const std::string &name,
-                                         const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue call_handler_with_context(const std::string &name,
+                                         const godot_autopilot::util::JsonValue &args,
                                          const DepthContext &depth_ctx) {
   ScopedDepthContext scope(depth_ctx);
   return call_handler_impl(name, args);
@@ -237,14 +237,14 @@ int64_t dispatch_wait_health_ms() {
   return value;
 }
 
-mcp::JsonValue internal_error_result(const std::string &name,
+godot_autopilot::util::JsonValue internal_error_result(const std::string &name,
                                      const std::string &reason) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   result["error"] =
-      mcp::JsonValue("tool '" + name + "' failed: " + reason);
-  result["code"] = mcp::JsonValue("internal_error");
-  result["retryable"] = mcp::JsonValue(false);
-  result["tool"] = mcp::JsonValue(name);
+      godot_autopilot::util::JsonValue("tool '" + name + "' failed: " + reason);
+  result["code"] = godot_autopilot::util::JsonValue("internal_error");
+  result["retryable"] = godot_autopilot::util::JsonValue(false);
+  result["tool"] = godot_autopilot::util::JsonValue(name);
   return result;
 }
 
@@ -286,14 +286,14 @@ void emit_dispatch_timeout_observation(const std::string &name,
                                        int64_t last_drain_age_ms,
                                        bool cancelled) {
   try {
-    mcp::JsonValue line(mcp::JsonValue::object_tag);
-    line["type"] = mcp::JsonValue("dispatch_timeout");
-    line["tool"] = mcp::JsonValue(name);
-    line["waited_ms"] = mcp::JsonValue(waited_ms);
-    line["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(stats.pending));
-    line["oldest_pending_ms"] = mcp::JsonValue(oldest_pending_ms);
-    line["last_drain_age_ms"] = mcp::JsonValue(last_drain_age_ms);
-    line["cancelled"] = mcp::JsonValue(cancelled);
+    godot_autopilot::util::JsonValue line(godot_autopilot::util::JsonValue::object_tag);
+    line["type"] = godot_autopilot::util::JsonValue("dispatch_timeout");
+    line["tool"] = godot_autopilot::util::JsonValue(name);
+    line["waited_ms"] = godot_autopilot::util::JsonValue(waited_ms);
+    line["queue_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(stats.pending));
+    line["oldest_pending_ms"] = godot_autopilot::util::JsonValue(oldest_pending_ms);
+    line["last_drain_age_ms"] = godot_autopilot::util::JsonValue(last_drain_age_ms);
+    line["cancelled"] = godot_autopilot::util::JsonValue(cancelled);
     LogPersist::instance().write_trace_now(line.Dump());
     LogSystem::instance().log(
         LogLevel::Warning, LogCategory::Transport,
@@ -333,7 +333,7 @@ ScopedDepthContext::ScopedDepthContext(const DepthContext &ctx)
 
 ScopedDepthContext::~ScopedDepthContext() { g_depth = saved_depth_; }
 
-bool has_deferred_marker(const mcp::JsonValue &result) {
+bool has_deferred_marker(const godot_autopilot::util::JsonValue &result) {
   if (!result.IsObject()) {
     return false;
   }
@@ -356,62 +356,62 @@ std::optional<std::string> resolve_alias_canonical(const std::string &name) {
 
 std::string dispatch_exception_message(const std::string &name,
                                        const std::string &reason,
-                                       const mcp::JsonValue &args) {
+                                       const godot_autopilot::util::JsonValue &args) {
   return "internal error in tool '" + name + "': " + reason + " (args: " +
          sanitized_args_preview(args) + ")";
 }
 
-mcp::JsonValue queue_unavailable_result(const std::string &name,
+godot_autopilot::util::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["error"] = godot_autopilot::util::JsonValue(
       "editor main thread queue unavailable for tool '" + name + "': " +
       reason +
       " — the editor may be shutting down or overloaded; retry after the "
       "editor is responsive");
-  result["code"] = mcp::JsonValue("queue_unavailable");
-  result["retryable"] = mcp::JsonValue(true);
+  result["code"] = godot_autopilot::util::JsonValue("queue_unavailable");
+  result["retryable"] = godot_autopilot::util::JsonValue(true);
   return result;
 }
 
-mcp::JsonValue queue_unavailable_result(const std::string &name,
+godot_autopilot::util::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason,
                                         const CommandQueue::Stats &stats,
                                         int64_t oldest_pending_ms,
                                         int64_t last_drain_age_ms,
                                         int64_t waited_ms) {
-  mcp::JsonValue result = queue_unavailable_result(name, reason);
-  result["tool"] = mcp::JsonValue(name);
-  result["waited_ms"] = mcp::JsonValue(waited_ms);
-  result["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(stats.pending));
+  godot_autopilot::util::JsonValue result = queue_unavailable_result(name, reason);
+  result["tool"] = godot_autopilot::util::JsonValue(name);
+  result["waited_ms"] = godot_autopilot::util::JsonValue(waited_ms);
+  result["queue_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(stats.pending));
   result["queue_capacity"] =
-      mcp::JsonValue(static_cast<int64_t>(stats.capacity));
-  result["oldest_pending_ms"] = mcp::JsonValue(oldest_pending_ms);
-  result["last_drain_age_ms"] = mcp::JsonValue(last_drain_age_ms);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(stats.capacity));
+  result["oldest_pending_ms"] = godot_autopilot::util::JsonValue(oldest_pending_ms);
+  result["last_drain_age_ms"] = godot_autopilot::util::JsonValue(last_drain_age_ms);
   return result;
 }
 
-mcp::JsonValue dispatch_timeout_result(const std::string &name,
+godot_autopilot::util::JsonValue dispatch_timeout_result(const std::string &name,
                                        int64_t waited_ms,
                                        const CommandQueue::Stats &stats,
                                        int64_t oldest_pending_ms,
                                        int64_t last_drain_age_ms,
                                        bool cancelled_before_execution,
                                        bool health) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(dispatch_timeout_message(
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["error"] = godot_autopilot::util::JsonValue(dispatch_timeout_message(
       name, waited_ms, dispatch_wait_health_ms(), health,
       cancelled_before_execution));
-  result["code"] = mcp::JsonValue("main_thread_timeout");
-  result["retryable"] = mcp::JsonValue(false);
-  result["tool"] = mcp::JsonValue(name);
-  result["waited_ms"] = mcp::JsonValue(waited_ms);
-  result["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(stats.pending));
-  result["oldest_pending_ms"] = mcp::JsonValue(oldest_pending_ms);
-  result["last_drain_age_ms"] = mcp::JsonValue(last_drain_age_ms);
-  result["cancelled"] = mcp::JsonValue(true);
+  result["code"] = godot_autopilot::util::JsonValue("main_thread_timeout");
+  result["retryable"] = godot_autopilot::util::JsonValue(false);
+  result["tool"] = godot_autopilot::util::JsonValue(name);
+  result["waited_ms"] = godot_autopilot::util::JsonValue(waited_ms);
+  result["queue_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(stats.pending));
+  result["oldest_pending_ms"] = godot_autopilot::util::JsonValue(oldest_pending_ms);
+  result["last_drain_age_ms"] = godot_autopilot::util::JsonValue(last_drain_age_ms);
+  result["cancelled"] = godot_autopilot::util::JsonValue(true);
   result["cancelled_before_execution"] =
-      mcp::JsonValue(cancelled_before_execution);
+      godot_autopilot::util::JsonValue(cancelled_before_execution);
   return result;
 }
 
@@ -462,37 +462,37 @@ std::string main_thread_timeout_message(const std::string &label,
   return message;
 }
 
-mcp::JsonValue main_thread_timeout_result(const std::string &label,
+godot_autopilot::util::JsonValue main_thread_timeout_result(const std::string &label,
                                           int64_t waited_ms,
                                           bool cancelled_before_execution) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["error"] = godot_autopilot::util::JsonValue(
       main_thread_timeout_message(label, waited_ms, cancelled_before_execution));
-  result["code"] = mcp::JsonValue("main_thread_timeout");
-  result["retryable"] = mcp::JsonValue(false);
-  result["target"] = mcp::JsonValue(label);
-  result["waited_ms"] = mcp::JsonValue(waited_ms);
-  result["cancelled"] = mcp::JsonValue(true);
+  result["code"] = godot_autopilot::util::JsonValue("main_thread_timeout");
+  result["retryable"] = godot_autopilot::util::JsonValue(false);
+  result["target"] = godot_autopilot::util::JsonValue(label);
+  result["waited_ms"] = godot_autopilot::util::JsonValue(waited_ms);
+  result["cancelled"] = godot_autopilot::util::JsonValue(true);
   result["cancelled_before_execution"] =
-      mcp::JsonValue(cancelled_before_execution);
+      godot_autopilot::util::JsonValue(cancelled_before_execution);
   return result;
 }
 
-mcp::JsonValue exec_timeout_result(int64_t timeout_ms,
+godot_autopilot::util::JsonValue exec_timeout_result(int64_t timeout_ms,
                                    int64_t execution_time_ms) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue("execution timed out after " +
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["error"] = godot_autopilot::util::JsonValue("execution timed out after " +
                                    std::to_string(timeout_ms) + " ms");
-  result["code"] = mcp::JsonValue("exec_timeout");
-  result["retryable"] = mcp::JsonValue(false);
-  result["execution_time_ms"] = mcp::JsonValue(execution_time_ms);
-  result["timeout_ms"] = mcp::JsonValue(timeout_ms);
+  result["code"] = godot_autopilot::util::JsonValue("exec_timeout");
+  result["retryable"] = godot_autopilot::util::JsonValue(false);
+  result["execution_time_ms"] = godot_autopilot::util::JsonValue(execution_time_ms);
+  result["timeout_ms"] = godot_autopilot::util::JsonValue(timeout_ms);
   return result;
 }
 
-mcp::JsonValue run_on_main_thread_with_budget(
+godot_autopilot::util::JsonValue run_on_main_thread_with_budget(
     CommandQueue &queue, const std::string &tool_name, uint32_t flags,
-    std::function<mcp::JsonValue()> fn) {
+    std::function<godot_autopilot::util::JsonValue()> fn) {
   if (queue.is_main_thread()) {
     return fn();
   }
@@ -503,7 +503,7 @@ mcp::JsonValue run_on_main_thread_with_budget(
     budget_ms = dispatch_wait_default_ms();
   }
   const auto submit_time = std::chrono::steady_clock::now();
-  CommandQueue::TrackedSubmission<mcp::JsonValue> submission;
+  CommandQueue::TrackedSubmission<godot_autopilot::util::JsonValue> submission;
   try {
     const CommandQueue::Stats stats_before = queue.stats();
     if (stats_before.capacity > 0 &&
@@ -575,14 +575,14 @@ mcp::JsonValue run_on_main_thread_with_budget(
       cancelled, (flags & tool_flags::kHealthProbe) != 0);
 }
 
-mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &label,
-                                     std::function<mcp::JsonValue()> slice,
+godot_autopilot::util::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &label,
+                                     std::function<godot_autopilot::util::JsonValue()> slice,
                                      int64_t budget_ms) {
   if (queue.is_main_thread()) {
     return slice();
   }
   const auto submit_time = std::chrono::steady_clock::now();
-  CommandQueue::TrackedSubmission<mcp::JsonValue> submission;
+  CommandQueue::TrackedSubmission<godot_autopilot::util::JsonValue> submission;
   try {
     submission = queue.submit_tracked(std::move(slice));
   } catch (const std::exception &ex) {
@@ -624,28 +624,28 @@ mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &lab
   }
 }
 
-mcp::JsonValue resolve_deferred_wait(const std::string &name,
-                                      mcp::JsonValue result) {
+godot_autopilot::util::JsonValue resolve_deferred_wait(const std::string &name,
+                                      godot_autopilot::util::JsonValue result) {
   std::string deferred_trace_key;
   const bool has_deferred_trace =
       spec_detail::deferred_key_of(result, &deferred_trace_key);
   int64_t job_id = 0;
   const bool is_game_job =
       runtime_ops::payload_is_game_job(result, &job_id);
-  const mcp::JsonValue *wait_p = result.Find("__gda_wait");
+  const godot_autopilot::util::JsonValue *wait_p = result.Find("__gda_wait");
   const bool is_deferred_wait = wait_p && wait_p->IsObject();
   auto *pending_p = result.Find("__gda_pending");
   const bool is_pending_op = !is_game_job && pending_p && pending_p->IsInt();
   if (!is_game_job && !is_deferred_wait && !is_pending_op) {
     if (!result.IsObject()) {
-      mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue wrapped(godot_autopilot::util::JsonValue::object_tag);
       wrapped["result"] = std::move(result);
       result = std::move(wrapped);
     }
     return result;
   }
   int64_t timeout = GDA_DEFAULT_TIMEOUT_MS;
-  const mcp::JsonValue *timeout_source =
+  const godot_autopilot::util::JsonValue *timeout_source =
       is_deferred_wait ? wait_p->Find("timeout_ms") : result.Find("timeout_ms");
   if (timeout_source && timeout_source->IsInt() &&
       timeout_source->GetInt() > 0) {
@@ -654,8 +654,8 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
   if (is_game_job) {
     result = runtime_ops::wait_game_job(job_id, timeout);
   } else if (is_deferred_wait) {
-    const mcp::JsonValue *kind_p = wait_p->Find("kind");
-    const mcp::JsonValue *id_p = wait_p->Find("id");
+    const godot_autopilot::util::JsonValue *kind_p = wait_p->Find("kind");
+    const godot_autopilot::util::JsonValue *id_p = wait_p->Find("id");
     const std::string kind =
         (kind_p && kind_p->IsString()) ? kind_p->GetString() : std::string();
     const int64_t id = (id_p && id_p->IsInt()) ? id_p->GetInt() : 0;
@@ -666,16 +666,16 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
     } else if (kind == "csharp_build") {
       result = editor_ops::wait_csharp_build(*wait_p, timeout);
     } else {
-      mcp::JsonValue error(mcp::JsonValue::object_tag);
-      error["error"] = mcp::JsonValue("unknown deferred wait kind: " + kind);
-      error["code"] = mcp::JsonValue("internal_error");
-      error["retryable"] = mcp::JsonValue(false);
+      godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+      error["error"] = godot_autopilot::util::JsonValue("unknown deferred wait kind: " + kind);
+      error["code"] = godot_autopilot::util::JsonValue("internal_error");
+      error["retryable"] = godot_autopilot::util::JsonValue(false);
       result = std::move(error);
     }
   } else {
     const int64_t rid = pending_p->GetInt();
-    mcp::JsonValue pending_options = result;
-    mcp::JsonValue awaited = runtime_ops::wait_pending_response(rid, timeout);
+    godot_autopilot::util::JsonValue pending_options = result;
+    godot_autopilot::util::JsonValue awaited = runtime_ops::wait_pending_response(rid, timeout);
     const bool is_capture_tool =
         name == "capture_game_viewport" || name == "capture_editor_viewport";
     if (is_capture_tool) {
@@ -685,7 +685,7 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
     result = std::move(awaited);
   }
   if (!result.IsObject()) {
-    mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue wrapped(godot_autopilot::util::JsonValue::object_tag);
     wrapped["result"] = std::move(result);
     result = std::move(wrapped);
   }
@@ -698,8 +698,8 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
   return result;
 }
 
-mcp::JsonValue call_handler(const std::string &name,
-                            const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue call_handler(const std::string &name,
+                            const godot_autopilot::util::JsonValue &args,
                             const DepthContext &depth_ctx) {
   if (depth_ctx.depth >= tools::kMaxInvokeDepth) {
     return depth_exceeded_result(name);
@@ -747,11 +747,11 @@ mcp::CallToolResult export_blocked_result() {
   return err;
 }
 
-mcp::JsonValue export_blocked_json_result() {
-  mcp::JsonValue body(mcp::JsonValue::object_tag);
-  body["error"] = mcp::JsonValue(export_blocked_error_text());
-  body["code"] = mcp::JsonValue("export_in_progress");
-  body["retryable"] = mcp::JsonValue(true);
+godot_autopilot::util::JsonValue export_blocked_json_result() {
+  godot_autopilot::util::JsonValue body(godot_autopilot::util::JsonValue::object_tag);
+  body["error"] = godot_autopilot::util::JsonValue(export_blocked_error_text());
+  body["code"] = godot_autopilot::util::JsonValue("export_in_progress");
+  body["retryable"] = godot_autopilot::util::JsonValue(true);
   return body;
 }
 

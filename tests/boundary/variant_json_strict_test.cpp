@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -12,7 +12,7 @@ namespace {
 using godot_autopilot::VariantJson;
 
 godot::Variant strict_parse(const char *json, const char *type_hint) {
-  return VariantJson::deserialize_strict(mcp::JsonValue::Parse(json), type_hint);
+  return VariantJson::deserialize_strict(godot_autopilot::util::JsonValue::Parse(json), type_hint);
 }
 
 } // namespace

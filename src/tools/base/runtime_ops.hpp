@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <deque>
 #include <map>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mutex>
 #include <optional>
 #include <string>
@@ -25,7 +25,7 @@ struct LateResult {
   std::string summary;
 };
 
-std::string late_result_summary(const mcp::JsonValue &response);
+std::string late_result_summary(const godot_autopilot::util::JsonValue &response);
 
 void push_late_result(std::deque<LateResult> &buffer, LateResult entry,
                        size_t cap);
@@ -41,10 +41,10 @@ struct GameTimeoutReceiptInput {
   int64_t last_channel_response_age_ms = -1;
   bool late_response_for_request = false;
   bool game_error_during_wait = false;
-  mcp::JsonValue late_results;
+  godot_autopilot::util::JsonValue late_results;
 };
 
-mcp::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input);
+godot_autopilot::util::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input);
 
 struct GameJob {
   int64_t job_id = 0;
@@ -82,26 +82,26 @@ void set_editor_queue(godot_autopilot::CommandQueue *q);
 bool has_editor_queue();
 bool on_editor_main_thread();
 
-mcp::JsonValue handle_game_status(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_eval(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_input(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_capture(const mcp::JsonValue &args);
-void append_runtime_degradation_hint(mcp::JsonValue &result);
-mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args);
-mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args);
-mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args);
-mcp::JsonValue handle_translate_text(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_status(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_eval(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_input(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_input_wait(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_input_status(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_capture(const godot_autopilot::util::JsonValue &args);
+void append_runtime_degradation_hint(godot_autopilot::util::JsonValue &result);
+godot_autopilot::util::JsonValue handle_game_reload_scripts(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_job_start(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_job_get(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_sample_property(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_collect_evidence(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_game_validate_ui_layout(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_game_locale(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_set_game_locale(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_translation_list(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_translate_text(const godot_autopilot::util::JsonValue &args);
 
-mcp::JsonValue handle_gda_send(const std::string &op,
-                                const mcp::JsonValue &params,
+godot_autopilot::util::JsonValue handle_gda_send(const std::string &op,
+                                const godot_autopilot::util::JsonValue &params,
                                 int64_t timeout_ms,
                                 bool suppress_error_breaks = false,
                                 bool wait_ready = true,
@@ -118,32 +118,32 @@ void run_channel_self_check(int32_t session_id);
 
 void on_session_ready(int32_t session_id);
 
-mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms);
+godot_autopilot::util::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms);
 
 bool wait_pending_completion(int64_t request_id, int64_t timeout_ms);
 
-mcp::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms);
+godot_autopilot::util::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms);
 
-bool payload_is_game_job(const mcp::JsonValue &payload, int64_t *out_job_id);
+bool payload_is_game_job(const godot_autopilot::util::JsonValue &payload, int64_t *out_job_id);
 
-mcp::JsonValue start_pending_op(const std::string &op,
-                                 const mcp::JsonValue &params,
+godot_autopilot::util::JsonValue start_pending_op(const std::string &op,
+                                 const godot_autopilot::util::JsonValue &params,
                                  bool suppress_error_breaks,
                                  int64_t *out_request_id,
                                  bool wait_ready = true,
                                  std::optional<int32_t> session_id = std::nullopt);
 
-bool try_collect_response(int64_t request_id, mcp::JsonValue &out_response);
+bool try_collect_response(int64_t request_id, godot_autopilot::util::JsonValue &out_response);
 
 void cancel_game_op_request(int64_t request_id);
 
-bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id);
+bool payload_is_pending(const godot_autopilot::util::JsonValue &payload, int64_t *out_request_id);
 
 bool discard_pending(int64_t request_id, std::string &out_detail);
 
-mcp::JsonValue finalize_capture_response(
-    const mcp::JsonValue &pending_result,
-    const mcp::JsonValue &options = mcp::JsonValue());
+godot_autopilot::util::JsonValue finalize_capture_response(
+    const godot_autopilot::util::JsonValue &pending_result,
+    const godot_autopilot::util::JsonValue &options = godot_autopilot::util::JsonValue());
 
 void handle_game_response(const std::string &json_str);
 

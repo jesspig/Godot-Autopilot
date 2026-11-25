@@ -5,6 +5,9 @@
 
 #include <gtest/gtest.h>
 
+#include "adapters/mcp_json_bridge.hpp"
+#include "util/json_value.hpp"
+
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -97,9 +100,9 @@ TEST(McpWireTest, RejectsBodyThatIsNotAClientRequest) {
 TEST(McpWireTest, BuildsResponseTextFromJsonRpcMessage) {
   mcp::JsonRpcResponse response;
   response.id = mcp::RequestId{int64_t{7}};
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["ok"] = mcp::JsonValue(true);
-  response.result = std::move(result);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+  result["ok"] = godot_autopilot::util::JsonValue(true);
+  response.result = godot_autopilot::adapters::ToSdk(result);
   const mcp::JsonRpcMessage message{std::move(response)};
 
   EXPECT_EQ(build_response_text(message),
@@ -114,17 +117,17 @@ TEST(McpWireTest, BuildsErrorResponseText) {
 TEST(McpWireTest, TimeoutResponsePreservesClientIdAndStillRunningState) {
   const std::string body = build_timeout_response_text(
       mcp::RequestId{std::string("client-7")}, "tools/call", true);
-  const mcp::JsonValue parsed = mcp::JsonValue::Parse(body);
+  const godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(body);
 
   ASSERT_TRUE(parsed.IsObject());
-  const mcp::JsonValue *id = parsed.Find("id");
+  const godot_autopilot::util::JsonValue *id = parsed.Find("id");
   ASSERT_NE(id, nullptr);
   EXPECT_EQ(id->GetString(), "client-7");
-  const mcp::JsonValue *error = parsed.Find("error");
+  const godot_autopilot::util::JsonValue *error = parsed.Find("error");
   ASSERT_NE(error, nullptr);
   ASSERT_TRUE(error->IsObject());
   EXPECT_EQ((*error)["code"].GetInt(), -32000);
-  const mcp::JsonValue *data = error->Find("data");
+  const godot_autopilot::util::JsonValue *data = error->Find("data");
   ASSERT_NE(data, nullptr);
   ASSERT_TRUE(data->IsObject());
   EXPECT_TRUE((*data)["still_running"].GetBool());

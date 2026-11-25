@@ -19,13 +19,13 @@
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 #include <limits>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 
 namespace godot_autopilot {
 namespace gridmap_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

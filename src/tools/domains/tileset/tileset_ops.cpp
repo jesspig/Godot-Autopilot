@@ -17,14 +17,14 @@
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <vector>
 
 namespace godot_autopilot {
 namespace tileset_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -375,7 +375,7 @@ JV handle_set_tile_collision(const JV &args) {
   return r;
 }
 
-mcp::JsonValue handle_update_tileset(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_update_tileset(const godot_autopilot::util::JsonValue &args) {
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     return util::error_json("missing required parameter: action");

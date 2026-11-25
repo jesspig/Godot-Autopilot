@@ -24,7 +24,7 @@ namespace {
 
 struct RenderDomainTag {};
 
-mcp::JsonValue find_tool_schema(
+godot_autopilot::util::JsonValue find_tool_schema(
     const std::vector<std::unique_ptr<godot_autopilot::ToolBase>> &tools,
     const std::string &name) {
   for (const auto &tool : tools) {
@@ -32,11 +32,11 @@ mcp::JsonValue find_tool_schema(
       return tool->input_schema();
     }
   }
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-bool schema_has_property(const mcp::JsonValue &schema, const std::string &name) {
-  const mcp::JsonValue *properties = schema.Find("properties");
+bool schema_has_property(const godot_autopilot::util::JsonValue &schema, const std::string &name) {
+  const godot_autopilot::util::JsonValue *properties = schema.Find("properties");
   return properties != nullptr && properties->IsObject() &&
          properties->Find(name) != nullptr;
 }
@@ -103,21 +103,21 @@ TEST(RuntimeBudgetTest, RidStoreOwnershipLookup) {
 
 TEST(RuntimeBudgetTest, SchemasExposeBudgetAndOwnershipGuards) {
   const auto render_tools = godot_autopilot::render_tools::make_tools();
-  const mcp::JsonValue instance =
+  const godot_autopilot::util::JsonValue instance =
       find_tool_schema(render_tools, "render_instance");
   EXPECT_TRUE(schema_has_property(instance, "confirm"));
-  const mcp::JsonValue viewport =
+  const godot_autopilot::util::JsonValue viewport =
       find_tool_schema(render_tools, "render_viewport");
   EXPECT_TRUE(schema_has_property(viewport, "width"));
   EXPECT_TRUE(schema_has_property(viewport, "height"));
 
   const auto nav_tools = godot_autopilot::nav_tools::make_tools();
-  const mcp::JsonValue astar = find_tool_schema(nav_tools, "astar_path");
+  const godot_autopilot::util::JsonValue astar = find_tool_schema(nav_tools, "astar_path");
   EXPECT_TRUE(schema_has_property(astar, "region"));
   EXPECT_TRUE(schema_has_property(astar, "size"));
 
   const auto capture_tools = godot_autopilot::capture_tools::make_tools();
-  const mcp::JsonValue capture =
+  const godot_autopilot::util::JsonValue capture =
       find_tool_schema(capture_tools, "capture_editor_viewport");
   EXPECT_TRUE(schema_has_property(capture, "save_dir"));
 }

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <string>
 
@@ -15,17 +15,17 @@ class ContractAssertSuite : public IntegrationHarnessWithAllow {
   ContractAssertSuite() : IntegrationHarnessWithAllow("code_execute") {}
 };
 
-mcp::JsonValue make_args() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue make_args() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
 TEST_F(ContractAssertSuite, CallToolGetToolDetailCodeExecuteContract) {
-  mcp::JsonValue args = make_args();
-  args["name"] = mcp::JsonValue("get_tool_detail");
-  mcp::JsonValue arguments = make_args();
-  arguments["name"] = mcp::JsonValue("code_execute");
+  godot_autopilot::util::JsonValue args = make_args();
+  args["name"] = godot_autopilot::util::JsonValue("get_tool_detail");
+  godot_autopilot::util::JsonValue arguments = make_args();
+  arguments["name"] = godot_autopilot::util::JsonValue("code_execute");
   args["arguments"] = std::move(arguments);
-  mcp::JsonValue result = call("call_tool", args);
+  godot_autopilot::util::JsonValue result = call("call_tool", args);
   const auto *tool = result.Find("tool");
   ASSERT_NE(tool, nullptr) << result.Dump();
   ASSERT_TRUE(tool->IsObject()) << result.Dump();

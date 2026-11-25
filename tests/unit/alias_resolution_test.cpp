@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "core/command_queue.hpp"
 #include "tools/base/dispatch.hpp"
@@ -29,12 +29,12 @@ using godot_autopilot::ToolRegistry;
 using godot_autopilot::ToolSpec;
 namespace tool_flags = godot_autopilot::tool_flags;
 
-mcp::JsonValue object() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue object() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-std::string string_field(const mcp::JsonValue &value, const char *key) {
-  const mcp::JsonValue *found = value.Find(key);
+std::string string_field(const godot_autopilot::util::JsonValue &value, const char *key) {
+  const godot_autopilot::util::JsonValue *found = value.Find(key);
   if (found == nullptr || !found->IsString()) {
     return std::string();
   }
@@ -43,7 +43,7 @@ std::string string_field(const mcp::JsonValue &value, const char *key) {
 
 ToolSpec make_tool(
     const std::string &name, SideEffect effect,
-    std::function<mcp::JsonValue(const mcp::JsonValue &)> handler) {
+    std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> handler) {
   ToolSpec spec;
   spec.name = name;
   spec.description = name + " alias test target";
@@ -70,8 +70,8 @@ protected:
 
     ToolSpec echo = make_tool(
         "alias_target_echo", SideEffect::None,
-        [](const mcp::JsonValue &args) {
-          mcp::JsonValue result(object());
+        [](const godot_autopilot::util::JsonValue &args) {
+          godot_autopilot::util::JsonValue result(object());
           result["echo"] = args;
           return result;
         });
@@ -79,9 +79,9 @@ protected:
     echo.aliases.push_back(make_alias("old_echo_name", "alias_target_echo"));
 
     ToolAlias param = make_alias("old_echo_param", "alias_target_echo");
-    param.adapt_args = [](const mcp::JsonValue &args) {
-      mcp::JsonValue adapted(object());
-      const mcp::JsonValue *old_key = args.Find("old_key");
+    param.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
+      godot_autopilot::util::JsonValue adapted(object());
+      const godot_autopilot::util::JsonValue *old_key = args.Find("old_key");
       if (old_key != nullptr) {
         adapted["new_key"] = *old_key;
       }
@@ -90,10 +90,10 @@ protected:
     echo.aliases.push_back(param);
 
     ToolAlias scalar = make_alias("old_echo_scalar", "alias_target_echo");
-    scalar.adapt_args = [](const mcp::JsonValue &args) {
-      mcp::JsonValue adapted(object());
-      mcp::JsonValue items(mcp::JsonValue::array_tag);
-      const mcp::JsonValue *item = args.Find("item");
+    scalar.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
+      godot_autopilot::util::JsonValue adapted(object());
+      godot_autopilot::util::JsonValue items(godot_autopilot::util::JsonValue::array_tag);
+      const godot_autopilot::util::JsonValue *item = args.Find("item");
       if (item != nullptr) {
         items.PushBack(*item);
       }
@@ -105,16 +105,16 @@ protected:
 
     ToolSpec profile = make_tool(
         "alias_target_profile", SideEffect::None,
-        [](const mcp::JsonValue &) {
-          mcp::JsonValue result(object());
-          result["value"] = mcp::JsonValue(static_cast<int64_t>(42));
-          result["extra"] = mcp::JsonValue("x");
+        [](const godot_autopilot::util::JsonValue &) {
+          godot_autopilot::util::JsonValue result(object());
+          result["value"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(42));
+          result["extra"] = godot_autopilot::util::JsonValue("x");
           return result;
         });
     ToolAlias projection = make_alias("old_profile", "alias_target_profile");
-    projection.project_result = [](const mcp::JsonValue &result) {
-      mcp::JsonValue projected(object());
-      const mcp::JsonValue *value = result.Find("value");
+    projection.project_result = [](const godot_autopilot::util::JsonValue &result) {
+      godot_autopilot::util::JsonValue projected(object());
+      const godot_autopilot::util::JsonValue *value = result.Find("value");
       if (value != nullptr) {
         projected["result"] = *value;
       }
@@ -125,16 +125,16 @@ protected:
 
     ToolSpec destructive = make_tool(
         "alias_target_destructive", SideEffect::Destructive,
-        [](const mcp::JsonValue &) {
-          mcp::JsonValue result(object());
-          result["result"] = mcp::JsonValue("ok");
+        [](const godot_autopilot::util::JsonValue &) {
+          godot_autopilot::util::JsonValue result(object());
+          result["result"] = godot_autopilot::util::JsonValue("ok");
           return result;
         });
     ToolAlias destructive_alias =
         make_alias("old_destructive", "alias_target_destructive");
-    destructive_alias.adapt_args = [](const mcp::JsonValue &args) {
-      mcp::JsonValue adapted(object());
-      const mcp::JsonValue *payload = args.Find("payload");
+    destructive_alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
+      godot_autopilot::util::JsonValue adapted(object());
+      const godot_autopilot::util::JsonValue *payload = args.Find("payload");
       if (payload != nullptr) {
         adapted["payload"] = *payload;
       }
@@ -145,22 +145,22 @@ protected:
 
     ToolSpec conflict = make_tool(
         "alias_target_conflict", SideEffect::None,
-        [](const mcp::JsonValue &) { return object(); });
+        [](const godot_autopilot::util::JsonValue &) { return object(); });
     conflict.aliases.push_back(
         make_alias("alias_target_echo", "alias_target_conflict"));
     registry_->add(godot_autopilot::make_spec_tool(std::move(conflict)));
 
     ToolSpec future = make_tool(
         "alias_target_future", SideEffect::None,
-        [](const mcp::JsonValue &) { return object(); });
+        [](const godot_autopilot::util::JsonValue &) { return object(); });
     future.aliases.push_back(make_alias("future_real", "alias_target_future"));
     registry_->add(godot_autopilot::make_spec_tool(std::move(future)));
 
     ToolSpec real = make_tool(
         "future_real", SideEffect::None,
-        [](const mcp::JsonValue &) {
-          mcp::JsonValue result(object());
-          result["real"] = mcp::JsonValue(true);
+        [](const godot_autopilot::util::JsonValue &) {
+          godot_autopilot::util::JsonValue result(object());
+          result["real"] = godot_autopilot::util::JsonValue(true);
           return result;
         });
     registry_->add(godot_autopilot::make_spec_tool(std::move(real)));
@@ -175,7 +175,7 @@ protected:
     godot_autopilot::runtime_ops::set_editor_queue(nullptr);
   }
 
-  mcp::JsonValue call(const std::string &name, const mcp::JsonValue &args) {
+  godot_autopilot::util::JsonValue call(const std::string &name, const godot_autopilot::util::JsonValue &args) {
     return godot_autopilot::dispatch::call_handler(name, args);
   }
 
@@ -186,33 +186,33 @@ protected:
 };
 
 TEST_F(AliasResolutionTest, RenameAliasReturnsCanonicalResult) {
-  const mcp::JsonValue result = call("old_echo_name", object());
+  const godot_autopilot::util::JsonValue result = call("old_echo_name", object());
   EXPECT_EQ(string_field(result, "deprecated_alias"), "old_echo_name");
   EXPECT_EQ(string_field(result, "canonical_name"), "alias_target_echo");
   EXPECT_EQ(string_field(result, "alias_removal_version"), "0.6.0");
   EXPECT_EQ(string_field(result, "deprecated_since"), "0.4.0");
-  const mcp::JsonValue *echo = result.Find("echo");
+  const godot_autopilot::util::JsonValue *echo = result.Find("echo");
   ASSERT_NE(echo, nullptr);
   EXPECT_TRUE(echo->IsObject());
 }
 
 TEST_F(AliasResolutionTest, ParamRenameAliasAdaptsArgs) {
-  mcp::JsonValue args = object();
-  args["old_key"] = mcp::JsonValue("value");
-  const mcp::JsonValue result = call("old_echo_param", args);
-  const mcp::JsonValue *echo = result.Find("echo");
+  godot_autopilot::util::JsonValue args = object();
+  args["old_key"] = godot_autopilot::util::JsonValue("value");
+  const godot_autopilot::util::JsonValue result = call("old_echo_param", args);
+  const godot_autopilot::util::JsonValue *echo = result.Find("echo");
   ASSERT_NE(echo, nullptr);
   EXPECT_EQ(string_field(*echo, "new_key"), "value");
   EXPECT_EQ(echo->Find("old_key"), nullptr);
 }
 
 TEST_F(AliasResolutionTest, ScalarToArrayAliasWrapsValue) {
-  mcp::JsonValue args = object();
-  args["item"] = mcp::JsonValue("x");
-  const mcp::JsonValue result = call("old_echo_scalar", args);
-  const mcp::JsonValue *echo = result.Find("echo");
+  godot_autopilot::util::JsonValue args = object();
+  args["item"] = godot_autopilot::util::JsonValue("x");
+  const godot_autopilot::util::JsonValue result = call("old_echo_scalar", args);
+  const godot_autopilot::util::JsonValue *echo = result.Find("echo");
   ASSERT_NE(echo, nullptr);
-  const mcp::JsonValue *items = echo->Find("items");
+  const godot_autopilot::util::JsonValue *items = echo->Find("items");
   ASSERT_NE(items, nullptr);
   ASSERT_TRUE(items->IsArray());
   ASSERT_EQ(items->GetArray().size(), 1u);
@@ -220,8 +220,8 @@ TEST_F(AliasResolutionTest, ScalarToArrayAliasWrapsValue) {
 }
 
 TEST_F(AliasResolutionTest, ProjectionRestoresOldShape) {
-  const mcp::JsonValue result = call("old_profile", object());
-  const mcp::JsonValue *projected = result.Find("result");
+  const godot_autopilot::util::JsonValue result = call("old_profile", object());
+  const godot_autopilot::util::JsonValue *projected = result.Find("result");
   ASSERT_NE(projected, nullptr);
   EXPECT_EQ(projected->GetInt(), 42);
   EXPECT_EQ(result.Find("value"), nullptr);
@@ -229,15 +229,15 @@ TEST_F(AliasResolutionTest, ProjectionRestoresOldShape) {
 }
 
 TEST_F(AliasResolutionTest, DestructiveAliasRequiresConfirm) {
-  mcp::JsonValue denied_args = object();
-  denied_args["payload"] = mcp::JsonValue("data");
-  const mcp::JsonValue denied = call("old_destructive", denied_args);
+  godot_autopilot::util::JsonValue denied_args = object();
+  denied_args["payload"] = godot_autopilot::util::JsonValue("data");
+  const godot_autopilot::util::JsonValue denied = call("old_destructive", denied_args);
   EXPECT_EQ(string_field(denied, "code"), "confirmation_required");
 
-  mcp::JsonValue allowed_args = object();
-  allowed_args["payload"] = mcp::JsonValue("data");
-  allowed_args["confirm"] = mcp::JsonValue(true);
-  const mcp::JsonValue allowed = call("old_destructive", allowed_args);
+  godot_autopilot::util::JsonValue allowed_args = object();
+  allowed_args["payload"] = godot_autopilot::util::JsonValue("data");
+  allowed_args["confirm"] = godot_autopilot::util::JsonValue(true);
+  const godot_autopilot::util::JsonValue allowed = call("old_destructive", allowed_args);
   EXPECT_EQ(string_field(allowed, "result"), "ok");
   EXPECT_EQ(string_field(allowed, "deprecated_alias"), "old_destructive");
 }
@@ -270,17 +270,17 @@ TEST_F(AliasResolutionTest, CatalogResolvesAliasButListsOnlyRealTools) {
 }
 
 TEST_F(AliasResolutionTest, ToolDetailReportsAliasMetadata) {
-  const mcp::JsonValue detail = godot_autopilot::tool_detail_for(
+  const godot_autopilot::util::JsonValue detail = godot_autopilot::tool_detail_for(
       "old_echo_name", catalog_, registry_);
   std::cout << "[alias-detail] " << detail.Dump() << "\n";
   EXPECT_EQ(string_field(detail, "deprecated_alias"), "old_echo_name");
   EXPECT_EQ(string_field(detail, "canonical_name"), "alias_target_echo");
   EXPECT_EQ(string_field(detail, "alias_removal_version"), "0.6.0");
-  const mcp::JsonValue *tool = detail.Find("tool");
+  const godot_autopilot::util::JsonValue *tool = detail.Find("tool");
   ASSERT_NE(tool, nullptr);
   EXPECT_EQ(string_field(*tool, "name"), "alias_target_echo");
   EXPECT_EQ(string_field(*tool, "side_effect"), "none");
-  const mcp::JsonValue *examples = tool->Find("examples");
+  const godot_autopilot::util::JsonValue *examples = tool->Find("examples");
   ASSERT_NE(examples, nullptr);
   ASSERT_TRUE(examples->IsArray());
   ASSERT_EQ(examples->Size(), 1u);

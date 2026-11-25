@@ -1,4 +1,6 @@
+#include "adapters/mcp_json_bridge.hpp"
 #include "core/transport/godot_transport.hpp"
+#include "util/json_value.hpp"
 
 #include <gtest/gtest.h>
 
@@ -110,7 +112,8 @@ TEST(GodotTransportPendingTest, ResponseRoutesToSubmittingConnection) {
 
   mcp::JsonRpcResponse response;
   response.id = request->id;
-  response.result = mcp::JsonValue(mcp::JsonValue::object_tag);
+  response.result = godot_autopilot::adapters::ToSdk(
+      godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag));
   transport.SendMessageAsync(mcp::JsonRpcMessage(response));
 
   mcp::JsonRpcMessage message;
@@ -148,11 +151,13 @@ TEST(GodotTransportPendingTest, OutOfOrderResponsesRouteByInternalId) {
 
   mcp::JsonRpcResponse response_b;
   response_b.id = mcp::RequestId{internal_b};
-  response_b.result = mcp::JsonValue("result-b");
+  response_b.result = godot_autopilot::adapters::ToSdk(
+      godot_autopilot::util::JsonValue("result-b"));
   transport.SendMessageAsync(mcp::JsonRpcMessage(response_b));
   mcp::JsonRpcResponse response_a;
   response_a.id = mcp::RequestId{internal_a};
-  response_a.result = mcp::JsonValue("result-a");
+  response_a.result = godot_autopilot::adapters::ToSdk(
+      godot_autopilot::util::JsonValue("result-a"));
   transport.SendMessageAsync(mcp::JsonRpcMessage(response_a));
 
   mcp::JsonRpcMessage delivered_a;
@@ -204,12 +209,14 @@ TEST(GodotTransportPendingTest, LateResponseForExpiredRequestDropped) {
 
   mcp::JsonRpcResponse late_response;
   late_response.id = mcp::RequestId{internal_a};
-  late_response.result = mcp::JsonValue("late-a");
+  late_response.result = godot_autopilot::adapters::ToSdk(
+      godot_autopilot::util::JsonValue("late-a"));
   transport.SendMessageAsync(mcp::JsonRpcMessage(late_response));
 
   mcp::JsonRpcResponse response_b;
   response_b.id = mcp::RequestId{internal_b};
-  response_b.result = mcp::JsonValue("result-b");
+  response_b.result = godot_autopilot::adapters::ToSdk(
+      godot_autopilot::util::JsonValue("result-b"));
   transport.SendMessageAsync(mcp::JsonRpcMessage(response_b));
 
   mcp::JsonRpcMessage delivered_b;

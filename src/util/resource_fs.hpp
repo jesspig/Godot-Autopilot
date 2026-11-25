@@ -6,7 +6,7 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <mcp/detail/sha256.hpp>
+#include "adapters/mcp_sha256.hpp"
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -678,15 +678,7 @@ inline uint64_t next_file_transaction_serial() {
 }
 
 inline std::string sha256_hex(std::string_view content) {
-  static const char digits[] = "0123456789abcdef";
-  const auto digest = mcp::detail::Sha256::Hash(content);
-  std::string out;
-  out.reserve(digest.size() * 2);
-  for (uint8_t byte : digest) {
-    out.push_back(digits[byte >> 4]);
-    out.push_back(digits[byte & 0x0F]);
-  }
-  return out;
+  return godot_autopilot::adapters::Sha256Hex(content);
 }
 
 inline std::string file_transaction_temp_path(const std::string &destination,

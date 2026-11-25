@@ -24,8 +24,8 @@ using godot_autopilot::tool_flags::kHealthProbe;
 
 namespace {
 
-mcp::JsonValue empty_payload() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue empty_payload() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
 class SanitizePolicyGuard {
@@ -50,7 +50,7 @@ TEST(DispatchSemanticsTest, ClosedQueueRejectionBecomesStructuredError) {
   CommandQueue queue;
   queue.close();
 
-  mcp::JsonValue result;
+  godot_autopilot::util::JsonValue result;
   ASSERT_NO_THROW(result = run_on_main_thread_with_budget(
       queue, "gda_probe", kHealthProbe, [] { return empty_payload(); }));
 
@@ -70,7 +70,7 @@ TEST(DispatchSemanticsTest, FullQueueRejectionBecomesStructuredError) {
   CommandQueue queue(1);
   auto pending = queue.submit([] { return 7; });
 
-  mcp::JsonValue result;
+  godot_autopilot::util::JsonValue result;
   ASSERT_NO_THROW(result = run_on_main_thread_with_budget(
       queue, "gda_probe", kHealthProbe, [] { return empty_payload(); }));
 
@@ -140,7 +140,7 @@ TEST(DispatchSemanticsTest, QueueUnavailableResultCarriesDiagnosticFields) {
   stats.pending = 3;
   stats.capacity = 8;
 
-  const mcp::JsonValue result = queue_unavailable_result(
+  const godot_autopilot::util::JsonValue result = queue_unavailable_result(
       "gda_probe", "the command queue is full", stats, 120, 45, 120);
 
   EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
@@ -158,7 +158,7 @@ TEST(DispatchSemanticsTest, TimeoutResultIsCancelledAndNotRetryable) {
   stats.pending = 1;
   stats.capacity = 1024;
 
-  const mcp::JsonValue result =
+  const godot_autopilot::util::JsonValue result =
       dispatch_timeout_result("gda_probe", 27000, stats, 100, 200, false,
                               false);
 
@@ -175,7 +175,7 @@ TEST(DispatchSemanticsTest, TimeoutResultIsCancelledAndNotRetryable) {
 TEST(DispatchSemanticsTest, TimeoutResultKeepsTheCancelHitDiagnostic) {
   CommandQueue::Stats stats;
 
-  const mcp::JsonValue result =
+  const godot_autopilot::util::JsonValue result =
       dispatch_timeout_result("gda_probe", 5000, stats, -1, -1, true, true);
 
   EXPECT_EQ(result["code"].GetString(), "main_thread_timeout");
@@ -190,7 +190,7 @@ TEST(DispatchSemanticsTest, MainThreadSliceTimeoutIsCancelledAndNotRetryable) {
   CommandQueue queue;
   bool slice_ran = false;
 
-  const mcp::JsonValue result = run_main_thread_slice(
+  const godot_autopilot::util::JsonValue result = run_main_thread_slice(
       queue, "gda_probe",
       [&slice_ran]() {
         slice_ran = true;
@@ -210,7 +210,7 @@ TEST(DispatchSemanticsTest, MainThreadSliceRejectionBecomesStructuredError) {
   CommandQueue queue;
   queue.close();
 
-  mcp::JsonValue result;
+  godot_autopilot::util::JsonValue result;
   ASSERT_NO_THROW(result = run_main_thread_slice(
       queue, "gda_probe", [] { return empty_payload(); }, 50));
 
@@ -224,7 +224,7 @@ TEST(DispatchSemanticsTest, MainThreadSliceTimeoutReportsRealCancelOutcome) {
   bool slice_ran = false;
   const int64_t budget_ms = 50;
 
-  const mcp::JsonValue result = run_main_thread_slice(
+  const godot_autopilot::util::JsonValue result = run_main_thread_slice(
       queue, "gda_probe",
       [&slice_ran]() {
         slice_ran = true;
@@ -246,9 +246,9 @@ TEST(DispatchSemanticsTest, MainThreadSliceTimeoutReportsRealCancelOutcome) {
 TEST(DispatchSemanticsTest, ExceptionMessageDropsSensitiveArgValues) {
   SanitizePolicyGuard policy(true);
   const std::string sentinel = "GDA_SENTINEL_4711";
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
-  args["password"] = mcp::JsonValue(sentinel);
-  args["path"] = mcp::JsonValue("/tmp/visible.txt");
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["password"] = godot_autopilot::util::JsonValue(sentinel);
+  args["path"] = godot_autopilot::util::JsonValue("/tmp/visible.txt");
 
   const std::string message =
       dispatch_exception_message("gda_probe", "boom", args);
@@ -264,8 +264,8 @@ TEST(DispatchSemanticsTest, ExceptionMessageKeepsTruncatedMultibyteArgsValid) {
   for (int i = 0; i < 200; ++i) {
     payload += "\xE4\xB8\xAD";
   }
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
-  args["text"] = mcp::JsonValue(payload);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["text"] = godot_autopilot::util::JsonValue(payload);
 
   const std::string message =
       dispatch_exception_message("gda_probe", "boom", args);

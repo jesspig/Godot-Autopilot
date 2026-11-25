@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -66,7 +66,7 @@ InstanceRecord sample_record() {
 
 TEST(InstanceRegistryTest, RecordRoundTripsThroughJson) {
   const InstanceRecord original = sample_record();
-  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  const godot_autopilot::util::JsonValue doc = godot_autopilot::record_to_json(original);
 
   InstanceRecord parsed;
   ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
@@ -107,18 +107,18 @@ TEST(InstanceRegistryTest, MalformedJsonTextFailsWithoutThrowing) {
 }
 
 TEST(InstanceRegistryTest, MissingFieldFailsValidation) {
-  mcp::JsonValue::Object partial;
+  godot_autopilot::util::JsonValue::Object partial;
   partial["instance_id"] = "instance-0001";
   InstanceRecord parsed;
   EXPECT_FALSE(
-      godot_autopilot::record_from_json(mcp::JsonValue(std::move(partial)),
+      godot_autopilot::record_from_json(godot_autopilot::util::JsonValue(std::move(partial)),
                                         parsed));
 }
 
 TEST(InstanceRegistryTest, NonObjectDocumentFailsValidation) {
   InstanceRecord parsed;
   EXPECT_FALSE(godot_autopilot::record_from_json(
-      mcp::JsonValue(mcp::JsonValue::Array()), parsed));
+      godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::Array()), parsed));
 }
 
 TEST(InstanceRegistryTest, RecordWithIpcEndpointRoundTrips) {
@@ -131,7 +131,7 @@ TEST(InstanceRegistryTest, RecordWithIpcEndpointRoundTrips) {
   original.endpoints.ipc.auth = "token";
   original.endpoints.ipc.version = 1;
   original.endpoints.ipc.present = true;
-  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  const godot_autopilot::util::JsonValue doc = godot_autopilot::record_to_json(original);
   InstanceRecord parsed;
   ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
   EXPECT_TRUE(parsed.endpoints.ipc.present);
@@ -151,7 +151,7 @@ TEST(InstanceRegistryTest, TcpIpcEndpointRoundTrips) {
   original.endpoints.ipc.port = 21437;
   original.endpoints.ipc.token = "tcp-token";
   original.endpoints.ipc.present = true;
-  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  const godot_autopilot::util::JsonValue doc = godot_autopilot::record_to_json(original);
   InstanceRecord parsed;
   ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
   EXPECT_TRUE(parsed.endpoints.ipc.present);
@@ -163,7 +163,7 @@ TEST(InstanceRegistryTest, TcpIpcEndpointRoundTrips) {
 
 TEST(InstanceRegistryTest, MissingIpcEndpointIsBackwardCompatible) {
   const InstanceRecord original = sample_record();
-  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  const godot_autopilot::util::JsonValue doc = godot_autopilot::record_to_json(original);
   InstanceRecord parsed;
   ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
   EXPECT_FALSE(parsed.endpoints.ipc.present);
@@ -171,10 +171,10 @@ TEST(InstanceRegistryTest, MissingIpcEndpointIsBackwardCompatible) {
 
 TEST(InstanceRegistryTest, InvalidIpcEndpointFailsValidation) {
   const InstanceRecord original = sample_record();
-  mcp::JsonValue doc = godot_autopilot::record_to_json(original);
-  mcp::JsonValue::Object bad;
+  godot_autopilot::util::JsonValue doc = godot_autopilot::record_to_json(original);
+  godot_autopilot::util::JsonValue::Object bad;
   bad["path"] = 5;
-  doc["endpoints"]["ipc"] = mcp::JsonValue(std::move(bad));
+  doc["endpoints"]["ipc"] = godot_autopilot::util::JsonValue(std::move(bad));
   InstanceRecord parsed;
   EXPECT_FALSE(godot_autopilot::record_from_json(doc, parsed));
 }
@@ -295,9 +295,9 @@ TEST(InstanceRegistryTest, IndexAlwaysReflectsCompleteRecords) {
   ASSERT_TRUE(in.good());
   const std::string text((std::istreambuf_iterator<char>(in)),
                          std::istreambuf_iterator<char>());
-  mcp::JsonValue index_doc;
-  ASSERT_NO_THROW(index_doc = mcp::JsonValue::Parse(text));
-  const mcp::JsonValue *instances = index_doc.Find("instances");
+  godot_autopilot::util::JsonValue index_doc;
+  ASSERT_NO_THROW(index_doc = godot_autopilot::util::JsonValue::Parse(text));
+  const godot_autopilot::util::JsonValue *instances = index_doc.Find("instances");
   ASSERT_NE(instances, nullptr);
   ASSERT_TRUE(instances->IsArray());
   EXPECT_EQ(instances->GetArray().size(), 2u);
@@ -326,8 +326,8 @@ TEST(InstanceRegistryTest, RemoveUpdatesIndexAtomically) {
   ASSERT_TRUE(in.good());
   const std::string text((std::istreambuf_iterator<char>(in)),
                          std::istreambuf_iterator<char>());
-  mcp::JsonValue index_doc = mcp::JsonValue::Parse(text);
-  const mcp::JsonValue *instances = index_doc.Find("instances");
+  godot_autopilot::util::JsonValue index_doc = godot_autopilot::util::JsonValue::Parse(text);
+  const godot_autopilot::util::JsonValue *instances = index_doc.Find("instances");
   ASSERT_NE(instances, nullptr);
   ASSERT_TRUE(instances->IsArray());
   EXPECT_TRUE(instances->GetArray().empty());

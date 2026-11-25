@@ -18,7 +18,7 @@ ToolInfo make_tool(const std::string &name, const std::string &category) {
   info.description = "desc of " + name;
   info.category = category;
   info.tags = {"tag_a", "tag_b"};
-  info.input_schema = mcp::JsonValue(mcp::JsonValue::object_tag);
+  info.input_schema = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
   return info;
 }
 

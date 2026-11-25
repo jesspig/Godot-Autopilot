@@ -17,7 +17,7 @@
 namespace godot_autopilot {
 namespace log_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 std::vector<std::string> filter_log_lines(const std::vector<std::string> &lines,
                                           const std::string &filter,

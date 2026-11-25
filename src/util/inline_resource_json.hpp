@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_INLINE_RESOURCE_JSON_HPP
 #define GODOT_AUTOPILOT_INLINE_RESOURCE_JSON_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <algorithm>
 #include <string>
 
@@ -19,17 +19,17 @@ struct Description {
   bool has_properties = false;
 };
 
-inline Description inspect(const mcp::JsonValue &value) {
+inline Description inspect(const godot_autopilot::util::JsonValue &value) {
   Description result;
   if (!value.IsObject()) {
     return result;
   }
-  const mcp::JsonValue *type = value.Find("type");
+  const godot_autopilot::util::JsonValue *type = value.Find("type");
   if (type == nullptr || !type->IsString() || type->GetString().empty()) {
     return result;
   }
   result.type = type->GetString();
-  const mcp::JsonValue *properties = value.Find("properties");
+  const godot_autopilot::util::JsonValue *properties = value.Find("properties");
   if (properties == nullptr) {
     result.shape = Shape::inline_description;
     return result;
@@ -43,10 +43,10 @@ inline Description inspect(const mcp::JsonValue &value) {
   return result;
 }
 
-inline int nested_depth(const mcp::JsonValue &value) {
+inline int nested_depth(const godot_autopilot::util::JsonValue &value) {
   if (value.IsArray()) {
     int deepest = 0;
-    for (const mcp::JsonValue &element : value.GetArray()) {
+    for (const godot_autopilot::util::JsonValue &element : value.GetArray()) {
       deepest = std::max(deepest, nested_depth(element));
     }
     return deepest;

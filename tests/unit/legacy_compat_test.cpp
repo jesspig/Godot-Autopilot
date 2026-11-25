@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -55,7 +55,7 @@ TEST(LegacyFallbackTest, NewPathValueSuppressesLegacyFallback) {
   EXPECT_FALSE(LegacyStore::should_fallback_to_legacy(true, true));
   EXPECT_FALSE(LegacyStore::should_fallback_to_legacy(true, false));
 
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = true;
   std::string error;
   ASSERT_TRUE(LegacyStore::select_config_value(kPrimaryJson, kLegacyJson,
@@ -71,7 +71,7 @@ TEST(LegacyFallbackTest, MissingNewPathValueFallsBackToLegacyValue) {
   EXPECT_TRUE(LegacyStore::should_fallback_to_legacy(false, true));
   EXPECT_FALSE(LegacyStore::should_fallback_to_legacy(false, false));
 
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = false;
   std::string error;
   ASSERT_TRUE(LegacyStore::select_config_value("{\"show_time\": true}",
@@ -84,7 +84,7 @@ TEST(LegacyFallbackTest, MissingNewPathValueFallsBackToLegacyValue) {
 }
 
 TEST(LegacyFallbackTest, LegacyFallbackAppliesToEveryConfigKey) {
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = false;
   std::string error;
   ASSERT_TRUE(LegacyStore::select_config_value("", kLegacyJson, "allow",
@@ -102,7 +102,7 @@ TEST(LegacyFallbackTest, LegacyFallbackAppliesToEveryConfigKey) {
 }
 
 TEST(LegacyFallbackTest, ValueMissingInBothPathsIsNotFound) {
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = true;
   std::string error;
   EXPECT_FALSE(LegacyStore::select_config_value(kPrimaryJson, kLegacyJson,
@@ -113,7 +113,7 @@ TEST(LegacyFallbackTest, ValueMissingInBothPathsIsNotFound) {
 }
 
 TEST(LegacyFallbackTest, UnparsablePrimaryFallsBackAndReportsError) {
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = false;
   std::string error;
   ASSERT_TRUE(LegacyStore::select_config_value("{not json", kLegacyJson,
@@ -126,7 +126,7 @@ TEST(LegacyFallbackTest, UnparsablePrimaryFallsBackAndReportsError) {
 }
 
 TEST(LegacyFallbackTest, UnparsableBothPathsReportErrorAndNoValue) {
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool from_legacy = true;
   std::string error;
   EXPECT_FALSE(LegacyStore::select_config_value("{not json", "[1,2]",

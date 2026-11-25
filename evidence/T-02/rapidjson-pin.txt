@@ -1,0 +1,9 @@
+dependency: third_party/rapidjson
+commit: 297637bc0a0f00dc504dbc1a47ebdaa577f8ae19
+upstream: Tencent/rapidjson
+version_marker: v1.1.0-764-g297637bc
+license: MIT for the source tree used here
+excluded_component: bin/jsonchecker (JSON License) is not used or compiled
+usage: header-only include from third_party/rapidjson/include
+public_header: src/util/json_value.hpp contains no RapidJSON or MCP include
+policy: pinned gitlink; no branch tracking and no master updates

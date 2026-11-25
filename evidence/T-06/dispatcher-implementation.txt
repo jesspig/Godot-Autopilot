@@ -1,0 +1,102 @@
+T-06 原生 GCP IPC 分发器实现记录（只写证据文本，未运行构建/测试）
+
+一、改动文件
+新增：
+  src/core/control/gcp_dispatcher.hpp
+  src/core/control/gcp_dispatcher.cpp
+  tests/support/gcp_dispatcher_fixture.hpp
+  tests/support/gcp_dispatcher_fixture.cpp
+  tests/unit/gcp_dispatcher_test.cpp
+  tests/integration/gcp_ipc_contract_test.cpp
+修改：
+  src/core/server_context.hpp        新增 gda::control 前置声明与 ControlService / InvocationSink /
+                                     GcpDispatcher 成员，以及 gcp_instance_id_
+  src/core/server_context.cpp        新增 GcpInvocationSink（异步桥），在 start() 构造 ControlService /
+                                     dispatcher / sink，line handler 分流 GCP 与 MCP，stop/rollback 清理
+  cmake/sources/api_contract.cmake   根侧登记 gcp_dispatcher.cpp
+  cmake/sources/api_unit_contract.cmake 测试侧登记 gcp_dispatcher.cpp 与 fixture.cpp
+未改动（刻意保留）：
+  src/core/transport/ipc_transport.cpp/.hpp —— 保留既有 initialize 首帧仍送入 line handler 的行为，
+    以免破坏 tests/boundary/ipc_transport_test.cpp 的 handled==1 断言；首帧与 GCP envelope 的
+    隔离改在 GcpDispatcher::looks_like_auth_frame / handle_frame 完成
+  tests/CMakeLists.txt —— 既有 glob 已自动收集 unit/ 与 integration/ 新测试，无需改动
+  MCP adapter、CLI、Skills、VERSION、third_party、其他工作树、.handoff —— 未触碰
+
+二、GCP 分发状态机（DispatchState）
+  idle          初始态，或收到帧后复位
+  auth_ignored  looks_like_auth_frame 命中（JSON-RPC initialize / jsonrpc 字段 / gda_token），
+                不解码、不回包，token 不进入业务 envelope
+  decode_failed JSON 解析失败（严格重复键策略）→ 返回 error(result_unknown)
+  validation_failed 版本/实例/种类/envelope 校验或未知方法失败 → 返回对应结构化错误
+  duplicate_rejected request.id 已完成（写出过）→ error(result_unknown)，不重新执行
+  dispatched     校验通过并路由到 ControlService 子服务
+  awaiting       异步 call.start：pending + task_id，任务落入 JobService，交还 in-flight 给 waiter
+  terminal       已产出响应 envelope（ok / error / needs_confirmation / pending）
+
+转换策略：
+  收到帧 → 先判认证首帧 → auth_ignored；否则 decode → decode_failed；
+  否则做版本/实例/种类/validate_envelope 校验 → validation_failed；
+  否则查 completed_ 去重 → duplicate_rejected；否则 routed → dispatched；
+  子服务产出响应 → terminal；异步 pending → awaiting → waiter 主线程 finalize 任务。
+  每个产生响应的分支把 request.id 写入 completed_；重复 id 一律 result_unknown 且不重发。
+
+三、方法到 ControlService 的映射
+  hello / capabilities.get → gcp::default_capabilities + negotiate_capabilities
+  catalog.list/search/describe → CatalogService
+  call.start / call.confirm / task.cancel → InvocationService（sink 注入，confirm 使用原请求参数摘要）
+  call.get / task.get / task.list → JobService
+  events.subscribe / events.resume → EventService + 有界 outbox
+  trace.get → TraceService
+  所有 Godot API 仍由 sink 经 transport->submit（SDK/CommandQueue）到主线程；waiter 只在后台等待，
+  finalize 通过 queue.submit 回主线程，无 execute_sync、无 transport 线程直接调用 Godot API。
+
+四、安全与契约保持
+  复用 4 字节长度前缀（ipc_framing）、4 MiB 帧、8 连接、16 在途、10 分钟空闲超时（常量未改）。
+  token 只在 transport 认证层出现；dispatcher 从不把入参 params 回显到响应，响应只带产出 result；
+  额外对 token/secret/password/credential/api_key 类参数键做输入过滤，避免进入 InvocationRequest 与工具参数。
+  事件 outbox 软限 64 / 硬限 256，用 gcp::classify_backpressure 判定，硬限时拒绝发布并返回
+  backpressure_exceeded。
+  认证失败沿用 transport 的关连接路径，不回退 HTTP。
+  MCP JSON-RPC/SDK 路径保留为 parity：仅 looks_like_gcp 为真时走 GCP，其余帧仍走原 MCP 路径。
+
+五、测试清单（新增，均未运行）
+  tests/unit/gcp_dispatcher_test.cpp
+    1 EncodeDecodeRoundTripPreservesEnvelope
+    2 HelloAndCapabilitiesAreServedByControlService
+    3 CatalogListSearchAndDescribe
+    4 HighRiskCallNeedsConfirmationThenDispatches
+    5 DeferredCallReportsPendingAndCreatesTask
+    6 DuplicateRequestIsResultUnknownWithoutRedispatch
+    7 TokenStaysOutOfEnvelopeTraceAndErrors
+    8 EventOutboxEnforcesHardLimitAndBackpressure
+    9 EventsSubscribeAndResumeDeliverEnvelopes
+    10 ValidationRejectsVersionInstanceAndMalformedFrames
+  tests/integration/gcp_ipc_contract_test.cpp
+    1 LengthPrefixCarriesGcpEnvelopeRoundTrip
+    2 IpcBudgetsAndFrameLimitsArePreserved
+    3 AuthFrameIsSeparatedFromGcpEnvelope
+    4 WrittenRequestIsNotRetriedAndMarksResultUnknown
+    5 EventOutboxFramesAreLengthPrefixedGcpEvents
+
+六、双登记位置
+  根侧：cmake/sources/api_contract.cmake 的 GDA_API_CONTRACT_SOURCES（含 gcp_dispatcher.cpp），
+        该文件由根 CMakeLists.txt include 后汇入 godot-autopilot 的 add_library。
+  测试侧：cmake/sources/api_unit_contract.cmake 的 GDA_UNIT_CONTRACT_SOURCES
+          （含 gcp_dispatcher.cpp 与 tests/support/gcp_dispatcher_fixture.cpp），
+          由 tests/CMakeLists.txt include 后汇入 GDA_UNIT_BUSINESS_SOURCES，
+          供 gda_unit_tests / gda_boundary_tests / gda_integration_tests 使用。
+  新测试文件由 tests/CMakeLists.txt 既有 glob 自动收集（unit/*.cpp、integration/*_test.cpp），
+  未被加入 gda_gcp_contract_tests（该目标仍只跑 gcp_envelope_test 与 gcp_contract_test）。
+
+七、未运行验证的原因
+  按任务指令，子代理不运行 cmake / build / ctest / bun test；统一构建与分批测试由主代理执行。
+  因此本记录不声称任何测试通过，全部结论仅为静态实现描述。
+
+八、风险与待办
+  - 未编译验证：GcpInvocationSink 的异步桥、lambda init-capture 与 JsonValue 用法需主代理统一构建确认。
+  - 实例记录 endpoints.ipc.protocol 仍为 "mcp-jsonrpc"（刻意保留，避免改动 CLI 发现逻辑）；
+    切换到 "gcp" 应与 CLI/Skills 改造协同，属于后续任务。
+  - line handler 同时承载 GCP 与 MCP parity；GCP 请求的 in-flight 在 awaiting 时移交 sink waiter，
+    需确认 stop() 先 cancel/join waiters 再析构 jobs 的顺序（已按此顺序接入）。
+  - call.confirm 使用 call.start 保存的原请求参数摘要；若客户端随后修改参数语义，应与摘要契约对齐。
+  - 事件 outbox 为进程级而非每连接级硬限；多连接共享时需主代理评估是否按连接拆分。

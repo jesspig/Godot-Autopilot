@@ -1,0 +1,151 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.031 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+CommandLine: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests\gda_unit_tests.exe --gtest_filter=LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+OK                                             C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Symbol search path is: C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\build\debug\tests
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff7`16620000 00007ff7`18691000   gda_unit_tests.exe
+ModLoad: 00007ffd`2a770000 00007ffd`2a9dc000   ntdll.dll
+ModLoad: 00007ffc`81c90000 00007ffc`81d02000   C:\WINDOWS\System32\verifier.dll
+Page heap: pid 0x79D8: page heap enabled with flags 0x3.
+AVRF: gda_unit_tests.exe: pid 0x79D8: flags 0x80000001: application verifier enabled
+ModLoad: 00007ffc`9d910000 00007ffc`9d951000   C:\WINDOWS\SYSTEM32\vrfcore.dll
+AVRF: Failed to create logging directory C:\Users\jesspig\AppVerifierLogs (status C0000022)
+ModLoad: 00007ffd`28e10000 00007ffd`28edb000   C:\WINDOWS\System32\KERNEL32.DLL
+ModLoad: 00007ffd`28020000 00007ffd`28429000   C:\WINDOWS\System32\KERNELBASE.dll
+ModLoad: 00007ffd`2a4b0000 00007ffd`2a530000   C:\WINDOWS\System32\WS2_32.dll
+ModLoad: 00007ffd`27b10000 00007ffd`27c5c000   C:\WINDOWS\System32\ucrtbase.dll
+ModLoad: 00007ffd`29a80000 00007ffd`29b98000   C:\WINDOWS\System32\RPCRT4.dll
+ModLoad: 00007ffd`27e60000 00007ffd`27fde000   C:\WINDOWS\System32\CRYPT32.dll
+ModLoad: 00007ffd`2a160000 00007ffd`2a21c000   C:\WINDOWS\System32\ADVAPI32.dll
+ModLoad: 00007ffd`277f0000 00007ffd`2781a000   C:\WINDOWS\SYSTEM32\bcrypt.dll
+ModLoad: 00007ffd`28430000 00007ffd`284d9000   C:\WINDOWS\System32\msvcrt.dll
+ModLoad: 00007ffd`297b0000 00007ffd`29858000   C:\WINDOWS\System32\sechost.dll
+ModLoad: 00000183`d0b60000 00000183`d0c08000   C:\WINDOWS\System32\sechost.dll
+(79d8.2c48): Break instruction exception - code 80000003 (first chance)
+ntdll!RtlGetReturnAddressHijackTarget+0xa45:
+00007ffd`2a895245 cc              int     3
+0:000> cdb: Reading initial command 'g; kPn; q'
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from LogSystemTest
+[ RUN      ] LogSystemTest.SdkLogBridgeRoutesStoreFailureReason
+(79d8.2c48): C++ EH exception - code e06d7363 (first chance)
+(79d8.2c48): Access violation - code c0000005 (first chance)
+First chance exceptions are reported before any exception handling.
+This exception may be expected and handled.
+*** WARNING: Unable to verify checksum for gda_unit_tests.exe
+ # Child-SP          RetAddr               Call Site
+00 00000051`274fc840 00007ff7`167f8552     gda_unit_tests!std::_Variant_assign_visitor<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::operator()<std::nullptr_t &&,0>(
+			struct std::_Tagged<std::nullptr_t &&,0> * _Source = 0x00000051`274fc960)+0x2c
+01 00000051`274fc8b0 00000051`274ff008     gda_unit_tests!std::_Variant_raw_visit1<2>::_Visit<std::_Variant_assign_visitor<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >,std::_Variant_storage_<0,std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > > >(
+			unsigned int64 _Idx = 7, 
+			struct std::_Variant_assign_visitor<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > > * _Func = 0x00000000`00000024, 
+			class std::_Variant_storage_<0,std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > > * _Obj = 0x00000051`274fc9cf)+0xa2
+02 00000051`274fc980 00000051`274fc9cf     0x00000051`274ff008
+03 00000051`274fc988 00007ff7`167f5e68     0x00000051`274fc9cf
+04 00000051`274fc990 00007ff7`167f5e08     gda_unit_tests!std::_Variant_base<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::_Destroy(void)+0x48
+05 00000051`274fc9e0 00007ff7`167f4683     gda_unit_tests!std::_Variant_destroy_layer_<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::~_Variant_destroy_layer_(void)+0x18
+06 00000051`274fca20 00007ff7`17a53333     gda_unit_tests!std::_Non_trivial_copy<std::_Variant_destroy_layer_<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > > >::~_Non_trivial_copy(void)+0x13
+07 00000051`274fca50 00007ff7`17a53313     gda_unit_tests!std::_Non_trivial_move<std::_Variant_destroy_layer_<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >,std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::~_Non_trivial_move(void)+0x13
+08 00000051`274fca80 00007ff7`17a532f3     gda_unit_tests!std::_Non_trivial_copy_assign<std::_Variant_destroy_layer_<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >,std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::~_Non_trivial_copy_assign(void)+0x13
+09 00000051`274fcab0 00007ff7`17a51353     gda_unit_tests!std::_Non_trivial_move_assign<std::_Variant_destroy_layer_<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >,std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::~_Non_trivial_move_assign(void)+0x13
+0a 00000051`274fcae0 00007ff7`17a3a667     gda_unit_tests!std::variant<std::nullptr_t,bool,long long,double,std::basic_string<char,std::char_traits<char>,std::allocator<char> >,std::vector<mcp::JsonValue,std::allocator<mcp::JsonValue> >,std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue,std::less<void>,std::allocator<std::pair<const std::basic_string<char,std::char_traits<char>,std::allocator<char> >,mcp::JsonValue> > > >::~variant(void)+0x13
+0b 00000051`274fcb10 00007ff7`1662c403     gda_unit_tests!mcp::JsonValue::~JsonValue(void)+0x417
+0c 00000051`274fcca0 00007ff7`1662c3d3     gda_unit_tests!std::_Optional_destruct_base<mcp::JsonValue,0>::~_Optional_destruct_base(void)+0x23
+0d 00000051`274fcce0 00007ff7`1662c3b3     gda_unit_tests!std::_Optional_construct_base<mcp::JsonValue>::~_Optional_construct_base(void)+0x13
+0e 00000051`274fcd10 00007ff7`1662c393     gda_unit_tests!std::_Non_trivial_copy<std::_Optional_construct_base<mcp::JsonValue> >::~_Non_trivial_copy(void)+0x13
+0f 00000051`274fcd40 00007ff7`1662c373     gda_unit_tests!std::_Non_trivial_move<std::_Optional_construct_base<mcp::JsonValue>,mcp::JsonValue>::~_Non_trivial_move(void)+0x13
+10 00000051`274fcd70 00007ff7`1662c353     gda_unit_tests!std::_Non_trivial_copy_assign<std::_Optional_construct_base<mcp::JsonValue>,mcp::JsonValue>::~_Non_trivial_copy_assign(void)+0x13
+11 00000051`274fcda0 00007ff7`1662c2f3     gda_unit_tests!std::_Non_trivial_move_assign<std::_Optional_construct_base<mcp::JsonValue>,mcp::JsonValue>::~_Non_trivial_move_assign(void)+0x13
+12 00000051`274fcdd0 00007ff7`16fa29e6     gda_unit_tests!std::optional<mcp::JsonValue>::~optional(void)+0x13
+13 00000051`274fce00 00007ff7`17b557c6     gda_unit_tests!mcp::McpError::~McpError(void)+0x26
+14 00000051`274fce40 00007ff7`17baaa3d     gda_unit_tests!__DestructExceptionObject(
+			struct EHExceptionRecord * pExcept = 0x00007ff7`168aeb82, 
+			unsigned char fThrowNotAllowed = 0x01 '')+0x46
+15 00000051`274fce90 00007ffd`2a8971e6     gda_unit_tests!__FrameHandler3::CxxCallCatchBlock(
+			struct _EXCEPTION_RECORD * pExcept = <Value unavailable error>)+0x1cd
+16 00000051`274fcf60 00007ff7`168aeb65     ntdll!RtlCaptureContext2+0x4a6
+17 00000051`274ff160 00007ff7`17ab3dd0     gda_unit_tests!LogSystemTest_SdkLogBridgeRoutesStoreFailureReason_Test::TestBody(void)+0x325
+18 00000051`274ff8a0 00007ff7`17a98778     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x00000183`d8828ff0, 
+			<function> * method = 0x00007ff7`17a98920, 
+			char * location = 0x00007ff7`17e6b7e0 "the test body")+0x20
+19 00000051`274ff900 00007ff7`17a7b733     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::Test,void>(
+			class testing::Test * object = 0x00000183`d03c8da0, 
+			<function> * method = 0x00000051`274ffc20, 
+			char * location = 0x00007ff7`17a7b733 "H???")+0x48
+1a 00000051`274ff9b0 00007ff7`17a7c279     gda_unit_tests!testing::Test::Run(void)+0x93
+1b 00000051`274ff9f0 00007ff7`17a7cb1f     gda_unit_tests!testing::TestInfo::Run(void)+0x119
+1c 00000051`274ffa60 00007ff7`17a8b000     gda_unit_tests!testing::TestSuite::Run(void)+0x18f
+1d 00000051`274ffae0 00007ff7`17ab7520     gda_unit_tests!testing::internal::UnitTestImpl::RunAllTests(void)+0x3f0
+1e 00000051`274ffbd0 00007ff7`17a9a878     gda_unit_tests!testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x00000183`d03c8da0, 
+			<function> * method = 0x00007ff7`17a8ac10, 
+			char * location = 0x00007ff7`17e6c175 "auxiliary test code (environments or event listeners)")+0x20
+1f 00000051`274ffc30 00007ff7`17a8abb9     gda_unit_tests!testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl,bool>(
+			class testing::internal::UnitTestImpl * object = 0x00000051`274ffd60, 
+			<function> * method = 0x00007ff7`17a8abb9, 
+			char * location = 0x00000051`00008002 "--- memory read error at address 0x00000051`00008002 ---")+0x48
+20 00000051`274ffcf0 00007ff7`17ae10c1     gda_unit_tests!testing::UnitTest::Run(void)+0xe9
+21 00000051`274ffd70 00007ff7`17ae107b     gda_unit_tests!RUN_ALL_TESTS(void)+0x11
+22 00000051`274ffda0 00007ff7`17b5532f     gda_unit_tests!main(
+			int argc = 0n1, 
+			char ** argv = 0x00000183`d02f6f10)+0x4b
+23 (Inline Function) --------`--------     gda_unit_tests!invoke_main(void)+0x22
+24 00000051`274ffdf0 00007ffd`28e3dda7     gda_unit_tests!__scrt_common_main_seh(void)+0x10f
+25 00000051`274ffe30 00007ffd`2a839c5c     KERNEL32!BaseThreadInitThunk+0x17
+26 00000051`274ffe60 00000000`00000000     ntdll!RtlUserThreadStart+0x2c
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

@@ -2,7 +2,7 @@
 #define GODOT_AUTOPILOT_EDITOR_TOOLS_HPP
 
 #include <algorithm>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -179,26 +179,26 @@ const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {
 
 const std::vector<ParamSpec> kDotnetEnvironmentParams = {};
 
-inline mcp::JsonValue editor_alias_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue editor_alias_action(const godot_autopilot::util::JsonValue &args,
                                           const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue editor_optional_action_schema(
+inline godot_autopilot::util::JsonValue editor_optional_action_schema(
     const std::vector<std::string> &actions,
     const std::vector<ParamSpec> &params, const std::string &description) {
-  mcp::JsonValue schema_value =
+  godot_autopilot::util::JsonValue schema_value =
       schema::build_action_schema(actions, params, description);
-  mcp::JsonValue *required = schema_value.Find("required");
+  godot_autopilot::util::JsonValue *required = schema_value.Find("required");
   if (required != nullptr && required->IsArray()) {
     auto &items = required->GetArray();
     items.erase(std::remove_if(items.begin(), items.end(),
-                               [](const mcp::JsonValue &value) {
+                               [](const godot_autopilot::util::JsonValue &value) {
                                  return value.IsString() &&
                                         value.GetString() == "action";
                                }),
@@ -221,12 +221,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "State to read: selection|root|open|unsaved|playing|info"),
       {
           ToolAlias{"get_editor_selection", "get_editor_state",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "selection");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_editor_edited_scene_root", "get_editor_state",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "root");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -241,22 +241,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "UI data to read: elements|hit|geometry|scene_tree_items"),
       {
           ToolAlias{"get_editor_ui_elements", "get_editor_ui",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "elements");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"hit_test_editor_point", "get_editor_ui",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "hit");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_editor_viewport_geometry", "get_editor_ui",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "geometry");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"scene_tree_items", "get_editor_ui",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "scene_tree_items");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -272,17 +272,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "File-system action: tree|status|scan"),
       {
           ToolAlias{"get_editor_file_system_tree", "get_editor_files",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "tree");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"get_editor_file_system_status", "get_editor_files",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "status");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"scan_editor_file_system", "get_editor_files",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "scan");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -299,32 +299,32 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Scene lifecycle action: create|open|close|reload|play|stop"),
       {
           ToolAlias{"create_editor_scene", "editor_scene_control",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "create");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"open_editor_scene", "editor_scene_control",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "open");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"close_editor_scene", "editor_scene_control",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "close");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"reload_editor_scene", "editor_scene_control",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "reload");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"play_editor_current_scene", "editor_scene_control",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "play");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"stop_editor_playing", "editor_scene_control",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "stop");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -341,12 +341,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                     "Save action: save (default when omitted)|save_as|save_all"),
       {
           ToolAlias{"save_editor_scene_as", "save_editor_scene",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "save_as");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"save_editor_scenes", "save_editor_scene",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "save_all");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -363,12 +363,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Selection action: set|select_tree"),
       {
           ToolAlias{"set_editor_selection", "editor_selection_set",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "set");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"select_scene_tree_node", "editor_selection_set",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "select_tree");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -384,22 +384,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Undo history action: create|add_do|add_undo|commit|undo|redo|history|clear"),
       {
           ToolAlias{"create_editor_undo_redo_action", "editor_undo",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "create");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"add_editor_undo_redo_do", "editor_undo",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "add_do");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"add_editor_undo_redo_undo", "editor_undo",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "add_undo");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"commit_editor_undo_redo", "editor_undo",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "commit");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -439,14 +439,14 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Inspector action: inspect_object|edit_resource|edit_node|selected_path|expand_all|collapse_all"),
       {
           ToolAlias{"inspect_editor_resource", "editor_inspect",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "edit_resource");
                     },
-                    [](const mcp::JsonValue &result) -> mcp::JsonValue {
+                    [](const godot_autopilot::util::JsonValue &result) -> godot_autopilot::util::JsonValue {
                       if (result.Find("error") != nullptr)
                         return result;
-                      mcp::JsonValue legacy(mcp::JsonValue::object_tag);
-                      legacy["result"] = mcp::JsonValue("ok");
+                      godot_autopilot::util::JsonValue legacy(godot_autopilot::util::JsonValue::object_tag);
+                      legacy["result"] = godot_autopilot::util::JsonValue("ok");
                       return legacy;
                     },
                     "0.4.0", "0.6.0"},
@@ -487,17 +487,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "UI action to run: click|type|shortcut"),
       {
           ToolAlias{"click_editor_element", "editor_ui_action",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "click");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"type_editor_element_text", "editor_ui_action",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "type");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"run_editor_shortcut", "editor_ui_action",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "shortcut");
                     },
                     {}, "0.4.0", "0.6.0"},
@@ -513,12 +513,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                                   "Configuration action: main_scene|plugin_enable"),
       {
           ToolAlias{"set_editor_main_scene", "editor_config",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "main_scene");
                     },
                     {}, "0.4.0", "0.6.0"},
           ToolAlias{"set_editor_plugin_enabled", "editor_config",
-                    [](const mcp::JsonValue &args) {
+                    [](const godot_autopilot::util::JsonValue &args) {
                       return editor_alias_action(args, "plugin_enable");
                     },
                     {}, "0.4.0", "0.6.0"},

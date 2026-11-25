@@ -8,7 +8,7 @@
 namespace godot_autopilot {
 namespace scene_tree_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 

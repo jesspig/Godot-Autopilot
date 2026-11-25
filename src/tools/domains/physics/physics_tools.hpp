@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_PHYSICS_TOOLS_HPP
 #define GODOT_AUTOPILOT_PHYSICS_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -281,36 +281,36 @@ const std::vector<std::string> kPhysicsQueryModes = {
     "collide_shape",   "rest_info",     "test_motion",     "contacts",
     "area_overlaps"};
 
-inline mcp::JsonValue physics_query_schema() {
-  mcp::JsonValue schema_value = schema::build_schema(kPhysicsQueryParams);
-  mcp::JsonValue *properties = schema_value.Find("properties");
+inline godot_autopilot::util::JsonValue physics_query_schema() {
+  godot_autopilot::util::JsonValue schema_value = schema::build_schema(kPhysicsQueryParams);
+  godot_autopilot::util::JsonValue *properties = schema_value.Find("properties");
   if (properties != nullptr && properties->IsObject()) {
-    mcp::JsonValue mode(mcp::JsonValue::object_tag);
-    mode["type"] = mcp::JsonValue("string");
-    mode["description"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue mode(godot_autopilot::util::JsonValue::object_tag);
+    mode["type"] = godot_autopilot::util::JsonValue("string");
+    mode["description"] = godot_autopilot::util::JsonValue(
         "Query mode: intersect_point|intersect_ray|intersect_shape|cast_motion|"
         "collide_shape|rest_info|test_motion|contacts|area_overlaps");
-    mcp::JsonValue values(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &value : kPhysicsQueryModes)
-      values.PushBack(mcp::JsonValue(value));
+      values.PushBack(godot_autopilot::util::JsonValue(value));
     mode["enum"] = std::move(values);
     (*properties)["mode"] = std::move(mode);
   }
   return schema_value;
 }
 
-inline mcp::JsonValue physics_query_alias_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue physics_query_alias_args(const godot_autopilot::util::JsonValue &args,
                                                int dimension,
                                                const char *mode) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject())
     out = args;
-  out["dimension"] = mcp::JsonValue(dimension);
-  out["mode"] = mcp::JsonValue(mode);
+  out["dimension"] = godot_autopilot::util::JsonValue(dimension);
+  out["mode"] = godot_autopilot::util::JsonValue(mode);
   return out;
 }
 
-inline mcp::JsonValue physics_query_legacy_project(mcp::JsonValue result) {
+inline godot_autopilot::util::JsonValue physics_query_legacy_project(godot_autopilot::util::JsonValue result) {
   if (!result.IsObject())
     return result;
   result.GetObject().erase("dimension");
@@ -323,7 +323,7 @@ inline ToolAlias physics_query_alias(const char *name, int dimension,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = "physics_query";
-  alias.adapt_args = [dimension, mode](const mcp::JsonValue &args) {
+  alias.adapt_args = [dimension, mode](const godot_autopilot::util::JsonValue &args) {
     return physics_query_alias_args(args, dimension, mode);
   };
   alias.project_result = physics_query_legacy_project;

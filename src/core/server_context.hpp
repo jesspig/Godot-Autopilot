@@ -14,6 +14,16 @@
 #include "core/transport/port_resolver.hpp"
 #include "core/storage/project_store.hpp"
 
+namespace gda {
+namespace control {
+
+class ControlService;
+class GcpDispatcher;
+class InvocationSink;
+
+} // namespace control
+} // namespace gda
+
 namespace godot_autopilot {
 
 class ToolCatalog;
@@ -47,6 +57,9 @@ private:
   std::unique_ptr<Bm25Index> bm25_index_;
   std::shared_ptr<GodotTransport> transport_;
   std::unique_ptr<mcp::McpServer> server_;
+  std::unique_ptr<gda::control::ControlService> gcp_control_;
+  std::unique_ptr<gda::control::InvocationSink> gcp_sink_;
+  std::unique_ptr<gda::control::GcpDispatcher> gcp_dispatcher_;
   IpcWaiterSet ipc_waiters_;
   int port_ = 0;
   int requested_port_ = 0;
@@ -55,6 +68,7 @@ private:
   bool instance_started_ = false;
   std::string last_error_;
   std::string instance_id_;
+  std::string gcp_instance_id_;
   std::string ipc_token_;
   PortAssignment port_assignment_;
   EndpointTable endpoints_;

@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <utility>
@@ -89,27 +89,27 @@ inline ToolSpec input_action_spec(ToolSpec spec,
   return spec;
 }
 
-inline mcp::JsonValue input_args_with_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue input_args_with_action(const godot_autopilot::util::JsonValue &args,
                                              const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue input_action_target_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue input_action_target_args(const godot_autopilot::util::JsonValue &args,
                                                const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *target = args.Find("action");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *target = args.Find("action");
   if (target != nullptr) {
     out["name"] = *target;
   }
-  const mcp::JsonValue *strength = args.Find("strength");
+  const godot_autopilot::util::JsonValue *strength = args.Find("strength");
   if (strength != nullptr) {
     out["strength"] = *strength;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -118,7 +118,7 @@ inline ToolAlias input_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return input_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -148,14 +148,14 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
            "{\"action\":\"action_just_pressed\",\"name\":\"ui_accept\"}"}),
       {
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
               return input_action_target_args(args, "action_pressed");
             };
             return alias;
           }(input_alias("is_input_action_pressed", "get_input_state",
                         "action_pressed")),
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
               return input_action_target_args(args, "action_just_pressed");
             };
             return alias;
@@ -179,13 +179,13 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
            "{\"action\":\"release\",\"name\":\"ui_accept\"}"}),
       {
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
               return input_action_target_args(args, "press");
             };
             return alias;
           }(input_alias("press_input_action", "input_action", "press")),
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
               return input_action_target_args(args, "release");
             };
             return alias;

@@ -8,7 +8,7 @@
 #include <variant>
 
 #include <mcp/JsonRpc.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mcp/ProtocolVersion.hpp>
 
 #include "core/transport/godot_transport.hpp"
@@ -193,35 +193,35 @@ std::string supported_protocol_versions_json() {
 }
 
 std::string build_error_body(int code, const std::string &message) {
-  mcp::JsonValue::Object error;
-  error["code"] = mcp::JsonValue(static_cast<int64_t>(code));
-  error["message"] = mcp::JsonValue(message);
-  mcp::JsonValue::Object root;
-  root["jsonrpc"] = mcp::JsonValue("2.0");
-  root["id"] = mcp::JsonValue(nullptr);
-  root["error"] = mcp::JsonValue(std::move(error));
-  return mcp::JsonValue(std::move(root)).Dump();
+  godot_autopilot::util::JsonValue::Object error;
+  error["code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(code));
+  error["message"] = godot_autopilot::util::JsonValue(message);
+  godot_autopilot::util::JsonValue::Object root;
+  root["jsonrpc"] = godot_autopilot::util::JsonValue("2.0");
+  root["id"] = godot_autopilot::util::JsonValue(nullptr);
+  root["error"] = godot_autopilot::util::JsonValue(std::move(error));
+  return godot_autopilot::util::JsonValue(std::move(root)).Dump();
 }
 
 std::string build_unsupported_version_body(const std::string &version) {
-  mcp::JsonValue::Object data;
-  mcp::JsonValue::Array supported;
+  godot_autopilot::util::JsonValue::Object data;
+  godot_autopilot::util::JsonValue::Array supported;
   for (const std::string_view &known : mcp::kProtocolVersions) {
-    supported.push_back(mcp::JsonValue(std::string(known)));
+    supported.push_back(godot_autopilot::util::JsonValue(std::string(known)));
   }
-  data["supported"] = mcp::JsonValue(std::move(supported));
-  data["requested"] = mcp::JsonValue(version);
-  mcp::JsonValue::Object error;
-  error["code"] = mcp::JsonValue(static_cast<int64_t>(
+  data["supported"] = godot_autopilot::util::JsonValue(std::move(supported));
+  data["requested"] = godot_autopilot::util::JsonValue(version);
+  godot_autopilot::util::JsonValue::Object error;
+  error["code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(
       kUnsupportedProtocolVersionCode));
   error["message"] =
-      mcp::JsonValue("Unsupported protocol version '" + version + "'");
-  error["data"] = mcp::JsonValue(std::move(data));
-  mcp::JsonValue::Object root;
-  root["jsonrpc"] = mcp::JsonValue("2.0");
-  root["id"] = mcp::JsonValue(nullptr);
-  root["error"] = mcp::JsonValue(std::move(error));
-  return mcp::JsonValue(std::move(root)).Dump();
+      godot_autopilot::util::JsonValue("Unsupported protocol version '" + version + "'");
+  error["data"] = godot_autopilot::util::JsonValue(std::move(data));
+  godot_autopilot::util::JsonValue::Object root;
+  root["jsonrpc"] = godot_autopilot::util::JsonValue("2.0");
+  root["id"] = godot_autopilot::util::JsonValue(nullptr);
+  root["error"] = godot_autopilot::util::JsonValue(std::move(error));
+  return godot_autopilot::util::JsonValue(std::move(root)).Dump();
 }
 
 int status_for_jsonrpc_error(int code) {

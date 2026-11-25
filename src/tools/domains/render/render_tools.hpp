@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_RENDER_TOOLS_HPP
 #define GODOT_AUTOPILOT_RENDER_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -217,18 +217,18 @@ const std::vector<std::string> kRenderInspectActions = {
     "global_shader_parameter_get", "global_shader_parameter_list",
     "global_shader_parameter_remove"};
 
-inline mcp::JsonValue render_action_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue render_action_args(const godot_autopilot::util::JsonValue &args,
                                          const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline mcp::JsonValue render_environment_group_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue render_environment_group_args(const godot_autopilot::util::JsonValue &args,
                                                     const char *group) {
-  mcp::JsonValue group_values(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue group_values(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     for (const auto &entry : args.GetObject()) {
       if (entry.first == "environment_rid" || entry.first == "action" ||
@@ -238,13 +238,13 @@ inline mcp::JsonValue render_environment_group_args(const mcp::JsonValue &args,
       group_values[entry.first] = entry.second;
     }
   }
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
   params[group] = std::move(group_values);
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  if (const mcp::JsonValue *environment = args.Find("environment_rid")) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  if (const godot_autopilot::util::JsonValue *environment = args.Find("environment_rid")) {
     out["environment_rid"] = *environment;
   }
-  out["action"] = mcp::JsonValue("set_params");
+  out["action"] = godot_autopilot::util::JsonValue("set_params");
   out["params"] = std::move(params);
   return out;
 }
@@ -254,7 +254,7 @@ inline ToolAlias render_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return render_action_args(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -267,7 +267,7 @@ inline ToolAlias render_environment_alias(const char *name,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = "render_environment";
-  alias.adapt_args = [group](const mcp::JsonValue &args) {
+  alias.adapt_args = [group](const godot_autopilot::util::JsonValue &args) {
     return render_environment_group_args(args, group);
   };
   alias.deprecated_since = "0.4.0";

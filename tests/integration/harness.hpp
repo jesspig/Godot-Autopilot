@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
 
@@ -45,7 +45,7 @@ class IntegrationHarness : public ::testing::Test {
     }
   }
 
-  mcp::JsonValue call(const std::string &name, const mcp::JsonValue &args) {
+  godot_autopilot::util::JsonValue call(const std::string &name, const godot_autopilot::util::JsonValue &args) {
     return godot_autopilot::dispatch::call_handler(name, args);
   }
 };

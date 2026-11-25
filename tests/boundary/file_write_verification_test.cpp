@@ -431,21 +431,21 @@ TEST(FileWriteVerificationTest, FailureJsonIsStructuredAndHasNoOkResult) {
   FakeTextWriteFs fs("must survive");
   fs.deny_read_write_ = true;
   const TextWriteResult result = write(fs, "new", TextWriteMode::kAppend);
-  const mcp::JsonValue error = godot_autopilot::text_ops::file_write_failure_json(
+  const godot_autopilot::util::JsonValue error = godot_autopilot::text_ops::file_write_failure_json(
       "res://write-target.txt", "APPEND", result);
   EXPECT_EQ(error.Find("result"), nullptr);
-  const mcp::JsonValue *message = error.Find("error");
+  const godot_autopilot::util::JsonValue *message = error.Find("error");
   ASSERT_NE(message, nullptr);
   ASSERT_TRUE(message->IsString());
   EXPECT_NE(message->GetString().find("APPEND"), std::string::npos);
-  const mcp::JsonValue *structured = error.Find("structured_error");
+  const godot_autopilot::util::JsonValue *structured = error.Find("structured_error");
   ASSERT_NE(structured, nullptr);
   ASSERT_TRUE(structured->IsObject());
-  const mcp::JsonValue *code = structured->Find("code");
+  const godot_autopilot::util::JsonValue *code = structured->Find("code");
   ASSERT_NE(code, nullptr);
   ASSERT_TRUE(code->IsString());
   EXPECT_EQ(code->GetString(), text_write_failure_code(result.failure));
-  const mcp::JsonValue *path = structured->Find("path");
+  const godot_autopilot::util::JsonValue *path = structured->Find("path");
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->GetString(), "res://write-target.txt");
 }
