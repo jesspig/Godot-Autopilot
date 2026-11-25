@@ -25,6 +25,7 @@
 using godot_autopilot::util::containment_status_allows;
 using godot_autopilot::util::normalize_project_path;
 using godot_autopilot::util::ProjectPathResolveStatus;
+using godot_autopilot::util::project_path_lexical;
 using godot_autopilot::util::project_path_resolve_status;
 using godot_autopilot::util::set_scheme_globalize_provider;
 
@@ -140,6 +141,14 @@ protected:
   std::filesystem::path user;
   std::filesystem::path outside;
 };
+
+TEST(PathLexicalTest, PreservesPosixLeadingSlash) {
+  bool escaped = false;
+  EXPECT_EQ(project_path_lexical("/a/b/c", escaped), "/a/b/c");
+  EXPECT_FALSE(escaped);
+  EXPECT_EQ(project_path_lexical("/", escaped), "/");
+  EXPECT_FALSE(escaped);
+}
 
 TEST_F(SchemePathContainmentTest, OnlyInsideIsAllowed) {
   EXPECT_TRUE(containment_status_allows(ProjectPathResolveStatus::Inside));
@@ -299,13 +308,20 @@ TEST_F(SchemePathContainmentTest, PermissionDeniedAncestorIsUnresolved) {
   if (ec) {
     GTEST_SKIP() << "permission changes are not available";
   }
+  std::error_code probe_ec;
+  std::filesystem::directory_iterator probe(locked, probe_ec);
+  if (!probe_ec) {
+    std::filesystem::permissions(locked, std::filesystem::perms::owner_all,
+                                 std::filesystem::perm_options::replace, ec);
+    GTEST_SKIP() << "filesystem does not enforce directory permissions";
+  }
   const auto status = project_path_resolve_status(
       (locked / "child.tres").generic_string(), root.generic_string());
-  std::filesystem::permissions(locked, std::filesystem::perms::owner_all,
-                               std::filesystem::perm_options::replace, ec);
   EXPECT_EQ(status, ProjectPathResolveStatus::Unresolved);
   EXPECT_FALSE(
       normalize_project_path("res://locked/child.tres", false, false).valid());
+  std::filesystem::permissions(locked, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::replace, ec);
 }
 #endif
 

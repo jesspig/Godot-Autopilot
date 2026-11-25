@@ -116,9 +116,26 @@ export function readBucket(key: string): DocsBucket | undefined {
 
 function writeAtomic(target: string, content: string): void {
   const tmp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+  const waitBuffer = new Int32Array(new SharedArrayBuffer(4));
   try {
     fs.writeFileSync(tmp, content, "utf8");
-    fs.renameSync(tmp, target);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        fs.renameSync(tmp, target);
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        const retryable =
+          code === "EEXIST" || code === "EPERM" ||
+          code === "EACCES" || code === "EBUSY";
+        if (!retryable || attempt >= 4) throw error;
+        try {
+          fs.rmSync(target, { force: true });
+        } catch {
+        }
+        Atomics.wait(waitBuffer, 0, 0, 5 * (attempt + 1));
+      }
+    }
   } finally {
     try {
       fs.rmSync(tmp, { force: true });
