@@ -6,6 +6,7 @@
 #include "util/variant_json.hpp"
 
 #include <gtest/gtest.h>
+#include "support/project_path_provider.hpp"
 #include <cstdlib>
 #include <string>
 #include <thread>
@@ -111,16 +112,20 @@ TEST(SecurityHardening, QueueOpenWithPendingThrows) {
 }
 
 TEST(SecurityHardening, ProjectPathRejectsUnsupportedScheme) {
+  godot_autopilot_test::ProjectPathProviderGuard provider;
   auto r = godot_autopilot::util::normalize_project_path("http://evil.com/file", true, false);
   EXPECT_FALSE(r.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsParentTraversal) {
+  godot_autopilot_test::ProjectPathProviderGuard provider;
   auto r = godot_autopilot::util::normalize_project_path("res://../outside", false, false);
   auto r2 = godot_autopilot::util::normalize_project_path("res://a/../b", false, false);
+  EXPECT_FALSE(r.valid());
   EXPECT_TRUE(r2.valid());
   EXPECT_EQ(r2.value, "res://b");
 }
 TEST(SecurityHardening, ProjectPathAcceptsResAndUser) {
+  godot_autopilot_test::ProjectPathProviderGuard provider;
   auto r = godot_autopilot::util::normalize_project_path("res://folder/file.tscn", true, false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://folder/file.tscn");
@@ -130,6 +135,7 @@ TEST(SecurityHardening, ProjectPathAcceptsResAndUser) {
   EXPECT_FALSE(r3.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsAbsoluteOutsideRoot) {
+  godot_autopilot_test::ProjectPathProviderGuard provider;
   auto r = godot_autopilot::util::normalize_project_path("res://a/../b", false, false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://b");

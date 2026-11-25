@@ -1,11 +1,13 @@
 
 #include "core/command_queue.hpp"
+#include "core/export_guard.hpp"
 #include "tools/base/code_exec_ops.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/runtime_ops.hpp"
 
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <string>
 
 using godot_autopilot::code_exec_ops::handle_batch_execute;
@@ -277,4 +279,67 @@ TEST_F(BatchRefsTest, StopOnErrorRespected) {
   ASSERT_NE(note, nullptr);
   EXPECT_NE(note->GetString().find("stopped at operation 2/3"),
             std::string::npos);
+}
+
+TEST_F(BatchRefsTest, ExportStartingAfterFirstStepBlocksRemainingSteps) {
+  godot_autopilot::ExportState export_state;
+  std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
+  bool second_called = false;
+  godot_autopilot::dispatch::replace_handlers(
+      {{"start_export",
+        [&export_scope, &export_state](const mcp::JsonValue &) {
+          export_scope = std::make_unique<godot_autopilot::ExportState::Scope>(
+              export_state);
+          return mcp::JsonValue::Parse(R"({"result":1})");
+        }},
+       {"after_export",
+        [&second_called](const mcp::JsonValue &) {
+          second_called = true;
+          return mcp::JsonValue::Parse(R"({"result":2})");
+        }}},
+      {});
+
+  const mcp::JsonValue result = handle_batch_execute(
+      mcp::JsonValue::Parse(R"({
+        "operations": [
+          {"tool": "start_export"},
+          {"tool": "after_export"}
+        ],
+        "stop_on_error": false
+      })"));
+  export_scope.reset();
+
+  EXPECT_FALSE(second_called);
+  const mcp::JsonValue *results = result.Find("results");
+  ASSERT_NE(results, nullptr);
+  ASSERT_EQ(results->Size(), 2u);
+  EXPECT_EQ(status_of((*results)[0]), "ok");
+  EXPECT_EQ(status_of((*results)[1]), "error");
+  EXPECT_EQ(error_of((*results)[1]),
+            godot_autopilot::dispatch::export_blocked_error_text());
+  EXPECT_EQ(result["total"].GetInt(), 2);
+  EXPECT_EQ(result["succeeded"].GetInt(), 1);
+  EXPECT_EQ(result["failed"].GetInt(), 1);
+}
+
+TEST_F(BatchRefsTest, ExportInProgressBlocksBatchBeforeUndoSnapshot) {
+  godot_autopilot::ExportState export_state;
+  godot_autopilot::ExportState::Scope export_scope(export_state);
+  bool handler_called = false;
+  godot_autopilot::dispatch::replace_handlers(
+      {{"probe",
+        [&handler_called](const mcp::JsonValue &) {
+          handler_called = true;
+          return mcp::JsonValue::Parse(R"({"result":1})");
+        }}},
+      {});
+
+  const mcp::JsonValue result = handle_batch_execute(
+      mcp::JsonValue::Parse(R"({
+        "operations": [{"tool": "probe"}],
+        "rollback_on_error": true
+      })"));
+
+  EXPECT_FALSE(handler_called);
+  EXPECT_EQ(result["code"].GetString(), "export_in_progress");
 }

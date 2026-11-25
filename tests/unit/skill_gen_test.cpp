@@ -124,7 +124,13 @@ const char *const kManualWhitelist[] = {
     "unsupported_binary_references", "update_file", "updated_files",
     "when_timeout", "would_delete", "wrapped_source",
     "channel_lost", "game_ready_timeout", "no_scene_open", "scene_ready",
-    "script_error", "startup_in_progress", "timeout_cause", "viewport_degenerate"};
+    "script_error", "startup_in_progress", "timeout_cause", "viewport_degenerate",
+    "next_action", "ready_diagnosis", "ready_lost", "scene_not_ready",
+    "extension_not_loaded", "hello_attempts", "invalid_input_response",
+    "missing_csharp_runtime", "csharp_script_not_compiled", "disk_persisted",
+    "autosaved", "disk_changed", "autosave_setting", "runtime_mountable",
+    "editor_runnable", "already_present", "script_class_not_found",
+    "base_type_not_node", "abstract_script", "csharp_bridge"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||

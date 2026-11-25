@@ -14,6 +14,7 @@ export interface GlobalOptions {
   pathText?: string;
   sourceText?: string;
   offline?: boolean;
+  withCsharpRuntime?: boolean;
   zh?: boolean;
   check?: boolean;
   confirm?: boolean;
@@ -111,6 +112,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--progress": "progress",
   "--direct": "direct",
   "--offline": "offline",
+  "--with-csharp-runtime": "withCsharpRuntime",
   "--zh": "zh",
   "--check": "check",
   "--confirm": "confirm",
@@ -230,6 +232,10 @@ Commands:
   trace slow          List calls slower than --slow <ms> (default 1000)
   trace failures      List failed tool calls
   trace export        Export traces as jsonl or otlp (--format)
+  monitor status      Show game monitor scope and recording directory
+  monitor sessions    List recorded game monitor sessions
+  monitor report <id> Analyze one session (or --file <path> for offline JSONL)
+  monitor export <id> Copy one session JSONL into GDA home
   install skills      Install skill books to ~/.agents/skills (--prune removes retired books)
   install plugin      Install the Godot addon into a project
   update <target>     Update cli, skills, plugin, or all (--check for status)
@@ -247,6 +253,7 @@ Global options:
   --path <dir>        Install target directory (install skills)
   --source <mode>     auto (default), online, cache, or builtin
   --offline           Never touch the network; use cache, then builtin
+  --with-csharp-runtime  Install time: add the GdaCSharpRuntime autoload in C# projects
   --zh                Use the Chinese skills archive (install, skills list/show)
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
@@ -270,10 +277,10 @@ Global options:
   --transport <mode>  auto (default), ipc, or http
   --no-fallback       Do not fall back to HTTP when IPC fails
   --json              JSON output (default for most commands)
-  --confirm           Confirm a high-risk tool call
+  --confirm           Confirm a high-risk call; sends confirm:true and an elicitation accept
   --async             call: run as an MCP task when the server supports it
   --progress          call: print progress notifications to stderr
-  --input <json>      call: inputResponses for MRTR input_required
+  --input <json>      call: inputResponses for MRTR input_required; {"confirm":true} is accepted
   --direct            call: invoke a full-surface tool at the top level
   --docs-file <path>  Read an external extension_api.json (bypasses the cache)
   --section <name>    docs class: brief, description, methods, properties, signals, enums, constants, operators, constructors, or all

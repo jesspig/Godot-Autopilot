@@ -60,6 +60,8 @@ const THREAD_CONTEXT_RULES: ReadonlyArray<readonly [string, Context, string]> = 
   ["src/core/export_guard.hpp", CTX_MAIN, "导出回调由引擎导出流程在主线程触发。"],
   ["src/core/mode_detector.cpp", CTX_MAIN, "运行模式探测在主线程读取引擎单例。"],
   ["src/core/mode_detector.hpp", CTX_MAIN, "运行模式探测在主线程读取引擎单例。"],
+  ["src/core/observability/game_monitor.cpp", CTX_MAIN, "逐帧采样由游戏进程 SceneTree 的 process_frame 回调在主线程驱动。"],
+  ["src/core/observability/game_monitor.hpp", CTX_MAIN, "逐帧采样状态只在游戏主线程读写。"],
   ["src/core/observability/monitor_env.cpp", CTX_MAIN, "环境快照只在 _enter_tree 的主线程调用。"],
   ["src/core/observability/perf_sampler.cpp", CTX_MAIN, "性能采样由 _process 在主线程驱动。"],
   ["src/core/observability/perf_sampler.hpp", CTX_MAIN, "性能采样由 _process 在主线程驱动。"],

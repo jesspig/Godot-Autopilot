@@ -11,6 +11,7 @@
 #include "prompts/prompt_setup_input_map.hpp"
 #include "prompts/prompt_tool_usage.hpp"
 #include "tools/base/dispatch.hpp"
+#include "util/error_util.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/McpError.hpp>
 #include <memory>
@@ -30,23 +31,40 @@ mcp::GetPromptResult make_result(const std::string &content) {
   return r;
 }
 
+struct PromptTaskState {
+  std::string content;
+  bool export_blocked = false;
+};
+
 template <typename Fn>
 mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
                                      const std::string &label, Fn task) {
   prompts_detail::reject_if_exporting();
-  auto state = std::make_shared<std::string>();
+  auto state = std::make_shared<PromptTaskState>();
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
-      queue, label, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+      queue, label, state,
+      [task = std::move(task)](PromptTaskState &st) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          st.export_blocked = true;
+          return;
+        }
+        task(st.content);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
-    throw mcp::McpError(
+    util::throw_mcp_error(
         mcp::McpErrorCode::RequestTimeout,
         dispatch::main_thread_timeout_message(label, outcome.waited_ms,
                                               outcome.cancelled));
   }
   if (!outcome.ok) {
-    throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
+    util::throw_mcp_error(mcp::McpErrorCode::InternalError, outcome.error);
   }
-  return make_result(*state);
+  if (state->export_blocked) {
+    util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
+                        dispatch::export_blocked_error_text());
+  }
+  return make_result(state->content);
 }
 
 } // namespace

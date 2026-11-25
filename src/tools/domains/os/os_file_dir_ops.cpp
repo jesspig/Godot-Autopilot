@@ -169,7 +169,36 @@ JV handle_copy_file_generic(const JV &args) {
     return util::error_json("source does not exist: " + src);
   if (godot::DirAccess::dir_exists_absolute(dest_gs))
     return util::error_json("destination is a directory: " + dest);
-  bool overwritten = godot::FileAccess::file_exists(dest_gs);
+  bool overwrite = false;
+  const JV *overwrite_arg = args.Find("overwrite");
+  if (overwrite_arg != nullptr) {
+    if (!overwrite_arg->IsBool())
+      return util::error_json("invalid parameter: overwrite must be a boolean");
+    overwrite = overwrite_arg->GetBool();
+  }
+  bool confirm = false;
+  const JV *confirm_arg = args.Find("confirm");
+  if (confirm_arg != nullptr) {
+    if (!confirm_arg->IsBool())
+      return util::error_json("invalid parameter: confirm must be a boolean");
+    confirm = confirm_arg->GetBool();
+  }
+  const bool overwritten = godot::FileAccess::file_exists(dest_gs);
+  const resource_fs::CopyOverwriteFailure policy =
+      resource_fs::check_copy_overwrite(overwritten, overwrite, confirm);
+  if (policy != resource_fs::CopyOverwriteFailure::kNone) {
+    JV error(JV::object_tag);
+    if (policy == resource_fs::CopyOverwriteFailure::kTargetExists) {
+      error["error"] = JV("destination already exists: " + dest);
+      error["code"] = JV("target_conflict");
+    } else {
+      error["error"] = JV(
+          "overwriting an existing destination requires confirm=true");
+      error["code"] = JV("confirmation_required");
+      error["confirm_required"] = JV(true);
+    }
+    return error;
+  }
   const std::string parent = resource_fs::parent_directory_of(dest);
   if (!resource_fs::is_resource_root_dir(parent)) {
     godot::String parent_gs(parent.c_str());
@@ -182,11 +211,26 @@ JV handle_copy_file_generic(const JV &args) {
                                 std::to_string(static_cast<int>(mk_err)) + ")");
     }
   }
-  godot::Error err = godot::DirAccess::copy_absolute(src_gs, dest_gs);
-  if (err != godot::OK)
-    return util::error_json("failed to copy file: " + src + " -> " + dest +
-                            " (error " + std::to_string(static_cast<int>(err)) +
-                            ")");
+  resource_fs::FileTransactionPlan plan;
+  plan.operations.push_back({resource_fs::FileTransactionKind::kCopy, src, dest,
+                             {}, false, overwritten});
+  resource_fs::FileTransactionJournal journal;
+  resource_fs::GodotFileTransactionFs file_system;
+  const resource_fs::FileTransactionResult copied =
+      resource_fs::commit_file_transaction(plan, journal, file_system);
+  if (!copied.ok) {
+    JV error(JV::object_tag);
+    error["error"] = JV(copied.message);
+    error["code"] = JV(copied.code);
+    if (!copied.compensation_errors.empty()) {
+      JV compensation(JV::array_tag);
+      for (const std::string &item : copied.compensation_errors) {
+        compensation.PushBack(JV(item));
+      }
+      error["compensation_errors"] = std::move(compensation);
+    }
+    return error;
+  }
   JV r(JV::object_tag);
   r["result"] = JV("copied");
   r["from"] = JV(src);

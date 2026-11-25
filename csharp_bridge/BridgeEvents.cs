@@ -19,18 +19,25 @@ public partial class GdaCSharpBridge : RefCounted
         public GodotObject Source;
         public EventInfo Event;
         public Delegate Handler;
+        public Forwarder Relay;
     }
 
     private sealed class Forwarder
     {
         private readonly GodotObject _target;
         private readonly StringName _method;
+        private string _lastError = string.Empty;
+        private int _failureCount;
 
         public Forwarder(GodotObject target, StringName method)
         {
             _target = target;
             _method = method;
         }
+
+        public string LastError { get { return _lastError; } }
+
+        public int FailureCount { get { return _failureCount; } }
 
         public void Forward()
         {
@@ -68,8 +75,11 @@ public partial class GdaCSharpBridge : RefCounted
                 }
                 _target.Call(_method, callArgs);
             }
-            catch
+            catch (Exception e)
             {
+                _lastError = e.Message;
+                _failureCount++;
+                GD.PushError("GDA event forward to '" + _method + "' failed: " + e.Message);
             }
         }
     }
@@ -80,6 +90,14 @@ public partial class GdaCSharpBridge : RefCounted
         {
             GodotObject source = RequireObject(obj);
             GodotObject sink = RequireObject(target);
+            if (sink == null)
+            {
+                return Fail("event target is null");
+            }
+            if (!sink.HasMethod(targetMethod))
+            {
+                return Fail("event target has no callable method '" + targetMethod + "'");
+            }
             Type t = source.GetType();
             EventInfo ev = t.GetEvent(eventName, ResolveFlags());
             if (ev == null)
@@ -145,11 +163,38 @@ public partial class GdaCSharpBridge : RefCounted
             sub.Source = source;
             sub.Event = ev;
             sub.Handler = handler;
+            sub.Relay = closure;
             _subscriptions[token] = sub;
             return new Godot.Collections.Dictionary
             {
                 { "ok", true },
                 { "token", (long)token }
+            };
+        }
+        catch (Exception e)
+        {
+            return Fail(e.Message);
+        }
+    }
+
+    public Godot.Collections.Dictionary subscriptionHealth(ulong token)
+    {
+        try
+        {
+            Subscription sub;
+            if (!_subscriptions.TryGetValue(token, out sub))
+            {
+                return Fail("unknown subscription token " + token);
+            }
+            bool alive = sub.Source != null && GodotObject.IsInstanceValid(sub.Source);
+            Forwarder relay = sub.Relay;
+            return new Godot.Collections.Dictionary
+            {
+                { "ok", true },
+                { "token", (long)token },
+                { "source_alive", alive },
+                { "failures", relay == null ? 0L : (long)relay.FailureCount },
+                { "last_error", relay == null ? string.Empty : relay.LastError }
             };
         }
         catch (Exception e)

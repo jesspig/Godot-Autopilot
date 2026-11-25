@@ -1,8 +1,17 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-23；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-25；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
 >
 > changelog 内的相对链接指向记录当时的源码路径；部分目标已随后续重构删除或迁移，按历史记录阅读，不代表当前文件布局。
+
+## 2026-11-25
+
+- **0.3.5 正式发布收口**：根 `VERSION` / `CLI_VERSION` 去 `-dev` 后缀为 `0.3.5`，`cli/assets/skills.json` 由官方脚本重新生成；新增发布说明 [release-notes/0.3.5.md](../release-notes/0.3.5.md)，汇总脚本能力、确认协议、hello 握手、C# 供给、场景持久化与 CI 跨平台稳定性修复。`build.md` / `modules/cli.md` / `modules/skills.md` / `modules/tools_ops_a.md` / `tool_surface_report.md` 的“当前正式版”表述与 `timestamp` 同步。仅改本地文件，未打 tag / 推送 / 触发发布流程。详见 [changelog/2026-11-25-log.md](changelog/2026-11-25-log.md)。
+- **根因修复批次**：脚本能力模型统一编辑器可运行性与运行时可挂载性，`update_autoloads` 接受非 Tool C# 脚本；call_tool 确认协议归一；`gda:hello` 握手替代 fire-and-forget ready 并提供 `ready_diagnosis`；C# autoload 显式供给与缺桥诊断；play 响应显式报告 Godot 运行前 autosave。详见 `.handoff/evidence/ST-01/summary.txt` 与 `.handoff/STATE.md`。
+
+## 2026-11-24
+
+- **游戏运行时监视器**：编辑器启动的游戏运行逐帧记录 59 项引擎监视器与自动发现的标准 API 自定义监控，JSONL 落盘；新增 `game_monitor` MCP 工具与 `gda monitor` CLI，支持按会话调取与离线分析。工具面 252→253、ctest 1101 全绿。详见 [changelog/2026-11-24-log.md](changelog/2026-11-24-log.md) 与 [modules/game_monitor.md](modules/game_monitor.md)。
 
 ## 2026-11-23
 

@@ -106,8 +106,12 @@ GDScript. For C# getters, overloads, and events, use `csharp_member` action=list
 - Editor side needs no manual singleton registration; the plugin loads
   `res://addons/godot-autopilot/GdaCSharpBridge.cs` when the singleton is absent.
 - Game side requires a `GdaCSharpRuntime` node; it creates the `__gda_runtime`
-  holder. Only scene-path locators cross into the game; `object_id` and
-  `memory` are editor-process handles.
+  holder. Add it as an autoload with
+  `gda call update_autoloads --args '{"action":"add","name":"GdaCSharpRuntime","path":"res://addons/godot-autopilot/GdaCSharpRuntime.cs","enabled":true}'`,
+  or install with `gda install plugin --with-csharp-runtime`. Missing bridge
+  now returns `missing_csharp_runtime` with this command as `next_action`.
+  Only scene-path locators cross into the game; `object_id` and `memory` are
+  editor-process handles.
 - A locator that resolves to a script resource is rejected; pass a node path or
   `object_id_str` of a live instance.
 

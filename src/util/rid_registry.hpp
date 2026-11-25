@@ -25,6 +25,8 @@ public:
     return godot::RID();
   }
 
+  bool contains(int64_t id) const { return map.find(id) != map.end(); }
+
   bool erase(int64_t id) { return map.erase(id) > 0; }
 
 private:

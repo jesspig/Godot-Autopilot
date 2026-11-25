@@ -3,12 +3,34 @@
 
 #include <godot_cpp/variant/string.hpp>
 #include <mcp/JsonValue.hpp>
+#include <mcp/McpError.hpp>
+#include <optional>
 #include <string>
+#include <utility>
 
 namespace godot_autopilot {
 namespace util {
 
 mcp::JsonValue error_json(const std::string &msg);
+
+class StableMcpError : public mcp::McpError {
+public:
+  StableMcpError(mcp::McpErrorCode code, std::string message,
+                 std::optional<mcp::JsonValue> data = std::nullopt)
+      : mcp::McpError(code, message, std::move(data)),
+        message_(std::move(message)) {}
+
+  const char *what() const noexcept override { return message_.c_str(); }
+
+private:
+  std::string message_;
+};
+
+[[noreturn]] inline void throw_mcp_error(
+    mcp::McpErrorCode code, std::string message,
+    std::optional<mcp::JsonValue> data = std::nullopt) {
+  throw StableMcpError(code, std::move(message), std::move(data));
+}
 
 mcp::JsonValue ok_result(mcp::JsonValue value);
 

@@ -1,35 +1,88 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { CliError, ExitCode } from "./errors";
+import { isSafeArchiveEntry } from "./security-policy";
 
-export function extractZip(zipPath: string, destDir: string): void {
-  fs.mkdirSync(destDir, { recursive: true });
-  const tar = Bun.spawnSync(["tar", "-xf", zipPath, "-C", destDir], {
+function archiveEntries(zipPath: string): string[] {
+  const tar = Bun.spawnSync(["tar", "-tf", zipPath], {
     stdout: "pipe",
     stderr: "pipe",
   });
   if (tar.exitCode === 0) {
-    assertNoZipSlip(destDir);
-    return;
+    return tar.stdout.toString().split(/\r?\n/).filter((line) => line.length > 0);
   }
-  const unzip = Bun.spawnSync(["unzip", "-q", zipPath, "-d", destDir], {
+  const unzip = Bun.spawnSync(["unzip", "-Z1", zipPath], {
     stdout: "pipe",
     stderr: "pipe",
   });
   if (unzip.exitCode === 0) {
-    assertNoZipSlip(destDir);
-    return;
+    return unzip.stdout.toString().split(/\r?\n/).filter((line) => line.length > 0);
   }
-  throw new CliError(
-    ExitCode.Transport,
-    `cannot extract ${zipPath}: ${tar.stderr.toString() || unzip.stderr.toString()}`,
-    "Install tar or unzip, or pass an already extracted directory.",
-  );
+  return [];
+}
+
+export function extractZip(zipPath: string, destDir: string): void {
+  assertNoZipSlip(destDir);
+  for (const entry of archiveEntries(zipPath)) {
+    if (!isSafeArchiveEntry(entry)) {
+      throw new CliError(ExitCode.Transport, `unsafe path in archive: ${entry}`);
+    }
+  }
+  fs.mkdirSync(destDir, { recursive: true });
+  const staging = fs.mkdtempSync(path.join(os.tmpdir(), "gda-extract-"));
+  try {
+    const tar = Bun.spawnSync(["tar", "-xf", zipPath, "-C", staging], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (tar.exitCode !== 0) {
+      const unzip = Bun.spawnSync(["unzip", "-q", zipPath, "-d", staging], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      if (unzip.exitCode !== 0) {
+        throw new CliError(
+          ExitCode.Transport,
+          `cannot extract ${zipPath}: ${tar.stderr.toString() || unzip.stderr.toString()}`,
+          "Install tar or unzip, or pass an already extracted directory.",
+        );
+      }
+    }
+    assertNoZipSlip(staging);
+    copyRegularTree(staging, destDir);
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+function copyRegularTree(source: string, target: string): void {
+  fs.mkdirSync(target, { recursive: true });
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isSymbolicLink()) continue;
+    if (entry.isDirectory()) {
+      copyRegularTree(from, to);
+      continue;
+    }
+    if (entry.isFile()) {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      const tmp = `${to}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, fs.readFileSync(from));
+      fs.renameSync(tmp, to);
+    }
+  }
 }
 
 function assertNoZipSlip(destDir: string): void {
-  const root = fs.realpathSync(path.resolve(destDir));
+  let root: string;
+  try {
+    root = fs.realpathSync(path.resolve(destDir));
+  } catch {
+    return;
+  }
   const walk = (dir: string): void => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
@@ -86,4 +139,3 @@ export function writeTree(
     fs.renameSync(tmp, target);
   }
 }
-

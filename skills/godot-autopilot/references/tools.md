@@ -50,7 +50,7 @@ never report a fabricated result after it.
 
 ## Tool surface and deprecated aliases
 
-- The live catalog carries 252 canonical tools; `gda tools list` and
+- The live catalog carries 253 canonical tools; `gda tools list` and
   `search_tools` expose only those. `get_tool_detail` also resolves an alias, but
   returns the canonical tool detail plus the replacement fields.
 - Another 325 deprecated aliases resolve to a canonical tool through
@@ -179,12 +179,13 @@ including errors the call itself produced. It is one-shot: reading resets it.
 |---|---|---|
 | `exec_timeout` | A `code_execute` script outran `timeout_ms` | Split the work or raise the timeout within the cap |
 | `eval_timeout` | A game-side eval outlived the host wait; `timeout_cause` names `script_error` or `channel_lost` | Not immediately; the game may still be running it |
-| `game_ready_timeout` | A queued game call never saw `gda:ready` with scene-ready | Yes, once ready; check the extension loads |
+| `game_ready_timeout` | A queued game call never saw `gda:ready` with scene-ready; `ready_diagnosis` distinguishes `extension_not_loaded`, `scene_not_ready`, and `ready_lost` | Yes, once ready; follow `next_action` in the receipt |
 | `startup_in_progress` | The editor is still restoring its scene after launch | Yes, after `retry_after_ms` |
 | `no_scene_open` / `viewport_degenerate` | Editor capture: no scene open, or 2D and 3D viewports both degenerate | Open a scene or restore the viewport, then retry |
 | `main_thread_timeout` | The editor main thread missed its budget | Read state first; the side effect may still land |
 | `queue_unavailable` | The main-thread queue was full or closing | Yes, later |
-| `confirmation_required` | A high-risk tool ran without confirmation | Review the target, then retry with `--confirm` |
+| `confirmation_required` | A high-risk tool ran without confirmation | Review the target, then retry with `--confirm` or `--input '{"confirm":true}'` |
+| `invalid_input_response` | `inputResponses.confirm` was neither a boolean nor an accept/decline object | Pass `{"confirm":true}` or `{"confirm":{"action":"accept"}}` |
 
 Soft, retryable errors carry `retryable: true` and `retry_after_ms` while the
 editor imports or scans resources. Wait at least the suggested interval and

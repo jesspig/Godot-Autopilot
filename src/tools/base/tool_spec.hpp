@@ -322,6 +322,19 @@ inline bool finish_deferred_trace(const std::string &key,
 inline mcp::JsonValue validate_dynamic_args(const mcp::JsonValue &args,
                                             const std::vector<ParamSpec> &params) {
   mcp::JsonValue accepted(mcp::JsonValue::object_tag);
+  if (!args.IsObject()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("tool arguments must be an object");
+    error["code"] = mcp::JsonValue("invalid_arguments");
+    return error;
+  }
+  std::string definition_error;
+  if (!schema::validate_param_defs(params, definition_error)) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue(definition_error);
+    error["code"] = mcp::JsonValue("invalid_tool_definition");
+    return error;
+  }
   if (params.empty()) {
     return accepted;
   }

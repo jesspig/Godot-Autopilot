@@ -29,6 +29,16 @@ export function stopDecision(pidAlive: boolean, endpointPort: number | null | un
   };
 }
 
+export function processStartTime(pid: number): number | null {
+  if (pid <= 0 || process.platform === "win32") return null;
+  const r = spawnSync("ps", ["-o", "lstart=", "-p", String(pid)], {
+    encoding: "utf8",
+  });
+  if (r.error !== undefined || r.status !== 0) return null;
+  const parsed = Date.parse(r.stdout.toString().trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function isAlive(pid: number): boolean {
   if (process.platform === "win32") {
     return windowsProcessExists(pid);
@@ -128,6 +138,17 @@ function spawnFailureReason(child: ChildProcess): Promise<string> {
 export async function terminateProcess(pid: number): Promise<TerminationOutcome> {
   if (!isAlive(pid)) return "already-exited";
   stopForce(pid);
+  const deadline = Date.now() + TERMINATE_CONFIRM_MS;
+  for (;;) {
+    if (!isAlive(pid)) return "terminated";
+    if (Date.now() >= deadline) return "failed";
+    await Bun.sleep(TERMINATE_POLL_MS);
+  }
+}
+
+export async function terminateGraceful(pid: number): Promise<TerminationOutcome> {
+  if (!isAlive(pid)) return "already-exited";
+  stopGraceful(pid);
   const deadline = Date.now() + TERMINATE_CONFIRM_MS;
   for (;;) {
     if (!isAlive(pid)) return "terminated";

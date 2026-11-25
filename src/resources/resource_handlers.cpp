@@ -1,4 +1,5 @@
 #include "resources/resource_handlers.hpp"
+#include "resources/resource_sanitization.hpp"
 #include "core/config.hpp"
 #include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
@@ -76,10 +77,19 @@ ResourceTaskResult run_resource_task(
     CommandQueue &queue, const std::string &uri,
     const std::shared_ptr<ResourceTaskState> &state, Fn task) {
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
-      queue, uri, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+      queue, uri, state,
+      [task = std::move(task)](ResourceTaskState &st) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          set_error(st, dispatch::export_blocked_error_text());
+          st.error_code = "export_in_progress";
+          return;
+        }
+        task(st);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {
     monitor::error_event("main_thread_timeout", "resource", uri);
-    throw mcp::McpError(
+    util::throw_mcp_error(
         mcp::McpErrorCode::RequestTimeout,
         dispatch::main_thread_timeout_message(uri, outcome.waited_ms,
                                               outcome.cancelled),
@@ -88,13 +98,17 @@ ResourceTaskResult run_resource_task(
   }
   if (!outcome.ok) {
     monitor::error_event("resource_read_failed", "resource", uri);
-    throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
+    util::throw_mcp_error(mcp::McpErrorCode::InternalError, outcome.error);
   }
   if (!state->error_code.empty()) {
     monitor::error_event(state->error_code, "resource", uri);
+    if (state->error_code == "export_in_progress") {
+      util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
+                          state->error_text);
+    }
     mcp::JsonValue data(mcp::JsonValue::object_tag);
     data["uri"] = mcp::JsonValue(uri);
-    throw mcp::McpError(resource_error_code(state->error_code),
+    util::throw_mcp_error(resource_error_code(state->error_code),
                         state->error_text, data);
   }
   ResourceTaskResult result;
@@ -163,6 +177,38 @@ void node_to_json(godot::Node *node, const std::string &root_prefix,
   }
 }
 
+std::string property_metadata_text(const godot::Variant &value) {
+  switch (value.get_type()) {
+  case godot::Variant::BOOL:
+    return value.operator bool() ? "true" : "false";
+  case godot::Variant::STRING:
+    return util::to_std(value.operator godot::String());
+  case godot::Variant::STRING_NAME:
+    return util::to_std(godot::String(value.operator godot::StringName()));
+  case godot::Variant::INT:
+    return std::to_string(value.operator int64_t());
+  case godot::Variant::FLOAT:
+    return std::to_string(value.operator double());
+  default:
+    return {};
+  }
+}
+
+std::map<std::string, std::string> property_metadata(
+    const godot::Dictionary &property) {
+  std::map<std::string, std::string> metadata;
+  const godot::Array keys = property.keys();
+  for (int64_t i = 0; i < keys.size(); ++i) {
+    const godot::String key = keys[i].operator godot::String();
+    const std::string name = util::to_std(key);
+    const std::string value = property_metadata_text(property[key]);
+    if (!value.empty()) {
+      metadata[name] = value;
+    }
+  }
+  return metadata;
+}
+
 mcp::JsonValue node_detail_to_json(godot::Node *node,
                                           const std::string &root_prefix) {
   mcp::JsonValue j(mcp::JsonValue::object_tag);
@@ -171,25 +217,41 @@ mcp::JsonValue node_detail_to_json(godot::Node *node,
   j["path"] = mcp::JsonValue(compute_relative_path(node, root_prefix));
 
   mcp::JsonValue props(mcp::JsonValue::object_tag);
+  mcp::JsonValue redacted_properties(mcp::JsonValue::array_tag);
   auto prop_list = node->get_property_list();
   for (int i = 0; i < prop_list.size(); i++) {
     godot::Dictionary prop = prop_list[i];
     godot::String prop_name = prop["name"];
-    int usage = static_cast<int>(prop["usage"]);
+    uint64_t usage = static_cast<uint64_t>(prop["usage"].operator int64_t());
 
-    int skip_mask = godot::PROPERTY_USAGE_INTERNAL | godot::PROPERTY_USAGE_GROUP |
-                    godot::PROPERTY_USAGE_CATEGORY | godot::PROPERTY_USAGE_SUBGROUP;
-    if (usage & skip_mask)
+    if (!resources::node_property_is_exported(usage))
       continue;
 
     std::string name_str = util::to_std(prop_name);
     if (name_str.empty())
       continue;
 
+    const std::map<std::string, std::string> metadata = property_metadata(prop);
+    if (resources::resource_value_is_sensitive(name_str, metadata)) {
+      props[name_str] =
+          mcp::JsonValue(godot_autopilot::sanitize_policy::kRedactedValue);
+      redacted_properties.PushBack(mcp::JsonValue(name_str));
+      continue;
+    }
+
     godot::Variant val = node->get(prop_name);
-    props[name_str] = godot_autopilot::VariantJson::serialize(val);
+    const resources::ResourceValueRedaction redacted =
+        resources::redact_resource_value(
+            name_str, godot_autopilot::VariantJson::serialize(val), metadata);
+    props[name_str] = redacted.value;
+    if (redacted.redacted) {
+      redacted_properties.PushBack(mcp::JsonValue(name_str));
+    }
   }
   j["properties"] = std::move(props);
+  if (!redacted_properties.Empty()) {
+    j["redacted_properties"] = std::move(redacted_properties);
+  }
 
   j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
   auto children = node->get_children();
@@ -265,7 +327,7 @@ const std::vector<skill_gen::SkillSpec> &embedded_skills() {
 int register_skill_resources(mcp::McpServer &server) {
   auto handler = [](const std::string &uri) -> mcp::ReadResourceResult {
     if (godot_autopilot::ExportGuard::is_exporting()) {
-      throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+      util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
     }
     const skill_resources::ContentResult content =
         skill_resources::resolve_content(embedded_skills(), uri);
@@ -273,7 +335,7 @@ int register_skill_resources(mcp::McpServer &server) {
       monitor::error_event("resource_not_found", "resource", uri);
       mcp::JsonValue data(mcp::JsonValue::object_tag);
       data["uri"] = mcp::JsonValue(uri);
-      throw mcp::McpError(mcp::McpErrorCode::InvalidParams, content.error, data);
+      util::throw_mcp_error(mcp::McpErrorCode::InvalidParams, content.error, data);
     }
     monitor::data_flow(
         "resource_read", static_cast<int64_t>(content.text.size()),
@@ -336,7 +398,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -369,7 +431,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -412,11 +474,11 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path;
         if (!util::resource_template_value(vars, "path", path)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "missing template variable: path");
         }
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -474,7 +536,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -523,17 +585,17 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path;
         if (!util::resource_template_value(vars, "path", path)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "missing template variable: path");
         }
         std::string normalized_path;
         if (!util::normalize_resource_uri_path(path, normalized_path)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "invalid template variable: path");
         }
         path = normalized_path;
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -596,7 +658,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -655,11 +717,11 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string key;
         if (!util::resource_template_value(vars, "key", key)) {
-          throw mcp::McpError(mcp::McpErrorCode::InvalidParams,
+          util::throw_mcp_error(mcp::McpErrorCode::InvalidParams,
                               "missing template variable: key");
         }
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();
@@ -687,9 +749,32 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 return;
               }
 
-              godot::Variant val = settings->get_setting(gd_key);
-              auto jv = VariantJson::serialize(val);
-              st.json_str = jv.Dump(-1);
+              godot::Dictionary setting_property;
+              const godot::TypedArray<godot::Dictionary> setting_properties =
+                  settings->get_property_list();
+              for (int64_t i = 0; i < setting_properties.size(); ++i) {
+                const godot::Dictionary candidate = setting_properties[i];
+                if (!candidate.has("name")) {
+                  continue;
+                }
+                if (util::to_std(candidate["name"].operator godot::String()) ==
+                    key) {
+                  setting_property = candidate;
+                  break;
+                }
+              }
+              const std::map<std::string, std::string> metadata =
+                  property_metadata(setting_property);
+              if (resources::resource_value_is_sensitive(key, metadata)) {
+                st.json_str = resources::redacted_resource_response().Dump(-1);
+              } else {
+                const godot::Variant val = settings->get_setting(gd_key);
+                const resources::ResourceValueRedaction redacted =
+                    resources::redact_resource_value(
+                        key, VariantJson::serialize(val), metadata);
+                st.json_str =
+                    resources::resource_value_response(redacted).Dump(-1);
+              }
             });
         monitor::data_flow(
             "resource_read", static_cast<int64_t>(result.json_str.size()),
@@ -706,7 +791,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         if (godot_autopilot::ExportGuard::is_exporting()) {
-          throw mcp::McpError(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
+          util::throw_mcp_error(mcp::McpErrorCode::HandlerError, dispatch::export_blocked_error_text());
         }
         const tools::TraceContext ctx = tools::capture_trace_context();
         auto state = std::make_shared<ResourceTaskState>();

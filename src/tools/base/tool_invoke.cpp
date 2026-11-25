@@ -21,14 +21,8 @@ namespace tools {
 
 namespace {
 
-thread_local int g_depth = 0;
 thread_local std::vector<std::pair<std::string, std::string>> g_span_stack;
 thread_local int64_t g_queued_wait_ms = 0;
-
-struct DepthGuard {
-  DepthGuard() { ++g_depth; }
-  ~DepthGuard() { --g_depth; }
-};
 
 void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
                          const mcp::JsonValue &result,
@@ -57,7 +51,7 @@ void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
   event.parent_span = parent;
   event.session_id = LogPersist::instance().session_id();
   event.tool = name;
-  event.depth = g_depth;
+  event.depth = invoke_depth();
   event.thread = invoke_thread_label();
   event.wall_start_ms = wall;
   event.wall_end_ms = wall;
@@ -82,13 +76,13 @@ void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
       std::move(event), LogLevel::Warning,
       "call_tool " + name + " -> error " + error_code,
       "trace=" + trace + " span=" + span + " depth=" +
-          std::to_string(g_depth) + " queue=0ms args=" + args_text +
+          std::to_string(invoke_depth()) + " queue=0ms args=" + args_text +
           " err=" + err_text);
 }
 
 } // namespace
 
-int invoke_depth() { return g_depth; }
+int invoke_depth() { return dispatch::current_depth(); }
 
 const std::string &current_trace_id() {
   static const std::string kNoSpan;
@@ -190,12 +184,6 @@ mcp::JsonValue invoke_tool(const std::string &name,
     record_invoke_trace(name, args, blocked, "export_blocked");
     return blocked;
   }
-  if (g_depth > kMaxInvokeDepth) {
-    mcp::JsonValue overflow = util::error_json(
-        "tool invoke depth exceeded (max 8): '" + name + "'");
-    record_invoke_trace(name, args, overflow, "depth_exceeded");
-    return overflow;
-  }
   std::string trace = current_trace_id();
   if (trace.empty()) {
     trace = TraceRecorder::new_trace_id();
@@ -204,10 +192,16 @@ mcp::JsonValue invoke_tool(const std::string &name,
   mcp::JsonValue result;
   {
     SpanGuard span_guard(trace, span);
-    DepthGuard guard;
-    result = dispatch::call_handler(name, args);
+    const dispatch::DepthContext depth_ctx = dispatch::capture_depth_context();
+    result = dispatch::call_handler(name, args, depth_ctx);
   }
   if (result.IsObject()) {
+    const mcp::JsonValue *code = result.Find("code");
+    if (code != nullptr && code->IsString() &&
+        code->GetString() == "depth_exceeded") {
+      record_invoke_trace(name, args, result, "depth_exceeded");
+      return result;
+    }
     const mcp::JsonValue *pending = result.Find("__gda_pending");
     const mcp::JsonValue *deferred = result.Find("__gda_wait");
     if ((pending != nullptr && pending->IsInt()) || deferred != nullptr) {

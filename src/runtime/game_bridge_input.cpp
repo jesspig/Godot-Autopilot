@@ -3,6 +3,7 @@
 #include "core/config.hpp"
 #include "core/editor_coords.hpp"
 #include "gda_protocol.hpp"
+#include "runtime/runtime_budget.hpp"
 #include "tools/domains/input_map/input_map_ops.hpp"
 #include "util/error_util.hpp"
 #include <cctype>
@@ -709,6 +710,7 @@ JV inject_duration_sequence(const JV &seq_value) {
 constexpr size_t GDA_SEQUENCE_MAX_ITEMS = 256;
 constexpr int64_t GDA_SEQUENCE_FRAME_BUDGET_MS = 33;
 constexpr int64_t GDA_SEQUENCE_BASE_TIMEOUT_MS = 2000;
+constexpr int64_t GDA_SEQUENCE_MAX_STEP_MS = 1000;
 
 struct FrameInputItem {
   int64_t at_frame = 0;
@@ -987,6 +989,7 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
   std::vector<FrameInputItem> timed;
   timed.reserve(items.size());
   int64_t max_at_frame = 0;
+  int64_t max_step_ms = 0;
   for (const JV &item : items) {
     if (!item.IsObject())
       return error_result(
@@ -1020,6 +1023,13 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
     if (auto *double_click = item.Find("double_click");
         double_click && !double_click->IsBool())
       return error_result("input_sequence item double_click must be a boolean");
+    if (auto *duration_p = item.Find("duration_ms")) {
+      if (!duration_p->IsInt() || duration_p->GetInt() <= 0)
+        return error_result(
+            "input_sequence item duration_ms must be a positive integer");
+      if (duration_p->GetInt() > max_step_ms)
+        max_step_ms = duration_p->GetInt();
+    }
     FrameInputItem entry;
     entry.at_frame = frame_p->GetInt();
     entry.payload = item;
@@ -1045,6 +1055,25 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
   }
   if (timeout_ms > GDA_MAX_TIMEOUT_MS)
     timeout_ms = GDA_MAX_TIMEOUT_MS;
+  const runtime_budget::SequencePlanVerdict plan =
+      runtime_budget::validate_sequence_plan(
+          items.size(), max_step_ms, timeout_ms, GDA_SEQUENCE_MAX_ITEMS,
+          GDA_SEQUENCE_MAX_STEP_MS, GDA_MAX_TIMEOUT_MS);
+  if (plan.failure != runtime_budget::SequencePlanFailure::kNone) {
+    const char *code =
+        plan.failure == runtime_budget::SequencePlanFailure::kTooManyItems
+            ? "too_many_items"
+            : plan.failure == runtime_budget::SequencePlanFailure::kStepTooLong
+                  ? "step_too_long"
+                  : "total_too_long";
+    JV body = error_result("input_sequence budget rejected");
+    body["code"] = JV(code);
+    body["max_items"] = JV(static_cast<int64_t>(GDA_SEQUENCE_MAX_ITEMS));
+    body["max_step_ms"] = JV(GDA_SEQUENCE_MAX_STEP_MS);
+    body["max_timeout_ms"] = JV(GDA_MAX_TIMEOUT_MS);
+    return body;
+  }
+  timeout_ms = plan.timeout_ms;
 
   GameBridgeFrameSequence *seq = memnew(GameBridgeFrameSequence);
   seq->setup(request_id, std::move(timed), timeout_ms);

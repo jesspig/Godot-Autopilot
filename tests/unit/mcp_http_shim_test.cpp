@@ -16,6 +16,7 @@ using godot_autopilot::mcp_wire::ParsedRequest;
 using godot_autopilot::mcp_wire::build_error_response_text;
 using godot_autopilot::mcp_wire::build_event_frame;
 using godot_autopilot::mcp_wire::build_response_text;
+using godot_autopilot::mcp_wire::build_timeout_response_text;
 using godot_autopilot::mcp_wire::is_supported_protocol_version;
 using godot_autopilot::mcp_wire::parse_request;
 using godot_autopilot::mcp_wire::request_id_key;
@@ -108,6 +109,26 @@ TEST(McpWireTest, BuildsResponseTextFromJsonRpcMessage) {
 TEST(McpWireTest, BuildsErrorResponseText) {
   EXPECT_EQ(build_error_response_text(-32700, "Parse error"),
             R"({"error":{"code":-32700,"message":"Parse error"},"jsonrpc":"2.0"})");
+}
+
+TEST(McpWireTest, TimeoutResponsePreservesClientIdAndStillRunningState) {
+  const std::string body = build_timeout_response_text(
+      mcp::RequestId{std::string("client-7")}, "tools/call", true);
+  const mcp::JsonValue parsed = mcp::JsonValue::Parse(body);
+
+  ASSERT_TRUE(parsed.IsObject());
+  const mcp::JsonValue *id = parsed.Find("id");
+  ASSERT_NE(id, nullptr);
+  EXPECT_EQ(id->GetString(), "client-7");
+  const mcp::JsonValue *error = parsed.Find("error");
+  ASSERT_NE(error, nullptr);
+  ASSERT_TRUE(error->IsObject());
+  EXPECT_EQ((*error)["code"].GetInt(), -32000);
+  const mcp::JsonValue *data = error->Find("data");
+  ASSERT_NE(data, nullptr);
+  ASSERT_TRUE(data->IsObject());
+  EXPECT_TRUE((*data)["still_running"].GetBool());
+  EXPECT_TRUE((*data)["cancellation_sent"].GetBool());
 }
 
 TEST(McpWireTest, BuildsEventFrameInServerSentEventFormat) {

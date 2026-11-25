@@ -1,3 +1,5 @@
+option(GDA_NATIVE_ARCH "Allow host-native instruction sets in non-Release developer builds" OFF)
+
 # ====================================================================
 # Compiler-specific flags — auto-detected from CMAKE_CXX_COMPILER_ID
 # 优先级: Clang(clang-cl) > MSVC(cl.exe) > GCC > fallback
@@ -29,10 +31,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             -Wall -Wextra -Wpedantic
             -Wno-unused-parameter
         )
-        if(NOT GDA_IS_CI)
+        if(GDA_NATIVE_ARCH AND NOT GDA_IS_CI AND NOT CMAKE_BUILD_TYPE STREQUAL "Release")
             add_compile_options(-march=native)
         endif()
-        message(STATUS "[gda] Clang flags applied")
+        message(STATUS "[gda] Clang flags applied (native arch: ${GDA_NATIVE_ARCH})")
     endif()
 
 # ── MSVC (cl.exe only) ──
@@ -68,10 +70,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         -Wall -Wextra -Wpedantic
         -Wno-unused-parameter
     )
-    if(NOT GDA_IS_CI)
+    if(GDA_NATIVE_ARCH AND NOT GDA_IS_CI AND NOT CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-march=native)
     endif()
-    message(STATUS "[gda] GCC flags applied")
+    message(STATUS "[gda] GCC flags applied (native arch: ${GDA_NATIVE_ARCH})")
 
 else()
     message(WARNING "[gda] Unknown compiler: ${CMAKE_CXX_COMPILER_ID}")

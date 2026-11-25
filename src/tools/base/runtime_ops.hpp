@@ -7,6 +7,7 @@
 #include <map>
 #include <mcp/JsonValue.hpp>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -65,7 +66,9 @@ struct GameJobTable {
   int64_t next_id = 1;
   std::map<int64_t, GameJob> jobs;
   int64_t register_job(int64_t request_id, const std::string &op,
-                       int64_t timeout_ms, int64_t now_ms);
+                        int64_t timeout_ms, int64_t now_ms);
+  bool bind_request(int64_t job_id, int64_t request_id);
+  bool release_job(int64_t job_id);
   bool contains(int64_t job_id) const;
   CollectOutcome collect(int64_t job_id, int64_t now_ms);
   int expire_stale(int64_t now_ms);
@@ -98,19 +101,20 @@ mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_translate_text(const mcp::JsonValue &args);
 
 mcp::JsonValue handle_gda_send(const std::string &op,
-                               const mcp::JsonValue &params,
-                               int64_t timeout_ms,
-                               bool suppress_error_breaks = false,
-                               bool wait_ready = true);
+                                const mcp::JsonValue &params,
+                                int64_t timeout_ms,
+                                bool suppress_error_breaks = false,
+                                bool wait_ready = true,
+                                std::optional<int32_t> session_id = std::nullopt);
 
 bool needs_error_break_suppression(const std::string &op,
-                                   const std::string &action);
+                                    const std::string &action);
 
 void suppress_error_breaks_for_eval();
 
 void restore_error_breaks();
 
-void run_channel_self_check(int32_t p_session_id);
+void run_channel_self_check(int32_t session_id);
 
 void on_session_ready(int32_t session_id);
 
@@ -123,10 +127,11 @@ mcp::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms);
 bool payload_is_game_job(const mcp::JsonValue &payload, int64_t *out_job_id);
 
 mcp::JsonValue start_pending_op(const std::string &op,
-                                const mcp::JsonValue &params,
-                                bool suppress_error_breaks,
-                                int64_t *out_request_id,
-                                bool wait_ready = true);
+                                 const mcp::JsonValue &params,
+                                 bool suppress_error_breaks,
+                                 int64_t *out_request_id,
+                                 bool wait_ready = true,
+                                 std::optional<int32_t> session_id = std::nullopt);
 
 bool try_collect_response(int64_t request_id, mcp::JsonValue &out_response);
 

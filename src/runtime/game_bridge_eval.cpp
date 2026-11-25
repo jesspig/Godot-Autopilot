@@ -1,6 +1,7 @@
 #include "game_bridge.hpp"
 
 #include "core/config.hpp"
+#include "runtime/runtime_budget.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
 #include "util/readback_util.hpp"
@@ -1197,17 +1198,15 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     return err;
   }
 
-  {
-    godot::Time *clock = godot::Time::get_singleton();
-    const int64_t budget_ms = eval_timeout_budget_ms(params);
-    const int64_t elapsed_ms =
-        clock ? static_cast<int64_t>(clock->get_ticks_msec()) - call_start_ticks
-              : 0;
-    if (clock && elapsed_ms >= budget_ms) {
-      JV body = eval_timeout_result(budget_ms, elapsed_ms, "");
-      append_eval_runtime_errors(body, call_seq_before);
-      return body;
-    }
+  const int64_t budget_ms = eval_timeout_budget_ms(params);
+  const int64_t elapsed_ms =
+      call_clock ? static_cast<int64_t>(call_clock->get_ticks_msec()) -
+                       call_start_ticks
+                 : 0;
+  if (call_clock && elapsed_ms >= budget_ms) {
+    JV body = eval_timeout_result(budget_ms, elapsed_ms, "");
+    append_eval_runtime_errors(body, call_seq_before);
+    return body;
   }
 
   godot::Object *state_obj = nullptr;
@@ -1218,10 +1217,12 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
       state_obj && state_obj->get_class() == "GDScriptFunctionState";
 
   if (is_await) {
-    int64_t await_timeout_ms = 5000;
-    if (auto *tp = params.Find("timeout_ms")) {
-      if (tp->IsInt() && tp->GetInt() > 0)
-        await_timeout_ms = tp->GetInt();
+    const int64_t await_timeout_ms =
+        runtime_budget::remaining_timeout_ms(budget_ms, elapsed_ms);
+    if (await_timeout_ms <= 0) {
+      JV body = eval_timeout_result(budget_ms, elapsed_ms, "");
+      append_eval_runtime_errors(body, call_seq_before);
+      return body;
     }
     GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
     awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result),

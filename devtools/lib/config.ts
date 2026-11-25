@@ -66,6 +66,8 @@ export function addonDir(projectDir: string): string {
   return path.join(projectDir, "addons", "godot-autopilot");
 }
 
+export const OWNED_FILES_MANIFEST = ".gda-owned-files.json";
+
 export const PLATFORM_LIBS: Readonly<Record<string, string>> = {
   windows: "godot-autopilot.dll",
   linux: "libgodot-autopilot.so",

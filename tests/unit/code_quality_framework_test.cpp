@@ -193,7 +193,29 @@ TEST(CodeQualityC4Test, DynamicToolAllowsConfirmMetaField) {
             "unknown parameter: bogus");
 }
 
-TEST(CodeQualityC4Test, DynamicToolWithoutParamsIsUnchanged) {
+TEST(CodeQualityC4Test, DynamicToolWithoutParamsRejectsNonObjectArguments) {
+  EXPECT_EQ(dynamic_validation_error(parse("[]"), {}),
+             "tool arguments must be an object");
+  EXPECT_EQ(dynamic_validation_error(parse("3"), {}),
+             "tool arguments must be an object");
+}
+
+TEST(CodeQualityC4Test, DynamicToolRejectsDuplicateAndUnsupportedParamDefs) {
+  const std::vector<godot_autopilot::ParamSpec> duplicates = {
+      {"value", "string", "", false},
+      {"value", "integer", "", false},
+  };
+  EXPECT_EQ(dynamic_validation_error(parse("{}"), duplicates),
+             "duplicate parameter name: value");
+
+  const std::vector<godot_autopilot::ParamSpec> unsupported = {
+      {"value", "unknown_kind", "", false},
+  };
+  EXPECT_EQ(dynamic_validation_error(parse(R"({"value":1})"), unsupported),
+             "unsupported parameter type: unknown_kind");
+}
+
+TEST(CodeQualityC4Test, DynamicToolWithoutParamsStillRequiresObjectArguments) {
   EXPECT_EQ(dynamic_validation_error(parse(R"({"arbitrary":{"nested":1}})"), {}),
             "<no error>");
 }

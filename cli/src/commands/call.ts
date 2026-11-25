@@ -2,7 +2,7 @@ import * as readline from "node:readline/promises";
 
 import type { GlobalOptions } from "../args";
 import { parseTransport } from "../args";
-import { CliError, ExitCode, isIpcAuthRejected } from "../errors";
+import { CliError, ExitCode, isIpcAuthRejected, isIpcRequestSent } from "../errors";
 import { callTool, ensureConnection, META_DIRECT_TOOLS } from "../mcp/client";
 import { err } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload, loadToolArguments } from "../payload";
@@ -13,6 +13,22 @@ import { appendCliTrace, makeTraceparent, newSpanId, newTraceId } from "../trace
 import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
+
+function parseInputResponses(text: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new CliError(ExitCode.Usage, "--input is not valid JSON");
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new CliError(ExitCode.Usage, "--input must be a JSON object");
+  }
+  const record = parsed as Record<string, unknown>;
+  if (record.confirm === true) return { confirm: { action: "accept" } };
+  if (record.confirm === false) return { confirm: { action: "decline" } };
+  return record;
+}
 
 function finishAsync(
   envelope: { result?: unknown },
@@ -63,6 +79,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const tool = positional[0];
   const args = loadToolArguments(opts);
+  const confirmResponses = opts.confirm === true
+    ? { confirm: { action: "accept" } }
+    : undefined;
   if (opts.confirm === true) {
     args.confirm = true;
   }
@@ -92,13 +111,14 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
         noFallback: opts.noFallback,
         traceparent,
         progressSink,
+        inputResponses: confirmResponses,
       });
       recordCliCall(traceId, tool, envelope, startedAt, "ipc");
       const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
       return emit(extracted, opts);
     } catch (error) {
       if (!(error instanceof CliError) || error.code !== ExitCode.Transport ||
-          opts.noFallback === true || isIpcAuthRejected(error)) {
+          opts.noFallback === true || isIpcAuthRejected(error) || isIpcRequestSent(error)) {
         throw error;
       }
       err(`IPC channel unavailable (${error.message}); falling back to the port channel.`);
@@ -118,6 +138,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     noFallback: opts.noFallback,
     traceparent,
     progressSink,
+    inputResponses: confirmResponses,
     keepTask: opts.async === true,
     transportSink: (actual) => {
       usedTransport = actual;
@@ -135,10 +156,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   if (inputRequired) {
     let inputResponses: Record<string, unknown> | null = null;
     if (opts.inputText !== undefined) {
-      try {
-        inputResponses = JSON.parse(opts.inputText) as Record<string, unknown>;
-      } catch {
-        throw new CliError(ExitCode.Usage, "--input is not valid JSON");
+      inputResponses = parseInputResponses(opts.inputText);
+      if ((inputResponses.confirm as { action?: unknown } | undefined)?.action === "accept") {
+        args.confirm = true;
       }
     } else if (process.stdin.isTTY) {
       const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
@@ -149,9 +169,10 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
         return ExitCode.ToolFailure;
       }
       inputResponses = { confirm: { action: "accept" } };
+      args.confirm = true;
     } else {
       err(`input_required: ${JSON.stringify(envelope.result)}`);
-      err("re-run with --confirm, or pass --input '<json>' with inputResponses");
+      err("re-run with --confirm, or pass --input '{\"confirm\":true}'");
       return ExitCode.Usage;
     }
     envelope = await callTool(tool, args, {

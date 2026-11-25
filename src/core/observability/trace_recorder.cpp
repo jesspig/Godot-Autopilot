@@ -1,3 +1,4 @@
+#include "core/observability/sanitize_policy.hpp"
 #include "core/observability/trace_recorder.hpp"
 #include "util/hash_util.hpp"
 #include "util/string_util.hpp"
@@ -6,7 +7,6 @@
 #include <cctype>
 #include <chrono>
 #include <cstdio>
-#include <cstring>
 #include <thread>
 #include <utility>
 
@@ -18,30 +18,6 @@ std::atomic<uint64_t> g_id_counter{1};
 
 bool is_blank(char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n';
-}
-
-bool ends_with(const std::string &text, const char *suffix) {
-  const std::size_t n = std::strlen(suffix);
-  return text.size() >= n && text.compare(text.size() - n, n, suffix) == 0;
-}
-
-bool is_sensitive_key(const std::string &raw_key) {
-  std::string key;
-  key.reserve(raw_key.size());
-  for (char c : raw_key) {
-    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  static const char *kExact[] = {
-      "data",     "base64",  "script_content", "token",    "secret",
-      "password", "passwd",  "key",            "api_key",  "apikey",
-      "authorization", "credential", "cookie", "session_token"};
-  for (const char *candidate : kExact) {
-    if (key == candidate) {
-      return true;
-    }
-  }
-  return ends_with(key, "_token") || ends_with(key, "_key") ||
-         ends_with(key, "_secret") || ends_with(key, "_password");
 }
 
 bool json_value_end(const std::string &text, std::size_t start,
@@ -143,7 +119,8 @@ std::string strip_key_values(const std::string &text) {
     while (colon < n && is_blank(text[colon])) {
       ++colon;
     }
-    if (colon < n && text[colon] == ':' && is_sensitive_key(raw_key)) {
+    if (colon < n && text[colon] == ':' &&
+        sanitize_policy::is_sensitive_key(raw_key)) {
       std::size_t value = colon + 1;
       while (value < n && is_blank(text[value])) {
         ++value;

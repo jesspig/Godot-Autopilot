@@ -71,7 +71,9 @@ const std::vector<ParamSpec> kResourceFileParams = {
     {"path", "string", "Source resource file or directory path inside res://, e.g. res://assets/icon.png; required by every action", true},
     {"new_path", "string", "Only with action='rename': new resource path, e.g. res://new_name.tres; 'to' is accepted as an alias; optional when new_directory is used", false},
     {"new_directory", "string", "Only with action='rename' (alternative to new_path) or 'move': destination directory inside res:// for a move that keeps the file or directory name; directories move recursively", false},
-    {"dest_path", "string", "Only with action='copy': destination file path to write, e.g. res://assets/icon_copy.png; missing parent directories are created recursively and an existing file is overwritten", false},
+    {"dest_path", "string", "Only with action='copy': destination file path to write, e.g. res://assets/icon_copy.png; missing parent directories are created recursively; an existing destination is rejected unless overwrite=true and confirm=true are both supplied", false},
+    {"overwrite", "boolean", "Only with action='copy': allow replacing an existing destination (default: false); replacing also requires confirm=true", false},
+    {"confirm", "boolean", "Only with action='copy' when overwrite=true and dest_path exists: explicit confirmation for replacing the destination", false},
     {"force", "boolean", "Only with action='remove': two-stage safety switch (default false); false returns would_delete plus dependents and deletes nothing, true performs the deletion", false},
 };
 
@@ -87,7 +89,9 @@ const std::vector<ParamSpec> kSaveResourceParams = {
 
 const std::vector<ParamSpec> kSetResourceUidParams = {
     {"path", "string", "Resource file path to assign the UID to, e.g. res://my_resource.tres", true},
-    {"uid", "integer", "UID value to assign; when omitted a fresh UID is auto-generated (contract gap: required in schema but optional in the implementation)", true},
+    {"uid", "integer", "UID value to assign; when omitted a fresh UID is auto-generated", false},
+    {"overwrite", "boolean", "Required with an already registered UID: allow reassigning it to this resource; without it the call is rejected", false},
+    {"confirm", "boolean", "Required together with overwrite=true when the UID is already registered; explicit confirmation prevents silent reference redirection", false},
 };
 
 const std::vector<ParamSpec> kResourceImportParams = {
@@ -394,12 +398,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
        "resource_property action=set name=path property=bake_interval value=8"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "resource_file",
-      "Copy, rename, move, remove or create resource files and directories (WritesFile, no confirmation). action selects the operation: 'copy' copies path to dest_path inside res:// (missing parent directories are created recursively and an existing dest_path is overwritten); 'rename' renames or moves path to new_path (or from/to) or into new_directory while keeping the name — the .uid sidecar travels with the file, open scenes that equal or reference the target are saved and reloaded, path= and uid= tokens in dependent .tscn/.tres files are rewritten and project.godot entries are remapped; 'move' moves path into new_directory and returns moved and failed arrays; 'remove' is a two-stage flow — without force it returns would_delete plus dependents from a reverse-reference scan and deletes nothing, with force=true it moves the file to the OS trash (or permanently removes it) and removes the .uid sidecar; 'create_dir' creates a directory below res:// recursively and reports created plus already_existed. Example: {\"action\": \"rename\", \"path\": \"res://old.tres\", \"new_path\": \"res://new.tres\"} or {\"action\": \"remove\", \"path\": \"res://old.tres\"}.",
+      "Copy, rename, move, remove or create resource files and directories (WritesFile; copy overwrite requires explicit confirmation). action selects the operation: 'copy' copies path to dest_path inside res:// (missing parent directories are created recursively; an existing dest_path is rejected unless overwrite=true and confirm=true are both supplied, and the staged copy is hash-verified before atomic replacement); 'rename' renames or moves path to new_path (or from/to) or into new_directory while keeping the name — the .uid sidecar travels with the file, open scenes that equal or reference the target are saved and reloaded, path= and uid= tokens in dependent .tscn/.tres files are rewritten and project.godot entries are remapped; 'move' moves path into new_directory and returns moved and failed arrays; 'remove' is a two-stage flow — without force it returns would_delete plus dependents from a reverse-reference scan and deletes nothing, with force=true it moves the file to the OS trash (or permanently removes it) and removes the .uid sidecar; 'create_dir' creates a directory below res:// recursively and reports created plus already_existed. Example: {\"action\": \"rename\", \"path\": \"res://old.tres\", \"new_path\": \"res://new.tres\"} or {\"action\": \"remove\", \"path\": \"res://old.tres\"}.",
       "Resources", {"resource", "file", "copy", "rename", "move", "remove", "delete", "directory", "create", "dry-run", "force", "uid", "copy_resource_file", "rename_resource_file", "move_resource_file", "remove_resource_file", "create_directory"}, SideEffect::WritesFile, tool_flags::kMutating,
       kResourceFileParams, resource_ops::handle_file_action,
       schema::build_action_schema(
           kResourceFileActions, kResourceFileParams,
-          "copy: copy a file inside res://; rename: rename or move a file/directory with reference rewrite; move: move a file/directory into another directory; remove: two-stage dry-run/force deletion; create_dir: create a directory recursively"),
+          "copy: copy a file inside res:// without silent overwrite; rename: rename or move a file/directory with reference rewrite; move: move a file/directory into another directory; remove: two-stage dry-run/force deletion; create_dir: create a directory recursively"),
 {
           resource_alias("copy_resource_file", "resource_file", "copy",
                          {"path", "dest_path"}),
@@ -428,7 +432,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
 {"resource_save action=save name=path dest_path=res://curves/path.tres"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "resource_uid_set",
-      "Assign a UID to a resource file so it can be referenced as uid://<id>, the counterpart of resource_query action='uid' (WritesFile, no confirmation). action='set_uid' requires path; uid is optional and auto-generated when omitted. Triggers a filesystem reimport so the assignment persists. Returns the UID that was applied. Example: {\"action\": \"set_uid\", \"path\": \"res://data/config.tres\"}.",
+      "Assign a UID to a resource file so it can be referenced as uid://<id>, the counterpart of resource_query action='uid' (WritesFile, confirmation required for reassignment). action='set_uid' requires path; uid is optional and auto-generated when omitted. If UID is already registered, overwrite=true and confirm=true are both required; the response previews old path, new path and affected references. Reference scanning fails closed when truncated. Mapping and .uid sidecar are written through a journaled transaction and restored on failure. Example: {\"action\": \"set_uid\", \"path\": \"res://data/config.tres\"}.",
       "Resources", {"resource", "uid", "set", "set_resource_uid"}, SideEffect::WritesFile, tool_flags::kMutating,
       kSetResourceUidParams, resource_ops::handle_uid_set_action,
       schema::build_action_schema(

@@ -2,10 +2,12 @@
 
 #include "core/config.hpp"
 #include "core/editor_coords.hpp"
+#include "core/observability/game_monitor.hpp"
 #include "core/observability/log_system.hpp"
 #include "gda_protocol.hpp"
 #include "runtime/error_cursor.hpp"
 #include "runtime/game_node_count.hpp"
+#include "runtime/runtime_budget.hpp"
 #include "tools/domains/capture/capture_ops.hpp"
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/base/tool_base.hpp"
@@ -30,6 +32,7 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
@@ -1728,6 +1731,41 @@ JV op_ui_elements(const JV &params) {
 
 godot::SceneTree *g_ready_tree = nullptr;
 
+namespace {
+
+bool node_has_csharp_bridge(godot::Node *node) {
+  if (node == nullptr)
+    return false;
+  if (node->get_name() == godot::StringName("__gda_runtime") &&
+      node->has_meta("bridge") &&
+      node->get_meta("bridge").get_type() != godot::Variant::NIL) {
+    return true;
+  }
+  for (int64_t i = 0; i < node->get_child_count(); ++i) {
+    if (node_has_csharp_bridge(node->get_child(i)))
+      return true;
+  }
+  return false;
+}
+
+bool csharp_bridge_present() {
+  auto *engine = godot::Engine::get_singleton();
+  if (engine == nullptr)
+    return false;
+  auto *tree = godot::Object::cast_to<godot::SceneTree>(engine->get_main_loop());
+  if (tree == nullptr)
+    return false;
+  return node_has_csharp_bridge(tree->get_root());
+}
+
+bool csharp_supported() {
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  return cdbs != nullptr &&
+         cdbs->class_exists(godot::StringName("CSharpScript"));
+}
+
+} // namespace
+
 void send_ready_message(bool scene_ready) {
   auto *dbg = godot::EngineDebugger::get_singleton();
   if (dbg == nullptr) {
@@ -1736,15 +1774,30 @@ void send_ready_message(bool scene_ready) {
   JV body(JV::object_tag);
   body[GDA_FIELD_READY] = JV(true);
   body[GDA_FIELD_SCENE_READY] = JV(scene_ready);
+  body["csharp_supported"] = JV(csharp_supported());
+  body["csharp_bridge"] =
+      JV(csharp_bridge_present() ? std::string("present") : std::string("missing"));
   append_activity_fields(body);
   godot::Array payload;
   payload.push_back(godot::String(body.Dump().c_str()));
   dbg->send_message(gda_string(GDA_MSG_READY), payload);
 }
 
+constexpr size_t GDA_MAX_TWEENS = 256;
+
 std::unordered_map<int64_t, godot::Ref<godot::Tween>> &game_tweens() {
   static std::unordered_map<int64_t, godot::Ref<godot::Tween>> store;
   return store;
+}
+
+void sweep_finished_tweens() {
+  auto &store = game_tweens();
+  for (auto it = store.begin(); it != store.end();) {
+    if (!it->second.is_valid() || !it->second->is_running())
+      it = store.erase(it);
+    else
+      ++it;
+  }
 }
 
 bool tween_number(const JV &params, const char *key, double &out) {
@@ -1862,6 +1915,11 @@ JV op_tween_create(const JV &params) {
     return error_result("invalid tween kind: " + kind);
   }
 
+  sweep_finished_tweens();
+  if (!runtime_budget::tween_capacity_available(game_tweens().size(),
+                                                GDA_MAX_TWEENS))
+    return error_result("tween registry is full (maximum " +
+                        std::to_string(GDA_MAX_TWEENS) + " live tweens)");
   const int64_t tween_id = tween->get_instance_id();
   game_tweens()[tween_id] = tween;
   inner["tween_id"] = JV(tween_id);
@@ -1904,6 +1962,7 @@ JV op_tween_control(const JV &params) {
 JV op_tween_list(const JV &params) {
   (void)params;
   JV items(JV::array_tag);
+  sweep_finished_tweens();
   auto &store = game_tweens();
   for (auto it = store.begin(); it != store.end();) {
     if (!it->second.is_valid()) {
@@ -1937,6 +1996,7 @@ public:
   bool scene_ready_sent_ = false;
 
   void on_process_frame() {
+    godot_autopilot::game_monitor::ensure_connected();
     if (scene_ready_sent_ || g_ready_tree == nullptr) {
       return;
     }
@@ -1953,7 +2013,19 @@ public:
 
   bool on_gda_message(const godot::String &p_message,
                       const godot::Array &p_data) {
-    (void)p_message;
+    if (p_message == gda_string(GDA_MSG_HELLO)) {
+      godot_autopilot::game_monitor::ensure_connected();
+      bool scene_ready = false;
+      if (auto *engine = godot::Engine::get_singleton()) {
+        if (auto *tree =
+                godot::Object::cast_to<godot::SceneTree>(engine->get_main_loop())) {
+          scene_ready = tree->get_current_scene() != nullptr;
+        }
+      }
+      send_ready_message(scene_ready);
+      return true;
+    }
+    godot_autopilot::game_monitor::ensure_connected();
     g_last_activity_ms = godot::Time::get_singleton()
                              ? godot::Time::get_singleton()->get_ticks_msec()
                              : 0;
@@ -2486,6 +2558,7 @@ void register_listener() {
       os->add_logger(g_logger);
     }
     g_registered = true;
+    godot_autopilot::game_monitor::ensure_connected();
 
     bool scene_ready_now = false;
     godot::SceneTree *tree = nullptr;
@@ -2497,16 +2570,12 @@ void register_listener() {
     }
     g_listener->scene_ready_sent_ = scene_ready_now;
     send_ready_message(scene_ready_now);
-    if (!scene_ready_now) {
-      if (tree != nullptr) {
-        g_ready_tree = tree;
-        tree->connect(
-            "process_frame",
-            godot::Callable(g_listener.ptr(),
-                            godot::StringName("on_process_frame")));
-      } else {
-        send_ready_message(true);
-      }
+    if (!scene_ready_now && tree != nullptr) {
+      g_ready_tree = tree;
+      tree->connect(
+          "process_frame",
+          godot::Callable(g_listener.ptr(),
+                          godot::StringName("on_process_frame")));
     }
     LogSystem::instance().log(
         LogLevel::Info, LogCategory::System,
@@ -2522,6 +2591,7 @@ void register_listener() {
 void unregister_listener() {
   if (!g_registered)
     return;
+  godot_autopilot::game_monitor::stop();
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
     dbg->unregister_message_capture(godot::StringName(gda_string(GDA_PREFIX)));
   }

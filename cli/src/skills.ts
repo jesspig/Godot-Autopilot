@@ -4,6 +4,7 @@ import path from "node:path";
 import builtinSkills from "../assets/skills.json";
 
 import { CliError, ExitCode } from "./errors";
+import { isPathInside, isSafeSkillName } from "./security-policy";
 
 export type SkillLanguage = "en" | "zh";
 
@@ -116,7 +117,7 @@ export function readSkillFile(
   relative?: string,
   lang: SkillLanguage = "en",
 ): string {
-  if (!/^[A-Za-z0-9._-]+$/.test(name)) {
+  if (!isSafeSkillName(name)) {
     throw new CliError(ExitCode.Usage, `invalid skill name: ${name}`);
   }
   if (root.source === "builtin") {
@@ -145,5 +146,11 @@ export function readSkillFile(
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
     throw new CliError(ExitCode.Usage, `skill file not found: ${name}/${target}`);
   }
-  return fs.readFileSync(resolved, "utf8");
+  const rootReal = fs.realpathSync(path.resolve(root.path));
+  const bookReal = fs.realpathSync(bookDir);
+  const targetReal = fs.realpathSync(resolved);
+  if (!isPathInside(rootReal, bookReal) || !isPathInside(bookReal, targetReal)) {
+    throw new CliError(ExitCode.Usage, `--file must stay inside the skill directory: ${relative}`);
+  }
+  return fs.readFileSync(targetReal, "utf8");
 }

@@ -2,6 +2,7 @@
 #define GODOT_AUTOPILOT_DISPATCH_HPP
 
 #include "core/command_queue.hpp"
+#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <optional>
@@ -12,6 +13,7 @@
 #include <utility>
 #include <mcp/JsonValue.hpp>
 #include <mcp/McpTypes.hpp>
+#include <tools/base/tool_invoke.hpp>
 
 namespace godot_autopilot {
 namespace dispatch {
@@ -74,6 +76,41 @@ BoundedWaitOutcome run_bounded_on_main_thread(
     CommandQueue &queue, const std::string &label,
     const std::shared_ptr<State> &state, Fn fn, int64_t budget_ms) {
   BoundedWaitOutcome out;
+  if (queue.is_main_thread()) {
+    const auto start = std::chrono::steady_clock::now();
+    try {
+      fn(*state);
+    } catch (const std::exception &ex) {
+      out.waited_ms = static_cast<int64_t>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - start)
+              .count());
+      out.error = std::string("editor main thread task failed: ") + ex.what();
+      return out;
+    } catch (...) {
+      out.waited_ms = static_cast<int64_t>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - start)
+              .count());
+      out.error = "editor main thread task failed: unexpected C++ exception";
+      return out;
+    }
+    out.waited_ms = static_cast<int64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start)
+            .count());
+    if (budget_ms <= 0 || out.waited_ms > budget_ms) {
+      out.timed_out = true;
+      out.error =
+          "editor main thread inline task '" + label + "' exceeded its " +
+          std::to_string(budget_ms) + " ms budget after " +
+          std::to_string(out.waited_ms) +
+          " ms; the task already ran to completion and could not be preempted";
+      return out;
+    }
+    out.ok = true;
+    return out;
+  }
   auto submission = queue.submit_tracked_bounded(
       [state, fn]() { fn(*state); }, budget_ms);
   out.waited_ms = submission.waited_ms;
@@ -107,10 +144,36 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
 
 bool has_deferred_marker(const mcp::JsonValue &result);
 
+struct DepthContext {
+  int depth = 0;
+  std::string trace_id;
+  std::string span_id;
+  std::string request_id;
+  bool run_on_calling_thread = false;
+};
+
+DepthContext capture_depth_context();
+int current_depth();
+
+class ScopedDepthContext {
+public:
+  explicit ScopedDepthContext(const DepthContext &ctx);
+  ~ScopedDepthContext();
+  ScopedDepthContext(const ScopedDepthContext &) = delete;
+  ScopedDepthContext &operator=(const ScopedDepthContext &) = delete;
+
+private:
+  int saved_depth_ = 0;
+  std::optional<tools::ScopedTraceContext> trace_scope_;
+};
+
 mcp::JsonValue call_handler(const std::string &name,
-                            const mcp::JsonValue &args);
+                            const mcp::JsonValue &args,
+                            const DepthContext &depth_ctx = {});
 
 mcp::CallToolResult export_blocked_result();
+
+mcp::JsonValue export_blocked_json_result();
 
 std::string export_blocked_error_text();
 

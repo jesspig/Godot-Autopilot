@@ -174,6 +174,39 @@ bool value_components_approx_equal(const godot::Variant &expected_value,
   }
 }
 
+bool variants_equal_exact(const godot::Variant &a, const godot::Variant &b,
+                          int depth = 0) {
+  if (a.get_type() != b.get_type())
+    return false;
+  if (depth > 32)
+    return false;
+  if (a.get_type() == godot::Variant::ARRAY) {
+    godot::Array aa = a;
+    godot::Array bb = b;
+    if (aa.size() != bb.size())
+      return false;
+    for (int i = 0; i < aa.size(); ++i) {
+      if (!variants_equal_exact(aa[i], bb[i], depth + 1))
+        return false;
+    }
+    return true;
+  }
+  if (a.get_type() == godot::Variant::DICTIONARY) {
+    godot::Dictionary da = a;
+    godot::Dictionary db = b;
+    if (da.size() != db.size())
+      return false;
+    godot::Array keys = da.keys();
+    for (int i = 0; i < keys.size(); ++i) {
+      if (!db.has(keys[i]) ||
+          !variants_equal_exact(da[keys[i]], db[keys[i]], depth + 1))
+        return false;
+    }
+    return true;
+  }
+  return a == b;
+}
+
 } // namespace
 
 ReadbackStatus check_readback(const godot::Variant &expected_value,
@@ -230,7 +263,7 @@ ReadbackStatus check_readback(const godot::Variant &expected_value,
         out_detail = "value matches expected";
         return ReadbackStatus::MATCHED;
       }
-      if (actual_dump == VariantJson::serialize(old_value).Dump()) {
+      if (variants_equal_exact(actual_value, old_value)) {
         out_detail =
             "value not applied: property stayed at old value (expected " +
             expected_dump + ", readback " + actual_dump + ")";
@@ -249,12 +282,12 @@ ReadbackStatus check_readback(const godot::Variant &expected_value,
     return ReadbackStatus::REJECTED;
   }
 
-  if (expected_dump == actual_dump) {
+  if (variants_equal_exact(expected_value, actual_value)) {
     out_detail = "value matches expected";
     return ReadbackStatus::MATCHED;
   }
 
-  if (expected_dump == VariantJson::serialize(old_value).Dump()) {
+  if (variants_equal_exact(expected_value, old_value)) {
     out_detail = "value already at target (default)";
     return ReadbackStatus::NOOP;
   }

@@ -110,4 +110,7 @@ set(GDA_CORE_SOURCES
     src/util/error_util.cpp
     src/util/readback_util.cpp
     src/util/scene_verify.cpp
-    src/ui/mcp_log_dock.cpp)
+    src/ui/mcp_log_dock.cpp
+    src/core/observability/game_monitor.cpp
+    src/core/observability/monitor_analysis.cpp
+    src/tools/domains/monitor/monitor_ops.cpp)

@@ -1,7 +1,9 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { run as runInstall } from "./install";
+import { selectLatest } from "../cache";
 import { updateCheck, updateCli, writeUpdateResult, type UpdateItemResult } from "../update";
+import { CLI_VERSION } from "../version";
 import { writeJson } from "./json-output";
 
 type Target = "cli" | "skills" | "plugin" | "all";
@@ -11,11 +13,11 @@ function parseTarget(text: string | undefined): Target {
   throw new CliError(ExitCode.Usage, "update requires cli, skills, plugin, or all");
 }
 
-function item(artifact: UpdateItemResult["artifact"], ok: boolean, error: string): UpdateItemResult {
+export function buildUpdateItem(artifact: UpdateItemResult["artifact"], ok: boolean, error: string): UpdateItemResult {
   return {
     artifact,
-    from: "",
-    to: "",
+    from: CLI_VERSION,
+    to: selectLatest(artifact)?.version ?? "",
     source: "cache",
     ok,
     action: ok ? "updated" : "failed",
@@ -43,10 +45,10 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
               [itemTarget],
               { ...opts, sourceText: opts.sourceText ?? "online" },
             );
-      results.push(item(itemTarget, code === ExitCode.Success, ""));
+      results.push(buildUpdateItem(itemTarget, code === ExitCode.Success, ""));
       return code === ExitCode.Success;
     } catch (error) {
-      results.push(item(itemTarget, false, String(error)));
+      results.push(buildUpdateItem(itemTarget, false, String(error)));
       return false;
     }
   };

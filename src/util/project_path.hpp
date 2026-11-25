@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace godot_autopilot {
@@ -27,8 +28,19 @@ inline std::string project_path_slashes(std::string path) {
   return path;
 }
 
+inline std::string project_path_root_prefix(std::string path) {
+  path = project_path_slashes(std::move(path));
+  if (path.size() == 3 && path[1] == ':' && path[2] == '/') {
+    return path;
+  }
+  while (path.size() > 1 && path.back() == '/') {
+    path.pop_back();
+  }
+  return path;
+}
+
 inline std::string project_path_lexical(const std::string &path,
-                                        bool &escaped) {
+                                         bool &escaped) {
   std::vector<std::string> parts;
   size_t start = 0;
   while (start <= path.size()) {
@@ -57,6 +69,12 @@ inline std::string project_path_lexical(const std::string &path,
       result += "/";
     result += part;
   }
+  if (result.size() == 2 && result[1] == ':') {
+    return result + "/";
+  }
+  if (!path.empty() && path[0] == '/') {
+    return result.empty() ? "/" : "/" + result;
+  }
   return result;
 }
 
@@ -68,21 +86,31 @@ inline bool project_path_is_absolute(const std::string &path) {
           path[1] == ':' && path[2] == '/');
 }
 
+inline char project_path_prefix_char(char value) {
+#ifdef _WIN32
+  if (value >= 'A' && value <= 'Z') {
+    return static_cast<char>(value + ('a' - 'A'));
+  }
+#endif
+  return value;
+}
+
 inline bool project_path_equal_prefix(const std::string &path,
                                       const std::string &root) {
-  if (path.size() < root.size())
+  const std::string normalized_root = project_path_root_prefix(root);
+  if (normalized_root.empty() || path.size() < normalized_root.size())
     return false;
-  for (size_t i = 0; i < root.size(); ++i) {
-    char left = path[i];
-    char right = root[i];
-    if (left >= 'A' && left <= 'Z')
-      left = static_cast<char>(left + ('a' - 'A'));
-    if (right >= 'A' && right <= 'Z')
-      right = static_cast<char>(right + ('a' - 'A'));
+  for (size_t i = 0; i < normalized_root.size(); ++i) {
+    char left = project_path_prefix_char(path[i]);
+    char right = project_path_prefix_char(normalized_root[i]);
     if (left != right)
       return false;
   }
-  return path.size() == root.size() || path[root.size()] == '/';
+  if (normalized_root == "/" ||
+      (normalized_root.size() == 3 && normalized_root[2] == '/'))
+    return true;
+  return path.size() == normalized_root.size() ||
+         path[normalized_root.size()] == '/';
 }
 
 enum class ProjectPathResolveStatus { Inside, Outside, Unresolved };
@@ -100,49 +128,102 @@ inline void set_scheme_globalize_provider(std::function<std::string(const std::s
   scheme_globalize_provider() = std::move(provider);
 }
 
+inline bool project_path_globalize(const std::string &scheme_path,
+                                   std::string &absolute_path) {
+  absolute_path.clear();
+  const auto &provider = scheme_globalize_provider();
+  if (!provider) {
+    return false;
+  }
+  try {
+    absolute_path = project_path_slashes(provider(scheme_path));
+  } catch (...) {
+    return false;
+  }
+  return !absolute_path.empty() && project_path_is_absolute(absolute_path);
+}
+
+inline bool project_path_components_resolve(
+    const std::filesystem::path &path, bool allow_file_final) {
+  std::filesystem::path component = path;
+  bool first = true;
+  while (!component.empty()) {
+    std::error_code ec;
+    const std::filesystem::file_status status =
+        std::filesystem::status(component, ec);
+    if (ec) {
+      if (ec != std::errc::no_such_file_or_directory) {
+        return false;
+      }
+    } else if (std::filesystem::exists(status) &&
+               (!std::filesystem::is_directory(status) &&
+                (!first || !allow_file_final))) {
+      return false;
+    }
+    const std::filesystem::path parent = component.parent_path();
+    if (parent == component) {
+      break;
+    }
+    component = parent;
+    first = false;
+  }
+  return true;
+}
+
 inline ProjectPathResolveStatus project_path_resolve_status(
     const std::string &absolute_path, const std::string &absolute_root) {
+  if (!project_path_is_absolute(absolute_path) ||
+      !project_path_is_absolute(absolute_root)) {
+    return ProjectPathResolveStatus::Unresolved;
+  }
+  const std::filesystem::path path(absolute_path);
+  const std::filesystem::path root(absolute_root);
+  if (!project_path_components_resolve(path, true) ||
+      !project_path_components_resolve(root, false)) {
+    return ProjectPathResolveStatus::Unresolved;
+  }
   std::error_code ec;
   const std::filesystem::path canonical_root =
-      std::filesystem::weakly_canonical(std::filesystem::path(absolute_root), ec);
+      std::filesystem::weakly_canonical(root, ec);
   if (ec)
     return ProjectPathResolveStatus::Unresolved;
-  const std::filesystem::path canonical_path = std::filesystem::weakly_canonical(
-      std::filesystem::path(absolute_path), ec);
+  const std::filesystem::path canonical_path =
+      std::filesystem::weakly_canonical(path, ec);
   if (ec)
     return ProjectPathResolveStatus::Unresolved;
-  std::string root_str = project_path_slashes(canonical_root.generic_string());
-  const std::string path_str = project_path_slashes(canonical_path.generic_string());
-  while (root_str.size() > 1 && root_str.back() == '/')
-    root_str.pop_back();
+  const std::string root_str =
+      project_path_root_prefix(canonical_root.generic_string());
+  const std::string path_str =
+      project_path_slashes(canonical_path.generic_string());
   return project_path_equal_prefix(path_str, root_str)
              ? ProjectPathResolveStatus::Inside
              : ProjectPathResolveStatus::Outside;
 }
 
 inline ProjectPath normalize_project_path(const std::string &raw,
-                                          bool allow_user, bool allow_root) {
+                                           bool allow_user, bool allow_root) {
   const std::string input = project_path_slashes(raw);
   if (input.empty())
     return {{}, "path is empty"};
 
   if (project_path_is_absolute(input)) {
-    auto *settings = godot::ProjectSettings::get_singleton();
-    if (!settings)
-      return {{}, "ProjectSettings is not available for absolute path validation"};
-    std::string absolute_root =
-        project_path_slashes(util::to_std(settings->globalize_path("res://")));
-    while (absolute_root.size() > 1 && absolute_root.back() == '/')
-      absolute_root.pop_back();
+    std::string absolute_root;
+    if (!project_path_globalize("res://", absolute_root)) {
+      return {{}, "project root could not be resolved for absolute path validation"};
+    }
+    const std::string root_prefix = project_path_root_prefix(absolute_root);
     bool absolute_escaped = false;
     const std::string absolute = project_path_lexical(input, absolute_escaped);
     if (absolute_escaped || absolute.empty() ||
-        !project_path_equal_prefix(absolute, absolute_root))
+        !project_path_equal_prefix(absolute, root_prefix))
       return {{}, "absolute path is outside the project root"};
-    if (project_path_resolve_status(absolute, absolute_root) ==
-        ProjectPathResolveStatus::Outside)
+    const ProjectPathResolveStatus status =
+        project_path_resolve_status(absolute, absolute_root);
+    if (status == ProjectPathResolveStatus::Outside)
       return {{}, "absolute path resolves outside the project root"};
-    std::string relative = absolute.substr(absolute_root.size());
+    if (status == ProjectPathResolveStatus::Unresolved)
+      return {{}, "absolute path containment could not be resolved"};
+    std::string relative = absolute.substr(root_prefix.size());
     if (!relative.empty() && relative[0] == '/')
       relative.erase(0, 1);
     if (relative.empty() && !allow_root)
@@ -173,28 +254,29 @@ inline ProjectPath normalize_project_path(const std::string &raw,
   if (clean.empty() && !allow_root)
     return {{}, "path must name an item below the namespace root"};
 
-  const auto &provider = scheme_globalize_provider();
-  if (provider && scheme == "res") {
-    const std::string absolute_root = project_path_slashes(provider("res://"));
-    const std::string scheme_path = scheme + "://" + clean;
-    const std::string absolute = project_path_slashes(provider(scheme_path));
-    if (!absolute_root.empty() && !absolute.empty() &&
-        !containment_status_allows(
-            project_path_resolve_status(absolute, absolute_root)))
-      return {{}, "path resolves outside the project root"};
+  std::string absolute_root;
+  std::string absolute;
+  const std::string namespace_root = scheme + "://";
+  const std::string scheme_path = scheme + "://" + clean;
+  if (!project_path_globalize(namespace_root, absolute_root) ||
+      !project_path_globalize(scheme_path, absolute)) {
+    return {{}, "path containment could not be resolved"};
   }
-  return {scheme + "://" + clean, {}};
+  const ProjectPathResolveStatus status =
+      project_path_resolve_status(absolute, absolute_root);
+  if (status == ProjectPathResolveStatus::Outside)
+    return {{}, "path resolves outside the namespace root"};
+  if (status == ProjectPathResolveStatus::Unresolved)
+    return {{}, "path containment could not be resolved"};
+  return {scheme_path, {}};
 }
 
 inline std::string current_project_root_path() {
   auto *settings = godot::ProjectSettings::get_singleton();
   if (!settings)
     return std::string();
-  std::string root =
-      project_path_slashes(util::to_std(settings->globalize_path("res://")));
-  while (root.size() > 1 && root.back() == '/')
-    root.pop_back();
-  return root;
+  return project_path_root_prefix(
+      util::to_std(settings->globalize_path("res://")));
 }
 
 } // namespace util

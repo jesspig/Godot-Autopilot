@@ -9,6 +9,7 @@
 #include "util/hash_util.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
+#include "util/script_capability.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
@@ -424,35 +425,38 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("failed to save script, error code: " +
                                 std::to_string(static_cast<int>(err)));
+    mcp::JsonValue details(mcp::JsonValue::object_tag);
+    details["code"] = mcp::JsonValue("script_save_failed");
+    details["path"] = mcp::JsonValue(path);
+    details["io_error"] = mcp::JsonValue(static_cast<int64_t>(err));
+    e["structured_error"] = std::move(details);
     return e;
   }
 
-  bool verified = false;
-  bool readback = false;
-  std::string read_back;
-  std::string write_issue;
-  std::string write_warning;
-  auto readback_file = godot::FileAccess::open(
-      godot::String(path.c_str()), godot::FileAccess::READ);
-  if (readback_file.is_valid() && readback_file->is_open()) {
-    readback = true;
-    read_back = util::to_std(readback_file->get_as_text());
-    godot::Error read_err = readback_file->get_error();
-    if (read_err != godot::OK && read_err != godot::ERR_FILE_EOF) {
-      write_issue = "readback read error";
-    } else if (read_back == source_code) {
-      verified = true;
-    } else {
-      write_issue = "readback mismatch (written " +
-                    std::to_string(source_code.size()) + " bytes, read back " +
-                    std::to_string(read_back.size()) + " bytes)";
-      write_warning =
-          "file may not have been updated on disk; retry or check file locks "
-          "(e.g. the running game or antivirus)";
+  resource_fs::GodotTextWriteFs file_system;
+  const resource_fs::TextWriteResult write_result =
+      resource_fs::verify_text_file(path, source_code, file_system);
+  if (!write_result.ok) {
+    mcp::JsonValue e = util::error_json(
+        "script write verification failed: " + write_result.message);
+    mcp::JsonValue details(mcp::JsonValue::object_tag);
+    details["code"] = mcp::JsonValue(
+        resource_fs::text_write_failure_code(write_result.failure));
+    details["path"] = mcp::JsonValue(path);
+    details["io_error"] =
+        mcp::JsonValue(static_cast<int64_t>(write_result.io_error));
+    details["expected_bytes"] =
+        mcp::JsonValue(static_cast<int64_t>(write_result.expected_bytes));
+    if (write_result.actual_bytes >= 0) {
+      details["actual_bytes"] =
+          mcp::JsonValue(static_cast<int64_t>(write_result.actual_bytes));
     }
-  } else {
-    write_issue = "readback open failed";
+    e["structured_error"] = std::move(details);
+    return e;
   }
+  const bool verified = true;
+  const bool readback = true;
+  const std::string read_back = source_code;
 
   std::string cache_refresh_error;
   bool cache_refreshed = refresh_script_cache(path, cache_refresh_error);
@@ -475,12 +479,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     j["disk_bytes"] = mcp::JsonValue(static_cast<int64_t>(read_back.size()));
     j["content_hash"] = mcp::JsonValue(fnv1a64_hex(read_back));
     j["content_hash_algo"] = mcp::JsonValue(content_hash_algo_name());
-  }
-  if (!write_issue.empty()) {
-    j["write_issue"] = mcp::JsonValue(write_issue);
-  }
-  if (!write_warning.empty()) {
-    j["warning"] = mcp::JsonValue(write_warning);
   }
   j["cache_refreshed"] = mcp::JsonValue(cache_refreshed);
   if (!cache_refreshed) {
@@ -554,15 +552,21 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("script attached to " + node_path);
-  bool instantiable = script->can_instantiate();
-  r["instantiated"] = mcp::JsonValue(instantiable);
+  const script_capability::Result capability =
+      script_capability::inspect_loaded(script);
+  r["instantiated"] = mcp::JsonValue(capability.editor_runnable);
+  r["editor_runnable"] = mcp::JsonValue(capability.editor_runnable);
+  r["runtime_mountable"] = mcp::JsonValue(capability.runtime_mountable);
+  r["code"] = mcp::JsonValue(script_capability::code_name(capability.code));
   scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
-  if (!instantiable) {
-    r["note"] =
-        mcp::JsonValue("script is not instantiable in the editor: method calls "
-                       "will fail until the game is run — mark the script with "
-                       "@tool to run in the editor");
+  if (!capability.editor_runnable && capability.runtime_mountable) {
+    r["note"] = mcp::JsonValue(
+        "runtime-only script: it runs in the game, not in the editor");
+  } else if (!capability.runtime_mountable) {
+    r["note"] = mcp::JsonValue(
+        "script is not mountable: " +
+        std::string(script_capability::code_name(capability.code)));
   }
   return r;
 }

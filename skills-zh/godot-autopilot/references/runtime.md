@@ -11,7 +11,7 @@
 
 所有 game 域工具经编辑器调试会话到达运行中的游戏。游戏必须从编辑器启动，且游戏项目加载 GDA 扩展。没有附加游戏时返回 `game not running`。会改变状态的 game 工具属于 GameRuntime，需要 `confirm: true`；确认错误是停下审查的信号，不是通道故障。
 
-已附加但未就绪时，默认 `wait_ready: true` 会排队，并在游戏报告带 `scene_ready`（当前场景已入树）的 `gda:ready` 后重放；`wait_ready: false` 立即失败。就绪一直不到时排队调用超时（`game_ready_timeout`）。force restart 后先等场景就绪再首调。已附加游戏且 `wait_ready: false` 持续失败，说明游戏项目未加载扩展。
+已附加但未就绪时，默认 `wait_ready: true` 会排队，并在游戏报告带 `scene_ready`（当前场景已入树）的 `gda:ready` 后重放；`wait_ready: false` 立即失败。就绪一直不到时排队调用超时（`game_ready_timeout`）。编辑器会向每个已附加会话发送 `gda:hello`，直到游戏回发真实 `scene_ready`；`game_ready_timeout` 与 `get_game_state(session)` 现在返回 `ready_diagnosis`（`extension_not_loaded` / `scene_not_ready` / `ready_lost` / `ready`）与 `hello_attempts`。force restart 后先等场景就绪再首调。已附加游戏且 `wait_ready: false` 持续失败，说明游戏项目未加载扩展。
 
 游戏调用等待 `timeout_ms` 加 2000 ms，上限 25000；长任务拆成较短调用并轮询 `get_game_state` 的 action=status。
 

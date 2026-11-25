@@ -7,6 +7,10 @@
 #include <vector>
 
 namespace godot_autopilot {
+namespace resource_fs {
+struct TextWriteResult;
+}
+
 namespace text_ops {
 
 struct CSharpClassInfo {
@@ -19,6 +23,10 @@ struct CSharpClassInfo {
 std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source);
 
 mcp::JsonValue script_load_diagnostics(bool loaded, bool instantiable);
+
+mcp::JsonValue file_write_failure_json(
+    const std::string &path, const std::string &mode,
+    const resource_fs::TextWriteResult &result);
 
 mcp::JsonValue handle_create_font(const mcp::JsonValue &args);
 mcp::JsonValue handle_create_shaped_text(const mcp::JsonValue &args);

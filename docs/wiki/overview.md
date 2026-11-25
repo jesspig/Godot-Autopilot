@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-11-23T17:28:29+08:00"
+timestamp: "2026-11-24T02:20:35+08:00"
 resource:
   - README.md
   - README.zh-CN.md
@@ -16,7 +16,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-11-23（公共 helper 与领域工具内部守卫增补；数值口径见 [tests.md](./tests.md)）
+> 审计日期：2026-11-24（插件启动日志与总览页工具面数值同步；数值口径见 [tests.md](./tests.md)）
 
 ## 项目定位
 
@@ -32,9 +32,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 插件在 TCP 端口之外额外监听一条本机 IPC 通道（Windows loopback TCP、POSIX AF_UNIX；4 字节大端长度前缀 + JSON，单帧 4 MiB；首帧 `initialize` 校验实例令牌），与 TCP `/mcp` 并存、绑定失败仅告警并降级；实例登记以 `endpoints.ipc = {kind, path|host+port, token, protocol, framing, auth, version}` 表达端点（缺字段按无 IPC 处理）。CLI `gda call --socket <path>` 或 `endpoints.ipc` 可直连该通道，失败默认回退端口通道。实现见 `src/core/transport/ipc_transport.cpp`、`ipc_framing.cpp`、`ipc_endpoint.cpp`。
 
-### MCP 工具面：catalog 252 = 5 元工具 + 246 领域工具 + `system_status`
+### MCP 工具面：catalog 253 = 5 元工具 + 247 领域工具 + `system_status`
 
-数值以 `src/tools/base/tool_spec.hpp`（`ToolSpec` 数据层）、`src/tools/base/tool_registry.hpp`（`ToolRegistry` 单一来源）与 `src/tools/domains/*/*_tools.hpp`（246 个域工具的 `make_tools()`，每工具一份 `ToolSpec`）为准；catalog/index 252 条目由 `register_all.cpp` 从 registry 派生；`get_active_registry()` 暴露活跃 registry，数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）；合并后的 action 工具用 `action` 参数区分动作，单工具最多 8 个 action。
+数值以 `src/tools/base/tool_spec.hpp`（`ToolSpec` 数据层）、`src/tools/base/tool_registry.hpp`（`ToolRegistry` 单一来源）与 `src/tools/domains/*/*_tools.hpp`（247 个域工具的 `make_tools()`，每工具一份 `ToolSpec`）为准；catalog/index 253 条目由 `register_all.cpp` 从 registry 派生；`get_active_registry()` 暴露活跃 registry，数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）；合并后的 action 工具用 `action` 参数区分动作，单工具最多 8 个 action。
 
 **5 个元工具**（`SpecTool` + `tool_flags::kMeta`，顶层 MCP 工具，见 `register_all.cpp`）：
 
@@ -46,7 +46,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | `batch_execute` | 顺序批量执行多工具（内部经 `dispatch::call_handler`，逐条返回） |
 | `code_execute` | 执行任意 GDScript（临时 Node + `_run()`，可选 `function_name` 多函数模式） |
 
-**246 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发；35 个域文件，28 个 category），按 category 分布如下（两列合计 252，含 5 元与 `system_status`；`Image`/`Mesh` 两个新域的工具归 Resources 类，`C#` 域归 Scripts 类，`GridMap`/`Tileset` 归 TileMap 类，`SceneTree` 归 Scene 类，故 category 数少于域文件数）：
+**247 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发；36 个域文件，29 个 category），按 category 分布如下（两列合计 253，含 5 元与 `system_status`；`Image`/`Mesh` 两个新域的工具归 Resources 类，`C#` 域归 Scripts 类，`GridMap`/`Tileset` 归 TileMap 类，`SceneTree` 归 Scene 类，故 category 数少于域文件数）：
 
 | 类别 | 数量 | 类别 | 数量 |
 |---|---:|---|---:|
@@ -64,10 +64,11 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | Meta | 2 | Analysis | 1 |
 | Docs | 1 | Group | 1 |
 | SpriteFrames | 1 | Testing | 1 |
+| Monitor | 1 |  |  |
 
-（`System` 5 = 3 个元工具（`call_tool`/`batch_execute`/`code_execute`）+ `system_status` + `get_game_log_entries`（Log 域，归 System 类），`Meta` 2 = `search_tools`/`get_tool_detail`；域文件口径的 35 个域计数见 [tool_surface_report.md](./tool_surface_report.md)「按域计数」。）
+（`System` 5 = 3 个元工具（`call_tool`/`batch_execute`/`code_execute`）+ `system_status` + `get_game_log_entries`（Log 域，归 System 类），`Meta` 2 = `search_tools`/`get_tool_detail`；域文件口径的 36 个域计数见 [tool_surface_report.md](./tool_surface_report.md)「按域计数」。）
 
-**生产别名 325** 不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析到 canonical，统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；schema 统计 235 非空 + 17 空（空 = 无参数且无 action schema）；能力矩阵 561 域行 / 567 catalog 行，mapped 315、kept 252、missing 0。`system_status`（端口/版本/运行时长，`SpecTool`）经 `call_tool` 调用，不直接注册为 MCP 工具。`ping` 是 `system_status` 的别名。只读工具回显 `"none"`（`side_effect_name(SideEffect::None)`）；`code_execute`/`batch_execute` 声明为 `code_execute`（`SideEffect::CodeExecute`）。
+**生产别名 325** 不占 catalog、不进 `search_tools`，只经 `call_tool` / `batch_execute` 解析到 canonical，统一 `deprecated_since="0.4.0"`、`removal_version="0.6.0"`；schema 统计 236 非空 + 17 空（空 = 无参数且无 action schema）；能力矩阵 562 域行 / 567 catalog 行，mapped 315、kept 253、missing 0。`system_status`（端口/版本/运行时长，`SpecTool`）经 `call_tool` 调用，不直接注册为 MCP 工具。`ping` 是 `system_status` 的别名。只读工具回显 `"none"`（`side_effect_name(SideEffect::None)`）；`code_execute`/`batch_execute` 声明为 `code_execute`（`SideEffect::CodeExecute`）。
 
 ### 提示词模板：12 个（7 通用 + 5 调试）
 
@@ -116,7 +117,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ## 目录结构
 
 ```text
-godot-self-driving/
+Godot-Autopilot/
 ├── CMakeLists.txt              # add_library(godot-autopilot SHARED ...)，新 .cpp 必须登记
 ├── CMakePresets.json           # 6 个 configure 预设：base-debug/base-release（hidden 基座）+ debug/release（Ninja）+ debug-portable/release-portable（平台默认生成器）
 ├── INSTALL.md                  # 一键脚本、Release 手动安装、源码构建与 Agent 安装流程
@@ -130,8 +131,8 @@ godot-self-driving/
 │   ├── main.cpp                # GDExtension 入口 + GodotAutopilotPlugin(EditorPlugin) 生命周期
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
 │   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext、PluginConfig、EditorReadiness、ErrorWatermark、EditorCoords、LogPersist、TraceRecorder、SanitizePolicy、Monitor、MonitorEnv、PerfSampler
-│   ├── tools/                  # 领域工具：61 个 .cpp（domains/*/*_ops + base/register_all、dispatch、tool_args、tool_pipeline 等）、
-│   │                           #   35 个域 _tools.hpp（246 条 ToolSpec，325 个别名）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
+│   ├── tools/                  # 领域工具：62 个 .cpp（domains/*/*_ops + base/register_all、dispatch、tool_args、tool_pipeline 等）、
+│   │                           #   36 个域 _tools.hpp（247 条 ToolSpec，325 个别名）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
 │   │                           #   ready_policy.hpp（游戏通道就绪决策，header-only）/ autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）；本轮新增 header-only helper：batch_verdict（批量结果判定）、call_depth_guard（调用深度）、call_tool_elicitation（高风险 elicitation 判定）
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources + skill_resources（skills 资源组，12 个资源）
 │   ├── prompts/                # 提示词模板：12 个（prompt_handlers 7 通用 + debugger_prompts 5 调试）

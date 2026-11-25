@@ -6,6 +6,7 @@ import { extractZip } from "./archive";
 import { cacheRoot, selectLatest, verifyManifest, cacheAssetPath } from "./cache";
 import { CliError, ExitCode } from "./errors";
 import { isAlive, stopForce } from "./process";
+import { canApplyUpdateTo } from "./security-policy";
 import { CLI_VERSION } from "./version";
 
 export interface UpdateItemResult {
@@ -118,6 +119,21 @@ export function applyUpdate(argv: string[]): number {
     writeUpdateResult(result);
     return 2;
   }
+  if (skipVerify) {
+    result.results[0].error = "--skip-verify is not allowed; the updated binary must be verified";
+    writeUpdateResult(result);
+    return 2;
+  }
+  if (!canApplyUpdateTo(process.execPath, target)) {
+    result.results[0].error = "--target must be the currently running gda executable";
+    writeUpdateResult(result);
+    return 2;
+  }
+  if (parentPid !== process.ppid) {
+    result.results[0].error = "--parent-pid does not match the parent process of apply-update";
+    writeUpdateResult(result);
+    return 2;
+  }
   waitForParent(parentPid);
   const dir = path.dirname(target);
   const temp = path.join(dir, `.gda-new-${process.pid}`);
@@ -157,11 +173,15 @@ export function applyUpdate(argv: string[]): number {
   }
 }
 
+export function cliUpdateBinaryName(platform: string = process.platform): string {
+  return platform === "win32" ? "gda.exe" : "gda";
+}
+
 function cacheCliBinary(): { binary: string; version: string; source: UpdateItemResult["source"] } | null {
   const manifest = selectLatest("cli");
   if (manifest === undefined || !verifyManifest(manifest)) return null;
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "cli-update-"));
-  const extracted = path.join(temp, "gda");
+  const extracted = path.join(temp, cliUpdateBinaryName());
   try {
     if (manifest.asset.endsWith(".zip")) {
       const dir = path.join(temp, "unpacked");

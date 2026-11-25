@@ -78,7 +78,8 @@ mcp::JsonValue serialize_ref(const godot::Ref<godot::Resource> &res) {
 
 namespace {
 
-
+using resource_ops_detail::ResourceScanBudget;
+using resource_ops_detail::scan_must_abort;
 
 constexpr size_t kGlobalClassFallbackMaxFiles = 500;
 constexpr size_t kGlobalClassAttrWindow = 512;
@@ -1016,7 +1017,17 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
       }
     }
   }
-  if (err == godot::OK && has_oid) {
+  if (err == godot::OK && !verified) {
+    mcp::JsonValue e = util::error_json(
+        "resource write verification failed for " + dest_path);
+    mcp::JsonValue details(mcp::JsonValue::object_tag);
+    details["code"] = mcp::JsonValue("resource_write_verification_failed");
+    details["path"] = mcp::JsonValue(dest_path);
+    details["io_error"] = mcp::JsonValue(static_cast<int64_t>(err));
+    e["structured_error"] = std::move(details);
+    return e;
+  }
+  if (err == godot::OK && verified && has_oid) {
     const std::vector<std::string> preserved_names =
         resource_registry::erase_oid_and_extract_names(obj_id);
     resource_registry::register_resource(res, name);
@@ -1356,37 +1367,6 @@ bool is_binary_candidate_entry(const godot::String &entry) {
   return has_binary_reference_extension(util::to_std(entry));
 }
 
-struct ResourceScanBudget {
-  size_t files_listed = 0;
-  size_t files_scanned = 0;
-  size_t bytes_scanned = 0;
-  std::string limit_reason;
-  bool truncated = false;
-  bool hit_limit(size_t file_bytes, size_t depth) {
-    if (depth > GDA_SCAN_MAX_DEPTH) {
-      limit_reason = "directory_depth";
-      truncated = true;
-      return true;
-    }
-    if (files_listed >= GDA_SCAN_MAX_FILES) {
-      limit_reason = "file_count";
-      truncated = true;
-      return true;
-    }
-    if (file_bytes > GDA_SCAN_MAX_FILE_BYTES) {
-      limit_reason = "single_file_bytes";
-      truncated = true;
-      return true;
-    }
-    if (bytes_scanned > GDA_SCAN_MAX_TOTAL_BYTES - file_bytes) {
-      limit_reason = "total_bytes";
-      truncated = true;
-      return true;
-    }
-    return false;
-  }
-};
-
 void collect_matching_files(const std::string &dir,
                             bool (*match)(const godot::String &),
                             std::vector<std::string> &out) {
@@ -1435,7 +1415,12 @@ void collect_matching_files_budget(const std::string &dir,
   }
   godot::Ref<godot::DirAccess> da =
       godot::DirAccess::open(godot::String(dir.c_str()));
-  if (da.is_null()) return;
+  if (da.is_null()) {
+    budget.limit_reason = "directory_open_failed";
+    budget.truncated = true;
+    truncated = true;
+    return;
+  }
   da->list_dir_begin();
   godot::String entry = da->get_next();
   while (entry != godot::String()) {
@@ -1600,6 +1585,9 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
   const auto *it_overwrite = args.Find("overwrite");
   const bool overwrite = it_overwrite != nullptr && it_overwrite->IsBool() &&
                          it_overwrite->GetBool();
+  const auto *it_confirm = args.Find("confirm");
+  const bool confirm = it_confirm != nullptr && it_confirm->IsBool() &&
+                       it_confirm->GetBool();
   const bool already_registered = uid_svc->has_id(uid);
   const resource_ops_detail::UidVerdict verdict =
       resource_ops_detail::validate_uid_assignment(explicit_uid, uid,
@@ -1609,16 +1597,149 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
         ? "uid must be a positive integer"
         : "uid already registered; pass overwrite=true to reassign it");
   }
+
+  const godot::String uid_text_value = uid_svc->id_to_text(uid);
+  const std::string uid_text = util::to_std(uid_text_value);
+  if (uid_text.empty()) {
+    return util::error_json("failed to convert uid " + std::to_string(uid) +
+                            " to text");
+  }
+  const std::string old_path =
+      util::to_std(uid_svc->get_id_path(uid));
+  ResourceScanBudget ref_budget;
+  bool ref_truncated = false;
+  const mcp::JsonValue affected = collect_reference_hits_budget(
+      path, uid_text, std::string(), ref_budget, ref_truncated);
+  auto reassignment_error = [&](const std::string &code,
+                                const std::string &message) {
+    mcp::JsonValue e = util::error_json(message);
+    e["code"] = mcp::JsonValue(code);
+    e["uid"] = mcp::JsonValue(static_cast<int64_t>(uid));
+    e["old_path"] = mcp::JsonValue(old_path);
+    e["new_path"] = mcp::JsonValue(path);
+    e["affected_references"] = affected;
+    e["scan_truncated"] = mcp::JsonValue(ref_truncated);
+    return e;
+  };
+  const resource_ops_detail::UidReassignFailure failure =
+      resource_ops_detail::check_uid_reassign(overwrite, confirm,
+                                              already_registered,
+                                              ref_truncated);
+  if (failure == resource_ops_detail::UidReassignFailure::kScanTruncated) {
+    mcp::JsonValue e = reassignment_error(
+        "transaction_failed",
+        "uid reassignment aborted because the reference scan was truncated");
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] =
+        mcp::JsonValue(static_cast<int64_t>(ref_budget.files_listed));
+    lim["files_scanned"] =
+        mcp::JsonValue(static_cast<int64_t>(ref_budget.files_scanned));
+    lim["bytes_scanned"] =
+        mcp::JsonValue(static_cast<int64_t>(ref_budget.bytes_scanned));
+    if (!ref_budget.limit_reason.empty())
+      lim["reason"] = mcp::JsonValue(ref_budget.limit_reason);
+    e["scan_limit"] = std::move(lim);
+    return e;
+  }
+  if (failure ==
+      resource_ops_detail::UidReassignFailure::kRequiresOverwrite) {
+    return reassignment_error(
+        "target_conflict",
+        "uid " + uid_text + " is already assigned to another resource; pass "
+        "overwrite=true to reassign it");
+  }
+  if (failure ==
+      resource_ops_detail::UidReassignFailure::kConfirmationRequired) {
+    mcp::JsonValue e = reassignment_error(
+        "confirmation_required",
+        "reassigning an existing UID requires overwrite=true and confirm=true");
+    e["confirm_required"] = mcp::JsonValue(true);
+    return e;
+  }
+
   const godot::String path_gs = godot::String::utf8(path.c_str());
-  const bool added = verdict == resource_ops_detail::UidVerdict::kAcceptAdd;
-  if (added) {
-    uid_svc->add_id(uid, path_gs);
-  } else {
+  const std::string sidecar = path + ".uid";
+  const godot::String sidecar_gs = godot::String::utf8(sidecar.c_str());
+  const bool sidecar_exists = godot::FileAccess::file_exists(sidecar_gs);
+  std::string original_sidecar;
+  if (sidecar_exists) {
+    godot::Ref<godot::FileAccess> sidecar_file =
+        godot::FileAccess::open(sidecar_gs, godot::FileAccess::READ);
+    if (sidecar_file.is_null()) {
+      return reassignment_error("transaction_failed",
+                                "failed to open existing UID sidecar: " +
+                                    sidecar);
+    }
+    original_sidecar = util::to_std(sidecar_file->get_as_text());
+    const godot::Error read_error = sidecar_file->get_error();
+    sidecar_file->close();
+    if (read_error != godot::OK && read_error != godot::ERR_FILE_EOF) {
+      return reassignment_error("transaction_failed",
+                                "failed to read existing UID sidecar: " +
+                                    sidecar);
+    }
+  }
+
+  resource_fs::GodotFileTransactionFs file_system;
+  resource_fs::FileTransactionPlan sidecar_plan;
+  sidecar_plan.operations.push_back(
+      {resource_fs::FileTransactionKind::kWrite, {}, sidecar, uid_text, true,
+       true});
+  resource_fs::FileTransactionJournal sidecar_journal;
+  const resource_fs::FileTransactionResult sidecar_result =
+      resource_fs::commit_file_transaction(sidecar_plan, sidecar_journal,
+                                           file_system);
+  if (!sidecar_result.ok) {
+    mcp::JsonValue e = reassignment_error(sidecar_result.code,
+                                          sidecar_result.message);
+    if (!sidecar_result.compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : sidecar_result.compensation_errors)
+        compensation.PushBack(mcp::JsonValue(item));
+      e["compensation_errors"] = std::move(compensation);
+    }
+    return e;
+  }
+
+  if (already_registered) {
     uid_svc->set_id(uid, path_gs);
+  } else {
+    uid_svc->add_id(uid, path_gs);
   }
-  if (!uid_svc->has_id(uid)) {
-    return util::error_json("failed to assign uid " + std::to_string(uid));
+  if (uid_svc->get_id_path(uid) != path_gs) {
+    if (old_path.empty()) {
+      uid_svc->remove_id(uid);
+    } else {
+      uid_svc->set_id(uid, godot::String::utf8(old_path.c_str()));
+    }
+    std::vector<std::string> compensation_errors;
+    if (sidecar_exists) {
+      resource_fs::FileTransactionPlan restore_plan;
+      restore_plan.operations.push_back(
+          {resource_fs::FileTransactionKind::kWrite, {}, sidecar,
+           original_sidecar, true, true});
+      resource_fs::FileTransactionJournal restore_journal;
+      const resource_fs::FileTransactionResult restored =
+          resource_fs::commit_file_transaction(restore_plan, restore_journal,
+                                               file_system);
+      if (!restored.ok) compensation_errors.push_back(restored.message);
+    } else {
+      std::string remove_error;
+      if (!file_system.remove_file(sidecar, remove_error))
+        compensation_errors.push_back(remove_error);
+    }
+    mcp::JsonValue e = reassignment_error(
+        "transaction_failed", "failed to update ResourceUID mapping for " +
+                                  uid_text);
+    if (!compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : compensation_errors)
+        compensation.PushBack(mcp::JsonValue(item));
+      e["compensation_errors"] = std::move(compensation);
+    }
+    return e;
   }
+
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
@@ -1628,6 +1749,13 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<int64_t>(uid));
+  r["uid"] = mcp::JsonValue(static_cast<int64_t>(uid));
+  r["uid_text"] = mcp::JsonValue(uid_text);
+  r["old_path"] = mcp::JsonValue(old_path);
+  r["new_path"] = mcp::JsonValue(path);
+  r["affected_references"] = affected;
+  r["sidecar_written"] = mcp::JsonValue(sidecar);
+  r["scan_truncated"] = mcp::JsonValue(false);
   return r;
 }
 
@@ -1807,10 +1935,35 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
                               "provide resource paths below res://");
   const std::string &from = from_path;
   const std::string &to = to_path;
+  if (from == to) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("source and destination are the same file: " +
+                                from);
+    return e;
+  }
   const std::string from_uid_path = from + ".uid";
   const std::string to_uid_path = to + ".uid";
   const std::string from_import_path = from + ".import";
   const std::string to_import_path = to + ".import";
+  const godot::String from_gs(from.c_str());
+  if (!godot::FileAccess::file_exists(from_gs) ||
+      godot::DirAccess::dir_exists_absolute(from_gs)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("source does not exist or is a directory: " +
+                                from);
+    return e;
+  }
+  for (const std::string &target :
+       {to, to_uid_path, to_import_path}) {
+    const godot::String target_gs(target.c_str());
+    if (godot::FileAccess::file_exists(target_gs) ||
+        godot::DirAccess::dir_exists_absolute(target_gs)) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("rename target already exists: " + target);
+      e["code"] = mcp::JsonValue("target_conflict");
+      return e;
+    }
+  }
 
   auto *loader = godot::ResourceLoader::get_singleton();
   auto *ruid = godot::ResourceUID::get_singleton();
@@ -1818,7 +1971,7 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   int64_t old_uid = -1;
   std::string old_uid_str;
   if (loader && ruid) {
-    old_uid = loader->get_resource_uid(godot::String(from.c_str()));
+    old_uid = loader->get_resource_uid(from_gs);
     if (old_uid >= 0) {
       old_uid_str = util::to_std(ruid->id_to_text(old_uid));
     }
@@ -1826,44 +1979,42 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
 
   const bool uid_sidecar_absent =
       !godot::FileAccess::file_exists(godot::String(from_uid_path.c_str()));
-  godot::Error uid_err = godot::OK;
-  if (!uid_sidecar_absent) {
-    uid_err = godot::DirAccess::rename_absolute(
-        godot::String(from_uid_path.c_str()),
-        godot::String(to_uid_path.c_str()));
-  }
-
   const bool import_sidecar_present = godot::FileAccess::file_exists(
       godot::String(from_import_path.c_str()));
-  godot::Error import_err = godot::OK;
-  if (import_sidecar_present) {
-    import_err = godot::DirAccess::rename_absolute(
-        godot::String(from_import_path.c_str()),
-        godot::String(to_import_path.c_str()));
-  }
-
-  std::vector<resource_ops_detail::SidecarMove> sidecar_moves;
-  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kUid,
-                           !uid_sidecar_absent && uid_err == godot::OK});
-  sidecar_moves.push_back({resource_ops_detail::SidecarKind::kImport,
-                           import_sidecar_present && import_err == godot::OK});
 
   ResourceScanBudget scan_budget;
   bool scan_truncated = false;
   std::vector<std::string> text_files;
-  collect_matching_files_budget("res://", is_text_resource_entry, text_files, scan_budget, 0, scan_truncated);
+  collect_matching_files_budget("res://", is_text_resource_entry, text_files,
+                                scan_budget, 0, scan_truncated);
   std::vector<std::pair<std::string, RefHit>> deps;
   for (const std::string &fp : text_files) {
-    if (scan_truncated) break;
+    if (scan_must_abort(scan_budget, scan_truncated)) {
+      break;
+    }
     godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
         godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (fa.is_null()) continue;
+    if (fa.is_null()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("failed to scan dependency: " + fp);
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
     int64_t len = fa->get_length();
     size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
-    if (scan_budget.hit_limit(file_bytes, 0)) { scan_truncated = true; break; }
+    if (scan_budget.hit_limit(file_bytes, 0)) {
+      scan_truncated = true;
+      break;
+    }
     scan_budget.files_scanned++;
     scan_budget.bytes_scanned += file_bytes;
     const godot::String content = fa->get_as_text();
+    if (fa->get_error() != godot::OK && fa->get_error() != godot::ERR_FILE_EOF) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("failed to read dependency: " + fp);
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
     const RefHit hit =
         scan_reference_tokens(content, from, old_uid_str, std::string());
     if (hit.path || hit.uid || hit.klass) {
@@ -1874,23 +2025,67 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
   std::vector<std::string> unsupported_binary;
   std::vector<std::string> binary_candidates;
   collect_matching_files_budget("res://", is_binary_candidate_entry,
-                         binary_candidates, scan_budget, 0, scan_truncated);
+                                binary_candidates, scan_budget, 0,
+                                scan_truncated);
   for (const std::string &fp : binary_candidates) {
-    if (scan_truncated) break;
+    if (scan_must_abort(scan_budget, scan_truncated)) {
+      break;
+    }
     godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
         godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (fa.is_null()) continue;
+    if (fa.is_null()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("failed to scan binary dependency: " + fp);
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
     int64_t len = fa->get_length();
     size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
-    if (scan_budget.hit_limit(file_bytes, 0)) { scan_truncated = true; break; }
+    if (scan_budget.hit_limit(file_bytes, 0)) {
+      scan_truncated = true;
+      break;
+    }
     scan_budget.files_scanned++;
     scan_budget.bytes_scanned += file_bytes;
+    const godot::String content = fa->get_as_text();
+    if (fa->get_error() != godot::OK && fa->get_error() != godot::ERR_FILE_EOF) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("failed to read binary dependency: " + fp);
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
     const RefHit hit =
-        scan_reference_tokens(fa->get_as_text(), from, old_uid_str,
-                              std::string());
+        scan_reference_tokens(content, from, old_uid_str, std::string());
     if (hit.path || hit.uid || hit.klass) {
       unsupported_binary.push_back(fp);
     }
+  }
+
+  if (scan_must_abort(scan_budget, scan_truncated)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "rename aborted because the dependency scan was truncated");
+    e["code"] = mcp::JsonValue("transaction_failed");
+    e["scan_truncated"] = mcp::JsonValue(true);
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] =
+        mcp::JsonValue(static_cast<int64_t>(scan_budget.files_listed));
+    lim["files_scanned"] =
+        mcp::JsonValue(static_cast<int64_t>(scan_budget.files_scanned));
+    lim["bytes_scanned"] =
+        mcp::JsonValue(static_cast<int64_t>(scan_budget.bytes_scanned));
+    lim["max_files"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
+    lim["max_file_bytes"] =
+        mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
+    lim["max_total_bytes"] =
+        mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_TOTAL_BYTES));
+    lim["max_depth"] =
+        mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
+    if (!scan_budget.limit_reason.empty()) {
+      lim["reason"] = mcp::JsonValue(scan_budget.limit_reason);
+    }
+    e["scan_limit"] = std::move(lim);
+    return e;
   }
 
   std::vector<std::string> affected_open_scenes;
@@ -1920,22 +2115,241 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     }
   }
 
-  godot::Error err = godot::DirAccess::rename_absolute(
-      godot::String(from.c_str()), godot::String(to.c_str()));
-  if (err != godot::OK) {
-    for (resource_ops_detail::SidecarKind kind :
-         resource_ops_detail::rollback_order(sidecar_moves)) {
-      const std::string &moved_from =
-          kind == resource_ops_detail::SidecarKind::kUid ? from_uid_path : from_import_path;
-      const std::string &moved_to =
-          kind == resource_ops_detail::SidecarKind::kUid ? to_uid_path : to_import_path;
-      godot::DirAccess::rename_absolute(godot::String(moved_to.c_str()),
-                                        godot::String(moved_from.c_str()));
+  struct UpdatedFileRec {
+    std::string file;
+    std::vector<std::string> changes;
+  };
+  struct StaleRefRec {
+    std::string file;
+    std::string token;
+  };
+  std::vector<UpdatedFileRec> updated;
+  std::vector<StaleRefRec> stale;
+  resource_fs::FileTransactionPlan plan;
+  resource_fs::FileTransactionOp main_move;
+  main_move.kind = resource_fs::FileTransactionKind::kMove;
+  main_move.source = from;
+  main_move.destination = to;
+
+  struct RemapRec {
+    std::string setting;
+    std::string old;
+    std::string updated;
+  };
+  std::vector<RemapRec> remaps;
+  auto *ps = godot::ProjectSettings::get_singleton();
+  if (ps) {
+    const std::string kAutoloadPrefix = "autoload/";
+    auto try_remap = [&](const std::string &setting_name) {
+      if (!ps->has_setting(godot::String(setting_name.c_str()))) {
+        return;
+      }
+      const godot::Variant v =
+          ps->get_setting(godot::String(setting_name.c_str()));
+      if (v.get_type() != godot::Variant::STRING) {
+        return;
+      }
+      const std::string s = util::to_std(v.operator godot::String());
+      const bool starred = !s.empty() && s[0] == '*';
+      const std::string core = starred ? s.substr(1) : s;
+      if (core != from) {
+        return;
+      }
+      const std::string rewritten =
+          (starred ? std::string("*") : std::string()) + to;
+      remaps.push_back({setting_name, s, rewritten});
+    };
+    try_remap("application/run/main_scene");
+    godot::TypedArray<godot::Dictionary> props = ps->get_property_list();
+    for (int64_t i = 0; i < props.size(); i++) {
+      godot::Dictionary d = props[i];
+      const std::string name =
+          util::to_std(d["name"].operator godot::String());
+      if (name.compare(0, kAutoloadPrefix.size(), kAutoloadPrefix) == 0) {
+        try_remap(name);
+      }
     }
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
-    r["error"] = mcp::JsonValue("rename failed; sidecars were restored");
-    return r;
+  }
+
+  for (const auto &dep : deps) {
+    const std::string &fp = dep.first;
+    const RefHit &hit = dep.second;
+    if (has_binary_reference_extension(fp)) {
+      unsupported_binary.push_back(fp);
+      continue;
+    }
+    godot::String content;
+    {
+      godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
+          godot::String(fp.c_str()), godot::FileAccess::READ);
+      if (fa.is_null()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to read dependency: " + fp);
+        e["code"] = mcp::JsonValue("transaction_failed");
+        return e;
+      }
+      content = fa->get_as_text();
+      if (fa->get_error() != godot::OK &&
+          fa->get_error() != godot::ERR_FILE_EOF) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to read dependency: " + fp);
+        e["code"] = mcp::JsonValue("transaction_failed");
+        return e;
+      }
+    }
+    std::vector<std::string> changes;
+    bool needs_write = false;
+
+    if (hit.path) {
+      const godot::String old_tok = make_token("path=\"", from);
+      const godot::String new_tok = make_token("path=\"", to);
+      if (!content.contains(old_tok)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(
+            "dependency changed before rewrite staging: " + fp);
+        e["code"] = mcp::JsonValue("transaction_failed");
+        return e;
+      }
+      content = content.replace(old_tok, new_tok);
+      needs_write = true;
+      changes.emplace_back("path");
+    }
+
+    if (hit.klass) {
+      const std::vector<std::string> class_tokens =
+          extract_script_class_tokens(content);
+      if (class_tokens.empty()) {
+        stale.push_back({fp, "script_class"});
+      } else {
+        for (const std::string &tok : class_tokens) {
+          stale.push_back({fp, tok});
+        }
+      }
+    }
+
+    if (!needs_write) {
+      continue;
+    }
+    if (fp == from) {
+      main_move.content = util::to_std(content);
+      main_move.has_content = true;
+    } else {
+      plan.operations.push_back({resource_fs::FileTransactionKind::kWrite, {},
+                                 fp, util::to_std(content), true, true});
+    }
+    updated.push_back({fp, std::move(changes)});
+  }
+
+  if (!remaps.empty()) {
+    godot::Ref<godot::ConfigFile> config;
+    config.instantiate();
+    if (config->load(godot::String("res://project.godot")) != godot::OK) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "failed to load project.godot for rename remapping");
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
+    for (const RemapRec &remap : remaps) {
+      const size_t slash = remap.setting.find('/');
+      if (slash == std::string::npos) {
+        continue;
+      }
+      config->set_value(
+          godot::String(remap.setting.substr(0, slash).c_str()),
+          godot::String(remap.setting.substr(slash + 1).c_str()),
+          godot::Variant(godot::String(remap.updated.c_str())));
+    }
+    const std::string staged_project =
+        resource_fs::file_transaction_temp_path(
+            "res://project.godot", resource_fs::next_file_transaction_serial(),
+            plan.operations.size());
+    if (config->save(godot::String(staged_project.c_str())) != godot::OK) {
+      godot::DirAccess::remove_absolute(
+          godot::String(staged_project.c_str()));
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "failed to stage project.godot rename remapping");
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
+    godot::Ref<godot::FileAccess> project_file = godot::FileAccess::open(
+        godot::String(staged_project.c_str()), godot::FileAccess::READ);
+    if (project_file.is_null()) {
+      godot::DirAccess::remove_absolute(
+          godot::String(staged_project.c_str()));
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "failed to read staged project.godot rename remapping");
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
+    const std::string project_content =
+        util::to_std(project_file->get_as_text());
+    const godot::Error project_read_error = project_file->get_error();
+    project_file->close();
+    godot::DirAccess::remove_absolute(godot::String(staged_project.c_str()));
+    if (project_read_error != godot::OK &&
+        project_read_error != godot::ERR_FILE_EOF) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "failed to read staged project.godot rename remapping");
+      e["code"] = mcp::JsonValue("transaction_failed");
+      return e;
+    }
+    plan.operations.push_back({resource_fs::FileTransactionKind::kWrite, {},
+                               "res://project.godot", project_content, true,
+                               true});
+    updated.push_back({"res://project.godot", {"settings"}});
+  }
+
+  plan.operations.push_back(std::move(main_move));
+  if (!uid_sidecar_absent) {
+    plan.operations.push_back({resource_fs::FileTransactionKind::kMove,
+                               from_uid_path, to_uid_path, {}, false, false});
+  } else {
+    plan.operations.push_back({resource_fs::FileTransactionKind::kRequireAbsent,
+                               {}, to_uid_path, {}, false, false});
+  }
+  if (import_sidecar_present) {
+    plan.operations.push_back({resource_fs::FileTransactionKind::kMove,
+                               from_import_path, to_import_path, {}, false,
+                               false});
+  } else {
+    plan.operations.push_back({resource_fs::FileTransactionKind::kRequireAbsent,
+                               {}, to_import_path, {}, false, false});
+  }
+
+  resource_fs::FileTransactionJournal journal;
+  resource_fs::GodotFileTransactionFs file_system;
+  const resource_fs::FileTransactionResult transaction =
+      resource_fs::commit_file_transaction(plan, journal, file_system);
+  if (!transaction.ok) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(transaction.message);
+    e["code"] = mcp::JsonValue(transaction.code.empty()
+                                  ? "transaction_failed"
+                                  : transaction.code);
+    if (!transaction.compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : transaction.compensation_errors) {
+        compensation.PushBack(mcp::JsonValue(item));
+      }
+      e["compensation_errors"] = std::move(compensation);
+    }
+    return e;
+  }
+  const int64_t err = godot::OK;
+  auto *editor_written = godot::EditorInterface::get_singleton();
+  if (editor_written) {
+    auto *efs_written = editor_written->get_resource_filesystem();
+    if (efs_written) {
+      for (const UpdatedFileRec &file : updated) {
+        if (file.file != from) {
+          efs_written->update_file(godot::String(file.file.c_str()));
+        }
+      }
+    }
   }
 
   std::vector<std::string> ghost_tabs;
@@ -1958,88 +2372,7 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     tab_cleanup = close_open_scene_tabs(ghost_tabs);
   }
 
-  struct UpdatedFileRec {
-    std::string file;
-    std::vector<std::string> changes;
-  };
-  struct StaleRefRec {
-    std::string file;
-    std::string token;
-  };
-  std::vector<UpdatedFileRec> updated;
-  std::vector<StaleRefRec> stale;
-
-  for (const auto &dep : deps) {
-    const std::string &fp = dep.first;
-    const RefHit &hit = dep.second;
-    if (has_binary_reference_extension(fp)) {
-      unsupported_binary.push_back(fp);
-      continue;
-    }
-    godot::String content;
-    {
-      godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
-          godot::String(fp.c_str()), godot::FileAccess::READ);
-      if (fa.is_null()) {
-        stale.push_back({fp, std::string()});
-        continue;
-      }
-      content = fa->get_as_text();
-    }
-    std::vector<std::string> changes;
-    bool needs_write = false;
-
-    if (hit.path) {
-      const godot::String old_tok = make_token("path=\"", from);
-      const godot::String new_tok = make_token("path=\"", to);
-      if (content.contains(old_tok)) {
-        content = content.replace(old_tok, new_tok);
-        needs_write = true;
-        changes.emplace_back("path");
-      }
-    }
-
-    if (hit.klass) {
-      const std::vector<std::string> class_tokens =
-          extract_script_class_tokens(content);
-      if (class_tokens.empty()) {
-        stale.push_back({fp, "script_class"});
-      } else {
-        for (const std::string &tok : class_tokens) {
-          stale.push_back({fp, tok});
-        }
-      }
-    }
-
-    if (!needs_write) {
-      continue;
-    }
-    godot::Ref<godot::FileAccess> writer = godot::FileAccess::open(
-        godot::String(fp.c_str()), godot::FileAccess::WRITE);
-    if (writer.is_null() || !writer->store_string(content)) {
-      stale.push_back({fp, "path=\"" + from + "\""});
-      continue;
-    }
-    writer->flush();
-    writer->close();
-    godot::Ref<godot::FileAccess> checker = godot::FileAccess::open(
-        godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (checker.is_null() ||
-        !checker->get_as_text().contains(make_token("path=\"", to))) {
-      stale.push_back({fp, "path=\"" + from + "\""});
-      continue;
-    }
-    auto *editor_written = godot::EditorInterface::get_singleton();
-    if (editor_written) {
-      auto *efs_written = editor_written->get_resource_filesystem();
-      if (efs_written) {
-        efs_written->update_file(godot::String(fp.c_str()));
-      }
-    }
-    updated.push_back({fp, std::move(changes)});
-  }
-
-  const bool uid_preserved = uid_sidecar_absent || uid_err == godot::OK;
+  const bool uid_preserved = true;
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
@@ -2095,30 +2428,7 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     }
     r["closed_tabs_warning"] = std::move(closed_warn_arr);
   }
-  if (scan_truncated) {
-    r["scan_truncated"] = mcp::JsonValue(true);
-    mcp::JsonValue lim(mcp::JsonValue::object_tag);
-    lim["files_listed"] = mcp::JsonValue(static_cast<int64_t>(scan_budget.files_listed));
-    lim["files_scanned"] = mcp::JsonValue(static_cast<int64_t>(scan_budget.files_scanned));
-    lim["bytes_scanned"] = mcp::JsonValue(static_cast<int64_t>(scan_budget.bytes_scanned));
-    lim["max_files"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
-    lim["max_file_bytes"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
-    lim["max_total_bytes"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_TOTAL_BYTES));
-    lim["max_depth"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
-    if (!scan_budget.limit_reason.empty()) lim["reason"] = mcp::JsonValue(scan_budget.limit_reason);
-    r["scan_limit"] = std::move(lim);
-  }
-  if (import_sidecar_present && import_err != godot::OK) {
-    r["import_sidecar_warning"] = mcp::JsonValue(
-        "failed to move .import sidecar " + from_import_path + " -> " +
-        to_import_path + " (error " +
-        std::to_string(static_cast<int>(import_err)) +
-        "); the asset will be re-imported with default settings at the new "
-        "location");
-  }
-
-  godot::String from_gs(from.c_str());
-  godot::String to_gs(to.c_str());
+  const godot::String to_gs(to.c_str());
   const std::string old_source_name =
       from.substr(from.find_last_of("/\\") == std::string::npos
                       ? 0
@@ -2142,8 +2452,7 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     if (efs) {
       efs->update_file(from_gs);
       efs->update_file(to_gs);
-      if (import_sidecar_present && import_err == godot::OK &&
-          !efs->is_importing()) {
+      if (import_sidecar_present && !efs->is_importing()) {
         godot::PackedStringArray files;
         files.push_back(to_gs);
         efs->reimport_files(files);
@@ -2184,49 +2493,10 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
     r["reloaded_open_scenes"] = std::move(reopened);
   }
 
-  struct RemapRec {
-    std::string setting;
-    std::string old;
-    std::string updated;
-  };
-  std::vector<RemapRec> remaps;
-  auto *ps = godot::ProjectSettings::get_singleton();
   if (ps) {
-    const std::string kAutoloadPrefix = "autoload/";
-    auto try_remap = [&](const std::string &setting_name) {
-      if (!ps->has_setting(godot::String(setting_name.c_str()))) {
-        return;
-      }
-      const godot::Variant v =
-          ps->get_setting(godot::String(setting_name.c_str()));
-      if (v.get_type() != godot::Variant::STRING) {
-        return;
-      }
-      const std::string s = util::to_std(v.operator godot::String());
-      const bool starred = !s.empty() && s[0] == '*';
-      const std::string core = starred ? s.substr(1) : s;
-      if (core != from) {
-        return;
-      }
-      const std::string rewritten =
-          (starred ? std::string("*") : std::string()) + to;
-      ps->set_setting(
-          godot::String(setting_name.c_str()),
-          godot::Variant(godot::String(rewritten.c_str())));
-      remaps.push_back({setting_name, s, rewritten});
-    };
-    try_remap("application/run/main_scene");
-    godot::TypedArray<godot::Dictionary> props = ps->get_property_list();
-    for (int64_t i = 0; i < props.size(); i++) {
-      godot::Dictionary d = props[i];
-      const std::string name =
-          util::to_std(d["name"].operator godot::String());
-      if (name.compare(0, kAutoloadPrefix.size(), kAutoloadPrefix) == 0) {
-        try_remap(name);
-      }
-    }
-    if (!remaps.empty()) {
-      ps->save();
+    for (const RemapRec &remap : remaps) {
+      ps->set_setting(godot::String(remap.setting.c_str()),
+                      godot::Variant(godot::String(remap.updated.c_str())));
     }
   }
 
@@ -2425,7 +2695,12 @@ void collect_all_file_paths_budget(const std::string &dir,
   }
   godot::Ref<godot::DirAccess> da =
       godot::DirAccess::open(godot::String(dir.c_str()));
-  if (da.is_null()) return;
+  if (da.is_null()) {
+    budget.limit_reason = "directory_open_failed";
+    budget.truncated = true;
+    truncated = true;
+    return;
+  }
   da->list_dir_begin();
   godot::String entry = da->get_next();
   while (entry != godot::String()) {
@@ -2511,6 +2786,54 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
     sources.push_back(path);
   }
 
+  auto destination_for_source = [&](const std::string &src) {
+    std::string dest_dir = target_dir;
+    if (src_is_dir) {
+      const std::string rel = src.substr(path.size() + 1);
+      const size_t rel_slash = rel.find_last_of('/');
+      if (rel_slash != std::string::npos) {
+        dest_dir = join_path(target_dir, rel.substr(0, rel_slash));
+      }
+    }
+    const std::string src_base = src.substr(src.find_last_of('/') + 1);
+    return join_path(dest_dir, src_base);
+  };
+
+  if (scan_must_abort(move_budget, move_truncated)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "move aborted because the source scan was truncated");
+    e["code"] = mcp::JsonValue("transaction_failed");
+    e["scan_truncated"] = mcp::JsonValue(true);
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] =
+        mcp::JsonValue(static_cast<int64_t>(move_budget.files_listed));
+    lim["reason"] = mcp::JsonValue(move_budget.limit_reason);
+    lim["max_files"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
+    lim["max_depth"] =
+        mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
+    e["scan_limit"] = std::move(lim);
+    return e;
+  }
+
+  for (const std::string &src : sources) {
+    const std::string dest = destination_for_source(src);
+    if (dest == src) {
+      continue;
+    }
+    for (const std::string &target :
+         {dest, dest + ".uid", dest + ".import"}) {
+      const godot::String target_gs(target.c_str());
+      if (godot::FileAccess::file_exists(target_gs) ||
+          godot::DirAccess::dir_exists_absolute(target_gs)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("move target already exists: " + target);
+        e["code"] = mcp::JsonValue("target_conflict");
+        return e;
+      }
+    }
+  }
+
   mcp::JsonValue moved_arr(mcp::JsonValue::array_tag);
   mcp::JsonValue failed_arr(mcp::JsonValue::array_tag);
   mcp::JsonValue stale_arr(mcp::JsonValue::array_tag);
@@ -2523,16 +2846,7 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
   bool scanned = false;
 
   for (const std::string &src : sources) {
-    std::string dest_dir = target_dir;
-    if (src_is_dir) {
-      const std::string rel = src.substr(path.size() + 1);
-      const size_t rel_slash = rel.find_last_of('/');
-      if (rel_slash != std::string::npos) {
-        dest_dir = join_path(target_dir, rel.substr(0, rel_slash));
-      }
-    }
-    const std::string src_base = src.substr(src.find_last_of('/') + 1);
-    const std::string dest = join_path(dest_dir, src_base);
+    const std::string dest = destination_for_source(src);
     if (dest == src) {
       mcp::JsonValue item(mcp::JsonValue::object_tag);
       item["from"] = mcp::JsonValue(src);
@@ -2542,7 +2856,8 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
     }
     bool dirs_created = false;
     std::string dir_error;
-    if (!ensure_save_directory(dest_dir, dirs_created, dir_error)) {
+    if (!ensure_save_directory(resource_fs::parent_directory_of(dest),
+                               dirs_created, dir_error)) {
       mcp::JsonValue item(mcp::JsonValue::object_tag);
       item["from"] = mcp::JsonValue(src);
       item["error"] = mcp::JsonValue(dir_error);
@@ -2649,15 +2964,6 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
   if (scanned) {
     r["filesystem_scanned"] = mcp::JsonValue(true);
   }
-  if (move_truncated) {
-    r["scan_truncated"] = mcp::JsonValue(true);
-    mcp::JsonValue lim(mcp::JsonValue::object_tag);
-    lim["files_listed"] = mcp::JsonValue(static_cast<int64_t>(move_budget.files_listed));
-    lim["reason"] = mcp::JsonValue(move_budget.limit_reason);
-    lim["max_files"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
-    lim["max_depth"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
-    r["scan_limit"] = std::move(lim);
-  }
   return r;
 }
 
@@ -2705,6 +3011,43 @@ mcp::JsonValue handle_copy(const mcp::JsonValue &args) {
         mcp::JsonValue("destination is a directory: " + dest_path);
     return e;
   }
+  bool overwrite = false;
+  const mcp::JsonValue *overwrite_arg = args.Find("overwrite");
+  if (overwrite_arg != nullptr) {
+    if (!overwrite_arg->IsBool()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "invalid parameter: overwrite must be a boolean");
+      return e;
+    }
+    overwrite = overwrite_arg->GetBool();
+  }
+  bool confirm = false;
+  const mcp::JsonValue *confirm_arg = args.Find("confirm");
+  if (confirm_arg != nullptr) {
+    if (!confirm_arg->IsBool()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("invalid parameter: confirm must be a boolean");
+      return e;
+    }
+    confirm = confirm_arg->GetBool();
+  }
+  const bool overwritten = godot::FileAccess::file_exists(dest_gs);
+  const resource_fs::CopyOverwriteFailure policy =
+      resource_fs::check_copy_overwrite(overwritten, overwrite, confirm);
+  if (policy != resource_fs::CopyOverwriteFailure::kNone) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    if (policy == resource_fs::CopyOverwriteFailure::kTargetExists) {
+      e["error"] = mcp::JsonValue("destination already exists: " + dest_path);
+      e["code"] = mcp::JsonValue("target_conflict");
+    } else {
+      e["error"] = mcp::JsonValue(
+          "overwriting an existing destination requires confirm=true");
+      e["code"] = mcp::JsonValue("confirmation_required");
+      e["confirm_required"] = mcp::JsonValue(true);
+    }
+    return e;
+  }
 
   const size_t last_slash = dest_path.find_last_of('/');
   if (last_slash != std::string::npos) {
@@ -2720,12 +3063,24 @@ mcp::JsonValue handle_copy(const mcp::JsonValue &args) {
     }
   }
 
-  godot::Error err = godot::DirAccess::copy_absolute(src_gs, dest_gs);
-  if (err != godot::OK) {
+  resource_fs::FileTransactionPlan plan;
+  plan.operations.push_back({resource_fs::FileTransactionKind::kCopy, path,
+                             dest_path, {}, false, overwritten});
+  resource_fs::FileTransactionJournal journal;
+  resource_fs::GodotFileTransactionFs file_system;
+  const resource_fs::FileTransactionResult copied =
+      resource_fs::commit_file_transaction(plan, journal, file_system);
+  if (!copied.ok) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "failed to copy file: " + path + " -> " + dest_path + " (error " +
-        std::to_string(static_cast<int>(err)) + ")");
+    e["error"] = mcp::JsonValue(copied.message);
+    e["code"] = mcp::JsonValue(copied.code);
+    if (!copied.compensation_errors.empty()) {
+      mcp::JsonValue compensation(mcp::JsonValue::array_tag);
+      for (const std::string &item : copied.compensation_errors) {
+        compensation.PushBack(mcp::JsonValue(item));
+      }
+      e["compensation_errors"] = std::move(compensation);
+    }
     return e;
   }
 
@@ -2741,6 +3096,7 @@ mcp::JsonValue handle_copy(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("copied");
   r["from"] = mcp::JsonValue(path);
   r["to"] = mcp::JsonValue(dest_path);
+  r["overwritten"] = mcp::JsonValue(overwritten);
   return r;
 }
 

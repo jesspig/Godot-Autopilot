@@ -10,6 +10,7 @@
 #include "util/inline_resource_json.hpp"
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/core/object.hpp>
 #include <algorithm>
 #include <exception>
 #include <string>
@@ -1014,11 +1015,24 @@ mcp::JsonValue handle_spawn_bundle(const mcp::JsonValue &args) {
     e["rolled_back"] = mcp::JsonValue(false);
     return e;
   }
-  auto rollback_bundle = [&]() {
+  uint64_t bundle_root_id = 0;
+  {
     auto *ed = godot::EditorInterface::get_singleton();
     godot::Node *root_now = ed ? ed->get_edited_scene_root() : nullptr;
-    godot::Node *top =
-        util::resolve_scene_node(bundle_path, root_now);
+    if (godot::Node *created = util::resolve_scene_node(bundle_path, root_now))
+      bundle_root_id = created->get_instance_id();
+  }
+  auto rollback_bundle = [&]() {
+    godot::Node *top = nullptr;
+    if (bundle_root_id != 0) {
+      top = godot::Object::cast_to<godot::Node>(
+          godot::ObjectDB::get_instance(bundle_root_id));
+    }
+    if (!top || !top->is_inside_tree()) {
+      auto *ed = godot::EditorInterface::get_singleton();
+      godot::Node *root_now = ed ? ed->get_edited_scene_root() : nullptr;
+      top = util::resolve_scene_node(bundle_path, root_now);
+    }
     if (top)
       spec_rollback_subtree(top);
   };

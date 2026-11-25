@@ -213,7 +213,7 @@ async function actionClean(): Promise<void> {
   if (
     !unwrap(
       await promptConfirm({
-        message: `清理 ${path.basename(projectDir)} 的 .godot 与 addons？`,
+        message: `清理 ${path.basename(projectDir)} 的 .godot 缓存与 GDA 部署文件？`,
         initialValue: false,
       }),
     )
