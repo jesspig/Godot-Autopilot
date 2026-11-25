@@ -3,6 +3,7 @@
 
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/string.hpp>
 
 #include <string>
@@ -10,7 +11,13 @@
 namespace godot_autopilot {
 namespace util {
 
+inline bool godot_api_available() {
+  return godot::gdextension_interface::global_get_singleton != nullptr;
+}
+
 inline int api_host_process_id() {
+  if (!godot_api_available())
+    return 0;
   auto *os = godot::OS::get_singleton();
   if (!os) {
     return 0;
@@ -19,6 +26,8 @@ inline int api_host_process_id() {
 }
 
 inline std::string api_host_project_root() {
+  if (!godot_api_available())
+    return std::string();
   auto *settings = godot::ProjectSettings::get_singleton();
   if (!settings) {
     return std::string();
@@ -32,7 +41,7 @@ inline std::string api_host_project_root() {
 }
 
 inline bool api_host_process_alive(int pid) {
-  if (pid <= 0) {
+  if (pid <= 0 || !godot_api_available()) {
     return false;
   }
   auto *os = godot::OS::get_singleton();
