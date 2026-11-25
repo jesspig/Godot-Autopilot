@@ -72,8 +72,8 @@ inline std::string project_path_lexical(const std::string &path,
   if (result.size() == 2 && result[1] == ':') {
     return result + "/";
   }
-  if (result.empty() && !path.empty() && path[0] == '/') {
-    return "/";
+  if (!path.empty() && path[0] == '/') {
+    return result.empty() ? "/" : "/" + result;
   }
   return result;
 }
