@@ -17,7 +17,7 @@ const EXPECTED_TREE = [
   "godot-autopilot/references/servers.md",
   "godot-autopilot/references/setup.md",
   "godot-autopilot/references/tools.md",
-] as const;
+];
 
 type SkillsAsset = {
   files?: Record<string, unknown>;

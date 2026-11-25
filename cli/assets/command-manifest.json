@@ -1,0 +1,3434 @@
+{
+  "schema_version": 1,
+  "generated_by": "cli/src/command-spec.ts",
+  "group_count": 24,
+  "command_count": 85,
+  "groups": [
+    {
+      "name": "editor",
+      "description": "Editor and instance lifecycle"
+    },
+    {
+      "name": "project",
+      "description": "Project discovery and metadata"
+    },
+    {
+      "name": "tool",
+      "description": "Tool discovery and generic tool calls"
+    },
+    {
+      "name": "workflow",
+      "description": "Saved multi-step workflows"
+    },
+    {
+      "name": "docs",
+      "description": "Engine documentation cache and lookup"
+    },
+    {
+      "name": "debug",
+      "description": "Live editor inspection and evaluation"
+    },
+    {
+      "name": "logs",
+      "description": "Instance logs and log streams"
+    },
+    {
+      "name": "scene",
+      "description": "Scene opening, editing, and saving"
+    },
+    {
+      "name": "script",
+      "description": "Script reading and editing"
+    },
+    {
+      "name": "resource",
+      "description": "Project resources, templates, and prompts"
+    },
+    {
+      "name": "game",
+      "description": "Game run lifecycle"
+    },
+    {
+      "name": "test",
+      "description": "Test suites and runs"
+    },
+    {
+      "name": "job",
+      "description": "Asynchronous jobs"
+    },
+    {
+      "name": "trace",
+      "description": "Trace events and latency reports"
+    },
+    {
+      "name": "monitor",
+      "description": "Game monitor sessions and reports"
+    },
+    {
+      "name": "setup",
+      "description": "Environment and installation setup"
+    },
+    {
+      "name": "skill",
+      "description": "Bundled skill books"
+    },
+    {
+      "name": "plugin",
+      "description": "Godot addon management"
+    },
+    {
+      "name": "cache",
+      "description": "Local cache manifests and entries"
+    },
+    {
+      "name": "update",
+      "description": "CLI, skills, and plugin updates"
+    },
+    {
+      "name": "doctor",
+      "description": "Environment diagnostics"
+    },
+    {
+      "name": "config",
+      "description": "CLI configuration"
+    },
+    {
+      "name": "shell",
+      "description": "Shell-level execution"
+    },
+    {
+      "name": "completion",
+      "description": "Shell completion generation"
+    }
+  ],
+  "commands": [
+    {
+      "name": "clear",
+      "path": "cache.clear",
+      "group": "cache",
+      "subcommand": "clear",
+      "description": "Remove old cache entries",
+      "tools": [
+        "cache_clear"
+      ],
+      "action": "gcp.cache.clear",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--force",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm removal"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda cache clear",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda cache clear"
+    },
+    {
+      "name": "info",
+      "path": "cache.info",
+      "group": "cache",
+      "subcommand": "info",
+      "description": "Show cache root, count, and size",
+      "tools": [
+        "cache_info"
+      ],
+      "action": "gcp.cache.info",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda cache info",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda cache info"
+    },
+    {
+      "name": "list",
+      "path": "cache.list",
+      "group": "cache",
+      "subcommand": "list",
+      "description": "List cache manifests",
+      "tools": [
+        "cache_list"
+      ],
+      "action": "gcp.cache.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda cache list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda cache list"
+    },
+    {
+      "name": "bash",
+      "path": "completion.bash",
+      "group": "completion",
+      "subcommand": "bash",
+      "description": "Print bash completion from the command spec",
+      "tools": [
+        "completion_bash"
+      ],
+      "action": "gcp.completion.bash",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda completion bash",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda completion bash"
+    },
+    {
+      "name": "fish",
+      "path": "completion.fish",
+      "group": "completion",
+      "subcommand": "fish",
+      "description": "Print fish completion from the command spec",
+      "tools": [
+        "completion_fish"
+      ],
+      "action": "gcp.completion.fish",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda completion fish",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda completion fish"
+    },
+    {
+      "name": "zsh",
+      "path": "completion.zsh",
+      "group": "completion",
+      "subcommand": "zsh",
+      "description": "Print zsh completion from the command spec",
+      "tools": [
+        "completion_zsh"
+      ],
+      "action": "gcp.completion.zsh",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda completion zsh",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda completion zsh"
+    },
+    {
+      "name": "get",
+      "path": "config.get",
+      "group": "config",
+      "subcommand": "get",
+      "description": "Read one configuration key",
+      "tools": [
+        "config_get"
+      ],
+      "action": "gcp.config.get",
+      "positional": [
+        {
+          "name": "key",
+          "type": "string",
+          "required": true,
+          "description": "Configuration key"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda config get",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda config get"
+    },
+    {
+      "name": "list",
+      "path": "config.list",
+      "group": "config",
+      "subcommand": "list",
+      "description": "List CLI configuration",
+      "tools": [
+        "config_list"
+      ],
+      "action": "gcp.config.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda config list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda config list"
+    },
+    {
+      "name": "set",
+      "path": "config.set",
+      "group": "config",
+      "subcommand": "set",
+      "description": "Write one configuration key",
+      "tools": [
+        "config_set"
+      ],
+      "action": "gcp.config.set",
+      "positional": [
+        {
+          "name": "key",
+          "type": "string",
+          "required": true,
+          "description": "Configuration key"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true,
+          "description": "New value"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda config set",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda config set"
+    },
+    {
+      "name": "attach",
+      "path": "debug.attach",
+      "group": "debug",
+      "subcommand": "attach",
+      "description": "Attach to a running instance",
+      "tools": [
+        "debug_attach"
+      ],
+      "action": "gcp.debug.attach",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Instance id"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug attach",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug attach"
+    },
+    {
+      "name": "eval",
+      "path": "debug.eval",
+      "group": "debug",
+      "subcommand": "eval",
+      "description": "Evaluate an expression in the editor",
+      "tools": [
+        "debug_eval"
+      ],
+      "action": "gcp.debug.eval",
+      "positional": [
+        {
+          "name": "expression",
+          "type": "string",
+          "required": true,
+          "description": "Expression to evaluate"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Evaluation timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug eval",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug eval"
+    },
+    {
+      "name": "inspect",
+      "path": "debug.inspect",
+      "group": "debug",
+      "subcommand": "inspect",
+      "description": "Inspect live editor state",
+      "tools": [
+        "debug_inspect"
+      ],
+      "action": "gcp.debug.inspect",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug inspect",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug inspect"
+    },
+    {
+      "name": "class",
+      "path": "docs.class",
+      "group": "docs",
+      "subcommand": "class",
+      "description": "Show one engine class",
+      "tools": [
+        "docs_class"
+      ],
+      "action": "gcp.docs.class",
+      "positional": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Class name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--section",
+          "type": "string",
+          "scope": "command",
+          "description": "Section to show"
+        },
+        {
+          "name": "--member",
+          "type": "string",
+          "scope": "command",
+          "description": "Member filter"
+        },
+        {
+          "name": "--full",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include every section"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda docs class",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda docs class"
+    },
+    {
+      "name": "clear",
+      "path": "docs.clear",
+      "group": "docs",
+      "subcommand": "clear",
+      "description": "Remove cached docs",
+      "tools": [
+        "docs_clear"
+      ],
+      "action": "gcp.docs.clear",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--engine",
+          "type": "string",
+          "scope": "command",
+          "description": "Remove one engine bucket",
+          "conflictsWith": [
+            "--all"
+          ]
+        },
+        {
+          "name": "--all",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Remove every bucket",
+          "conflictsWith": [
+            "--engine"
+          ]
+        },
+        {
+          "name": "--force",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm removal"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda docs clear",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda docs clear"
+    },
+    {
+      "name": "member",
+      "path": "docs.member",
+      "group": "docs",
+      "subcommand": "member",
+      "description": "Show one class member",
+      "tools": [
+        "docs_member"
+      ],
+      "action": "gcp.docs.member",
+      "positional": [
+        {
+          "name": "class",
+          "type": "string",
+          "required": true,
+          "description": "Class name"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Member name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--kind",
+          "type": "string",
+          "scope": "command",
+          "description": "Member kind"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda docs member",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda docs member"
+    },
+    {
+      "name": "search",
+      "path": "docs.search",
+      "group": "docs",
+      "subcommand": "search",
+      "description": "Search classes, members, and utilities",
+      "tools": [
+        "docs_search"
+      ],
+      "action": "gcp.docs.search",
+      "positional": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "Search query"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--kind",
+          "type": "string",
+          "scope": "command",
+          "description": "Result kind"
+        },
+        {
+          "name": "--class",
+          "type": "string",
+          "scope": "command",
+          "description": "Restrict to one class"
+        },
+        {
+          "name": "--engine",
+          "type": "string",
+          "scope": "command",
+          "description": "Engine version bucket"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda docs search",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda docs search"
+    },
+    {
+      "name": "status",
+      "path": "docs.status",
+      "group": "docs",
+      "subcommand": "status",
+      "description": "Show docs cache and engine pin state",
+      "tools": [
+        "docs_status"
+      ],
+      "action": "gcp.docs.status",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda docs status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda docs status"
+    },
+    {
+      "name": "sync",
+      "path": "docs.sync",
+      "group": "docs",
+      "subcommand": "sync",
+      "description": "Export engine docs into the local cache",
+      "tools": [
+        "docs_sync"
+      ],
+      "action": "gcp.docs.sync",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--engine",
+          "type": "string",
+          "scope": "command",
+          "description": "Engine version bucket"
+        },
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Never use the network"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda docs sync",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda docs sync"
+    },
+    {
+      "name": "run",
+      "path": "doctor.run",
+      "group": "doctor",
+      "subcommand": "run",
+      "description": "Run environment diagnostics",
+      "tools": [
+        "doctor_run"
+      ],
+      "action": "gcp.doctor.run",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Never use the network"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda doctor run",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda doctor run"
+    },
+    {
+      "name": "list",
+      "path": "editor.list",
+      "group": "editor",
+      "subcommand": "list",
+      "description": "List running Godot instances",
+      "tools": [
+        "instance_list"
+      ],
+      "action": "gcp.editor.list",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--all",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include projects with no running instance"
+        },
+        {
+          "name": "--projects",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Aggregate entries by project"
+        },
+        {
+          "name": "--stale",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Keep only non-live entries"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda editor list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda editor list"
+    },
+    {
+      "name": "restart",
+      "path": "editor.restart",
+      "group": "editor",
+      "subcommand": "restart",
+      "description": "Restart a Godot editor with the same settings",
+      "tools": [
+        "editor_restart"
+      ],
+      "action": "gcp.editor.restart",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--force",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Force-stop the process",
+          "conflictsWith": [
+            "--wait"
+          ]
+        },
+        {
+          "name": "--wait",
+          "type": "string",
+          "scope": "command",
+          "description": "Stop wait in seconds",
+          "conflictsWith": [
+            "--force"
+          ]
+        },
+        {
+          "name": "--no-import",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Skip the asset import pre-step"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda editor restart",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda editor restart"
+    },
+    {
+      "name": "start",
+      "path": "editor.start",
+      "group": "editor",
+      "subcommand": "start",
+      "description": "Start a Godot editor",
+      "tools": [
+        "editor_start"
+      ],
+      "action": "gcp.editor.start",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--godot",
+          "type": "string",
+          "scope": "command",
+          "description": "Explicit Godot executable"
+        },
+        {
+          "name": "--headless",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Start headless"
+        },
+        {
+          "name": "--play",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Play the current scene when ready"
+        },
+        {
+          "name": "--no-import",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Skip the asset import pre-step"
+        },
+        {
+          "name": "--wait",
+          "type": "string",
+          "scope": "command",
+          "description": "Readiness wait in seconds"
+        },
+        {
+          "name": "--probe",
+          "type": "string",
+          "scope": "command",
+          "description": "Liveness level: light or strict"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda editor start",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda editor start"
+    },
+    {
+      "name": "status",
+      "path": "editor.status",
+      "group": "editor",
+      "subcommand": "status",
+      "description": "Show editor and server status",
+      "tools": [
+        "system_status"
+      ],
+      "action": "gcp.editor.status",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda editor status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda editor status"
+    },
+    {
+      "name": "stop",
+      "path": "editor.stop",
+      "group": "editor",
+      "subcommand": "stop",
+      "description": "Stop a Godot editor",
+      "tools": [
+        "editor_stop"
+      ],
+      "action": "gcp.editor.stop",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "Instance id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        },
+        {
+          "name": "--force",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Force-stop the process",
+          "conflictsWith": [
+            "--wait"
+          ]
+        },
+        {
+          "name": "--wait",
+          "type": "string",
+          "scope": "command",
+          "description": "Stop wait in seconds",
+          "conflictsWith": [
+            "--force"
+          ]
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda editor stop",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda editor stop"
+    },
+    {
+      "name": "start",
+      "path": "game.start",
+      "group": "game",
+      "subcommand": "start",
+      "description": "Run the game",
+      "tools": [
+        "game_start"
+      ],
+      "action": "gcp.game.start",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--headless",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Run headless"
+        },
+        {
+          "name": "--play",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Play the current scene"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game start",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game start"
+    },
+    {
+      "name": "status",
+      "path": "game.status",
+      "group": "game",
+      "subcommand": "status",
+      "description": "Show game run status",
+      "tools": [
+        "game_status"
+      ],
+      "action": "gcp.game.status",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game status"
+    },
+    {
+      "name": "stop",
+      "path": "game.stop",
+      "group": "game",
+      "subcommand": "stop",
+      "description": "Stop the game",
+      "tools": [
+        "game_stop"
+      ],
+      "action": "gcp.game.stop",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game stop",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game stop"
+    },
+    {
+      "name": "cancel",
+      "path": "job.cancel",
+      "group": "job",
+      "subcommand": "cancel",
+      "description": "Cancel a job",
+      "tools": [
+        "job_cancel"
+      ],
+      "action": "gcp.job.cancel",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Job id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm cancellation"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda job cancel",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job cancel"
+    },
+    {
+      "name": "clean",
+      "path": "job.clean",
+      "group": "job",
+      "subcommand": "clean",
+      "description": "Remove terminal jobs",
+      "tools": [
+        "job_clean"
+      ],
+      "action": "gcp.job.clean",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--force",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm removal"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda job clean",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job clean"
+    },
+    {
+      "name": "get",
+      "path": "job.get",
+      "group": "job",
+      "subcommand": "get",
+      "description": "Get one job",
+      "tools": [
+        "job_get"
+      ],
+      "action": "gcp.job.get",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Job id"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda job get",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job get"
+    },
+    {
+      "name": "list",
+      "path": "job.list",
+      "group": "job",
+      "subcommand": "list",
+      "description": "List jobs",
+      "tools": [
+        "job_list"
+      ],
+      "action": "gcp.job.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda job list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job list"
+    },
+    {
+      "name": "wait",
+      "path": "job.wait",
+      "group": "job",
+      "subcommand": "wait",
+      "description": "Wait for a job to finish",
+      "tools": [
+        "job_wait"
+      ],
+      "action": "gcp.job.wait",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Job id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Wait timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda job wait",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job wait"
+    },
+    {
+      "name": "list",
+      "path": "logs.list",
+      "group": "logs",
+      "subcommand": "list",
+      "description": "List log streams",
+      "tools": [
+        "logs_list"
+      ],
+      "action": "gcp.logs.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda logs list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda logs list"
+    },
+    {
+      "name": "show",
+      "path": "logs.show",
+      "group": "logs",
+      "subcommand": "show",
+      "description": "Show an instance log",
+      "tools": [
+        "logs_read"
+      ],
+      "action": "gcp.logs.show",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--tail",
+          "type": "number",
+          "scope": "command",
+          "description": "Number of trailing lines"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda logs show",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda logs show"
+    },
+    {
+      "name": "export",
+      "path": "monitor.export",
+      "group": "monitor",
+      "subcommand": "export",
+      "description": "Copy a monitor session into GDA home",
+      "tools": [
+        "monitor_export"
+      ],
+      "action": "gcp.monitor.export",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Session id"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda monitor export",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda monitor export"
+    },
+    {
+      "name": "report",
+      "path": "monitor.report",
+      "group": "monitor",
+      "subcommand": "report",
+      "description": "Analyze one monitor session",
+      "tools": [
+        "monitor_report"
+      ],
+      "action": "gcp.monitor.report",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "Session id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--file",
+          "type": "string",
+          "scope": "command",
+          "description": "Offline JSONL path"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda monitor report",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda monitor report"
+    },
+    {
+      "name": "sessions",
+      "path": "monitor.sessions",
+      "group": "monitor",
+      "subcommand": "sessions",
+      "description": "List recorded monitor sessions",
+      "tools": [
+        "monitor_sessions"
+      ],
+      "action": "gcp.monitor.sessions",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda monitor sessions",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda monitor sessions"
+    },
+    {
+      "name": "status",
+      "path": "monitor.status",
+      "group": "monitor",
+      "subcommand": "status",
+      "description": "Show monitor scope and recording directory",
+      "tools": [
+        "monitor_status"
+      ],
+      "action": "gcp.monitor.status",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda monitor status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda monitor status"
+    },
+    {
+      "name": "enable",
+      "path": "plugin.enable",
+      "group": "plugin",
+      "subcommand": "enable",
+      "description": "Enable a plugin",
+      "tools": [
+        "plugin_enable"
+      ],
+      "action": "gcp.plugin.enable",
+      "positional": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Plugin name"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda plugin enable",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda plugin enable"
+    },
+    {
+      "name": "install",
+      "path": "plugin.install",
+      "group": "plugin",
+      "subcommand": "install",
+      "description": "Install the Godot addon",
+      "tools": [
+        "plugin_install"
+      ],
+      "action": "gcp.plugin.install",
+      "positional": [
+        {
+          "name": "dir",
+          "type": "string",
+          "required": false,
+          "description": "Project directory"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--with-csharp-runtime",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Add the C# runtime autoload"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda plugin install",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda plugin install"
+    },
+    {
+      "name": "list",
+      "path": "plugin.list",
+      "group": "plugin",
+      "subcommand": "list",
+      "description": "List installed plugins",
+      "tools": [
+        "plugin_list"
+      ],
+      "action": "gcp.plugin.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda plugin list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda plugin list"
+    },
+    {
+      "name": "info",
+      "path": "project.info",
+      "group": "project",
+      "subcommand": "info",
+      "description": "Show project metadata",
+      "tools": [
+        "project_info"
+      ],
+      "action": "gcp.project.info",
+      "positional": [
+        {
+          "name": "dir",
+          "type": "string",
+          "required": true,
+          "description": "Project directory"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda project info",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda project info"
+    },
+    {
+      "name": "list",
+      "path": "project.list",
+      "group": "project",
+      "subcommand": "list",
+      "description": "List known Godot projects",
+      "tools": [
+        "project_list"
+      ],
+      "action": "gcp.project.list",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--all",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include projects without instances"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda project list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda project list"
+    },
+    {
+      "name": "open",
+      "path": "project.open",
+      "group": "project",
+      "subcommand": "open",
+      "description": "Open a project in an editor",
+      "tools": [
+        "project_open"
+      ],
+      "action": "gcp.project.open",
+      "positional": [
+        {
+          "name": "dir",
+          "type": "string",
+          "required": true,
+          "description": "Project directory"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--godot",
+          "type": "string",
+          "scope": "command",
+          "description": "Explicit Godot executable"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda project open",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda project open"
+    },
+    {
+      "name": "list",
+      "path": "resource.list",
+      "group": "resource",
+      "subcommand": "list",
+      "description": "List project resources",
+      "tools": [
+        "resource_list"
+      ],
+      "action": "gcp.resource.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource list"
+    },
+    {
+      "name": "prompts",
+      "path": "resource.prompts",
+      "group": "resource",
+      "subcommand": "prompts",
+      "description": "List or render prompt templates",
+      "tools": [
+        "resource_prompts"
+      ],
+      "action": "gcp.resource.prompts",
+      "positional": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "Prompt name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--args",
+          "type": "string",
+          "scope": "command",
+          "description": "Prompt arguments as JSON"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource prompts",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource prompts"
+    },
+    {
+      "name": "read",
+      "path": "resource.read",
+      "group": "resource",
+      "subcommand": "read",
+      "description": "Read one resource",
+      "tools": [
+        "resource_read"
+      ],
+      "action": "gcp.resource.read",
+      "positional": [
+        {
+          "name": "uri",
+          "type": "string",
+          "required": true,
+          "description": "Resource uri"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--json",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Pretty JSON output",
+          "conflictsWith": [
+            "--raw"
+          ]
+        },
+        {
+          "name": "--raw",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Raw payload output",
+          "conflictsWith": [
+            "--json"
+          ]
+        },
+        {
+          "name": "--save",
+          "type": "string",
+          "scope": "command",
+          "description": "Write blobs to a directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource read",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource read"
+    },
+    {
+      "name": "templates",
+      "path": "resource.templates",
+      "group": "resource",
+      "subcommand": "templates",
+      "description": "List resource templates",
+      "tools": [
+        "resource_templates"
+      ],
+      "action": "gcp.resource.templates",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource templates",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource templates"
+    },
+    {
+      "name": "watch",
+      "path": "resource.watch",
+      "group": "resource",
+      "subcommand": "watch",
+      "description": "Poll a resource and print changes",
+      "tools": [
+        "resource_watch"
+      ],
+      "action": "gcp.resource.watch",
+      "positional": [
+        {
+          "name": "uri",
+          "type": "string",
+          "required": true,
+          "description": "Resource uri"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--interval",
+          "type": "number",
+          "scope": "command",
+          "description": "Polling interval in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda resource watch",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource watch"
+    },
+    {
+      "name": "add",
+      "path": "scene.add",
+      "group": "scene",
+      "subcommand": "add",
+      "description": "Add a node to a scene",
+      "tools": [
+        "scene_node_add"
+      ],
+      "action": "gcp.scene.add",
+      "positional": [
+        {
+          "name": "node",
+          "type": "string",
+          "required": true,
+          "description": "Node type or path"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--scene",
+          "type": "string",
+          "scope": "command",
+          "description": "Target scene"
+        },
+        {
+          "name": "--parent",
+          "type": "string",
+          "scope": "command",
+          "description": "Parent node path"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene add",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene add"
+    },
+    {
+      "name": "list",
+      "path": "scene.list",
+      "group": "scene",
+      "subcommand": "list",
+      "description": "List open scenes",
+      "tools": [
+        "scene_list"
+      ],
+      "action": "gcp.scene.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene list"
+    },
+    {
+      "name": "open",
+      "path": "scene.open",
+      "group": "scene",
+      "subcommand": "open",
+      "description": "Open a scene in the editor",
+      "tools": [
+        "scene_open"
+      ],
+      "action": "gcp.scene.open",
+      "positional": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Scene path"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene open",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene open"
+    },
+    {
+      "name": "save",
+      "path": "scene.save",
+      "group": "scene",
+      "subcommand": "save",
+      "description": "Save the current scene",
+      "tools": [
+        "scene_save"
+      ],
+      "action": "gcp.scene.save",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene save",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene save"
+    },
+    {
+      "name": "create",
+      "path": "script.create",
+      "group": "script",
+      "subcommand": "create",
+      "description": "Create a project script",
+      "tools": [
+        "script_create"
+      ],
+      "action": "gcp.script.create",
+      "positional": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Script path"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--extends",
+          "type": "string",
+          "scope": "command",
+          "description": "Base class"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script create",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script create"
+    },
+    {
+      "name": "delete",
+      "path": "script.delete",
+      "group": "script",
+      "subcommand": "delete",
+      "description": "Delete a project script",
+      "tools": [
+        "script_delete"
+      ],
+      "action": "gcp.script.delete",
+      "positional": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Script path"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm deletion"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script delete",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script delete"
+    },
+    {
+      "name": "list",
+      "path": "script.list",
+      "group": "script",
+      "subcommand": "list",
+      "description": "List project scripts",
+      "tools": [
+        "script_list"
+      ],
+      "action": "gcp.script.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script list"
+    },
+    {
+      "name": "read",
+      "path": "script.read",
+      "group": "script",
+      "subcommand": "read",
+      "description": "Read a project script",
+      "tools": [
+        "script_read"
+      ],
+      "action": "gcp.script.read",
+      "positional": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Script path"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script read",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script read"
+    },
+    {
+      "name": "init",
+      "path": "setup.init",
+      "group": "setup",
+      "subcommand": "init",
+      "description": "Initialize GDA in a project",
+      "tools": [
+        "setup_init"
+      ],
+      "action": "gcp.setup.init",
+      "positional": [
+        {
+          "name": "dir",
+          "type": "string",
+          "required": false,
+          "description": "Project directory"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--with-csharp-runtime",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Add the C# runtime autoload"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda setup init",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda setup init"
+    },
+    {
+      "name": "install",
+      "path": "setup.install",
+      "group": "setup",
+      "subcommand": "install",
+      "description": "Install skills or the Godot plugin",
+      "tools": [
+        "setup_install"
+      ],
+      "action": "gcp.setup.install",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--artifact",
+          "type": "string",
+          "scope": "command",
+          "description": "Artifact to install: cli, plugin, or skills"
+        },
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Install target directory"
+        },
+        {
+          "name": "--zh",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the Chinese skills archive"
+        },
+        {
+          "name": "--prune",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Remove retired skill directories"
+        },
+        {
+          "name": "--with-csharp-runtime",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Add the C# runtime autoload"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda setup install",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda setup install"
+    },
+    {
+      "name": "status",
+      "path": "setup.status",
+      "group": "setup",
+      "subcommand": "status",
+      "description": "Show setup state",
+      "tools": [
+        "setup_status"
+      ],
+      "action": "gcp.setup.status",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda setup status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda setup status"
+    },
+    {
+      "name": "run",
+      "path": "shell.run",
+      "group": "shell",
+      "subcommand": "run",
+      "description": "Run a shell command",
+      "tools": [
+        "shell_run"
+      ],
+      "action": "gcp.shell.run",
+      "positional": [
+        {
+          "name": "command",
+          "type": "string",
+          "required": false,
+          "description": "Command to execute"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Command timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda shell run",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda shell run"
+    },
+    {
+      "name": "install",
+      "path": "skill.install",
+      "group": "skill",
+      "subcommand": "install",
+      "description": "Install skill books",
+      "tools": [
+        "skill_install"
+      ],
+      "action": "gcp.skill.install",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Install target directory"
+        },
+        {
+          "name": "--zh",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the Chinese archive"
+        },
+        {
+          "name": "--prune",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Remove retired books"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda skill install",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda skill install"
+    },
+    {
+      "name": "list",
+      "path": "skill.list",
+      "group": "skill",
+      "subcommand": "list",
+      "description": "List bundled skill books",
+      "tools": [
+        "skill_list"
+      ],
+      "action": "gcp.skill.list",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--zh",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the Chinese archive"
+        },
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Never use the network"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda skill list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda skill list"
+    },
+    {
+      "name": "show",
+      "path": "skill.show",
+      "group": "skill",
+      "subcommand": "show",
+      "description": "Print one skill book",
+      "tools": [
+        "skill_show"
+      ],
+      "action": "gcp.skill.show",
+      "positional": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Skill book name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--file",
+          "type": "string",
+          "scope": "command",
+          "description": "Auxiliary file path"
+        },
+        {
+          "name": "--zh",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the Chinese archive"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda skill show",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda skill show"
+    },
+    {
+      "name": "list",
+      "path": "test.list",
+      "group": "test",
+      "subcommand": "list",
+      "description": "List test suites",
+      "tools": [
+        "test_list"
+      ],
+      "action": "gcp.test.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda test list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda test list"
+    },
+    {
+      "name": "run",
+      "path": "test.run",
+      "group": "test",
+      "subcommand": "run",
+      "description": "Run a test suite",
+      "tools": [
+        "test_run"
+      ],
+      "action": "gcp.test.run",
+      "positional": [
+        {
+          "name": "suite",
+          "type": "string",
+          "required": false,
+          "description": "Suite name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Run timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda test run",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda test run"
+    },
+    {
+      "name": "status",
+      "path": "test.status",
+      "group": "test",
+      "subcommand": "status",
+      "description": "Show a test run",
+      "tools": [
+        "test_status"
+      ],
+      "action": "gcp.test.status",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Run id"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda test status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda test status"
+    },
+    {
+      "name": "batch",
+      "path": "tool.batch",
+      "group": "tool",
+      "subcommand": "batch",
+      "description": "Run multiple tool calls in one process",
+      "tools": [
+        "tool_batch"
+      ],
+      "action": "gcp.tool.batch",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Batch arguments from a JSON file"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool batch",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool batch"
+    },
+    {
+      "name": "call",
+      "path": "tool.call",
+      "group": "tool",
+      "subcommand": "call",
+      "description": "Call any canonical tool",
+      "tools": [
+        "tool_call"
+      ],
+      "action": "gcp.tool.call",
+      "positional": [
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "Tool name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--args",
+          "type": "string",
+          "scope": "command",
+          "description": "Arguments as JSON",
+          "conflictsWith": [
+            "--args-file"
+          ]
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Arguments from a JSON file",
+          "conflictsWith": [
+            "--args"
+          ]
+        },
+        {
+          "name": "--input",
+          "type": "string",
+          "scope": "command",
+          "description": "MRTR input responses"
+        },
+        {
+          "name": "--async",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Run as an asynchronous job"
+        },
+        {
+          "name": "--progress",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Print progress notifications"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm a high-risk call"
+        },
+        {
+          "name": "--direct",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Invoke a full-surface tool"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Call timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool call",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool call"
+    },
+    {
+      "name": "categories",
+      "path": "tool.categories",
+      "group": "tool",
+      "subcommand": "categories",
+      "description": "List tool categories",
+      "tools": [
+        "tool_categories"
+      ],
+      "action": "gcp.tool.categories",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool categories",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool categories"
+    },
+    {
+      "name": "describe",
+      "path": "tool.describe",
+      "group": "tool",
+      "subcommand": "describe",
+      "description": "Show one tool schema and side effects",
+      "tools": [
+        "tool_describe"
+      ],
+      "action": "gcp.tool.describe",
+      "positional": [
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "Tool name"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool describe",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool describe"
+    },
+    {
+      "name": "list",
+      "path": "tool.list",
+      "group": "tool",
+      "subcommand": "list",
+      "description": "List direct tools from a live instance",
+      "tools": [
+        "tool_list"
+      ],
+      "action": "gcp.tool.list",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--category",
+          "type": "string",
+          "scope": "command",
+          "description": "Restrict by category"
+        },
+        {
+          "name": "--tags",
+          "type": "string",
+          "scope": "command",
+          "description": "Restrict by tags"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool list"
+    },
+    {
+      "name": "ping",
+      "path": "tool.ping",
+      "group": "tool",
+      "subcommand": "ping",
+      "description": "Check connectivity to the control plane",
+      "tools": [
+        "ping"
+      ],
+      "action": "gcp.tool.ping",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool ping",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool ping"
+    },
+    {
+      "name": "search",
+      "path": "tool.search",
+      "group": "tool",
+      "subcommand": "search",
+      "description": "Search canonical tools",
+      "tools": [
+        "tool_search"
+      ],
+      "action": "gcp.tool.search",
+      "positional": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "Search query"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--category",
+          "type": "string",
+          "scope": "command",
+          "description": "Restrict by category"
+        },
+        {
+          "name": "--tags",
+          "type": "string",
+          "scope": "command",
+          "description": "Restrict by tags"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda tool search",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda tool search"
+    },
+    {
+      "name": "export",
+      "path": "trace.export",
+      "group": "trace",
+      "subcommand": "export",
+      "description": "Export traces",
+      "tools": [
+        "trace_export"
+      ],
+      "action": "gcp.trace.export",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--format",
+          "type": "string",
+          "scope": "command",
+          "description": "Export format: jsonl or otlp"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda trace export",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda trace export"
+    },
+    {
+      "name": "failures",
+      "path": "trace.failures",
+      "group": "trace",
+      "subcommand": "failures",
+      "description": "List failed calls",
+      "tools": [
+        "trace_failures"
+      ],
+      "action": "gcp.trace.failures",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda trace failures",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda trace failures"
+    },
+    {
+      "name": "list",
+      "path": "trace.list",
+      "group": "trace",
+      "subcommand": "list",
+      "description": "List recent trace events",
+      "tools": [
+        "trace_list"
+      ],
+      "action": "gcp.trace.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda trace list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda trace list"
+    },
+    {
+      "name": "show",
+      "path": "trace.show",
+      "group": "trace",
+      "subcommand": "show",
+      "description": "Show all events of one trace",
+      "tools": [
+        "trace_show"
+      ],
+      "action": "gcp.trace.show",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Trace id"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda trace show",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda trace show"
+    },
+    {
+      "name": "slow",
+      "path": "trace.slow",
+      "group": "trace",
+      "subcommand": "slow",
+      "description": "List slow calls",
+      "tools": [
+        "trace_slow"
+      ],
+      "action": "gcp.trace.slow",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--slow",
+          "type": "number",
+          "scope": "command",
+          "description": "Threshold in milliseconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda trace slow",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda trace slow"
+    },
+    {
+      "name": "summary",
+      "path": "trace.summary",
+      "group": "trace",
+      "subcommand": "summary",
+      "description": "Summarize latency and failures",
+      "tools": [
+        "trace_summary"
+      ],
+      "action": "gcp.trace.summary",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda trace summary",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda trace summary"
+    },
+    {
+      "name": "check",
+      "path": "update.check",
+      "group": "update",
+      "subcommand": "check",
+      "description": "Check for available updates",
+      "tools": [
+        "update_check"
+      ],
+      "action": "gcp.update.check",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Never use the network"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda update check",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda update check"
+    },
+    {
+      "name": "run",
+      "path": "update.run",
+      "group": "update",
+      "subcommand": "run",
+      "description": "Update cli, skills, plugin, or all",
+      "tools": [
+        "update_run"
+      ],
+      "action": "gcp.update.run",
+      "positional": [
+        {
+          "name": "target",
+          "type": "string",
+          "required": true,
+          "description": "Update target: cli, skills, plugin, or all"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--check",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Report status without applying"
+        },
+        {
+          "name": "--force",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Force the update"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda update run",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda update run"
+    },
+    {
+      "name": "list",
+      "path": "workflow.list",
+      "group": "workflow",
+      "subcommand": "list",
+      "description": "List saved workflows",
+      "tools": [
+        "workflow_list"
+      ],
+      "action": "gcp.workflow.list",
+      "positional": [],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda workflow list",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda workflow list"
+    },
+    {
+      "name": "run",
+      "path": "workflow.run",
+      "group": "workflow",
+      "subcommand": "run",
+      "description": "Run a saved workflow",
+      "tools": [
+        "workflow_run"
+      ],
+      "action": "gcp.workflow.run",
+      "positional": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Workflow name"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--args",
+          "type": "string",
+          "scope": "command",
+          "description": "Workflow arguments as JSON"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda workflow run",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda workflow run"
+    },
+    {
+      "name": "status",
+      "path": "workflow.status",
+      "group": "workflow",
+      "subcommand": "status",
+      "description": "Show a workflow run",
+      "tools": [
+        "workflow_status"
+      ],
+      "action": "gcp.workflow.status",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Workflow run id"
+        }
+      ],
+      "flags": [],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda workflow status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda workflow status"
+    }
+  ],
+  "aliases": [
+    {
+      "from": "batch",
+      "to": "tool.batch"
+    },
+    {
+      "from": "cache",
+      "to": "cache.list"
+    },
+    {
+      "from": "call",
+      "to": "tool.call"
+    },
+    {
+      "from": "categories",
+      "to": "tool.categories"
+    },
+    {
+      "from": "describe",
+      "to": "tool.describe"
+    },
+    {
+      "from": "docs",
+      "to": "docs.status"
+    },
+    {
+      "from": "install",
+      "to": "setup.install"
+    },
+    {
+      "from": "install plugin",
+      "to": "plugin.install"
+    },
+    {
+      "from": "install skills",
+      "to": "skill.install"
+    },
+    {
+      "from": "list",
+      "to": "editor.list"
+    },
+    {
+      "from": "logs",
+      "to": "logs.show"
+    },
+    {
+      "from": "monitor",
+      "to": "monitor.status"
+    },
+    {
+      "from": "ping",
+      "to": "tool.ping"
+    },
+    {
+      "from": "projects",
+      "to": "project.list"
+    },
+    {
+      "from": "prompts",
+      "to": "resource.prompts"
+    },
+    {
+      "from": "prompts get",
+      "to": "resource.prompts"
+    },
+    {
+      "from": "prompts list",
+      "to": "resource.prompts"
+    },
+    {
+      "from": "resources",
+      "to": "resource.list"
+    },
+    {
+      "from": "resources read",
+      "to": "resource.read"
+    },
+    {
+      "from": "resources templates",
+      "to": "resource.templates"
+    },
+    {
+      "from": "resources watch",
+      "to": "resource.watch"
+    },
+    {
+      "from": "restart",
+      "to": "editor.restart"
+    },
+    {
+      "from": "search",
+      "to": "tool.search"
+    },
+    {
+      "from": "skills",
+      "to": "skill.list"
+    },
+    {
+      "from": "skills list",
+      "to": "skill.list"
+    },
+    {
+      "from": "skills show",
+      "to": "skill.show"
+    },
+    {
+      "from": "start",
+      "to": "editor.start"
+    },
+    {
+      "from": "status",
+      "to": "editor.status"
+    },
+    {
+      "from": "stop",
+      "to": "editor.stop"
+    },
+    {
+      "from": "tasks",
+      "to": "job.list"
+    },
+    {
+      "from": "tasks cancel",
+      "to": "job.cancel"
+    },
+    {
+      "from": "tasks clean",
+      "to": "job.clean"
+    },
+    {
+      "from": "tasks get",
+      "to": "job.get"
+    },
+    {
+      "from": "tasks list",
+      "to": "job.list"
+    },
+    {
+      "from": "tasks wait",
+      "to": "job.wait"
+    },
+    {
+      "from": "tools",
+      "to": "tool.list"
+    },
+    {
+      "from": "trace",
+      "to": "trace.list"
+    },
+    {
+      "from": "update",
+      "to": "update.run"
+    }
+  ]
+}

@@ -1,0 +1,1073 @@
+import { GLOBAL_BOOLEAN_FLAGS, GLOBAL_STRING_FLAGS } from "./args";
+import { CliError, ExitCode } from "./errors";
+
+export type FlagType = "string" | "number" | "boolean";
+export type RiskLevel = "none" | "low" | "high";
+
+export interface CommandFlag {
+  name: string;
+  type: FlagType;
+  scope: "global" | "command";
+  description: string;
+  required?: boolean;
+  conflictsWith?: string[];
+}
+
+export interface CommandPositional {
+  name: string;
+  type: "string" | "number";
+  required: boolean;
+  description: string;
+  repeatable?: boolean;
+}
+
+export interface CommandOutput {
+  schema: string;
+  envelope: boolean;
+  description: string;
+}
+
+export interface CommandExample {
+  argv: string;
+  description: string;
+}
+
+export interface CommandSpec {
+  group: string;
+  subcommand: string;
+  name: string;
+  path: string;
+  description: string;
+  tools: string[];
+  action: string;
+  positional: CommandPositional[];
+  flags: CommandFlag[];
+  output: CommandOutput;
+  risk: RiskLevel;
+  long_running: boolean;
+  examples: CommandExample[];
+}
+
+export interface CommandGroup {
+  name: string;
+  description: string;
+}
+
+export interface ParsedCommandArgs {
+  spec: CommandSpec;
+  options: Record<string, string | number | boolean>;
+  positionals: string[];
+}
+
+export interface CommandTokens {
+  tokens: string[];
+  indexes: number[];
+}
+
+interface SpecInput {
+  group: string;
+  subcommand: string;
+  description: string;
+  tools?: string[];
+  action?: string;
+  positional?: CommandPositional[];
+  flags?: CommandFlag[];
+  outputSchema?: string;
+  risk?: RiskLevel;
+  long_running?: boolean;
+  examples?: Array<string | CommandExample>;
+}
+
+function positional(name: string, description: string, required = true): CommandPositional {
+  return { name, type: "string", required, description };
+}
+
+function stringFlag(name: string, description: string, conflictsWith?: string[]): CommandFlag {
+  return conflictsWith === undefined
+    ? { name, type: "string", scope: "command", description }
+    : { name, type: "string", scope: "command", description, conflictsWith };
+}
+
+function numberFlag(name: string, description: string, conflictsWith?: string[]): CommandFlag {
+  return conflictsWith === undefined
+    ? { name, type: "number", scope: "command", description }
+    : { name, type: "number", scope: "command", description, conflictsWith };
+}
+
+function boolFlag(name: string, description: string, conflictsWith?: string[]): CommandFlag {
+  return conflictsWith === undefined
+    ? { name, type: "boolean", scope: "command", description }
+    : { name, type: "boolean", scope: "command", description, conflictsWith };
+}
+
+function define(input: SpecInput): CommandSpec {
+  const path = `${input.group}.${input.subcommand}`;
+  const examples = (input.examples ?? [`gda ${input.group} ${input.subcommand}`]).map((example) =>
+    typeof example === "string" ? { argv: example, description: "Example invocation" } : example,
+  );
+  return {
+    group: input.group,
+    subcommand: input.subcommand,
+    name: input.subcommand,
+    path,
+    description: input.description,
+    tools: input.tools ?? [],
+    action: input.action ?? `gcp.${path}`,
+    positional: input.positional ?? [],
+    flags: input.flags ?? [],
+    output: {
+      schema: input.outputSchema ?? "gda.result.v1",
+      envelope: true,
+      description: "CLI envelope v1",
+    },
+    risk: input.risk ?? "none",
+    long_running: input.long_running ?? false,
+    examples,
+  };
+}
+
+export const COMMAND_GROUPS: ReadonlyArray<CommandGroup> = [
+  { name: "editor", description: "Editor and instance lifecycle" },
+  { name: "project", description: "Project discovery and metadata" },
+  { name: "tool", description: "Tool discovery and generic tool calls" },
+  { name: "workflow", description: "Saved multi-step workflows" },
+  { name: "docs", description: "Engine documentation cache and lookup" },
+  { name: "debug", description: "Live editor inspection and evaluation" },
+  { name: "logs", description: "Instance logs and log streams" },
+  { name: "scene", description: "Scene opening, editing, and saving" },
+  { name: "script", description: "Script reading and editing" },
+  { name: "resource", description: "Project resources, templates, and prompts" },
+  { name: "game", description: "Game run lifecycle" },
+  { name: "test", description: "Test suites and runs" },
+  { name: "job", description: "Asynchronous jobs" },
+  { name: "trace", description: "Trace events and latency reports" },
+  { name: "monitor", description: "Game monitor sessions and reports" },
+  { name: "setup", description: "Environment and installation setup" },
+  { name: "skill", description: "Bundled skill books" },
+  { name: "plugin", description: "Godot addon management" },
+  { name: "cache", description: "Local cache manifests and entries" },
+  { name: "update", description: "CLI, skills, and plugin updates" },
+  { name: "doctor", description: "Environment diagnostics" },
+  { name: "config", description: "CLI configuration" },
+  { name: "shell", description: "Shell-level execution" },
+  { name: "completion", description: "Shell completion generation" },
+];
+
+export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
+  define({ group: "editor", subcommand: "status", description: "Show editor and server status", tools: ["system_status"] }),
+  define({
+    group: "editor",
+    subcommand: "list",
+    description: "List running Godot instances",
+    tools: ["instance_list"],
+    flags: [
+      boolFlag("--all", "Include projects with no running instance"),
+      boolFlag("--projects", "Aggregate entries by project"),
+      boolFlag("--stale", "Keep only non-live entries"),
+    ],
+  }),
+  define({
+    group: "editor",
+    subcommand: "start",
+    description: "Start a Godot editor",
+    tools: ["editor_start"],
+    flags: [
+      stringFlag("--godot", "Explicit Godot executable"),
+      boolFlag("--headless", "Start headless"),
+      boolFlag("--play", "Play the current scene when ready"),
+      boolFlag("--no-import", "Skip the asset import pre-step"),
+      stringFlag("--wait", "Readiness wait in seconds"),
+      stringFlag("--probe", "Liveness level: light or strict"),
+    ],
+  }),
+  define({
+    group: "editor",
+    subcommand: "stop",
+    description: "Stop a Godot editor",
+    tools: ["editor_stop"],
+    positional: [positional("id", "Instance id", false)],
+    flags: [
+      stringFlag("--id", "Target instance id"),
+      stringFlag("--port", "Target connection port"),
+      stringFlag("--project", "Target project directory"),
+      boolFlag("--force", "Force-stop the process", ["--wait"]),
+      stringFlag("--wait", "Stop wait in seconds", ["--force"]),
+    ],
+    risk: "high",
+  }),
+  define({
+    group: "editor",
+    subcommand: "restart",
+    description: "Restart a Godot editor with the same settings",
+    tools: ["editor_restart"],
+    flags: [
+      boolFlag("--force", "Force-stop the process", ["--wait"]),
+      stringFlag("--wait", "Stop wait in seconds", ["--force"]),
+      boolFlag("--no-import", "Skip the asset import pre-step"),
+    ],
+    risk: "high",
+  }),
+
+  define({
+    group: "project",
+    subcommand: "list",
+    description: "List known Godot projects",
+    tools: ["project_list"],
+    flags: [boolFlag("--all", "Include projects without instances")],
+  }),
+  define({
+    group: "project",
+    subcommand: "info",
+    description: "Show project metadata",
+    tools: ["project_info"],
+    positional: [positional("dir", "Project directory")],
+  }),
+  define({
+    group: "project",
+    subcommand: "open",
+    description: "Open a project in an editor",
+    tools: ["project_open"],
+    positional: [positional("dir", "Project directory")],
+    flags: [stringFlag("--godot", "Explicit Godot executable")],
+    risk: "low",
+  }),
+
+  define({ group: "tool", subcommand: "ping", description: "Check connectivity to the control plane", tools: ["ping"] }),
+  define({
+    group: "tool",
+    subcommand: "list",
+    description: "List direct tools from a live instance",
+    tools: ["tool_list"],
+    flags: [stringFlag("--category", "Restrict by category"), stringFlag("--tags", "Restrict by tags")],
+  }),
+  define({ group: "tool", subcommand: "categories", description: "List tool categories", tools: ["tool_categories"] }),
+  define({
+    group: "tool",
+    subcommand: "search",
+    description: "Search canonical tools",
+    tools: ["tool_search"],
+    positional: [positional("query", "Search query")],
+    flags: [stringFlag("--category", "Restrict by category"), stringFlag("--tags", "Restrict by tags")],
+  }),
+  define({
+    group: "tool",
+    subcommand: "describe",
+    description: "Show one tool schema and side effects",
+    tools: ["tool_describe"],
+    positional: [positional("tool", "Tool name")],
+  }),
+  define({
+    group: "tool",
+    subcommand: "call",
+    description: "Call any canonical tool",
+    tools: ["tool_call"],
+    positional: [positional("tool", "Tool name")],
+    flags: [
+      stringFlag("--args", "Arguments as JSON", ["--args-file"]),
+      stringFlag("--args-file", "Arguments from a JSON file", ["--args"]),
+      stringFlag("--input", "MRTR input responses"),
+      boolFlag("--async", "Run as an asynchronous job"),
+      boolFlag("--progress", "Print progress notifications"),
+      boolFlag("--confirm", "Confirm a high-risk call"),
+      boolFlag("--direct", "Invoke a full-surface tool"),
+      stringFlag("--timeout", "Call timeout in seconds"),
+    ],
+    risk: "high",
+  }),
+  define({
+    group: "tool",
+    subcommand: "batch",
+    description: "Run multiple tool calls in one process",
+    tools: ["tool_batch"],
+    flags: [stringFlag("--args-file", "Batch arguments from a JSON file")],
+    risk: "high",
+  }),
+
+  define({
+    group: "workflow",
+    subcommand: "run",
+    description: "Run a saved workflow",
+    tools: ["workflow_run"],
+    positional: [positional("name", "Workflow name")],
+    flags: [stringFlag("--args", "Workflow arguments as JSON")],
+    risk: "high",
+    long_running: true,
+  }),
+  define({ group: "workflow", subcommand: "list", description: "List saved workflows", tools: ["workflow_list"] }),
+  define({
+    group: "workflow",
+    subcommand: "status",
+    description: "Show a workflow run",
+    tools: ["workflow_status"],
+    positional: [positional("id", "Workflow run id")],
+  }),
+
+  define({
+    group: "docs",
+    subcommand: "sync",
+    description: "Export engine docs into the local cache",
+    tools: ["docs_sync"],
+    flags: [stringFlag("--engine", "Engine version bucket"), boolFlag("--offline", "Never use the network")],
+  }),
+  define({ group: "docs", subcommand: "status", description: "Show docs cache and engine pin state", tools: ["docs_status"] }),
+  define({
+    group: "docs",
+    subcommand: "search",
+    description: "Search classes, members, and utilities",
+    tools: ["docs_search"],
+    positional: [positional("query", "Search query")],
+    flags: [stringFlag("--kind", "Result kind"), stringFlag("--class", "Restrict to one class"), stringFlag("--engine", "Engine version bucket")],
+  }),
+  define({
+    group: "docs",
+    subcommand: "class",
+    description: "Show one engine class",
+    tools: ["docs_class"],
+    positional: [positional("name", "Class name")],
+    flags: [stringFlag("--section", "Section to show"), stringFlag("--member", "Member filter"), boolFlag("--full", "Include every section")],
+  }),
+  define({
+    group: "docs",
+    subcommand: "member",
+    description: "Show one class member",
+    tools: ["docs_member"],
+    positional: [positional("class", "Class name"), positional("name", "Member name")],
+    flags: [stringFlag("--kind", "Member kind")],
+  }),
+  define({
+    group: "docs",
+    subcommand: "clear",
+    description: "Remove cached docs",
+    tools: ["docs_clear"],
+    flags: [
+      stringFlag("--engine", "Remove one engine bucket", ["--all"]),
+      boolFlag("--all", "Remove every bucket", ["--engine"]),
+      boolFlag("--force", "Confirm removal"),
+    ],
+    risk: "high",
+  }),
+
+  define({
+    group: "debug",
+    subcommand: "inspect",
+    description: "Inspect live editor state",
+    tools: ["debug_inspect"],
+    flags: [stringFlag("--project", "Target project directory")],
+  }),
+  define({
+    group: "debug",
+    subcommand: "attach",
+    description: "Attach to a running instance",
+    tools: ["debug_attach"],
+    positional: [positional("id", "Instance id")],
+  }),
+  define({
+    group: "debug",
+    subcommand: "eval",
+    description: "Evaluate an expression in the editor",
+    tools: ["debug_eval"],
+    positional: [positional("expression", "Expression to evaluate")],
+    flags: [stringFlag("--timeout", "Evaluation timeout in seconds")],
+    risk: "high",
+  }),
+
+  define({
+    group: "logs",
+    subcommand: "show",
+    description: "Show an instance log",
+    tools: ["logs_read"],
+    flags: [
+      numberFlag("--tail", "Number of trailing lines"),
+      stringFlag("--id", "Target instance id"),
+      stringFlag("--port", "Target connection port"),
+      stringFlag("--project", "Target project directory"),
+    ],
+  }),
+  define({ group: "logs", subcommand: "list", description: "List log streams", tools: ["logs_list"] }),
+
+  define({ group: "scene", subcommand: "list", description: "List open scenes", tools: ["scene_list"] }),
+  define({
+    group: "scene",
+    subcommand: "open",
+    description: "Open a scene in the editor",
+    tools: ["scene_open"],
+    positional: [positional("path", "Scene path")],
+    risk: "low",
+  }),
+  define({
+    group: "scene",
+    subcommand: "add",
+    description: "Add a node to a scene",
+    tools: ["scene_node_add"],
+    positional: [positional("node", "Node type or path")],
+    flags: [stringFlag("--scene", "Target scene"), stringFlag("--parent", "Parent node path")],
+    risk: "low",
+  }),
+  define({ group: "scene", subcommand: "save", description: "Save the current scene", tools: ["scene_save"], risk: "low" }),
+
+  define({ group: "script", subcommand: "list", description: "List project scripts", tools: ["script_list"] }),
+  define({
+    group: "script",
+    subcommand: "read",
+    description: "Read a project script",
+    tools: ["script_read"],
+    positional: [positional("path", "Script path")],
+  }),
+  define({
+    group: "script",
+    subcommand: "create",
+    description: "Create a project script",
+    tools: ["script_create"],
+    positional: [positional("path", "Script path")],
+    flags: [stringFlag("--extends", "Base class")],
+    risk: "low",
+  }),
+  define({
+    group: "script",
+    subcommand: "delete",
+    description: "Delete a project script",
+    tools: ["script_delete"],
+    positional: [positional("path", "Script path")],
+    flags: [boolFlag("--confirm", "Confirm deletion")],
+    risk: "high",
+  }),
+
+  define({
+    group: "resource",
+    subcommand: "list",
+    description: "List project resources",
+    tools: ["resource_list"],
+  }),
+  define({ group: "resource", subcommand: "templates", description: "List resource templates", tools: ["resource_templates"] }),
+  define({
+    group: "resource",
+    subcommand: "read",
+    description: "Read one resource",
+    tools: ["resource_read"],
+    positional: [positional("uri", "Resource uri")],
+    flags: [
+      boolFlag("--json", "Pretty JSON output", ["--raw"]),
+      boolFlag("--raw", "Raw payload output", ["--json"]),
+      stringFlag("--save", "Write blobs to a directory"),
+    ],
+  }),
+  define({
+    group: "resource",
+    subcommand: "watch",
+    description: "Poll a resource and print changes",
+    tools: ["resource_watch"],
+    positional: [positional("uri", "Resource uri")],
+    flags: [numberFlag("--interval", "Polling interval in seconds")],
+    long_running: true,
+  }),
+  define({
+    group: "resource",
+    subcommand: "prompts",
+    description: "List or render prompt templates",
+    tools: ["resource_prompts"],
+    positional: [positional("name", "Prompt name", false)],
+    flags: [stringFlag("--args", "Prompt arguments as JSON")],
+  }),
+
+  define({
+    group: "game",
+    subcommand: "start",
+    description: "Run the game",
+    tools: ["game_start"],
+    flags: [boolFlag("--headless", "Run headless"), boolFlag("--play", "Play the current scene")],
+  }),
+  define({ group: "game", subcommand: "stop", description: "Stop the game", tools: ["game_stop"], risk: "high" }),
+  define({ group: "game", subcommand: "status", description: "Show game run status", tools: ["game_status"] }),
+
+  define({ group: "test", subcommand: "list", description: "List test suites", tools: ["test_list"] }),
+  define({
+    group: "test",
+    subcommand: "run",
+    description: "Run a test suite",
+    tools: ["test_run"],
+    positional: [positional("suite", "Suite name", false)],
+    flags: [stringFlag("--timeout", "Run timeout in seconds")],
+    long_running: true,
+  }),
+  define({
+    group: "test",
+    subcommand: "status",
+    description: "Show a test run",
+    tools: ["test_status"],
+    positional: [positional("id", "Run id")],
+  }),
+
+  define({ group: "job", subcommand: "list", description: "List jobs", tools: ["job_list"] }),
+  define({ group: "job", subcommand: "get", description: "Get one job", tools: ["job_get"], positional: [positional("id", "Job id")] }),
+  define({
+    group: "job",
+    subcommand: "wait",
+    description: "Wait for a job to finish",
+    tools: ["job_wait"],
+    positional: [positional("id", "Job id")],
+    flags: [stringFlag("--timeout", "Wait timeout in seconds")],
+    long_running: true,
+  }),
+  define({
+    group: "job",
+    subcommand: "cancel",
+    description: "Cancel a job",
+    tools: ["job_cancel"],
+    positional: [positional("id", "Job id")],
+    flags: [boolFlag("--confirm", "Confirm cancellation")],
+    risk: "high",
+  }),
+  define({
+    group: "job",
+    subcommand: "clean",
+    description: "Remove terminal jobs",
+    tools: ["job_clean"],
+    flags: [boolFlag("--force", "Confirm removal")],
+    risk: "high",
+  }),
+
+  define({ group: "trace", subcommand: "list", description: "List recent trace events", tools: ["trace_list"] }),
+  define({
+    group: "trace",
+    subcommand: "show",
+    description: "Show all events of one trace",
+    tools: ["trace_show"],
+    positional: [positional("id", "Trace id")],
+  }),
+  define({ group: "trace", subcommand: "summary", description: "Summarize latency and failures", tools: ["trace_summary"] }),
+  define({
+    group: "trace",
+    subcommand: "slow",
+    description: "List slow calls",
+    tools: ["trace_slow"],
+    flags: [numberFlag("--slow", "Threshold in milliseconds")],
+  }),
+  define({ group: "trace", subcommand: "failures", description: "List failed calls", tools: ["trace_failures"] }),
+  define({
+    group: "trace",
+    subcommand: "export",
+    description: "Export traces",
+    tools: ["trace_export"],
+    flags: [stringFlag("--format", "Export format: jsonl or otlp")],
+  }),
+
+  define({ group: "monitor", subcommand: "status", description: "Show monitor scope and recording directory", tools: ["monitor_status"] }),
+  define({ group: "monitor", subcommand: "sessions", description: "List recorded monitor sessions", tools: ["monitor_sessions"] }),
+  define({
+    group: "monitor",
+    subcommand: "report",
+    description: "Analyze one monitor session",
+    tools: ["monitor_report"],
+    positional: [positional("id", "Session id", false)],
+    flags: [stringFlag("--file", "Offline JSONL path")],
+  }),
+  define({
+    group: "monitor",
+    subcommand: "export",
+    description: "Copy a monitor session into GDA home",
+    tools: ["monitor_export"],
+    positional: [positional("id", "Session id")],
+  }),
+
+  define({
+    group: "setup",
+    subcommand: "init",
+    description: "Initialize GDA in a project",
+    tools: ["setup_init"],
+    positional: [positional("dir", "Project directory", false)],
+    flags: [boolFlag("--with-csharp-runtime", "Add the C# runtime autoload")],
+    risk: "low",
+  }),
+  define({
+    group: "setup",
+    subcommand: "install",
+    description: "Install skills or the Godot plugin",
+    tools: ["setup_install"],
+    flags: [
+      stringFlag("--artifact", "Artifact to install: cli, plugin, or skills"),
+      stringFlag("--path", "Install target directory"),
+      boolFlag("--zh", "Use the Chinese skills archive"),
+      boolFlag("--prune", "Remove retired skill directories"),
+      boolFlag("--with-csharp-runtime", "Add the C# runtime autoload"),
+    ],
+    risk: "high",
+  }),
+  define({ group: "setup", subcommand: "status", description: "Show setup state", tools: ["setup_status"] }),
+
+  define({
+    group: "skill",
+    subcommand: "list",
+    description: "List bundled skill books",
+    tools: ["skill_list"],
+    flags: [boolFlag("--zh", "Use the Chinese archive"), boolFlag("--offline", "Never use the network")],
+  }),
+  define({
+    group: "skill",
+    subcommand: "show",
+    description: "Print one skill book",
+    tools: ["skill_show"],
+    positional: [positional("name", "Skill book name")],
+    flags: [stringFlag("--file", "Auxiliary file path"), boolFlag("--zh", "Use the Chinese archive")],
+  }),
+  define({
+    group: "skill",
+    subcommand: "install",
+    description: "Install skill books",
+    tools: ["skill_install"],
+    flags: [stringFlag("--path", "Install target directory"), boolFlag("--zh", "Use the Chinese archive"), boolFlag("--prune", "Remove retired books")],
+    risk: "high",
+  }),
+
+  define({ group: "plugin", subcommand: "list", description: "List installed plugins", tools: ["plugin_list"] }),
+  define({
+    group: "plugin",
+    subcommand: "install",
+    description: "Install the Godot addon",
+    tools: ["plugin_install"],
+    positional: [positional("dir", "Project directory", false)],
+    flags: [boolFlag("--with-csharp-runtime", "Add the C# runtime autoload")],
+    risk: "high",
+  }),
+  define({
+    group: "plugin",
+    subcommand: "enable",
+    description: "Enable a plugin",
+    tools: ["plugin_enable"],
+    positional: [positional("name", "Plugin name")],
+    risk: "low",
+  }),
+
+  define({ group: "cache", subcommand: "list", description: "List cache manifests", tools: ["cache_list"] }),
+  define({ group: "cache", subcommand: "info", description: "Show cache root, count, and size", tools: ["cache_info"] }),
+  define({
+    group: "cache",
+    subcommand: "clear",
+    description: "Remove old cache entries",
+    tools: ["cache_clear"],
+    flags: [boolFlag("--force", "Confirm removal")],
+    risk: "high",
+  }),
+
+  define({
+    group: "update",
+    subcommand: "check",
+    description: "Check for available updates",
+    tools: ["update_check"],
+    flags: [boolFlag("--offline", "Never use the network")],
+  }),
+  define({
+    group: "update",
+    subcommand: "run",
+    description: "Update cli, skills, plugin, or all",
+    tools: ["update_run"],
+    positional: [positional("target", "Update target: cli, skills, plugin, or all")],
+    flags: [boolFlag("--check", "Report status without applying"), boolFlag("--force", "Force the update")],
+    risk: "high",
+  }),
+
+  define({
+    group: "doctor",
+    subcommand: "run",
+    description: "Run environment diagnostics",
+    tools: ["doctor_run"],
+    flags: [boolFlag("--offline", "Never use the network")],
+  }),
+
+  define({ group: "config", subcommand: "list", description: "List CLI configuration", tools: ["config_list"] }),
+  define({
+    group: "config",
+    subcommand: "get",
+    description: "Read one configuration key",
+    tools: ["config_get"],
+    positional: [positional("key", "Configuration key")],
+  }),
+  define({
+    group: "config",
+    subcommand: "set",
+    description: "Write one configuration key",
+    tools: ["config_set"],
+    positional: [positional("key", "Configuration key"), positional("value", "New value")],
+    risk: "low",
+  }),
+
+  define({
+    group: "shell",
+    subcommand: "run",
+    description: "Run a shell command",
+    tools: ["shell_run"],
+    positional: [positional("command", "Command to execute", false)],
+    flags: [stringFlag("--timeout", "Command timeout in seconds")],
+    risk: "high",
+    long_running: true,
+  }),
+
+  define({ group: "completion", subcommand: "bash", description: "Print bash completion from the command spec", tools: ["completion_bash"] }),
+  define({ group: "completion", subcommand: "zsh", description: "Print zsh completion from the command spec", tools: ["completion_zsh"] }),
+  define({ group: "completion", subcommand: "fish", description: "Print fish completion from the command spec", tools: ["completion_fish"] }),
+];
+
+export const LEGACY_ALIASES: ReadonlyArray<readonly [string, string]> = [
+  ["ping", "tool.ping"],
+  ["status", "editor.status"],
+  ["categories", "tool.categories"],
+  ["search", "tool.search"],
+  ["describe", "tool.describe"],
+  ["call", "tool.call"],
+  ["batch", "tool.batch"],
+  ["list", "editor.list"],
+  ["start", "editor.start"],
+  ["stop", "editor.stop"],
+  ["restart", "editor.restart"],
+  ["logs", "logs.show"],
+  ["docs", "docs.status"],
+  ["skills", "skill.list"],
+  ["skills list", "skill.list"],
+  ["skills show", "skill.show"],
+  ["tools", "tool.list"],
+  ["resources", "resource.list"],
+  ["resources templates", "resource.templates"],
+  ["resources read", "resource.read"],
+  ["resources watch", "resource.watch"],
+  ["prompts", "resource.prompts"],
+  ["prompts list", "resource.prompts"],
+  ["prompts get", "resource.prompts"],
+  ["tasks", "job.list"],
+  ["tasks list", "job.list"],
+  ["tasks get", "job.get"],
+  ["tasks wait", "job.wait"],
+  ["tasks cancel", "job.cancel"],
+  ["tasks clean", "job.clean"],
+  ["projects", "project.list"],
+  ["cache", "cache.list"],
+  ["install", "setup.install"],
+  ["install skills", "skill.install"],
+  ["install plugin", "plugin.install"],
+  ["update", "update.run"],
+  ["trace", "trace.list"],
+  ["monitor", "monitor.status"],
+];
+
+const SPEC_BY_PATH = new Map<string, CommandSpec>(COMMAND_SPECS.map((spec) => [spec.path, spec]));
+const GROUP_NAMES = new Set<string>(COMMAND_GROUPS.map((group) => group.name));
+
+export function findSpec(path: string): CommandSpec | undefined {
+  return SPEC_BY_PATH.get(path);
+}
+
+export function isGroup(name: string | undefined): boolean {
+  return name !== undefined && GROUP_NAMES.has(name);
+}
+
+export function buildAliasMap(entries: ReadonlyArray<readonly [string, string]>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [from, to] of entries) {
+    if (map.has(from)) {
+      throw new Error(`duplicate command alias: ${from}`);
+    }
+    if (findSpec(to) === undefined) {
+      throw new Error(`command alias target is not a spec: ${from} -> ${to}`);
+    }
+    map.set(from, to);
+  }
+  return map;
+}
+
+export const COMMAND_ALIASES: ReadonlyMap<string, string> = buildAliasMap(LEGACY_ALIASES);
+
+export function resolveCommand(tokens: string[]): CommandSpec | undefined {
+  if (tokens.length === 0) return undefined;
+  const head = tokens[0];
+  if (tokens.length >= 2 && isGroup(head)) {
+    const direct = findSpec(`${head}.${tokens[1]}`);
+    if (direct !== undefined) return direct;
+  }
+  for (const count of [2, 1]) {
+    if (tokens.length < count) continue;
+    const alias = COMMAND_ALIASES.get(tokens.slice(0, count).join(" "));
+    if (alias !== undefined) return findSpec(alias);
+  }
+  return undefined;
+}
+
+export function extractCommandTokens(argv: string[]): CommandTokens {
+  const tokens: string[] = [];
+  const indexes: number[] = [];
+  let i = 0;
+  while (i < argv.length) {
+    const token = argv[i];
+    if (token === "--") break;
+    if (token.startsWith("-")) {
+      const name = token.split("=", 1)[0];
+      const takesValue = GLOBAL_STRING_FLAGS[name] !== undefined && !token.includes("=");
+      i += takesValue ? 2 : 1;
+      continue;
+    }
+    tokens.push(token);
+    indexes.push(i);
+    if (tokens.length >= 2) break;
+    i += 1;
+  }
+  return { tokens, indexes };
+}
+
+function globalFlagTypes(): Map<string, FlagType> {
+  const types = new Map<string, FlagType>();
+  for (const name of Object.keys(GLOBAL_STRING_FLAGS)) types.set(name, "string");
+  for (const name of Object.keys(GLOBAL_BOOLEAN_FLAGS)) types.set(name, "boolean");
+  return types;
+}
+
+export function globalFlags(): CommandFlag[] {
+  const types = globalFlagTypes();
+  return [...types.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, type]) => ({ name, type, scope: "global" as const, description: "Global option" }));
+}
+
+function usageError(spec: CommandSpec, message: string): CliError {
+  return new CliError(ExitCode.Usage, `gda ${spec.path}: ${message}`, `Run gda ${spec.path} --help for valid arguments.`);
+}
+
+export function parseCommandArgs(spec: CommandSpec, argv: string[]): ParsedCommandArgs {
+  const allowed = globalFlagTypes();
+  for (const flag of spec.flags) {
+    if (flag.scope === "command") allowed.set(flag.name, flag.type);
+  }
+  const options: Record<string, string | number | boolean> = {};
+  const positionals: string[] = [];
+  let onlyPositionals = false;
+  let i = 0;
+  while (i < argv.length) {
+    const token = argv[i];
+    if (onlyPositionals) {
+      positionals.push(token);
+      i += 1;
+      continue;
+    }
+    if (token === "--") {
+      onlyPositionals = true;
+      i += 1;
+      continue;
+    }
+    if (!token.startsWith("-")) {
+      positionals.push(token);
+      i += 1;
+      continue;
+    }
+    const eq = token.indexOf("=");
+    const name = eq === -1 ? token : token.slice(0, eq);
+    const type = allowed.get(name);
+    if (type === undefined) throw usageError(spec, `unknown option ${name}`);
+    const flag = spec.flags.find((entry) => entry.name === name);
+    if (type === "boolean") {
+      if (eq !== -1) throw usageError(spec, `boolean option ${name} does not take a value`);
+      options[name] = true;
+    } else {
+      let value: string;
+      if (eq !== -1) {
+        value = token.slice(eq + 1);
+      } else {
+        const next = argv[i + 1];
+        if (next === undefined || next.startsWith("-")) throw usageError(spec, `option ${name} requires a value`);
+        value = next;
+        i += 1;
+      }
+      if (type === "number") {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) throw usageError(spec, `option ${name} requires a number, got: ${value}`);
+        options[name] = parsed;
+      } else {
+        options[name] = value;
+      }
+    }
+    if (flag?.conflictsWith !== undefined) {
+      for (const other of flag.conflictsWith) {
+        if (options[other] !== undefined) throw usageError(spec, `option ${name} conflicts with ${other}`);
+      }
+    }
+    i += 1;
+  }
+  for (const flag of spec.flags) {
+    if (flag.required === true && options[flag.name] === undefined) {
+      throw usageError(spec, `missing required option ${flag.name}`);
+    }
+  }
+  const maximum = spec.positional.reduce((sum, entry) => sum + (entry.repeatable === true ? Number.MAX_SAFE_INTEGER : 1), 0);
+  if (positionals.length > maximum) {
+    throw usageError(spec, `too many positional arguments (expected at most ${maximum}, got ${positionals.length})`);
+  }
+  for (let index = 0; index < spec.positional.length; index += 1) {
+    const entry = spec.positional[index];
+    if (entry.required && positionals[index] === undefined) {
+      throw usageError(spec, `missing required argument <${entry.name}>`);
+    }
+  }
+  return { spec, options, positionals };
+}
+
+function flagLine(flag: CommandFlag): string {
+  const value = flag.type === "boolean" ? "" : flag.type === "number" ? " <n>" : " <text>";
+  const conflicts = flag.conflictsWith === undefined ? "" : ` (conflicts: ${flag.conflictsWith.join(", ")})`;
+  return `  ${flag.name}${value}  ${flag.description}${conflicts}`;
+}
+
+export function leafHelpText(spec: CommandSpec): string {
+  const usage = [...spec.positional.map((entry) => (entry.required ? `<${entry.name}>` : `[${entry.name}]`)), "[flags]"].join(" ");
+  const lines = [
+    `gda ${spec.path} — ${spec.description}`,
+    "",
+    "Usage:",
+    `  gda ${spec.path.replace(".", " ")} ${usage}`,
+    "",
+    `Subcommand: ${spec.subcommand}`,
+    `Group: ${spec.group}`,
+    `Invoke: gda ${spec.path.replace(".", " ")}`,
+    `Tools: ${spec.tools.length === 0 ? "-" : spec.tools.join(", ")}`,
+    `Action: ${spec.action}`,
+    "",
+  ];
+  if (spec.positional.length > 0) {
+    lines.push("Arguments:", ...spec.positional.map((entry) => `  <${entry.name}>  ${entry.description}${entry.required ? "" : " (optional)"}`), "");
+  }
+  lines.push("Flags:", ...globalFlags().map(flagLine));
+  if (spec.flags.length > 0) {
+    lines.push("", `Flags for ${spec.path}:`, ...spec.flags.map((flag) => `  ${flagLine(flag).slice(2)}`));
+  }
+  lines.push(
+    "",
+    `Output: ${spec.output.schema} (${spec.output.envelope ? "envelope" : "raw"})`,
+    `Risk: ${spec.risk}`,
+    `Long running: ${spec.long_running ? "yes" : "no"}`,
+    "",
+    "Examples:",
+    ...spec.examples.map((example) => `  ${example.argv}${example.description === "" ? "" : `  ${example.description}`}`),
+  );
+  return lines.join("\n");
+}
+
+export function groupHelpText(groupName: string): string | undefined {
+  const group = COMMAND_GROUPS.find((entry) => entry.name === groupName);
+  if (group === undefined) return undefined;
+  const leaves = COMMAND_SPECS.filter((spec) => spec.group === groupName);
+  return [
+    `gda ${group.name} — ${group.description}`,
+    "",
+    "Usage:",
+    `  gda ${group.name} <subcommand> [args...]`,
+    "",
+    "Subcommands:",
+    ...leaves.map((spec) => `  ${spec.subcommand.padEnd(12)} ${spec.description}`),
+    "",
+    `Run gda ${group.name} <subcommand> --help for details.`,
+  ].join("\n");
+}
+
+export function commandsHelpText(): string {
+  return [
+    "gda commands — Inspect the declarative command manifest",
+    "",
+    "Usage:",
+    "  gda commands --json",
+    "",
+    "Outputs every command's name, path, positional arguments, flags, output schema, risk, and invoke target.",
+    "The manifest is generated from the same CliCommandSpec used for help, completion, and tests.",
+    "",
+    "Domains:",
+    ...COMMAND_GROUPS.map((group) => `  ${group.name.padEnd(12)} ${group.description}`),
+  ].join("\n");
+}
+
+export function helpTextForTokens(tokens: string[]): string | undefined {
+  if (tokens[0] === "commands") return commandsHelpText();
+  if (tokens.length >= 2 && isGroup(tokens[0])) {
+    const spec = findSpec(`${tokens[0]}.${tokens[1]}`);
+    if (spec !== undefined) return leafHelpText(spec);
+  }
+  const resolved = resolveCommand(tokens);
+  if (resolved !== undefined) return leafHelpText(resolved);
+  if (tokens.length === 1 && isGroup(tokens[0])) return groupHelpText(tokens[0]);
+  return undefined;
+}
+
+export function completionCandidates(argv: string[]): string[] {
+  const current = argv[argv.length - 1] ?? "";
+  const tokens = extractCommandTokens(argv).tokens.filter((token) => token.length > 0);
+  const flags = [...globalFlags().map((flag) => flag.name), "--help"];
+  const domains = [...COMMAND_GROUPS.map((group) => group.name), "commands"];
+  const leaves = (group: string): string[] =>
+    COMMAND_SPECS.filter((spec) => spec.group === group).map((spec) => spec.subcommand);
+  if (current.startsWith("--")) {
+    return flags.filter((name) => name.startsWith(current)).sort();
+  }
+  if (tokens.length === 0) {
+    return domains.filter((name) => name.startsWith(current)).sort();
+  }
+  if (tokens.length === 1) {
+    if (isGroup(tokens[0])) {
+      const prefix = tokens[0] === current ? "" : current;
+      return leaves(tokens[0]).filter((name) => name.startsWith(prefix)).sort();
+    }
+    if (tokens[0] === current) return domains.filter((name) => name.startsWith(current)).sort();
+    return flags.filter((name) => name.startsWith(current)).sort();
+  }
+  if (isGroup(tokens[0])) {
+    return leaves(tokens[0]).filter((name) => name.startsWith(current)).sort();
+  }
+  const spec = resolveCommand(tokens);
+  if (spec === undefined) return [];
+  return [...spec.flags.map((flag) => flag.name), ...flags].filter((name) => name.startsWith(current)).sort();
+}
+
+export interface CommandManifest {
+  schema_version: number;
+  generated_by: string;
+  group_count: number;
+  command_count: number;
+  groups: Array<{ name: string; description: string }>;
+  commands: Array<{
+    name: string;
+    path: string;
+    group: string;
+    subcommand: string;
+    description: string;
+    tools: string[];
+    action: string;
+    positional: CommandPositional[];
+    flags: CommandFlag[];
+    output: CommandOutput;
+    risk: RiskLevel;
+    long_running: boolean;
+    examples: CommandExample[];
+    invoke: string;
+  }>;
+  aliases: Array<{ from: string; to: string }>;
+}
+
+export function buildManifest(): CommandManifest {
+  return {
+    schema_version: 1,
+    generated_by: "cli/src/command-spec.ts",
+    group_count: COMMAND_GROUPS.length,
+    command_count: COMMAND_SPECS.length,
+    groups: COMMAND_GROUPS.map((group) => ({ ...group })),
+    commands: [...COMMAND_SPECS]
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .map((spec) => ({
+        name: spec.name,
+        path: spec.path,
+        group: spec.group,
+        subcommand: spec.subcommand,
+        description: spec.description,
+        tools: [...spec.tools],
+        action: spec.action,
+        positional: spec.positional.map((entry) => ({ ...entry })),
+        flags: spec.flags.map((flag) => ({ ...flag, conflictsWith: flag.conflictsWith === undefined ? undefined : [...flag.conflictsWith] })),
+        output: { ...spec.output },
+        risk: spec.risk,
+        long_running: spec.long_running,
+        examples: spec.examples.map((example) => ({ ...example })),
+        invoke: `gda ${spec.path.replace(".", " ")}`,
+      })),
+    aliases: [...COMMAND_ALIASES.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([from, to]) => ({ from, to })),
+  };
+}

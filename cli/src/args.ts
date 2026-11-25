@@ -120,6 +120,9 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--prune": "prune",
 };
 
+export const GLOBAL_STRING_FLAGS: Readonly<Record<string, keyof GlobalOptions>> = STRING_FLAGS;
+export const GLOBAL_BOOLEAN_FLAGS: Readonly<Record<string, keyof GlobalOptions>> = BOOLEAN_FLAGS;
+
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
   const opts: Record<string, string | boolean | undefined> = {};
   const positionals: string[] = [];
