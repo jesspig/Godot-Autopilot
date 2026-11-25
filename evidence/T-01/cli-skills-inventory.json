@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "captured_from": "pre-change T-01 baseline",
+  "version": "0.3.5",
+  "cli": {
+    "commands": [
+      "batch",
+      "cache",
+      "call",
+      "categories",
+      "describe",
+      "docs",
+      "install",
+      "list",
+      "logs",
+      "monitor",
+      "ping",
+      "projects",
+      "prompts",
+      "resources",
+      "restart",
+      "search",
+      "skills",
+      "start",
+      "status",
+      "stop",
+      "tasks",
+      "tools",
+      "trace",
+      "update"
+    ],
+    "flags": [
+      "--all",
+      "--args",
+      "--args-file",
+      "--artifact",
+      "--async",
+      "--category",
+      "--check",
+      "--class",
+      "--confirm",
+      "--direct",
+      "--docs-file",
+      "--engine",
+      "--file",
+      "--force",
+      "--format",
+      "--full",
+      "--godot",
+      "--headless",
+      "--help",
+      "--id",
+      "--input",
+      "--interval",
+      "--json",
+      "--kind",
+      "--limit",
+      "--member",
+      "--no-fallback",
+      "--no-import",
+      "--offline",
+      "--path",
+      "--play",
+      "--port",
+      "--pretty",
+      "--probe",
+      "--progress",
+      "--project",
+      "--projects",
+      "--prune",
+      "--raw",
+      "--save",
+      "--save-images",
+      "--section",
+      "--slow",
+      "--socket",
+      "--source",
+      "--stale",
+      "--tags",
+      "--tail",
+      "--templates",
+      "--timeout",
+      "--transport",
+      "--version",
+      "--wait",
+      "--with-csharp-runtime",
+      "--zh"
+    ],
+    "status_fields": [
+      "cli_version",
+      "error",
+      "instance_id",
+      "ipc_kind",
+      "mcp",
+      "mcp_url",
+      "ok",
+      "pid",
+      "plugin_version",
+      "port",
+      "port_source",
+      "project",
+      "protocol_version",
+      "schema_version",
+      "server",
+      "toolset_hash",
+      "transport"
+    ],
+    "help": "gda 0.3.5 — Godot Autopilot CLI\n\nUsage:\n  gda [global options] <command> [args...]\n\nCommands:\n  ping                Check connectivity to the MCP server\n  status              Show server status and project info\n  categories          List tool categories\n  search <query>      Search tools\n  describe <tool>     Show one tool's schema and side effects\n  call <tool>         Call a tool\n  batch --args-file <path>  Run multiple tool calls in one process over a shared IPC session\n  list                List running Godot instances\n  docs sync           Export engine docs into the local cache (always)\n  docs status         Show the resolved engine, project pin, and cache state\n  docs search <query> Search classes, members, and global utilities\n  docs class <name>   Show one class (--section/--member/--full)\n  docs member <class> <name> Show one member by name (--kind)\n  docs clear          Remove cached docs (--engine <x.y> or --all --force)\n  skills list         List the bundled skill books (offline, --zh for Chinese)\n  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file\n  tools list          List all direct tools from a live instance (--category/--tags)\n  resources list      List MCP resources (--templates)\n  resources templates List MCP resource templates\n  resources read <uri> Read one resource (--json/--raw/--save <dir>)\n  resources watch <uri> Poll a resource and print changes (--interval sec)\n  prompts list        List MCP prompt templates\n  prompts get <name>  Render one prompt (--args JSON)\n  tasks list          List locally recorded MCP tasks\n  tasks get <id>      Get one task\n  tasks wait <id>     Wait for a task to finish (--timeout)\n  tasks cancel <id>   Cancel a task\n  tasks clean         Remove terminal tasks from the local index\n  projects            List known Godot projects (offline)\n  start               Start a Godot editor\n  stop                Stop a Godot editor (<id> | --id | --port | --project)\n  restart             Restart a Godot editor with the same port and settings\n  logs                Show an instance log\n  cache list          List cache manifests\n  cache info          Show cache root, entry count, and size\n  cache clear         Remove old cache entries (requires --force)\n  trace list          List recent trace events (plugin + CLI)\n  trace show <id>     Show all events with one trace id\n  trace summary       Summarize latency, failures, retries, and top tools\n  trace slow          List calls slower than --slow <ms> (default 1000)\n  trace failures      List failed tool calls\n  trace export        Export traces as jsonl or otlp (--format)\n  monitor status      Show game monitor scope and recording directory\n  monitor sessions    List recorded game monitor sessions\n  monitor report <id> Analyze one session (or --file <path> for offline JSONL)\n  monitor export <id> Copy one session JSONL into GDA home\n  install skills      Install skill books to ~/.agents/skills (--prune removes retired books)\n  install plugin      Install the Godot addon into a project\n  update <target>     Update cli, skills, plugin, or all (--check for status)\n\nGlobal options:\n  --port <text>       MCP server port for connection only (never a listen port)\n  --id <text>         Target instance id from the registry\n  --project <text>    Project directory\n  --pretty            Pretty-print JSON output (2-space indent)\n  --raw               Raw JSON envelope output\n  --timeout <text>    Call timeout in seconds\n  --category <text>   Filter tools list/search results by category\n  --tags <text>       Filter tools list/search results by tags (comma separated)\n  --artifact <name>   Cache artifact: cli, plugin, or skills\n  --path <dir>        Install target directory (install skills)\n  --source <mode>     auto (default), online, cache, or builtin\n  --offline           Never touch the network; use cache, then builtin\n  --with-csharp-runtime  Install time: add the GdaCSharpRuntime autoload in C# projects\n  --zh                Use the Chinese skills archive (install, skills list/show)\n  --args <json>       Tool arguments as a JSON string\n  --args-file <path>  Tool arguments from a JSON file\n  --save-images <dir> Write returned images to a local directory\n  --save <dir>        Write resource blobs to a directory\n  --templates         resources list: include resource templates\n  --interval <sec>    resources watch polling interval (default 1)\n  --godot <path>      Explicit Godot executable (start)\n  --headless          Start the editor headless (start)\n  --play              Play the current scene once ready (start)\n  --no-import         Skip the asset import pre-step (start/restart)\n  --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)\n  --force             Force-stop the process (stop/restart)\n  --tail <n>          Number of trailing log lines (logs)\n  --probe <value>     Liveness level light/strict (start); list: probed port 1-65535\n  --file <rel>        Reference file to read with skills show (relative to the skill dir)\n  --all               list: include projects with no running instance\n  --projects          list: aggregate entries by project instead of per instance\n  --stale             list: keep only non-live entries\n  --socket <path>     Connect through the plugin's local IPC socket\n  --transport <mode>  auto (default), ipc, or http\n  --no-fallback       Do not fall back to HTTP when IPC fails\n  --json              JSON output (default for most commands)\n  --confirm           Confirm a high-risk call; sends confirm:true and an elicitation accept\n  --async             call: run as an MCP task when the server supports it\n  --progress          call: print progress notifications to stderr\n  --input <json>      call: inputResponses for MRTR input_required; {\"confirm\":true} is accepted\n  --direct            call: invoke a full-surface tool at the top level\n  --docs-file <path>  Read an external extension_api.json (bypasses the cache)\n  --section <name>    docs class: brief, description, methods, properties, signals, enums, constants, operators, constructors, or all\n  --member <text>     docs class: filter members by name or signature\n  --kind <kind>       docs search/member: class, method, property, signal, enum, constant, or utility\n  --class <name>      docs search: restrict results to one class\n  --engine <x.y>      docs clear: remove one cache bucket (stable uses x.y)\n  --full              docs class: include every section\n  --prune             install skills: remove retired skill directories\n  --help              Show this help\n  --version           Show the version\n\nExit codes:\n  0  success\n  1  tool failure\n  2  transport or environment failure\n  3  usage error"
+  },
+  "skills": {
+    "en": [
+      {
+        "path": "skills/godot-autopilot/references/content.md",
+        "bytes": 6598,
+        "sha256": "90b0d7efab53be5653b837845b6464a735e165816a18e891e4136b9f6b2d9105"
+      },
+      {
+        "path": "skills/godot-autopilot/references/csharp.md",
+        "bytes": 6518,
+        "sha256": "5a17e4bdfeaea44ab4a824847cd14a1c902e76361a22143f2e5aa942e2d08461"
+      },
+      {
+        "path": "skills/godot-autopilot/references/resources.md",
+        "bytes": 6901,
+        "sha256": "6d538489e7b7d8f89f0c5f45c07a8b127070309c74339973a1bb8a2ba93957ea"
+      },
+      {
+        "path": "skills/godot-autopilot/references/runtime.md",
+        "bytes": 11540,
+        "sha256": "d309d6e2522e88b44aadf990286501bac2d4533bfd4b29e3717db7166c48fc1c"
+      },
+      {
+        "path": "skills/godot-autopilot/references/scene-system.md",
+        "bytes": 11264,
+        "sha256": "dda48c4a4ba8e3fd0048ce65ec10eafe2047364bd8af7a6dcdfdc765035ae90e"
+      },
+      {
+        "path": "skills/godot-autopilot/references/scripting.md",
+        "bytes": 6564,
+        "sha256": "4c2c15123c33861c1cf019a244843eb28a067c461928cdb0aefac38e9f97416d"
+      },
+      {
+        "path": "skills/godot-autopilot/references/servers.md",
+        "bytes": 8015,
+        "sha256": "872df15a6ecfae8f8ff282aae84ec145e6a2bb1e68bf0c639668102243672e39"
+      },
+      {
+        "path": "skills/godot-autopilot/references/setup.md",
+        "bytes": 4836,
+        "sha256": "dfc102abb88a98ba9b13c39d6433fc11ac95f654185f03f89d85e9fd7e2fc6d5"
+      },
+      {
+        "path": "skills/godot-autopilot/references/tools.md",
+        "bytes": 14020,
+        "sha256": "87e25242a5aeecafa336651ccb6862c1ea96cb33428e5b637afdb1f810939e96"
+      },
+      {
+        "path": "skills/godot-autopilot/SKILL.md",
+        "bytes": 10209,
+        "sha256": "2322cbd926d6644aded9c258ce89f87eadc10c8f6bec015e1b6e17938f78efb3"
+      }
+    ],
+    "zh": [
+      {
+        "path": "skills-zh/godot-autopilot/references/content.md",
+        "bytes": 6157,
+        "sha256": "203ebf2b6f2410597bc4e2d3cf6392feaca301f74d46b02034b6a0e9243d4010"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/csharp.md",
+        "bytes": 5967,
+        "sha256": "589de380a970a4591a16ac614166210794b2ad64692bb0e45945347eebc503ca"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/resources.md",
+        "bytes": 6186,
+        "sha256": "565ef2a7627b2c7e833bf822973db6ff28afa600b9e3ab2434b8b3841a2fd220"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/runtime.md",
+        "bytes": 10869,
+        "sha256": "b73ef52ff8443e07d21ad16f015e4ab3a42f227131e49ade52a11dbf2eead857"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/scene-system.md",
+        "bytes": 10185,
+        "sha256": "1dd374d6651cc49097264fc1c529d41a11e8a5303c9ff34d75e5f4d967f15200"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/scripting.md",
+        "bytes": 6135,
+        "sha256": "40d26dd4a91e600e06fcb5ac9b275ed547d501c459730f7329c17d5e90d8953a"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/servers.md",
+        "bytes": 7452,
+        "sha256": "1aee4061ce0c688bba6dca7dda41120c16687ee4ff1f0438d34689117b7a053c"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/setup.md",
+        "bytes": 4231,
+        "sha256": "21496fd91a74dd551cc108abc460ff67e8856d4097c844397ecc8726c6cee87d"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/references/tools.md",
+        "bytes": 12998,
+        "sha256": "56f325386275df498d525bab689ceceba81ea580159fa12a795d7f14aa1d0d8e"
+      },
+      {
+        "path": "skills-zh/godot-autopilot/SKILL.md",
+        "bytes": 9233,
+        "sha256": "a4cf0dbcaeb00cb168053cb649a909f972cfba4e0ae0c82744ca75585cc6e715"
+      }
+    ]
+  }
+}
