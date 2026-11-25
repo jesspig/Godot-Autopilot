@@ -1,0 +1,34 @@
+-- [gda] Auto-detected: clang-cl (C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin/clang-cl.exe)
+-- [gda] Ninja: C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe
+-- [gda] Platform: Windows x86_64
+-- [gda] Compiler: Clang 22.1.3
+-- [gda] Hardware: 16 cores, 32549 MB RAM
+-- [gda] Ninja pools: compile=14, link=2
+-- [gda] Unity: batch=8 (16 cores, 32549 MB, 500 MB/unit)
+-- [gda] clang-cl flags applied
+-- [gda] Cache: sccache.exe (C:/Users/jesspig/.local/bin/sccache.exe)
+-- Auto-detected 16 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using clang-cl
+-- Using 15 cores for multi-threaded compilation.
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- [mcp] Auto-detected: clang-cl (C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin/clang-cl.exe)
+-- [mcp] SDK version: 0.3.12
+-- [mcp] Ninja: C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe
+-- [mcp] Platform: Windows x86_64
+-- [mcp] Compiler: Clang 22.1.3
+-- [mcp] Hardware: 16 cores, 32549 MB RAM
+-- [mcp] Ninja pools: compile=14, link=2
+-- [mcp] Unity: batch=8 (16 cores, 32549 MB, 500 MB/unit)
+-- [mcp] clang-cl flags applied
+-- [mcp] Cache: sccache.exe (C:/Users/jesspig/.local/bin/sccache.exe)
+-- [mcp] OpenSSL disabled (MCP_WITH_OPENSSL=OFF)
+-- [mcp] LTO: skipped (non-Release build)
+-- [gda] Dependencies: godot-cpp + mcp-cpp-sdk (third_party submodule)
+-- [gda] LTO: skipped (non-Release build)
+-- Configuring done (15.3s)
+-- Generating done (1.4s)
+-- Build files have been written to: C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane/build/debug
