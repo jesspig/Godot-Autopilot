@@ -36,3 +36,18 @@ set_target_properties(gda_error_code_probe PROPERTIES
     CXX_STANDARD_REQUIRED ON
     LINK_SEARCH_START_STATIC ON
     LINK_SEARCH_END_STATIC ON)
+
+add_executable(gda_json_parity_probe
+    ${CMAKE_SOURCE_DIR}/tools/json_parity_probe.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp)
+
+target_include_directories(gda_json_parity_probe PRIVATE
+    ${CMAKE_SOURCE_DIR}/src)
+
+target_link_libraries(gda_json_parity_probe PRIVATE mcp-server)
+
+set_target_properties(gda_json_parity_probe PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    LINK_SEARCH_START_STATIC ON
+    LINK_SEARCH_END_STATIC ON)

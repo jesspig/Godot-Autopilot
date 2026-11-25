@@ -20,4 +20,5 @@ set(GDA_UNIT_CONTRACT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/prompts/prompt_tool_usage.cpp
     ${CMAKE_SOURCE_DIR}/src/prompts/prompt_keycode_reference.cpp
     ${CMAKE_SOURCE_DIR}/tests/boundary/authorization_policy_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/boundary/dispatch_semantics_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/boundary/dispatch_semantics_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp)
