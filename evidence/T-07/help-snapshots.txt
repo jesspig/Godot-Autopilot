@@ -1,0 +1,43 @@
+T-07 子命令帮助快照（由 CliCommandSpec 生成；未运行 bun test，未宣称通过）
+
+一、gda editor stop --help（截取关键行）
+  gda editor.stop — Stop a Godot editor
+  Usage:
+    gda editor stop [id] [flags]
+  Subcommand: stop
+  Group: editor
+  Invoke: gda editor stop
+  Tools: editor_stop
+  Action: gcp.editor.stop
+  Arguments:
+    <id>  Instance id (optional)
+  Flags for editor.stop:
+    --force  Force-stop the process (conflicts: --wait)
+    --wait <text>  Stop wait in seconds (conflicts: --force)
+  Output: gda.result.v1 (envelope)
+  Risk: high
+  Long running: no
+  Examples:
+    gda editor stop  Example invocation
+
+二、gda start --help（旧顶层命令 alias 到 editor.start）
+  gda editor.start — Start a Godot editor
+  Subcommand: start
+  Invoke: gda editor start
+
+三、gda tasks wait --help（二级 alias 到 job.wait）
+  gda job.wait — Wait for a job to finish
+  Invoke: gda job wait
+
+四、领域帮助
+  gda editor — Editor and instance lifecycle
+  Subcommands: status / list / start / stop / restart
+
+五、gda commands --help
+  Usage:
+    gda commands --json
+  Domains: 24 个一级领域全部列出
+
+六、同一 spec 来源
+  子命令帮助 leafHelpText、领域帮助 groupHelpText、commands 帮助 commandsHelpText、
+  补全 completionCandidates、manifest buildManifest 均读取 COMMAND_SPECS / COMMAND_GROUPS。

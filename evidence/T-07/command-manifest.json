@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "generated_by": "cli/src/command-spec.ts",
+  "generated_asset": "cli/assets/command-manifest.json",
+  "generator": "cli/scripts/generate-command-manifest.ts",
+  "group_count": 24,
+  "command_count": 85,
+  "alias_count": 38,
+  "first_level_groups": [
+    "editor", "project", "tool", "workflow", "docs", "debug", "logs", "scene",
+    "script", "resource", "game", "test", "job", "trace", "monitor", "setup",
+    "skill", "plugin", "cache", "update", "doctor", "config", "shell", "completion"
+  ],
+  "manifest_fields_per_command": [
+    "name", "path", "group", "subcommand", "description", "tools", "action",
+    "positional", "flags", "output", "risk", "long_running", "examples", "invoke"
+  ],
+  "verification": "生成脚本已执行并写出产物；bun test / tsc / 构建未运行，测试结果未宣称通过"
+}
