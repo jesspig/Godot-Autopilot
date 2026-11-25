@@ -192,10 +192,21 @@ add_test(NAME version_sync_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.ts")
 
 # ── ctest 注册: 测试源清单守卫（零依赖，读源码断言，无需构建产物） ──
-# 解析 cmake/sources/ 下插件清单 + src/tools/*_ops.cpp glob 断言并集 == src/ 全部 .cpp，
-# 测试源清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.ts。
+# 解析根 add_library 直列源与 cmake/sources/ 生产清单，断言显式登记并集 == src/ 全部 .cpp，
+# 测试源清单引用的 src/ 源 ⊆ 生产显式登记；ops glob 不补生产登记。
 add_test(NAME source_manifest_guard
-    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.ts")
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.ts"
+            --root "${CMAKE_SOURCE_DIR}")
+add_test(NAME source_manifest_guard_self_test
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.ts" --self-test)
+
+# ── ctest 注册: MCP 迁移基线守卫（默认统计，T-16 再启用 --strict） ──
+add_test(NAME no_mcp_guard
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/no_mcp_guard.ts"
+            --root "${CMAKE_SOURCE_DIR}")
+add_test(NAME no_mcp_json_guard
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/no_mcp_json_guard.ts"
+            --root "${CMAKE_SOURCE_DIR}")
 
 # ── ctest 注册: 工具域守卫（零依赖，读源码断言域规格与实现同名前缀） ──
 # 断言 src/tools/<X>_tools.hpp 存在同前缀 <X>_ops.cpp / <X>_*_ops.cpp，
@@ -281,6 +292,9 @@ set_tests_properties(
     main_thread_guard
     version_sync_guard
     source_manifest_guard
+    source_manifest_guard_self_test
+    no_mcp_guard
+    no_mcp_json_guard
     tool_domain_guard
     install_docs_guard
     zip_layout_guard

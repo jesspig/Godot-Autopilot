@@ -1,0 +1,10 @@
+command: bun test cli/tests
+exit_code: 1
+result: 410 pass, 23 skip, 7 fail, 1875 expect calls, 440 tests across 52 files
+failure_scope: cli/tests/ipc_client.test.ts socket-listen cases
+failure_signal: Failed to listen at <worktree>/i17a.sock
+comparison: same test file passed 12/12 from the primary checkout and from a temporary short drive mapping of this worktree
+verification_workaround: expose the worktree through a short junction and run the suite there
+final_verification: bun test cli/tests from the short junction passed 424 pass / 23 skip / 0 fail across 447 tests in 54 files
+assessment: Windows AF_UNIX path-length environment failure under the long .worktrees path, not a production code regression
+baseline_policy: retain the raw long-path failure; use a short junction for full-suite verification and disclose it

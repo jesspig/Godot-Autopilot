@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "task": "T-01",
+  "captured_at": "2026-11-26T00:35:25+08:00",
+  "version": "0.3.5",
+  "environment": {
+    "os": "Windows x86_64",
+    "bun": "1.4.5",
+    "cmake": "4.4.4",
+    "ninja": "1.13.2",
+    "compiler": "Clang 22.1.3 (clang-cl)",
+    "godot": "4.7.2.stable.mono.official.ed1daf0bf"
+  },
+  "commands": [
+    {
+      "command": "cmake --preset debug",
+      "exit_code": 0,
+      "evidence": "evidence/T-01/build-summary.txt"
+    },
+    {
+      "command": "cmake --build --preset debug",
+      "exit_code": 0,
+      "first_attempt_exit_code": 143,
+      "first_attempt_reason": "harness timeout; incremental resume completed",
+      "evidence": "evidence/T-01/build-summary.txt"
+    },
+    {
+      "command": "ctest --preset debug -N",
+      "exit_code": 0,
+      "total_tests": 1277,
+      "evidence": "evidence/T-01/ctest-list.txt"
+    },
+    {
+      "command": "bun test cli/tests",
+      "exit_code": 1,
+      "pass": 410,
+      "skip": 23,
+      "fail": 7,
+      "failure_scope": "Windows AF_UNIX socket path length in ipc_client.test.ts",
+      "evidence": "evidence/T-01/cli-baseline-summary.txt"
+    }
+  ],
+  "inventory": {
+    "cli_commands": 24,
+    "cli_flags": 55,
+    "status_fields": 17,
+    "tool_catalog_total": 253,
+    "tool_domain_total": 247,
+    "tool_meta_total": 5,
+    "tool_system_total": 1,
+    "deprecated_alias_count": 325,
+    "skills_en_files": 10,
+    "skills_zh_files": 10,
+    "cli_skills": "evidence/T-01/cli-skills-inventory.json",
+    "tool_catalog": "evidence/T-01/tool-catalog.json",
+    "mcp_references": "evidence/T-01/mcp-inventory.json"
+  },
+  "known_baseline_failures": [
+    {
+      "suite": "cli/tests/ipc_client.test.ts",
+      "count": 7,
+      "cause": "Windows AF_UNIX path-length limit under .worktrees/cli-native-control-plane",
+      "control": "full suite from a short junction of this worktree: 424 pass, 23 skip, 0 fail"
+    }
+  ]
+}
