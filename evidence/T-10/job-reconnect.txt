@@ -1,0 +1,35 @@
+# T-10 Job 重连 / cursor / 过期 / interrupted 证据（静态记录，未运行测试）
+
+本文件只记录静态实现与测试设计事实，不代表任何测试已执行或通过。
+
+## 场景到实现的映射
+
+| 场景 | 实现位置 | 可观察结果 |
+| --- | --- | --- |
+| 读取连接断开 | `cli/src/commands/job.ts` `runWait` | 捕获 `isIpcRequestSent` 的只读 `task.get` 错误，按 `--retries` 重连；stderr NDJSON `state=reconnect`；stdout 的 envelope 带 `reconnects` |
+| 不重发原始任务 | `runWait` 只调用 `nativeTaskGet` | `call.start` 请求数为 0；测试 `job-reconnect.test.ts` 显式断言 |
+| 任务过期 | `nativeTaskGet` GCP code 14 → `runStatus/runWait/runCancel` | `error.code=not_found`，`state=not_found`，退出码 1，不留在 working |
+| 事件 cursor 过期 | `nativeEventsSubscribe/Resume` GCP code 10 → `runLogs` | `error.code=resync_required`，提示从 0 重新订阅，不静默丢事件 |
+| 编辑器重启 | 持久化 `instance_id/generation` 与目标比对，`fromNative` 再校验响应 | `error.code=interrupted`，`interrupted=true`，本地终态落盘，不发工具调用 |
+| 取消阶段 | `nativeTaskCancel` 返回 `cancel_stage`，`CANCEL_STAGES` 校验 | 仅当 state 为 cancelled 时 `cancelled=true`；否则报告 requested/acknowledged/draining/completed 实际阶段 |
+| 分页 limit 0 | `paginate` / `selectTail` | `events=[]`、`count=0`；不出现 `slice(-0)` 全量返回 |
+
+## GCP 错误码常量
+
+- `NATIVE_ERROR_CURSOR_EXPIRED = 10` → CLI `resync_required`。
+- `NATIVE_ERROR_TASK_NOT_FOUND = 14` → CLI `not_found`。
+- `instance_mismatch = 8` 的本地等价判定 → CLI `interrupted`。
+
+## 测试设计（`cli/tests/job-reconnect.test.ts`）
+
+1. 第一个 `task.get` 连接直接销毁，第二个连接返回 succeeded：断言 `reconnects=1`、
+   两次 `task.get`、零次 `call.start`。
+2. `task.get` 返回 error 14：断言 `not_found` 与退出码 1。
+3. `events.subscribe` 返回 error 10：断言 `resync_required`。
+4. 预先写入旧 `instance_id/generation` 的 jobs.json，当前目标换成新 instance：
+   断言 `interrupted`、终态落盘、零次 `task.get`。
+
+## 待主代理验证
+
+- 上述测试未运行；真实引擎是否在网络断开时设置 `ipcRequestSent` 标记需在 live 环境复核。
+- 原生 `events.resume` 返回的是 event frame 还是 `result.events`，T-11 收口时需按实测调整。

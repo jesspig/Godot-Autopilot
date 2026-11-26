@@ -1,0 +1,94 @@
+# T-10 Debug/Logs/Test/Job 与观测实现证据（静态记录，未运行测试）
+
+本文件只记录静态实现事实。按任务约束，子代理未运行 `bun test`、`tsc`、
+任何构建或 CLI 实测；不声称测试通过，全部验证由主代理统一执行后判定。
+
+## 一、改动文件
+
+新增：
+- `cli/src/commands/debug.ts` —— 一级 Debug 工作流，编排多个 canonical 工具与本地 trace。
+- `cli/src/commands/test.ts` —— 一级 Test 工作流，JUnit/coverage/shard/retries/detach。
+- `cli/src/commands/job.ts` —— 一级 Job 状态机、持久化、重连、游标与取消阶段。
+- `cli/tests/debug-log-test-job.test.ts` —— 契约、确认、tail/limit 0、报告输出测试。
+- `cli/tests/job-reconnect.test.ts` —— 重连、过期、cursor、interrupted 测试。
+- `cli/tests/test-report-junit.test.ts` —— JUnit 归一化、转义与端到端报告测试。
+- `evidence/T-10/debug-log-test-job.txt`（本文件）
+- `evidence/T-10/job-reconnect.txt`
+- `evidence/T-10/test-report-junit.xml`（静态 JUnit 样例，非真实运行结果）
+
+修改：
+- `cli/src/commands/logs.ts` —— editor/game/plugin/cli 四个来源、level/source/since/tail/follow/export；
+  修复 `tail 0` 的 `slice(-0)` 全量返回语义。
+- `cli/src/commands/trace.ts` —— list/show/slow/failures 分页与 `limit 0` 空页；字段统一为
+  `seq/trace_id/span_id/event_id/source/tool/ok/error_code/duration_ms/wall_end_ms`。
+- `cli/src/commands/monitor.ts` —— sessions 分页、`session_id` 字段归一、图片扩展名统一 `.png`。
+- `cli/src/command-spec.ts` —— 补 debug/logs/test/job 子命令、trace/monitor 分页 flags、
+  `--detach`/`--generation`/`--cursor`/`--junit` 等命令级 flag；保留全部旧 flags 与 alias。
+- `cli/bin/gda.ts` —— 注册 debug/logs/test/job/trace/monitor 一级路由与默认子命令；
+  `tool call` 逃生口保持不变。
+- `cli/src/discovery.ts` —— 仅新增 events/task/trace 原生封装：
+  `nativeTaskGet/List/Cancel`、`nativeEventsSubscribe/Resume`、`nativeTraceGet` 与 GCP 错误码常量。
+
+未触碰：主工作树、其他工作树、`.handoff`、`src/` C++、`tests/` C++、CMake、Skills、`VERSION`、
+`third_party`、`cli/src/args.ts`；未提交，未运行测试/构建；未实现 T-11 的统一 envelope/flags 收口。
+
+## 二、命令到工具/动作的映射
+
+| 一级命令 | 编排步骤（不是单工具别名） |
+| --- | --- |
+| debug status | `system_status` → `get_game_state` → `trace.get` → 本地 trace 汇总 |
+| debug errors | `get_debugger_stream(action=errors)` → `get_game_log_entries`，输出 error_count/watermark |
+| debug output | `get_debugger_stream(action=output)` |
+| debug stack | `get_debug_stack` → `get_debugger_scene_tree` |
+| debug inspect | `get_debug_info` (+ 有 path 时 `get_debug_object_info`) |
+| debug trace | `trace.get` + 本地 trace summary |
+| debug repro | `editor_scene_control(play)` → `game_input(sequence)` → `get_game_evidence(sample)` → `capture_editor_viewport(save)` → `get_debugger_stream(errors)` |
+| debug report | `get_debugger_stream` → `get_game_log_entries` → `game_monitor(status)` → `trace.get`，可落盘 JSON 与 PNG 证据路径 |
+| logs editor | 本地 registry 日志文件 + level/source/since/tail/follow/export |
+| logs game | `get_game_log_entries(limit/level/source)` |
+| logs plugin | `get_plugin_log(limit/level/source)` |
+| logs cli | CLI trace JSONL（`source=cli` 记录） |
+| test run | `run_gdscript_tests`，参数 label/changed/failed_first/shard/retries/timeout_ms |
+| test script | `run_gdscript_tests(tests=[...])`，支持 `--source`/`--args-file` |
+| test scenario | `game_input(action=sequence)` → `get_debugger_stream(errors)`；高危需 `--confirm` |
+| test watch | `get_game_state(action=status)` 轮询 + 最终 JUnit |
+| job list/status/wait/cancel/logs | `task.list` / `task.get` / `task.get` 轮询 / `task.cancel` / `events.subscribe`+`events.resume` |
+
+逃逸口：所有 canonical 工具仍可经 `gda tool call <tool>` 调用；`gda tool call` 仍走原生
+`call.start`/`call.confirm`，未改其语义。
+
+## 三、Job state machine
+
+```
+pending -> running -> (blocked) -> succeeded
+                          \-> cancelling -> cancelled
+                          \-> failed
+                          \-> interrupted（instance_id/generation 绑定失配）
+not_found（GCP 14）/ expired：终态错误，不保留 working
+wait 的读取断线：仅重发只读 task.get，不重发原始 call.start
+cancel 阶段：requested / acknowledged / draining / completed；未返回 completed 不声称已撤销
+```
+
+持久化：`GODOT_AUTOPILOT_CLI_HOME/cli/jobs.json`（原子写 tmp+rename），记录
+`task_id/instance_id/generation/state/cancel_stage/progress/result/error/terminal/cursor`。
+`job status/wait/cancel/logs` 先比对持久化绑定，不一致直接返回 `interrupted`，不发工具调用。
+
+## 四、输出契约
+
+- 所有新一级命令 stdout 只有一次 JSON envelope：`{schema_version,ok,command,data,error,meta,warnings}`。
+- `--detach`/`--progress` 的进度仅写 stderr，单行 NDJSON `{"kind":"progress",...}`。
+- `trace`/`monitor` 分页字段为 `limit/cursor/next_cursor/count/events`；`limit 0` 返回空页。
+- `logs` 的 `tail 0` 返回空数组；`export` 写文件并在 envelope 的 `data.export_path` 报告。
+- 图片路径统一 `.png`；`debug repro` 的 capture 路径与 `monitor export --image` 均归一。
+- 错误码：`not_found`（14）、`resync_required`（10）、`interrupted`（绑定失配）、`timeout`。
+
+## 五、未运行验证与风险
+
+- 未运行：`bun test cli/tests`、`bun run typecheck`、构建和任何 live GCP 调用。
+- 风险 1：`test.run` 的 pending 任务轮询使用 `generation=0`，若引擎将 generation 非默认化，
+  需主代理在真实环境确认；目前 envelope 已返回 task_id/state 便于复核。
+- 风险 2：`logs follow` 对 game/plugin 走显式拒绝而非长轮询，避免无界等待；若需要持续流，
+  后续应复用 `job logs` 的 cursor 通道。
+- 风险 3：`events.subscribe`/`events.resume` 的 payload 解析依赖 GCP `result` 为对象；
+  真实引擎若把事件作为独立 event frame 推送，需在 T-11 收口时再接事件通道。
+- 风险 4：JUnit 报告按工具返回的 `summary/cases` 归一；若真实工具字段名不同，需按实测调整映射。

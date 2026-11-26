@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 静态样例：由 cli/src/commands/test.ts 的 junitXml() 格式化逻辑推导，非真实测试运行结果。 -->
+<testsuite name="smoke" tests="3" failures="1" skipped="1" errors="0">
+  <testcase name="passes" classname="smoke" time="0.003"/>
+  <testcase name="fails &quot;quoted&quot;" classname="smoke" time="0.004"><failure message="expected &lt;a&gt; &amp; b"/></testcase>
+  <testcase name="skips" classname="smoke" time="0.000"><skipped message="no fixture"/></testcase>
+</testsuite>
