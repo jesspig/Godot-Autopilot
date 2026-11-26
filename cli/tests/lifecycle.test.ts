@@ -473,7 +473,7 @@ describe.serial("list", () => {
   test("空登记输出 [] 且 exit 0", async () => {
     const { code, stdout } = await captureStdout(() => runList([], {}));
     expect(code).toBe(ExitCode.Success);
-    expect(stdout.trim()).toBe("[]");
+    expect((JSON.parse(stdout) as { data: unknown }).data).toEqual([]);
   });
 
   test("只输出存活实例并标注 live", async () => {
@@ -485,7 +485,7 @@ describe.serial("list", () => {
       writeEntry(makeEntry({ id: "pdead", pid: dead, project: path.join(tmp, "b") }));
       const { code, stdout } = await captureStdout(() => runList([], {}));
       expect(code).toBe(ExitCode.Success);
-      const parsed = JSON.parse(stdout);
+      const parsed = (JSON.parse(stdout) as { data: Array<Record<string, unknown>> }).data;
       expect(parsed).toHaveLength(1);
       expect(parsed[0].id).toBe(`p${runner.pid}`);
       expect(parsed[0].live).toBe(true);
@@ -774,7 +774,7 @@ describe.serial("stop", () => {
       const { code, stderr, stdout } = await captureStdout(() => runStop([`p${runner.pid}`], { waitText: "1" }));
       expect(code).toBe(ExitCode.Transport);
       expect(stderr).toContain("--force");
-      expect(JSON.parse(stdout).ok).toBe(false);
+      expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(false);
       expect(isAlive(runner.pid)).toBe(true);
       expect(registeredInstances()).toHaveLength(1);
     } finally {
@@ -789,7 +789,7 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${pid}`, pid, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([`p${pid}`], { force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(stdout).ok).toBe(true);
+    expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
@@ -821,7 +821,7 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9601, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([], { id: `p${pid}`, force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(stdout).ok).toBe(true);
+    expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
@@ -832,7 +832,7 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9602, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([], { portText: "9602", force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(stdout).ok).toBe(true);
+    expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
@@ -924,7 +924,7 @@ describe.serial("CLI 端到端", () => {
       encoding: "utf8",
     });
     expect(result.status).toBe(ExitCode.Success);
-    expect(result.stdout.trim()).toBe("[]");
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
   });
 
   test("gda stop nope 未命中 exit 2", () => {
@@ -935,5 +935,81 @@ describe.serial("CLI 端到端", () => {
     });
     expect(result.status).toBe(ExitCode.Transport);
     expect(result.stderr).toContain("gda list");
+  });
+});
+
+describe.serial("T-08 命令树与 alias", () => {
+  function cliRoot(): string {
+    return path.resolve(import.meta.dir, "..", "..");
+  }
+
+  function invoke(args: string[]) {
+    return spawnSync(process.execPath, ["cli/bin/gda.ts", ...args], {
+      cwd: cliRoot(),
+      env: { ...process.env, GODOT_AUTOPILOT_CLI_HOME: tmp, GODOT_AUTOPILOT_HOME: tmp },
+      encoding: "utf8",
+    });
+  }
+
+  test("gda editor list 空登记输出 []", () => {
+    const result = invoke(["editor", "list"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
+  });
+
+  test("gda editor status 无实例输出原生状态错误且无 mcp_url", () => {
+    const result = invoke(["editor", "status"]);
+    expect(result.status).toBe(ExitCode.Transport);
+    const body = JSON.parse(result.stdout);
+    expect(body.ok).toBe(false);
+    for (const forbidden of ["mcp_url", "mcp", "port", "port_source"]) {
+      expect(Object.keys(body)).not.toContain(forbidden);
+    }
+  });
+
+  test("gda editor stop 未命中 exit 2", () => {
+    const result = invoke(["editor", "stop", "nope"]);
+    expect(result.status).toBe(ExitCode.Transport);
+  });
+
+  test("projects 旧顶层 alias 仍可用", () => {
+    const result = invoke(["projects"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
+  });
+
+  test("ping 旧顶层 alias 帮助指向 editor ping", () => {
+    const result = invoke(["ping", "--help"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect(result.stdout).toContain("Invoke: gda editor ping");
+    expect(result.stdout).toContain("Subcommand: ping");
+  });
+
+  test("gda tool categories --offline 无缓存报传输错误", () => {
+    const result = invoke(["tool", "categories", "--offline"]);
+    expect(result.status).toBe(ExitCode.Transport);
+    expect(result.stderr).toContain("offline catalog");
+  });
+
+  test("gda shell 缺少 --protocol ndjson 报用法错误", () => {
+    const result = invoke(["shell", "run", "echo hi", "--protocol", "text"]);
+    expect(result.status).toBe(ExitCode.Usage);
+    expect(result.stderr).toContain("--protocol ndjson");
+  });
+
+  test("gda doctor --ci 输出稳定字段", () => {
+    const result = invoke(["doctor", "--ci"]);
+    expect(result.status).toBe(ExitCode.Success);
+    const body = JSON.parse(result.stdout) as {
+      schema_version: number;
+      data: { mode: string; checks: Array<{ code: string; remediation: string }> };
+    };
+    expect(body.schema_version).toBe(1);
+    expect(body.data.mode).toBe("ci");
+    expect(Array.isArray(body.data.checks)).toBe(true);
+    for (const check of body.data.checks) {
+      expect(typeof check.code).toBe("string");
+      expect(typeof check.remediation).toBe("string");
+    }
   });
 });

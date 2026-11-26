@@ -84,14 +84,14 @@ describe("projects", () => {
 
     const result = await runCaptured([], {});
     expect(result.code).toBe(ExitCode.Success);
-    const projects = JSON.parse(result.stdout) as Array<{
+    const projects = (JSON.parse(result.stdout) as { data: Array<{
       name: string;
       path: string;
       hash: string;
       instances: number;
       lastActive: string;
       live: boolean;
-    }>;
+    }> }).data;
     expect(projects.length).toBe(2);
     const alpha = projects.find((p) => p.name === "alpha");
     expect(alpha).toBeDefined();
@@ -112,7 +112,7 @@ describe("projects", () => {
   test("无工程目录时输出空数组并给出提示", async () => {
     const result = await runCaptured([], {});
     expect(result.code).toBe(ExitCode.Success);
-    expect(JSON.parse(result.stdout)).toEqual([]);
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
     expect(result.stderr).toContain("no projects found");
   });
 });

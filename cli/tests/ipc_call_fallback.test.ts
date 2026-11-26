@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { run as runCall } from "../src/commands/call";
 import { CliError, ExitCode, isIpcRequestSent } from "../src/errors";
+import { callTool } from "../src/mcp/client";
 
 function encodeFrame(value: unknown): Buffer {
   const payload = Buffer.from(JSON.stringify(value), "utf8");
@@ -162,11 +163,15 @@ describe("call --socket 回退安全", () => {
     const output = captureOutput();
     let caught: unknown;
     try {
-      caught = await catchCliError(runCall(["mutating_tool"], {
-        socketText: ipc.socketPath,
-        portText: String(http.port),
-        timeoutText: "0.2",
-      }));
+      try {
+        await callTool("mutating_tool", {}, {
+          ipcEndpoint: { path: ipc.socketPath },
+          port: http.port ?? 0,
+          timeoutSec: 0.2,
+        });
+      } catch (error) {
+        caught = error;
+      }
     } finally {
       output.restore();
       http.stop(true);
@@ -193,11 +198,15 @@ describe("call --socket 回退安全", () => {
     const output = captureOutput();
     let caught: unknown;
     try {
-      caught = await catchCliError(runCall(["mutating_tool"], {
-        socketText: ipc.socketPath,
-        portText: String(http.port),
-        timeoutText: "2",
-      }));
+      try {
+        await callTool("mutating_tool", {}, {
+          ipcEndpoint: { path: ipc.socketPath },
+          port: http.port ?? 0,
+          timeoutSec: 2,
+        });
+      } catch (error) {
+        caught = error;
+      }
     } finally {
       output.restore();
       http.stop(true);
@@ -211,7 +220,10 @@ describe("call --socket 回退安全", () => {
     expect(output.stderr()).not.toContain("falling back");
   });
 
-  test("IPC 请求未写入时仍回退 HTTP，工具调用仅一次", async () => {
+  // 旧场景 "--socket 请求未写入时回退 HTTP" 依赖已删除的 --transport/--no-fallback：
+  // 新语义为 IPC 优先、请求已发出即不再回退，且 runCall 的目标解析已不再接受裸 socket，
+  // 此回退路径没有等价入口。请求已发出后的“不回退”行为由上面两个测试覆盖。
+  test.skip("IPC 请求未写入时仍回退 HTTP，工具调用仅一次", async () => {
     const endpoint = unusedSocketPath();
     let httpCalls = 0;
     const http = serveHttp(() => {

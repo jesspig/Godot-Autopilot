@@ -48,6 +48,10 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
   }
 }
 
+function envelopeData(stdout: string): { stale: string[]; removed: string[] } {
+  return (JSON.parse(stdout) as { data: { stale: string[]; removed: string[] } }).data;
+}
+
 function createRetiredDirs(target: string): string[] {
   const names = builtinRetiredSkills();
   for (const name of names) {
@@ -112,7 +116,7 @@ describe("install skills", () => {
       pathText: target,
       force: true,
     });
-    const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
+    const payload = envelopeData(result.stdout);
     expect(result.code).toBe(0);
     expect(payload.stale).toEqual(retired);
     expect(payload.removed).toEqual([]);
@@ -131,7 +135,7 @@ describe("install skills", () => {
       force: true,
       prune: true,
     });
-    const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
+    const payload = envelopeData(result.stdout);
     expect(result.code).toBe(0);
     expect(payload.stale).toEqual(retired);
     expect(payload.removed).toEqual(retired);
@@ -152,7 +156,7 @@ describe("install skills", () => {
       force: true,
       prune: true,
     });
-    const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
+    const payload = envelopeData(result.stdout);
     expect(result.code).toBe(0);
     expect(payload.stale).toEqual([]);
     expect(payload.removed).toEqual([]);

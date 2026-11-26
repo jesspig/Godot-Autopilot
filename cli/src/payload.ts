@@ -5,7 +5,7 @@ import path from "node:path";
 import type { GlobalOptions } from "./args";
 import { CliError, ExitCode } from "./errors";
 import type { JsonRpcResponse } from "./mcp/client";
-import { err, renderJson } from "./output";
+import { activeCommandName, err, writeJson } from "./output";
 
 const DEFAULT_TIMEOUT_SEC = 60;
 
@@ -246,8 +246,9 @@ export function taskResultFailed(result: unknown): boolean {
 }
 
 export function assertCallFamilyUsage(command: string, opts: GlobalOptions): void {
-  if (command !== "search" && command !== "tools" && (opts.category !== undefined || opts.tagsText !== undefined)) {
-    throw new CliError(ExitCode.Usage, "--category and --tags apply to the search and tools list commands.");
+  if (command !== "search" && command !== "tools" &&
+      (opts.category !== undefined || opts.tagsText !== undefined || opts.tag !== undefined)) {
+    throw new CliError(ExitCode.Usage, "--category, --tags and --tag apply to the search and tools list commands.");
   }
   if (command !== "call" && command !== "batch" && (opts.argsJson !== undefined || opts.argsFile !== undefined)) {
     throw new CliError(ExitCode.Usage, "--args and --args-file only apply to the call and batch commands.");
@@ -280,7 +281,7 @@ export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> 
   } else if (opts.argsFile !== undefined) {
     let text: string;
     try {
-      text = fs.readFileSync(opts.argsFile, "utf8");
+      text = opts.argsFile === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(opts.argsFile, "utf8");
     } catch {
       throw new CliError(ExitCode.Usage, `cannot read --args-file: ${opts.argsFile}`);
     }
@@ -309,7 +310,7 @@ export function callTimeoutSec(opts: GlobalOptions): number {
 }
 
 export function emit(extracted: ExtractedPayload, opts: GlobalOptions): number {
-  process.stdout.write(`${renderJson(extracted.display, opts)}\n`);
+  writeJson(extracted.display, opts, activeCommandName(), !extracted.toolFailed);
   if (extracted.toolFailed) {
     err(extracted.failureMessage ?? "tool-level failure reported in the business payload.");
     return ExitCode.ToolFailure;

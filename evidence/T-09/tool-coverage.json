@@ -1,0 +1,102 @@
+{
+  "task": "T-09",
+  "artifact": "tool-coverage",
+  "schema_version": 1,
+  "status": "static_unverified",
+  "note": "子代理未运行 bun test/tsc/构建；本文件为静态映射记录，不代表测试通过。",
+  "sources": {
+    "canonical_catalog": "evidence/T-01/tool-catalog.json",
+    "command_spec": "cli/src/command-spec.ts",
+    "domain_routes": "cli/bin/gda.ts",
+    "generic_call": "cli/src/discovery.ts:nativeToolInvoke"
+  },
+  "domains": {
+    "scene": {
+      "tree": ["get_scene_tree"],
+      "node": ["create_scene_node"],
+      "property": ["property_set"],
+      "signal": ["signal_connect", "signal_disconnect"],
+      "save": ["save_editor_scene"],
+      "verify": ["get_scene_tree"],
+      "diff": ["get_scene_tree"],
+      "list": ["get_editor_state"],
+      "open": ["editor_scene_control"],
+      "add": ["create_scene_node"]
+    },
+    "script": {
+      "create": ["create_script"],
+      "patch": ["patch_script"],
+      "compile": ["patch_script"],
+      "attach": ["attach_script_to_node"],
+      "exec": ["execute_script"],
+      "reload": ["reload_script"],
+      "test": ["run_gdscript_tests"],
+      "list": ["get_editor_files"],
+      "read": ["os_file_text"],
+      "delete": ["resource_file"]
+    },
+    "resource": {
+      "inspect": ["resource_query"],
+      "get": ["resource_property"],
+      "set": ["resource_property"],
+      "save": ["resource_save"],
+      "import": ["resource_import"],
+      "rename": ["resource_file"],
+      "move": ["resource_file"],
+      "references": ["resource_query"],
+      "list": ["resource_query"],
+      "templates": ["resource_query"],
+      "read": ["resource_load"],
+      "watch": ["resource_query"],
+      "prompts": ["os_file_text"]
+    },
+    "game": {
+      "play": ["editor_scene_control"],
+      "start": ["editor_scene_control"],
+      "stop": ["editor_scene_control"],
+      "status": ["get_game_state"],
+      "input": ["game_input"],
+      "capture": ["capture_editor_viewport"],
+      "eval": ["game_script"],
+      "scenario": ["game_input"]
+    }
+  },
+  "required_subcommands": {
+    "scene": ["tree", "node", "property", "signal", "save", "verify", "diff"],
+    "script": ["create", "patch", "compile", "attach", "exec", "reload", "test"],
+    "resource": ["inspect", "get", "set", "save", "import", "rename", "move", "references"],
+    "game": ["play", "stop", "status", "input", "capture", "eval", "scenario"]
+  },
+  "generic_access": {
+    "command": "gda tool call <tool> [--args <json> | --args-file <path|->] [--confirm]",
+    "spec": "tool.call",
+    "transport": "native GCP call.start / call.confirm / call.get",
+    "covers": "all canonical tools, including those not lifted to a dedicated subcommand",
+    "example_unlifted_tool": "physics_query"
+  },
+  "confirmation_matrix": {
+    "requires_confirm": [
+      "script.exec",
+      "script.delete",
+      "resource.rename",
+      "resource.move",
+      "game.play",
+      "game.start",
+      "game.stop",
+      "game.input",
+      "game.eval",
+      "game.scenario"
+    ],
+    "no_confirm": [
+      "scene.tree", "scene.node", "scene.property", "scene.signal", "scene.save", "scene.verify", "scene.diff",
+      "script.create", "script.patch", "script.compile", "script.attach", "script.reload", "script.test",
+      "resource.inspect", "resource.get", "resource.set", "resource.save", "resource.import", "resource.references",
+      "game.status", "game.capture"
+    ]
+  },
+  "tests": {
+    "domain": "cli/tests/domain.test.ts",
+    "coverage": "cli/tests/tool-coverage.test.ts",
+    "readback": "cli/tests/readback.test.ts"
+  }
+}

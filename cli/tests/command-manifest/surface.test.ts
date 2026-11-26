@@ -28,7 +28,7 @@ const CURRENT_COMMANDS = [
   "tools",
   "trace",
   "update",
-] as const;
+];
 
 function documentedCommands(): string[] {
   const section = usageText().split("\nGlobal options:\n")[0] ?? "";

@@ -10,6 +10,8 @@ export interface GlobalOptions {
   timeoutText?: string;
   category?: string;
   tagsText?: string;
+  tag?: string[];
+  include?: string[];
   artifactText?: string;
   pathText?: string;
   sourceText?: string;
@@ -30,25 +32,28 @@ export interface GlobalOptions {
   play?: boolean;
   noImport?: boolean;
   force?: boolean;
+  forceStop?: boolean;
+  forceClear?: boolean;
+  forceInstall?: boolean;
   probe?: string;
   file?: string;
+  reportFile?: string;
+  skillFile?: string;
+  inputFile?: string;
   all?: boolean;
+  allProjects?: boolean;
+  allBuckets?: boolean;
   projectsView?: boolean;
   stale?: boolean;
   socketText?: string;
-  noFallback?: boolean;
-  transportText?: string;
   formatText?: string;
+  exportFormat?: string;
   slowText?: string;
   limitText?: string;
   saveText?: string;
   intervalText?: string;
   templates?: boolean;
-  async?: boolean;
   progress?: boolean;
-  inputText?: string;
-  direct?: boolean;
-  json?: boolean;
   docsFile?: string;
   section?: string;
   member?: string;
@@ -57,7 +62,17 @@ export interface GlobalOptions {
   classFilter?: string;
   full?: boolean;
   prune?: boolean;
+  legacyOutput?: boolean;
 }
+
+export interface ValueAlias {
+  key: keyof GlobalOptions;
+  value: string;
+}
+
+export const VALUE_ALIASES: Readonly<Record<string, ValueAlias>> = {
+  "--json": { key: "formatText", value: "json" },
+};
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--port": "portText",
@@ -66,6 +81,8 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--timeout": "timeoutText",
   "--category": "category",
   "--tags": "tagsText",
+  "--tag": "tag",
+  "--include": "include",
   "--artifact": "artifactText",
   "--path": "pathText",
   "--source": "sourceText",
@@ -75,16 +92,18 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--godot": "godot",
   "--wait": "waitText",
   "--tail": "tailText",
-  "--probe": "probe",
-  "--file": "file",
+  "--probe-level": "probe",
+  "--probe-port": "probe",
+  "--report-file": "file",
+  "--skill-file": "file",
+  "--input-file": "file",
   "--socket": "socketText",
-  "--transport": "transportText",
   "--format": "formatText",
+  "--export-format": "exportFormat",
   "--slow": "slowText",
   "--limit": "limitText",
   "--save": "saveText",
   "--interval": "intervalText",
-  "--input": "inputText",
   "--docs-file": "docsFile",
   "--section": "section",
   "--member": "member",
@@ -101,16 +120,15 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--headless": "headless",
   "--play": "play",
   "--no-import": "noImport",
-  "--force": "force",
-  "--all": "all",
+  "--force-stop": "force",
+  "--force-clear": "force",
+  "--force-install": "force",
+  "--all-projects": "all",
+  "--all-buckets": "all",
   "--projects": "projectsView",
   "--stale": "stale",
-  "--no-fallback": "noFallback",
-  "--json": "json",
   "--templates": "templates",
-  "--async": "async",
   "--progress": "progress",
-  "--direct": "direct",
   "--offline": "offline",
   "--with-csharp-runtime": "withCsharpRuntime",
   "--zh": "zh",
@@ -118,11 +136,42 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--confirm": "confirm",
   "--full": "full",
   "--prune": "prune",
+  "--legacy-output": "legacyOutput",
 };
 
+const REPEATABLE_FLAGS: ReadonlySet<keyof GlobalOptions> = new Set(["tag", "include"]);
+
+export const GLOBAL_STRING_FLAGS: Readonly<Record<string, keyof GlobalOptions>> = STRING_FLAGS;
+export const GLOBAL_BOOLEAN_FLAGS: Readonly<Record<string, keyof GlobalOptions>> = BOOLEAN_FLAGS;
+export const REPEATABLE_OPTIONS: ReadonlySet<keyof GlobalOptions> = REPEATABLE_FLAGS;
+
+export const GLOBAL_SCOPE_FLAGS: ReadonlySet<string> = new Set([
+  "--help",
+  "--version",
+  "--format",
+  "--json",
+  "--pretty",
+  "--raw",
+  "--confirm",
+  "--timeout",
+  "--port",
+  "--id",
+  "--socket",
+  "--project",
+  "--args-file",
+  "--tag",
+  "--include",
+]);
+
+export function repeatableFlag(name: string): boolean {
+  const key = STRING_FLAGS[name];
+  return key !== undefined && REPEATABLE_FLAGS.has(key);
+}
+
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
-  const opts: Record<string, string | boolean | undefined> = {};
+  const opts: Record<string, string | boolean | string[] | undefined> = {};
   const positionals: string[] = [];
+  const seen = new Set<string>();
   let onlyPositionals = false;
   let i = 0;
   while (i < argv.length) {
@@ -136,28 +185,45 @@ export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: s
     } else if (token.startsWith("-")) {
       const eq = token.indexOf("=");
       const name = eq === -1 ? token : token.slice(0, eq);
+      const alias = VALUE_ALIASES[name];
       const stringKey = STRING_FLAGS[name];
       const boolKey = BOOLEAN_FLAGS[name];
-      if (stringKey !== undefined) {
+      if (alias === undefined && stringKey === undefined && boolKey === undefined) {
+        throw new CliError(ExitCode.Usage, `unknown option: ${name}`);
+      }
+      const repeatable = alias === undefined && repeatableFlag(name);
+      if (!repeatable && seen.has(name)) {
+        throw new CliError(ExitCode.Usage, `option ${name} specified more than once`);
+      }
+      seen.add(name);
+      if (alias !== undefined) {
+        if (eq !== -1) {
+          throw new CliError(ExitCode.Usage, `option ${name} does not take a value`);
+        }
+        (opts as Record<string, unknown>)[alias.key] = alias.value;
+      } else if (stringKey !== undefined) {
         let value: string;
         if (eq !== -1) {
           value = token.slice(eq + 1);
         } else {
           const next = argv[i + 1];
-          if (next === undefined || next.startsWith("-")) {
+          if (next === undefined || (next.startsWith("-") && next !== "-")) {
             throw new CliError(ExitCode.Usage, `option ${name} requires a value`);
           }
           value = next;
           i += 1;
         }
-        opts[stringKey] = value;
+        if (repeatable) {
+          const existing = opts[stringKey];
+          opts[stringKey] = Array.isArray(existing) ? [...existing, value] : [value];
+        } else {
+          opts[stringKey] = value;
+        }
       } else if (boolKey !== undefined) {
         if (eq !== -1) {
           throw new CliError(ExitCode.Usage, `boolean option ${name} does not take a value`);
         }
         opts[boolKey] = true;
-      } else {
-        throw new CliError(ExitCode.Usage, `unknown option: ${name}`);
       }
       i += 1;
     } else {
@@ -172,15 +238,15 @@ export function parseProbePort(text: string): number {
   const value = text.trim();
   const port = /^\d+$/.test(value) ? Number(value) : Number.NaN;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new CliError(ExitCode.Usage, `--probe for list must be a port in 1-65535, got: ${text}`);
+    throw new CliError(ExitCode.Usage, `--probe-port for list must be a port in 1-65535, got: ${text}`);
   }
   return port;
 }
 
-export function parseTransport(text: string | undefined): "auto" | "ipc" | "http" {
-  if (text === undefined) return "auto";
-  if (text === "auto" || text === "ipc" || text === "http") return text;
-  throw new CliError(ExitCode.Usage, `--transport must be auto, ipc, or http, got: ${text}`);
+export function probeLevel(text: string | undefined): "light" | "strict" {
+  if (text === undefined || text === "light") return "light";
+  if (text === "strict") return "strict";
+  throw new CliError(ExitCode.Usage, `--probe-level must be light or strict, got: ${text}`);
 }
 
 export function usageText(): string {
@@ -190,30 +256,30 @@ Usage:
   gda [global options] <command> [args...]
 
 Commands:
-  ping                Check connectivity to the MCP server
-  status              Show server status and project info
+  ping                Check native control-plane connectivity
+  status              Show instance status and project info
   categories          List tool categories
   search <query>      Search tools
   describe <tool>     Show one tool's schema and side effects
   call <tool>         Call a tool
-  batch --args-file <path>  Run multiple tool calls in one process over a shared IPC session
+  batch --args-file <path>  Run multiple tool calls over one native IPC session (use - for stdin)
   list                List running Godot instances
   docs sync           Export engine docs into the local cache (always)
   docs status         Show the resolved engine, project pin, and cache state
   docs search <query> Search classes, members, and global utilities
   docs class <name>   Show one class (--section/--member/--full)
   docs member <class> <name> Show one member by name (--kind)
-  docs clear          Remove cached docs (--engine <x.y> or --all --force)
+  docs clear          Remove cached docs (--engine <x.y> or --all-buckets --force-clear)
   skills list         List the bundled skill books (offline, --zh for Chinese)
-  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
-  tools list          List all direct tools from a live instance (--category/--tags)
-  resources list      List MCP resources (--templates)
-  resources templates List MCP resource templates
-  resources read <uri> Read one resource (--json/--raw/--save <dir>)
+  skills show <name>  Print one skill book's SKILL.md; --skill-file <rel> reads an auxiliary file
+  tools list          List canonical tools from a live instance (--category/--tag)
+  resources list      List project resources (--templates)
+  resources templates List resource templates
+  resources read <uri> Read one resource (--pretty/--raw/--save <dir>)
   resources watch <uri> Poll a resource and print changes (--interval sec)
-  prompts list        List MCP prompt templates
+  prompts list        List prompt templates
   prompts get <name>  Render one prompt (--args JSON)
-  tasks list          List locally recorded MCP tasks
+  tasks list          List locally recorded tasks
   tasks get <id>      Get one task
   tasks wait <id>     Wait for a task to finish (--timeout)
   tasks cancel <id>   Cancel a task
@@ -225,30 +291,35 @@ Commands:
   logs                Show an instance log
   cache list          List cache manifests
   cache info          Show cache root, entry count, and size
-  cache clear         Remove old cache entries (requires --force)
+  cache clear         Remove old cache entries (requires --force-clear)
   trace list          List recent trace events (plugin + CLI)
   trace show <id>     Show all events with one trace id
   trace summary       Summarize latency, failures, retries, and top tools
   trace slow          List calls slower than --slow <ms> (default 1000)
   trace failures      List failed tool calls
-  trace export        Export traces as jsonl or otlp (--format)
+  trace export        Export traces as jsonl or otlp (--export-format)
   monitor status      Show game monitor scope and recording directory
   monitor sessions    List recorded game monitor sessions
-  monitor report <id> Analyze one session (or --file <path> for offline JSONL)
+  monitor report <id> Analyze one session (or --input-file <path> for offline JSONL)
   monitor export <id> Copy one session JSONL into GDA home
   install skills      Install skill books to ~/.agents/skills (--prune removes retired books)
   install plugin      Install the Godot addon into a project
   update <target>     Update cli, skills, plugin, or all (--check for status)
 
 Global options:
-  --port <text>       MCP server port for connection only (never a listen port)
+  --port <text>       Target connection port (never a listen port)
   --id <text>         Target instance id from the registry
   --project <text>    Project directory
+  --socket <path>     Connect through the plugin's local IPC socket
+  --format <json>     Machine output format; --json is the compatibility alias
+  --json              Alias for --format json
   --pretty            Pretty-print JSON output (2-space indent)
-  --raw               Raw JSON envelope output
+  --raw               Raw business payload inside the envelope
   --timeout <text>    Call timeout in seconds
-  --category <text>   Filter tools list/search results by category
-  --tags <text>       Filter tools list/search results by tags (comma separated)
+  --category <text>   Filter tool list/search results by category
+  --tags <text>       Filter tool list/search results by tags (comma separated)
+  --tag <text>        Repeatable tag filter
+  --include <text>    Repeatable include filter
   --artifact <name>   Cache artifact: cli, plugin, or skills
   --path <dir>        Install target directory (install skills)
   --source <mode>     auto (default), online, cache, or builtin
@@ -256,9 +327,9 @@ Global options:
   --with-csharp-runtime  Install time: add the GdaCSharpRuntime autoload in C# projects
   --zh                Use the Chinese skills archive (install, skills list/show)
   --args <json>       Tool arguments as a JSON string
-  --args-file <path>  Tool arguments from a JSON file
+  --args-file <path>  Tool arguments from a JSON file (- reads stdin)
   --save-images <dir> Write returned images to a local directory
-  --save <dir>        Write resource blobs to a directory
+  --save <dir>        Write blobs to a directory
   --templates         resources list: include resource templates
   --interval <sec>    resources watch polling interval (default 1)
   --godot <path>      Explicit Godot executable (start)
@@ -266,36 +337,38 @@ Global options:
   --play              Play the current scene once ready (start)
   --no-import         Skip the asset import pre-step (start/restart)
   --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)
-  --force             Force-stop the process (stop/restart)
-  --tail <n>          Number of trailing log lines (logs)
-  --probe <value>     Liveness level light/strict (start); list: probed port 1-65535
-  --file <rel>        Reference file to read with skills show (relative to the skill dir)
-  --all               list: include projects with no running instance
+  --force-stop        Force-stop the process (stop/restart)
+  --force-clear       Confirm an explicit clear (docs clear, cache clear)
+  --force-install     Overwrite existing managed files (install)
+  --all-projects      Include projects with no running instance (list)
+  --all-buckets       Remove every docs cache bucket (docs clear)
+  --probe-level <level>  Liveness level light/strict (start)
+  --probe-port <port> Probe a specific port (list)
+  --report-file <path>  Write a debug report (debug report)
+  --skill-file <rel>    Read an auxiliary skill file (skills show)
+  --input-file <path>   Read offline monitor JSONL (monitor report)
+  --export-format <fmt> Trace export format jsonl/otlp (trace export)
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries
-  --socket <path>     Connect through the plugin's local IPC socket
-  --transport <mode>  auto (default), ipc, or http
-  --no-fallback       Do not fall back to HTTP when IPC fails
-  --json              JSON output (default for most commands)
-  --confirm           Confirm a high-risk call; sends confirm:true and an elicitation accept
-  --async             call: run as an MCP task when the server supports it
-  --progress          call: print progress notifications to stderr
-  --input <json>      call: inputResponses for MRTR input_required; {"confirm":true} is accepted
-  --direct            call: invoke a full-surface tool at the top level
+  --progress          call: print progress diagnostics to stderr
   --docs-file <path>  Read an external extension_api.json (bypasses the cache)
-  --section <name>    docs class: brief, description, methods, properties, signals, enums, constants, operators, constructors, or all
+  --section <name>    docs class: section to show
   --member <text>     docs class: filter members by name or signature
-  --kind <kind>       docs search/member: class, method, property, signal, enum, constant, or utility
+  --kind <kind>       docs search/member: result kind
   --class <name>      docs search: restrict results to one class
   --engine <x.y>      docs clear: remove one cache bucket (stable uses x.y)
   --full              docs class: include every section
   --prune             install skills: remove retired skill directories
+  --confirm           Approve the shown tool/target/risk/argument summary
   --help              Show this help
   --version           Show the version
 
 Exit codes:
-  0  success
-  1  tool failure
-  2  transport or environment failure
-  3  usage error`;
+  0    success
+  1    tool or business failure
+  2    transport or environment failure
+  3    usage error
+  4    confirmation required (nothing was sent)
+  5    user declined confirmation
+  130  interrupted`;
 }

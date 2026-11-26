@@ -1,0 +1,41 @@
+T-11 证据：CLI envelope 与退出码契约
+=====================================
+
+状态：代码与新增测试已写入；本子代理按 ST-03 严格串行分工未运行 bun test / tsc / 构建。
+所有结论为“实现已落地、未验证”，请以主代理统一构建与测试结果为最终判据。
+
+1. 统一 envelope（IF-05）
+- 单一实现：cli/src/output.ts
+  - successEnvelope / failureEnvelope / normalizeEnvelope / writeEnvelope / writeJson / writeFailure
+  - 固定七字段：schema_version, ok, command, data, error, meta, warnings
+  - error 始终存在：成功为 null，失败为
+    {code, message, retryable, request_sent, suggestion?, ...details}
+  - meta 基线：request_id, instance_id, project, duration_ms
+- cli/src/commands/json-output.ts 改为从 output.ts 再导出，消除第二套输出路径。
+- cli/src/payload.ts emit() 走 writeJson；cli/src/main.ts 与 cli/bin/gda.ts 的错误路径走 writeFailure。
+- stderr 仅保留 err() 人类诊断与 --help 文本；机器数据只在 stdout。
+
+2. 退出码矩阵（errors.ts ExitCode + ERROR_CODES）
+  0    OK                 成功
+  1    TOOL_FAILURE       工具/业务失败
+  2    TRANSPORT_FAILURE  传输/环境失败
+  3    USAGE_ERROR        用法错误
+  4    CONFIRMATION_REQUIRED  缺少确认（未发送任何请求）
+  5    USER_DECLINED      用户拒绝确认
+  130  INTERRUPTED        中断（bin/gda.ts SIGINT 处理器）
+
+3. batch 部分失败
+- batch.ts 以 batchStatus() 计算 total/succeeded/failed/partial。
+- envelope.data.status = "partial"|"complete"，envelope.data.partial 与 envelope.meta.partial 同步。
+- batchExitCode 优先级：Usage(3) > Transport(2) > Interrupted(130) >
+  UserDeclined(5) > ConfirmationRequired(4) > ToolFailure(1) > Success(0)。
+
+4. 覆盖测试（新增，未运行）
+- cli/tests/cli-contract.test.ts：同形 envelope、error 结构化、退出码矩阵、batch partial、--format 校验。
+- cli/tests/boundary.test.ts：退出码矩阵、--args-file -、文件参数、batch 汇总优先级。
+- cli/tests/cli-contract.test.ts 与 boundary.test.ts 均可在主代理环境中用 `bun test cli/tests` 验证。
+
+5. 已知风险
+- 旧 MCP 时代测试（contract.test.ts、capabilities.test.ts、commands.test.ts、list.test.ts 等）
+  仍断言裸业务负载或已删除 flag，本任务边界不允许修改；需主代理在归并时迁移或退役。
+- 未在真实 TTY / 真实 IPC 会话中验证确认提示与 batch 逐项确认。

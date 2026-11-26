@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { requestOverIpc } from "../src/ipc/client";
 import { callTool } from "../src/mcp/client";
 import { run as runCall } from "../src/commands/call";
+import type { GlobalOptions } from "../src/args";
 import { CliError, ExitCode } from "../src/errors";
 
 function captureOutput(): { stderr(): string; restore(): void } {
@@ -283,10 +284,10 @@ describe("ipc session and socket channel", () => {
     }
   });
 
-  test("call --socket 失败且 --no-fallback 时直接报传输错误", async () => {
+  test("call --socket 失败时直接报传输错误", async () => {
     let caught: unknown;
     try {
-      await runCall(["ping"], { socketText: socketPath, noFallback: true });
+      await runCall(["ping"], { socketText: socketPath } as unknown as GlobalOptions);
     } catch (error) {
       caught = error;
     }
@@ -294,11 +295,11 @@ describe("ipc session and socket channel", () => {
     expect((caught as CliError).code).toBe(ExitCode.Transport);
   });
 
-  test("call --socket 失败时提示回退到端口通道", async () => {
+  test("call --socket 失败时直接报传输错误，不再提示端口回退", async () => {
     const cap = captureOutput();
     let caught: unknown;
     try {
-      await runCall(["ping"], { socketText: socketPath, portText: "1" });
+      await runCall(["ping"], { socketText: socketPath });
     } catch (error) {
       caught = error;
     } finally {
@@ -306,6 +307,7 @@ describe("ipc session and socket channel", () => {
     }
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
-    expect(cap.stderr()).toContain("falling back");
+    // --no-fallback/--transport 已删除：IPC 优先且不再提示回退到端口通道。
+    expect(cap.stderr()).not.toContain("falling back");
   });
 });

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
+import type { GlobalOptions } from "../src/args";
 import { run as call } from "../src/commands/call";
 import { run as status } from "../src/commands/status";
-import { ExitCode } from "../src/errors";
+import { ConfirmationRequiredError, ExitCode } from "../src/errors";
 
 const servers: ReturnType<typeof Bun.serve>[] = [];
 
@@ -57,7 +58,7 @@ function capture(): { stdout(): string; stderr(): string; restore(): void } {
 }
 
 describe("handshake capabilities", () => {
-  test("status 暴露 mcp 协议版本与 capabilities", async () => {
+  test("status 输出统一 envelope（MCP 专属字段已删除）", async () => {
     const port = start((body) => {
       if (body.method === "initialize") {
         return sse({
@@ -78,73 +79,93 @@ describe("handshake capabilities", () => {
     const code = await status([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    const payload = JSON.parse(cap.stdout()) as {
-      mcp: { protocol_version: string; capabilities: Record<string, unknown>; server_info: Record<string, unknown> };
+    const envelope = JSON.parse(cap.stdout()) as {
+      schema_version: number;
+      ok: boolean;
+      command: string;
+      data: { port: number; server: Record<string, unknown> };
     };
-    expect(payload.mcp.protocol_version).toBe("2026-07-28");
-    expect(payload.mcp.capabilities).toEqual({
-      tools: { listChanged: true },
-      extensions: { "io.modelcontextprotocol/tasks": {} },
-    });
-    expect(payload.mcp.server_info).toEqual({ name: "gda", version: "0.3.3" });
+    expect(envelope.schema_version).toBe(1);
+    expect(envelope.ok).toBe(true);
+    expect(envelope.command).toBe("editor.status");
+    expect(envelope.data.port).toBe(port);
+    expect(envelope.data.server).toEqual({ version: "0.3.3", tool_count: 459 });
+    // protocol_version / capabilities / server_info 等 MCP 专属字段已随 T-11 删除
   });
 
-  test("input_required 无 --input 时退出 3 并提示", async () => {
+  test("input_required 抛 ConfirmationRequiredError（exit 4，提示 --confirm）且不重发", async () => {
+    let calls = 0;
     const port = start((body) => {
       if (body.method === "initialize") return sse({ protocolVersion: "2025-11-25", capabilities: {} });
       if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+      calls += 1;
       return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
     });
     const cap = capture();
-    const code = await call(["do_risky_thing"], { portText: String(port) });
-    cap.restore();
-    expect(code).toBe(ExitCode.Usage);
-    expect(cap.stderr()).toContain("--input");
+    let caught: unknown;
+    try {
+      await call(["do_risky_thing"], { portText: String(port) });
+    } catch (error) {
+      caught = error;
+    } finally {
+      cap.restore();
+    }
+    expect(caught).toBeInstanceOf(ConfirmationRequiredError);
+    const failure = caught as ConfirmationRequiredError;
+    expect(failure.code).toBe(ExitCode.ConfirmationRequired);
+    expect(failure.suggestion).toContain("--confirm");
+    expect(calls).toBe(1);
     expect(cap.stdout()).toBe("");
   });
 
-  test("input_required 带 --input 时重试", async () => {
+  test("input_required 下旧 --input 不再触发重试（calls 保持 1）", async () => {
     let calls = 0;
     const port = start((body) => {
       if (body.method === "initialize") return sse({ protocolVersion: "2025-11-25", capabilities: {} });
       if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
       calls += 1;
-      if (calls === 1) {
-        return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
-      }
-      return sse({ content: [{ type: "text", text: JSON.stringify({ ok: true }) }] });
+      return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
     });
     const cap = capture();
-    const code = await call(["do_risky_thing"], {
-      portText: String(port),
-      inputText: '{"confirm":{"action":"accept"}}',
-    });
-    cap.restore();
-    expect(code).toBe(ExitCode.Success);
-    expect(calls).toBe(2);
-    expect(JSON.parse(cap.stdout())).toEqual({ ok: true });
+    let caught: unknown;
+    try {
+      await call(["do_risky_thing"], {
+        portText: String(port),
+        inputText: '{"confirm":{"action":"accept"}}',
+      } as unknown as GlobalOptions);
+    } catch (error) {
+      caught = error;
+    } finally {
+      cap.restore();
+    }
+    expect(caught).toBeInstanceOf(ConfirmationRequiredError);
+    expect((caught as ConfirmationRequiredError).code).toBe(ExitCode.ConfirmationRequired);
+    expect(calls).toBe(1);
+    expect(cap.stdout()).toBe("");
   });
 
-  test("input_required 带 --input 布尔简写时重试", async () => {
+  test("input_required 带 --confirm 仍不重发，确认摘要写入 stderr", async () => {
     let calls = 0;
     const port = start((body) => {
       if (body.method === "initialize") return sse({ protocolVersion: "2025-11-25", capabilities: {} });
       if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
       calls += 1;
-      if (calls === 1) {
-        return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
-      }
-      return sse({ content: [{ type: "text", text: JSON.stringify({ ok: true }) }] });
+      return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
     });
     const cap = capture();
-    const code = await call(["do_risky_thing"], {
-      portText: String(port),
-      inputText: '{"confirm":true}',
-    });
-    cap.restore();
-    expect(code).toBe(ExitCode.Success);
-    expect(calls).toBe(2);
-    expect(JSON.parse(cap.stdout())).toEqual({ ok: true });
+    let caught: unknown;
+    try {
+      await call(["do_risky_thing"], { portText: String(port), confirm: true });
+    } catch (error) {
+      caught = error;
+    } finally {
+      cap.restore();
+    }
+    expect(caught).toBeInstanceOf(ConfirmationRequiredError);
+    expect((caught as ConfirmationRequiredError).code).toBe(ExitCode.ConfirmationRequired);
+    expect(calls).toBe(1);
+    expect(cap.stderr()).toContain("confirm tool.call");
+    expect(cap.stdout()).toBe("");
   });
 
   test("call --progress 写 stderr，stdout 保持 JSON", async () => {
@@ -173,6 +194,6 @@ describe("handshake capabilities", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(cap.stderr()).toContain("progress 2/5 step");
-    expect(JSON.parse(cap.stdout())).toEqual({ ok: true });
+    expect(JSON.parse(cap.stdout()).data).toEqual({ ok: true });
   });
 });

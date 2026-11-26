@@ -323,7 +323,7 @@ describe("CLI MCP contract", () => {
       state.methods = [];
       const result = await cliRun(["ping"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ pong: true });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ pong: true });
       expect(result.stdout.trim()).not.toContain("\n");
       expect(state.lastDirectName).toBe("ping");
       expect(state.lastWrappedParams).toEqual({
@@ -345,10 +345,15 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["status"]);
       checkStatus(result, 0);
-      const body = parseJson(result.stdout) as Record<string, unknown>;
+      const body = parseJson(result.stdout) as {
+        ok: boolean;
+        command: string;
+        data: { server: Record<string, unknown> };
+      };
       expect(body.ok).toBe(true);
-      expect(body.server).toEqual({ ok: true, engine: "mock", status: "ready" });
-      expect(body.mcp_url).toBe(`http://127.0.0.1:${port}/mcp`);
+      expect(body.command).toBe("editor.status");
+      expect(body.data.server).toEqual({ ok: true, engine: "mock", status: "ready" });
+      // mcp_url / transport 等 MCP 专属字段已随 T-11 删除
       expect(state.lastWrappedParams).toEqual({
         name: "call_tool",
         arguments: { name: "system_status", arguments: {} },
@@ -362,7 +367,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["categories"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ categories: ["mock-cat"] });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ categories: ["mock-cat"] });
       expect(state.lastDirectName).toBe("list_categories");
     },
     TEST_TIMEOUT_MS,
@@ -373,7 +378,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["search", "q"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ results: SEARCH_RESULTS });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ results: SEARCH_RESULTS });
       expect(state.lastDirectName).toBe("search_tools");
     },
     TEST_TIMEOUT_MS,
@@ -384,7 +389,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["search", "mock", "--category", "mock-cat", "--tags", "a,b"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ results: SEARCH_RESULTS });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ results: SEARCH_RESULTS });
       const seen = state.lastSearchArgs as Record<string, unknown> | undefined;
       expect(seen?.category).toBe("mock-cat");
       expect(seen?.tags).toEqual(["a", "b"]);
@@ -397,9 +402,9 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["describe", "mock_tool"]);
       checkStatus(result, 0);
-      const body = parseJson(result.stdout) as Record<string, unknown>;
-      expect(body.name).toBe("mock_tool");
-      expect("inputSchema" in body).toBe(true);
+      const body = parseJson(result.stdout) as { data: Record<string, unknown> };
+      expect(body.data.name).toBe("mock_tool");
+      expect("inputSchema" in body.data).toBe(true);
       expect(state.lastDirectName).toBe("get_tool_detail");
     },
     TEST_TIMEOUT_MS,
@@ -410,7 +415,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["call", "mock_echo", "--args", '{"k":1}']);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ echo: { k: 1 } });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ echo: { k: 1 } });
       expect(state.lastWrappedParams).toEqual({
         name: "call_tool",
         arguments: { name: "mock_echo", arguments: { k: 1 } },
@@ -429,8 +434,8 @@ describe("CLI MCP contract", () => {
       const second = await cliRun(["call", "mock_echo", "--args-file", argsFile]);
       checkStatus(first, 0);
       checkStatus(second, 0);
-      expect(parseJson(first.stdout)).toEqual({ echo: payload });
-      expect(parseJson(second.stdout)).toEqual({ echo: payload });
+      expect((parseJson(first.stdout) as { data: unknown }).data).toEqual({ echo: payload });
+      expect((parseJson(second.stdout) as { data: unknown }).data).toEqual({ echo: payload });
     },
     TEST_TIMEOUT_MS,
   );
@@ -440,7 +445,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["call", "ping"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ pong: true });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ pong: true });
       expect(state.lastDirectName).toBe("ping");
     },
     TEST_TIMEOUT_MS,
@@ -461,8 +466,14 @@ describe("CLI MCP contract", () => {
       const result = await cliRun(["call", "mock_rpc_error"]);
       checkStatus(result, 1);
       expect(result.stderr).toContain("mock top-level JSON-RPC error");
-      const body = parseJson(result.stdout) as { error?: { code?: number } };
-      expect(body.error?.code).toBe(-32602);
+      const body = parseJson(result.stdout) as {
+        ok: boolean;
+        data: unknown;
+        error: { code: string };
+      };
+      expect(body.ok).toBe(false);
+      expect(body.data).toBeNull();
+      expect(body.error.code).toBe("TOOL_FAILURE");
     },
     TEST_TIMEOUT_MS,
   );
@@ -504,9 +515,11 @@ describe("CLI MCP contract", () => {
       const result = await cliRun(["call", "mock_image", "--save-images", imageDir]);
       checkStatus(result, 0);
       expect(result.stdout).not.toContain(PNG_B64.slice(0, 40));
-      const body = parseJson(result.stdout) as { images?: Array<{ saved?: boolean }> };
-      expect(Array.isArray(body.images)).toBe(true);
-      expect(body.images?.[0]?.saved).toBe(true);
+      const body = parseJson(result.stdout) as {
+        data: { images?: Array<{ saved?: boolean }> };
+      };
+      expect(Array.isArray(body.data.images)).toBe(true);
+      expect(body.data.images?.[0]?.saved).toBe(true);
       const pngs = fs.readdirSync(imageDir).filter((name) => name.endsWith(".png"));
       expect(pngs).toHaveLength(1);
       const magic = fs.readFileSync(path.join(imageDir, pngs[0])).subarray(0, 8);
@@ -544,7 +557,7 @@ describe("CLI MCP contract", () => {
       checkStatus(result, 0);
       expect(result.stdout.trim().split(/\r?\n/).length).toBeGreaterThan(1);
       expect(result.stdout).toContain('  "pong": true');
-      expect(parseJson(result.stdout)).toEqual({ pong: true });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ pong: true });
     },
     TEST_TIMEOUT_MS,
   );

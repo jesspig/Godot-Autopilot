@@ -53,7 +53,7 @@ export async function start(opts: GlobalOptions, runOpts: StartRunOptions = {}):
   if (opts.portText !== undefined) {
     throw new CliError(
       ExitCode.Usage,
-      "gda start no longer selects or injects a port; the plugin owns the MCP port.",
+      "gda start no longer selects or injects a port; the plugin owns the control-plane port.",
       "Remove --port. Use --port only on connection commands such as gda call/status.",
     );
   }
@@ -186,7 +186,7 @@ async function waitForPluginRecord(
       throw new CliError(
         ExitCode.Transport,
         `the plugin did not register an instance within ${waitSec}s${logTailSuffix(logPath)}`,
-        "raise --wait, or check that the Godot Autopilot plugin is enabled and its MCP server started",
+        "raise --wait, or check that the Godot Autopilot plugin is enabled and its native control plane started",
       );
     }
     await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
