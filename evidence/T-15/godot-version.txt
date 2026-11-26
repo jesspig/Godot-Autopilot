@@ -1,0 +1,13 @@
+固定引擎版本（T-15 引擎门禁）
+==============================
+
+Godot 版本：4.7.2.stable.mono.official.ed1daf0bf
+命令：C:\Users\jesspig\Documents\Godot\default\Godot.exe --version
+校验：smoke.ts godot_version 步骤 pass（版本精确匹配，不符即失败，不自动升级）
+
+GDExtension 构建：cmake --preset debug（godot-cpp 507ed9d / mcp-cpp-sdk 0.3.12 / googletest b514bdc）
+产物：build/debug/godot-autopilot.dll（28676096 bytes）
+部署：tests/engine/project/addons/godot-autopilot/
+gdextension 描述符：entry_symbol=GDExtensionEntryPoint, compatibility_minimum=4.7（与 devtools/lib/gdextension.ts 一致）
+
+子模块来源：网络克隆失败（连接重置），从本地根工作树复制并修复 .git 指针（git submodule status 三个依赖均正确，未做网络回退）

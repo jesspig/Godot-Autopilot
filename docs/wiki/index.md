@@ -11,6 +11,7 @@
 | [gamejam.md](gamejam.md) | Game Jam 题库 v2、随机抽样、创意约束、intake 与项目创建、固定 e2e 沙盒、本地收藏 | `devtools/commands/jam.ts`、`devtools/data/gamejam/`、`devtools/templates/gamejam/` |
 | [tests.md](tests.md) | 测试体系（程序化四层 + Agent e2e）、守卫清单、数值核算总表 | `tests/` |
 | [engine-behavior-checklist.md](engine-behavior-checklist.md) | 引擎行为验收清单：D-01 蒸馏落点、A 类迁移对照表、e2e 抽查建议 | — |
+| [engine-smoke.md](engine-smoke.md) | T-15 真实 Godot 引擎 Smoke 门禁：夹具、orchestrator、CI 分层、报告判读与边界 | `tests/engine/`、`.github/workflows/engine-smoke.yml` |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、线程纪律、添加工具流程、守卫约定 | 全仓库 |
 | [security_contract.md](security_contract.md) | T0 安全边界与并发契约：MCP 可信客户端、监听范围、高风险工具与 `confirm`、主线程、队列生命周期、路径/响应大小边界 | `src/core/`、`src/tools/`、`src/main.cpp` |
 | [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：SpecTool、dispatch 预算、Args 取参、动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、各域 `*_tools.hpp`、`register_all.cpp` |

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task": "T-15",
+  "generated_at": "",
+  "status": "pending",
+  "environment": {
+    "godot": "",
+    "godot_version_expected": "4.7.2.stable.mono.official.ed1daf0bf",
+    "cli": "",
+    "project": "",
+    "mode": "",
+    "platform": "",
+    "arch": "",
+    "timeout_sec": 90
+  },
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "pending": 0
+  },
+  "steps": [],
+  "artifacts": {
+    "report": "",
+    "screenshots": ""
+  },
+  "warnings": [],
+  "failure": null
+}

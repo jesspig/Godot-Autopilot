@@ -1,0 +1,13 @@
+[configuration]
+
+entry_symbol = "GDExtensionEntryPoint"
+compatibility_minimum = "4.7"
+
+[libraries]
+
+windows.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"
+windows.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"
+linux.debug.x86_64 = "res://addons/godot-autopilot/libgodot-autopilot.so"
+linux.release.x86_64 = "res://addons/godot-autopilot/libgodot-autopilot.so"
+macos.debug.universal = "res://addons/godot-autopilot/libgodot-autopilot.dylib"
+macos.release.universal = "res://addons/godot-autopilot/libgodot-autopilot.dylib"
