@@ -23,7 +23,7 @@ const std::vector<SkillSpec> &skills() {
 }
 
 constexpr std::size_t kExpectedSkillCount = 1;
-constexpr std::size_t kExpectedSkillResourceCount = 12;
+constexpr std::size_t kExpectedSkillResourceCount = 26;
 
 const char *const kExpectedSkillNames[] = {
     "godot-autopilot"};
@@ -246,8 +246,8 @@ TEST(SkillResourcesTest, ResolvesSkillFileContentVerbatim) {
   EXPECT_EQ(content.kind, UriKind::file);
   EXPECT_EQ(content.mime_type, "text/markdown");
   EXPECT_FALSE(content.text.empty());
-  EXPECT_NE(content.text.find("# Calling Protocol and Docs CLI"),
-            std::string::npos);
+  EXPECT_EQ(content.text, file->body);
+  EXPECT_NE(content.text.find("# Tools"), std::string::npos);
 }
 
 TEST(SkillResourcesTest, MarkdownMimeType) {

@@ -359,39 +359,52 @@ function validateAndLoad(skillsDir: string): { entries: EmbeddedSkill[]; errors:
           filesOk = false;
           continue;
         }
-        for (const itemName of readdirSync(sub).sort(compareNames)) {
-          const item = path.join(sub, itemName);
-          if (!isFile(item)) {
-            errors.push(`${label}/${subName}: 不允许嵌套目录: ${pyRepr(itemName)}`);
-            filesOk = false;
-            continue;
-          }
-          const relative = `${subName}/${itemName}`;
-          if (subName === "references") {
-            if (!itemName.endsWith(".md")) {
-              errors.push(`${label}: ${relative} 须为 .md 文件`);
+        const queue: Array<[prefix: string, dir: string]> = [["", sub]];
+        while (queue.length > 0) {
+          const [prefix, dir] = queue.shift()!;
+          for (const itemName of readdirSync(dir).sort(compareNames)) {
+            const item = path.join(dir, itemName);
+            const relative = `${subName}/${prefix}${itemName}`;
+            if (isDirectory(item)) {
+              if (subName !== "references") {
+                errors.push(`${label}/${relative}: 不允许嵌套目录`);
+                filesOk = false;
+                continue;
+              }
+              queue.push([`${prefix}${itemName}/`, item]);
+              continue;
+            }
+            if (!isFile(item)) {
+              errors.push(`${label}/${relative}: 不是文件`);
               filesOk = false;
               continue;
             }
-          } else if (!itemName.endsWith(".mjs")) {
-            errors.push(`${label}: ${relative} 须为 .mjs 文件`);
-            filesOk = false;
-            continue;
+            if (subName === "references") {
+              if (!itemName.endsWith(".md")) {
+                errors.push(`${label}: ${relative} 须为 .md 文件`);
+                filesOk = false;
+                continue;
+              }
+            } else if (!itemName.endsWith(".mjs")) {
+              errors.push(`${label}: ${relative} 须为 .mjs 文件`);
+              filesOk = false;
+              continue;
+            }
+            const raw = readBytes(item);
+            if (startsWithBytes(raw, BOM)) {
+              errors.push(`${label}: ${relative} 含 UTF-8 BOM`);
+              filesOk = false;
+              continue;
+            }
+            const decoded = decodeUtf8(raw);
+            if (decoded === undefined) {
+              errors.push(`${label}: ${relative} 非 UTF-8`);
+              filesOk = false;
+              continue;
+            }
+            files.push([relative, decoded]);
+            referenced.add(item);
           }
-          const raw = readBytes(item);
-          if (startsWithBytes(raw, BOM)) {
-            errors.push(`${label}: ${relative} 含 UTF-8 BOM`);
-            filesOk = false;
-            continue;
-          }
-          const decoded = decodeUtf8(raw);
-          if (decoded === undefined) {
-            errors.push(`${label}: ${relative} 非 UTF-8`);
-            filesOk = false;
-            continue;
-          }
-          files.push([relative, decoded]);
-          referenced.add(item);
         }
       } else {
         errors.push(`${label}: 根下不允许零散文件: ${pyRepr(subName)}`);

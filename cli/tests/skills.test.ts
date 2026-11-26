@@ -88,7 +88,7 @@ describe("skills", () => {
       file: "references/tools.md",
     });
     expect(result.code).toBe(ExitCode.Success);
-    expect(result.stdout).toContain("# Calling Protocol and Docs CLI");
+    expect(result.stdout).toContain("# Tools");
   });
 
   test("--zh show 输出中文正文", async () => {

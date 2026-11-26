@@ -110,10 +110,9 @@ function validateTree(tree: Record<string, string>, label: string): void {
         throw new Error(`${label}/${relative}: name ${parsed.name} does not match directory ${book}`);
       }
     } else if (
-      parts.length === 3 &&
+      parts.length >= 3 &&
       parts[1] === "references" &&
-      parts[2] !== undefined &&
-      parts[2].endsWith(".md")
+      parts[parts.length - 1].endsWith(".md")
     ) {
       continue;
     } else {

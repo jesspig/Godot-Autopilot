@@ -90,7 +90,7 @@ describe("install skills", () => {
     expect(dirs.length).toBe(1);
     expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "setup.md"))).toBe(true);
     expect(fs.readFileSync(path.join(target, "godot-autopilot", "references", "setup.md"), "utf8")).toContain(
-      "# 安装与连接",
+      "# Setup",
     );
   });
 

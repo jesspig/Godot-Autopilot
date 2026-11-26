@@ -16,7 +16,7 @@ namespace {
 using namespace godot_autopilot::skill_gen;
 
 constexpr size_t kSkillCount = 1;
-constexpr size_t kSkillFileCount = 10;
+constexpr size_t kSkillFileCount = 24;
 const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot"};
 
@@ -88,6 +88,7 @@ const char *const kManualWhitelist[] = {
 
     "mcp_url", "port_source", "toolset_hash", "plugin_version", "cli_version",
     "protocol_version", "ipc_kind", "instance_id", "schema_version",
+    "request_sent", "code_execute", "discard_unsaved",
     "confirmation_required", "converted_node_path", "scene_path",
     "scene_unsaved", "node_released", "applied_properties",
     "property_warnings", "inline_resources", "converted_node_paths",
@@ -247,6 +248,28 @@ bool contains_ci_token(const std::string &text, const char *token) {
     if (left_ok && right_ok) {
       return true;
     }
+  }
+  return false;
+}
+
+bool contains_token(const std::string &text, const char *token) {
+  const std::string needle(token);
+  if (needle.compare(0, 2, "--") != 0) {
+    return text.find(needle) != std::string::npos;
+  }
+  size_t pos = 0;
+  while (pos < text.size()) {
+    const size_t at = text.find(needle, pos);
+    if (at == std::string::npos) {
+      return false;
+    }
+    const size_t after = at + needle.size();
+    if (after < text.size() &&
+        (is_lower_alnum(text[after]) || text[after] == '-')) {
+      pos = at + 1;
+      continue;
+    }
+    return true;
   }
   return false;
 }
@@ -445,8 +468,8 @@ TEST(SkillGenTest, CliChannelContract) {
     if (spec.name == "godot-autopilot") {
       EXPECT_TRUE(contains_ci_token(body, "gda"))
           << spec.name << ": SKILL.md must mention the gda CLI channel";
-      EXPECT_NE(body.find("gda tools list"), std::string::npos);
-      EXPECT_NE(body.find("gda call"), std::string::npos);
+      EXPECT_NE(body.find("gda tool list"), std::string::npos);
+      EXPECT_NE(body.find("gda tool call"), std::string::npos);
     }
     for (const SkillFile &file : spec.files) {
       if (!ends_with(file.relative_path, ".md")) {
@@ -601,7 +624,7 @@ TEST(SkillGenTest, SkillBooksContainNoMcpContent) {
         continue;
       }
       for (const char *token : kMcpTokens) {
-        EXPECT_EQ(file.body.find(token), std::string::npos)
+        EXPECT_FALSE(contains_token(file.body, token))
             << spec.name << "/" << file.relative_path << " mentions " << token;
       }
     }
@@ -627,8 +650,9 @@ TEST(SkillGenTest, EntryCardCliOnlyContract) {
       "gda ping", "gda tool list", "gda tool search", "gda tool describe",
       "gda tool call", "--confirm", "confirmation_required", "gda doctor",
       "gda job"};
+  const std::vector<SkillSpec> all = all_skills();
   const SkillSpec *entry = nullptr;
-  for (const SkillSpec &spec : all_skills()) {
+  for (const SkillSpec &spec : all) {
     if (spec.name == "godot-autopilot") {
       entry = &spec;
     }
