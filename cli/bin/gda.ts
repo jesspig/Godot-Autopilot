@@ -9,16 +9,22 @@ import {
   resolveCommand,
   type CommandSpec,
 } from "../src/command-spec";
+import { run as runDebug } from "../src/commands/debug";
 import { run as runDoctor } from "../src/commands/doctor";
 import { run as runEditor } from "../src/commands/editor";
 import { run as runGame } from "../src/commands/game";
+import { run as runJob } from "../src/commands/job";
+import { run as runLogs } from "../src/commands/logs";
 import { run as runManifest } from "../src/commands/manifest";
+import { run as runMonitor } from "../src/commands/monitor";
 import { run as runProject } from "../src/commands/project";
 import { run as runResource } from "../src/commands/resource";
 import { runGenericToolCall, run as runScene } from "../src/commands/scene";
 import { run as runScript } from "../src/commands/script";
 import { run as runShell } from "../src/commands/shell";
+import { run as runTest } from "../src/commands/test";
 import { run as runTool } from "../src/commands/tool";
+import { run as runTrace } from "../src/commands/trace";
 import { CliError, ExitCode } from "../src/errors";
 import { main } from "../src/main";
 
@@ -46,6 +52,12 @@ const GROUP_RUNNERS: Readonly<Record<string, GroupRunner>> = {
   script: runScript,
   resource: runResource,
   game: runGame,
+  debug: runDebug,
+  logs: runLogs,
+  test: runTest,
+  job: runJob,
+  trace: runTrace,
+  monitor: runMonitor,
 };
 
 const DEFAULT_SUBCOMMAND: Readonly<Record<string, string>> = {
@@ -59,6 +71,12 @@ const DEFAULT_SUBCOMMAND: Readonly<Record<string, string>> = {
   script: "list",
   resource: "list",
   game: "status",
+  debug: "status",
+  logs: "editor",
+  test: "list",
+  job: "list",
+  trace: "list",
+  monitor: "status",
 };
 
 const FLAG_TO_OPTION: Readonly<Record<string, keyof GlobalOptions>> = {

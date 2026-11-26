@@ -46,6 +46,8 @@ export interface GcpEnvelopeLike {
   error_message?: string;
   task_id?: string;
   request_id?: string;
+  seq?: number;
+  event_type?: string;
   confirmation?: {
     ttl_ms?: number;
     issued_at_ms?: number;
@@ -603,4 +605,233 @@ export async function nativeToolInvoke(
     return nativeCallConfirm(endpoint, instanceId, started.request_id, options);
   }
   return started;
+}
+
+export interface NativeTaskRecord {
+  task_id: string;
+  instance_id: string;
+  generation: number;
+  state: string;
+  progress: number;
+  progress_message: string;
+  result: unknown;
+  error: number;
+  error_symbol: string;
+  error_message: string;
+  cancel_stage: string;
+}
+
+export interface NativeEventRecord {
+  seq: number;
+  instance_id: string;
+  event_type: string;
+  payload: unknown;
+  traceparent: string;
+  task_id: string;
+  request_id: string;
+}
+
+export interface NativeEventPage {
+  subscription_id: string;
+  events: NativeEventRecord[];
+  delivered: number;
+  next_cursor: number;
+}
+
+export interface NativeTraceContext {
+  traceparent: string;
+  trace_id: string;
+  span_id: string;
+  parent_span: string;
+  flags: string;
+}
+
+export interface NativeErrorInfo {
+  code: number;
+  message: string;
+}
+
+export const NATIVE_ERROR_CURSOR_EXPIRED = 10;
+export const NATIVE_ERROR_TASK_NOT_FOUND = 14;
+
+export function nativeErrorInfo(response: GcpEnvelopeLike): NativeErrorInfo | undefined {
+  if (response.status === "ok" || response.status === "pending") return undefined;
+  const code = typeof response.error === "number" ? response.error : 0;
+  const message = response.error_message ?? "";
+  if (code === 0 && message === "") return undefined;
+  return { code, message };
+}
+
+function nativeResultRaw(response: GcpEnvelopeLike, method: string): unknown {
+  const failure = nativeErrorInfo(response);
+  if (failure !== undefined) {
+    const error = new CliError(
+      ExitCode.Transport,
+      `native ${method} failed (code ${failure.code})${failure.message === "" ? "" : `: ${failure.message}`}.`,
+    );
+    (error as CliError & { gcp_code?: number }).gcp_code = failure.code;
+    throw error;
+  }
+  return gcpResult(response);
+}
+
+function nativeResultRecord(response: GcpEnvelopeLike, method: string): Record<string, unknown> {
+  const result = nativeResultRaw(response, method);
+  if (result === null || typeof result !== "object" || Array.isArray(result)) {
+    throw new CliError(ExitCode.Transport, `the native ${method} response is malformed.`);
+  }
+  return result as Record<string, unknown>;
+}
+
+function recordText(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value : "";
+}
+
+function recordNumber(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function parseTaskRecord(record: Record<string, unknown>): NativeTaskRecord {
+  return {
+    task_id: recordText(record, "task_id"),
+    instance_id: recordText(record, "instance_id"),
+    generation: recordNumber(record, "generation"),
+    state: recordText(record, "state"),
+    progress: recordNumber(record, "progress"),
+    progress_message: recordText(record, "progress_message"),
+    result: record.result ?? null,
+    error: recordNumber(record, "error"),
+    error_symbol: recordText(record, "error_symbol"),
+    error_message: recordText(record, "error_message"),
+    cancel_stage: recordText(record, "cancel_stage"),
+  };
+}
+
+export async function nativeTaskGet(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  taskId: string,
+  generation: number,
+  options: NativeCallOptions = {},
+): Promise<NativeTaskRecord> {
+  const response = await nativeRequest(
+    endpoint, "task.get", { task_id: taskId, generation: String(generation) },
+    instanceId, options.timeoutMs,
+  );
+  return parseTaskRecord(nativeResultRecord(response, "task.get"));
+}
+
+export async function nativeTaskList(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  generation: number,
+  options: NativeCallOptions = {},
+): Promise<NativeTaskRecord[]> {
+  const response = await nativeRequest(
+    endpoint, "task.list", { generation: String(generation) }, instanceId, options.timeoutMs,
+  );
+  const raw = nativeResultRaw(response, "task.list");
+  const record = raw !== null && typeof raw === "object" && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {};
+  const tasks = Array.isArray(record.tasks) ? record.tasks : raw;
+  if (!Array.isArray(tasks)) {
+    throw new CliError(ExitCode.Transport, "the native task.list response is malformed.");
+  }
+  return tasks.filter((item) => item !== null && typeof item === "object" && !Array.isArray(item))
+    .map((item) => parseTaskRecord(item as Record<string, unknown>));
+}
+
+export async function nativeTaskCancel(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  taskId: string,
+  generation: number,
+  reason: string,
+  options: NativeCallOptions = {},
+): Promise<NativeTaskRecord> {
+  const response = await nativeRequest(
+    endpoint, "task.cancel",
+    { task_id: taskId, generation: String(generation), reason },
+    instanceId, options.timeoutMs,
+  );
+  return parseTaskRecord(nativeResultRecord(response, "task.cancel"));
+}
+
+function parseEventRecord(value: unknown): NativeEventRecord {
+  const record = value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  return {
+    seq: recordNumber(record, "seq"),
+    instance_id: recordText(record, "instance_id"),
+    event_type: recordText(record, "event_type"),
+    payload: record.payload ?? null,
+    traceparent: recordText(record, "traceparent"),
+    task_id: recordText(record, "task_id"),
+    request_id: recordText(record, "request_id"),
+  };
+}
+
+export async function nativeEventsSubscribe(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  cursor: number,
+  eventType: string,
+  options: NativeCallOptions = {},
+): Promise<string> {
+  const response = await nativeRequest(
+    endpoint, "events.subscribe",
+    { cursor: String(cursor), event_type: eventType === "" ? "all" : eventType },
+    instanceId, options.timeoutMs,
+  );
+  const result = nativeResultRecord(response, "events.subscribe");
+  const id = recordText(result, "subscription_id");
+  if (id === "") {
+    throw new CliError(ExitCode.Transport, "the native events.subscribe response has no subscription_id.");
+  }
+  return id;
+}
+
+export async function nativeEventsResume(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  subscriptionId: string,
+  limit: number,
+  options: NativeCallOptions = {},
+): Promise<NativeEventPage> {
+  const response = await nativeRequest(
+    endpoint, "events.resume",
+    { subscription_id: subscriptionId, limit: String(limit) },
+    instanceId, options.timeoutMs,
+  );
+  const result = nativeResultRecord(response, "events.resume");
+  const events = (Array.isArray(result.events) ? result.events : []).map(parseEventRecord);
+  const nextCursor = events.length === 0 ? 0 : events[events.length - 1].seq + 1;
+  return {
+    subscription_id: subscriptionId,
+    events,
+    delivered: recordNumber(result, "delivered"),
+    next_cursor: nextCursor,
+  };
+}
+
+export async function nativeTraceGet(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  traceparent: string,
+  options: NativeCallOptions = {},
+): Promise<NativeTraceContext> {
+  const params: Record<string, string> | undefined = traceparent === "" ? undefined : { traceparent };
+  const response = await nativeRequest(endpoint, "trace.get", params, instanceId, options.timeoutMs);
+  const result = nativeResultRecord(response, "trace.get");
+  return {
+    traceparent: recordText(result, "traceparent"),
+    trace_id: recordText(result, "trace_id"),
+    span_id: recordText(result, "span_id"),
+    parent_span: recordText(result, "parent_span"),
+    flags: recordText(result, "flags"),
+  };
 }
