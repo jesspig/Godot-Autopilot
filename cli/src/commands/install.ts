@@ -3,12 +3,21 @@ import os from "node:os";
 import path from "node:path";
 
 import type { GlobalOptions } from "../args";
-import { extractZip, readTree, writeTree } from "../archive";
+import { extractZip, readTree } from "../archive";
 import { cacheRoot, cacheAssetPath, selectLatest, verifyManifest } from "../cache";
 import { CliError, ExitCode } from "../errors";
 import { readPluginInstanceIndex } from "../instances";
 import { isAlive, terminateGraceful } from "../process";
-import { builtinRetiredSkills, builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
+import {
+  applySkillSync,
+  builtinSkillsDigest,
+  builtinSkillsFiles,
+  builtinSkillsVersion,
+  planSkillSync,
+  skillTreeDigest,
+  verifyBuiltinSkillsAsset,
+  type SkillLanguage,
+} from "../skills";
 import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
 import { start } from "./start";
@@ -55,7 +64,7 @@ async function onlineSkills(lang: string): Promise<Record<string, string>> {
   }
 }
 
-function cacheSkills(lang: string): Record<string, string> {
+function cacheSkills(lang: string): { files: Record<string, string>; version: string } {
   const manifest = selectLatest("skills", lang);
   if (manifest === undefined) {
     throw new CliError(ExitCode.Transport, `no cached ${lang} skills archive is available.`);
@@ -68,7 +77,7 @@ function cacheSkills(lang: string): Record<string, string> {
   try {
     const dest = path.join(temp, "unpacked");
     extractZip(zip, dest);
-    return normalizeSkillFiles(readTree(dest));
+    return { files: normalizeSkillFiles(readTree(dest)), version: manifest.version };
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
@@ -93,8 +102,17 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
     ? path.resolve(opts.pathText)
     : path.join(os.homedir(), ".agents", "skills");
 
+  if (!verifyBuiltinSkillsAsset()) {
+    throw new CliError(
+      ExitCode.Transport,
+      "the builtin skills asset digest does not match its source trees",
+      "Repair cli/assets/skills.json with build:skills-asset, then reinstall the CLI.",
+    );
+  }
+
   let files: Record<string, string> | undefined;
   let origin: Source = source;
+  let cacheVersion: string | undefined;
   const tryOnline = async (): Promise<void> => {
     try {
       files = await onlineSkills(lang);
@@ -112,7 +130,9 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   }
   if (files === undefined && (source === "cache" || source === "auto" || source === "offline")) {
     try {
-      files = cacheSkills(lang);
+      const cached = cacheSkills(lang);
+      files = cached.files;
+      cacheVersion = cached.version;
       origin = "cache";
     } catch (error) {
       if (source === "cache") throw error;
@@ -125,34 +145,52 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   if (files === undefined) {
     throw new CliError(ExitCode.Transport, "no skills source is available (online, cache, builtin).");
   }
-  writeTree(target, files, opts.force === true);
-  const retired = builtinRetiredSkills();
-  const existing = new Set(
-    fs
-      .readdirSync(target, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name),
-  );
-  const stale = retired.filter((name) => existing.has(name));
-  const removed: string[] = [];
-  if (opts.prune === true) {
-    for (const name of stale) {
-      fs.rmSync(path.join(target, name), { recursive: true, force: true });
-      removed.push(name);
-    }
+
+  const assetVersion = builtinSkillsVersion();
+  const assetDigest = builtinSkillsDigest();
+  const version = origin === "cache" ? cacheVersion ?? assetVersion : assetVersion;
+  const digest = origin === "builtin" || version === assetVersion
+    ? assetDigest
+    : skillTreeDigest(files);
+  const plan = planSkillSync(target, files, lang, {
+    version,
+    content_digest: digest,
+    force: opts.force === true,
+    prune: opts.prune === true,
+  });
+  const applied = applySkillSync(plan);
+  if (!applied.ok) {
+    throw new CliError(
+      ExitCode.Transport,
+      `skills sync failed: ${applied.error}`,
+      applied.rolled_back
+        ? "The previous installation was preserved. Pass --force to overwrite managed files."
+        : `Run 'gda skills sync --force' to repair (${applied.error}).`,
+    );
   }
   writeJson(
     {
       ok: true,
       artifact: "skills",
-      version: CLI_VERSION,
+      version,
+      asset_version: assetVersion,
+      content_digest: digest,
+      tree_digest: skillTreeDigest(files),
       origin,
       lang,
       target,
       files: Object.keys(files).length,
       skills: [...new Set(Object.keys(files).map((file) => file.split("/")[0]))].sort(),
-      stale,
-      removed,
+      stale: plan.retired_present,
+      removed: applied.retired_removed,
+      preserved: plan.preserved,
+      cache_version: cacheVersion ?? null,
+      cache_version_matches_asset: cacheVersion === undefined ? null : cacheVersion === assetVersion,
+      sync: {
+        written: applied.written,
+        deleted: applied.deleted,
+        rolled_back: applied.rolled_back,
+      },
     },
     opts,
   );

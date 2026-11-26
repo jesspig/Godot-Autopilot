@@ -1,0 +1,72 @@
+bun test v1.4.5 (a7733435c)
+[gda] exported Godot 4.7 docs from C:/fake/godot.exe (363291 bytes)
+[gda] exported Godot 4.7 docs from C:/fake/godot.exe (363286 bytes)
+[gda] exported Godot 4.7 docs from C:/fake/godot.exe (363291 bytes)
+[gda] confirm game.input: tool=game_input target=instance:native-domain risk=high args={"action":"queue","type":"key","mode":"event","event":{}}
+[gda] confirm game.eval: tool=game_script target=instance:native-domain risk=high args={"action":"execute","script_action":"script","source_code":"return 1"}
+[gda] confirm game.scenario: tool=game_input target=instance:native-domain risk=high args={"events":[],"action":"sequence"}
+[gda] confirm resource.rename: tool=resource_file target=instance:native-domain risk=high args={"path":"res://a.tres","new_path":"res://b.tres","action":"rename"}
+{"schema_version":1,"ok":true,"command":"","data":{"ok":true,"artifact":"skills","version":"0.3.5","origin":"builtin","lang":"en","target":"C:\\gda-cli\\build\\cli-test-tmp\\gda-install-nex5Vj\\skills","files":24,"skills":["godot-autopilot"],"stale":[],"removed":[]},"error":null,"meta":{"request_id":"","instance_id":"","project":"","duration_ms":0},"warnings":[]}
+{"schema_version":1,"ok":true,"command":"","data":{"ok":true,"artifact":"skills","version":"0.3.5","origin":"builtin","lang":"zh","target":"C:\\gda-cli\\build\\cli-test-tmp\\gda-install-iTbJ7m\\skills-zh","files":24,"skills":["godot-autopilot"],"stale":[],"removed":[]},"error":null,"meta":{"request_id":"","instance_id":"","project":"","duration_ms":0},"warnings":[]}
+{"schema_version":1,"ok":true,"command":"","data":{"ok":true,"artifact":"skills","version":"0.3.5","origin":"builtin","lang":"en","target":"C:\\gda-cli\\build\\cli-test-tmp\\gda-install-VdfUbW\\skills","files":24,"skills":["godot-autopilot"],"stale":[],"removed":[]},"error":null,"meta":{"request_id":"","instance_id":"","project":"","duration_ms":0},"warnings":[]}
+
+..\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-skills\cli\tests\jam.test.ts:
+[ERROR] refusing to overwrite non-intake directory: C:\gda-cli\build\cli-test-tmp\gda-jam-1dGYXh\brackeys_2026_2_trust_no_one\project
+[JAM] TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] intake: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-cprQ6O/brackeys_2026_2_trust_no_one/project
+[JAM] sampled: 3 keywords, 3 concept ideas
+[JAM] next: read ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-cprQ6O/brackeys_2026_2_trust_no_one/project/GAMEJAM.md, then create a project with: bun run gda-dev-tools jam create --theme brackeys_2026_2_trust_no_one --name "<project name>"
+[JAM] TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] intake: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-XXD9sy/brackeys_2026_2_trust_no_one/project
+[JAM] sampled: 3 keywords, 3 concept ideas
+[JAM] next: read ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-XXD9sy/brackeys_2026_2_trust_no_one/project/GAMEJAM.md, then create a project with: bun run gda-dev-tools jam create --theme brackeys_2026_2_trust_no_one --name "<project name>"
+[JAM] TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] intake: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-HEAyXy/brackeys_2026_2_trust_no_one/project
+[JAM] sampled: 3 keywords, 3 concept ideas
+[JAM] next: read ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-HEAyXy/brackeys_2026_2_trust_no_one/project/GAMEJAM.md, then create a project with: bun run gda-dev-tools jam create --theme brackeys_2026_2_trust_no_one --name "<project name>"
+[ERROR] cannot derive an ASCII slug from the project name; pass --slug <ascii-slug>
+[JAM] project: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-HEAyXy/brackeys_2026_2_trust_no_one/neon-7cf77306
+[JAM] name: 闇撹櫣 (neon-7cf77306)
+[JAM] next: bun run gda-dev-tools deploy --project ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-HEAyXy/brackeys_2026_2_trust_no_one/neon-7cf77306
+[JAM] TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] intake: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-aem5io/brackeys_2026_2_trust_no_one/project
+[JAM] sampled: 3 keywords, 3 concept ideas
+[JAM] next: read ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-aem5io/brackeys_2026_2_trust_no_one/project/GAMEJAM.md, then create a project with: bun run gda-dev-tools jam create --theme brackeys_2026_2_trust_no_one --name "<project name>"
+[ERROR] output directory already exists: C:\gda-cli\build\cli-test-tmp\gda-jam-aem5io\custom
+[ERROR] missing intake project for brackeys_2026_2_trust_no_one; run jam first: C:\gda-cli\build\cli-test-tmp\gda-jam-CdmWve\brackeys_2026_2_trust_no_one\project
+[JAM] e2e project: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-Zt0HCn/e2e
+[JAM] theme: TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] next: bun run gda-dev-tools build && bun run gda-dev-tools deploy --project ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-Zt0HCn/e2e
+[JAM] e2e project: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-Zt0HCn/e2e
+[JAM] theme: SHIFT (Game Off 2026)
+[JAM] next: bun run gda-dev-tools build && bun run gda-dev-tools deploy --project ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-Zt0HCn/e2e
+[ERROR] refusing to overwrite non-e2e directory: C:\gda-cli\build\cli-test-tmp\gda-jam-Zt0HCn\e2e
+[ERROR] refusing to reset non-e2e directory: C:\gda-cli\build\cli-test-tmp\gda-jam-Zt0HCn\e2e
+[JAM] TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] intake: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/brackeys_2026_2_trust_no_one/project
+[JAM] sampled: 3 keywords, 3 concept ideas
+[JAM] next: read ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/brackeys_2026_2_trust_no_one/project/GAMEJAM.md, then create a project with: bun run gda-dev-tools jam create --theme brackeys_2026_2_trust_no_one --name "<project name>"
+[JAM] project: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/brackeys_2026_2_trust_no_one/neon-shift-a598f392
+[JAM] name: Neon Shift (neon-shift-a598f392)
+[JAM] next: bun run gda-dev-tools deploy --project ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/brackeys_2026_2_trust_no_one/neon-shift-a598f392
+[JAM] e2e project: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/e2e
+[JAM] theme: SHIFT (Game Off 2026)
+[JAM] next: bun run gda-dev-tools build && bun run gda-dev-tools deploy --project ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/e2e
+[JAM] index: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-k9v72W/INDEX.md (1 projects)
+[JAM] TRUST NO ONE (Brackeys Game Jam 2026.2)
+[JAM] intake: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-nMo4gO/brackeys_2026_2_trust_no_one/project
+[JAM] sampled: 3 keywords, 3 concept ideas
+[JAM] next: read ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-nMo4gO/brackeys_2026_2_trust_no_one/project/GAMEJAM.md, then create a project with: bun run gda-dev-tools jam create --theme brackeys_2026_2_trust_no_one --name "<project name>"
+[JAM] project: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-nMo4gO/brackeys_2026_2_trust_no_one/neon-shift-a598f392
+[JAM] name: Neon Shift (neon-shift-a598f392)
+[JAM] next: bun run gda-dev-tools deploy --project ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-nMo4gO/brackeys_2026_2_trust_no_one/neon-shift-a598f392
+[JAM] index: ../../../../../../../../gda-cli/build/cli-test-tmp/gda-jam-nMo4gO/INDEX.md (1 projects)
+[gda] confirm resource.rename: tool=resource_file target=instance:readback-native risk=high args={"path":"res://a.tres","new_path":"res://b.tres","action":"rename"}
+[gda] prompt argument 'since' converted from number to string
+[gda] prompt argument 'verbose' converted from boolean to string
+
+ 548 pass
+ 26 skip
+ 0 fail
+ 7198 expect() calls
+Ran 574 tests across 71 files. [58.28s]

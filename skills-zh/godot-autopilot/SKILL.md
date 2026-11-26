@@ -1,115 +1,95 @@
 ---
 name: godot-autopilot
-description: "Godot Autopilot（GDA）唯一入口技能卡：通过 gda status --json 与 mcp_url 连接，用 gda docs 查引擎 API，用 gda search/describe 发现 live 工具，用 gda call 调用，遵守 confirm 与错误水位线，并执行变更-观测-验证环。按任务读取 setup、tools、scene-system、scripting、resources、runtime、content、csharp 或 servers 参考。"
+description: "Godot Autopilot（GDA）纯 CLI 入口技能卡：用 gda ping 探测健康，用 gda commands 发现命令，用 gda tool list/search/describe 发现工具，用 gda tool call --confirm 调用，遵循变更-观测-验证环。只读取与当前任务匹配的参考。"
 ---
 
 # Godot Autopilot
 
-Godot Autopilot（GDA）是进程内 GDExtension，通过本地 `gda` CLI 与 MCP 端点把运行中的 Godot 编辑器暴露给 Agent。本卡是唯一入口；只读与当前任务匹配的参考，不要一次加载全部。
+Godot Autopilot（GDA）通过一个本地 `gda` CLI 把运行中的 Godot 编辑器暴露出来。没有第二套协议，也没有需要配置的端点：每个操作都是一条输出 JSON envelope 的 CLI 命令。只读取与当前任务匹配的那一份参考，不要一次加载全部。
 
-## 连接模型
+## 从这里开始
 
-- `gda` CLI 是一等接口：自动发现插件的随机端口，优先 IPC，失败回退 HTTP，输出 JSON。
-- 端口由插件拥有并持久化。禁止自选监听端口、假设默认端口，或在编辑器重启后复用旧端口。
-- `gda status --json` 是连接记录；`mcp_url` 是 MCP 客户端唯一权威端点，`transport` 与 `ipc_kind` 说明 CLI 使用的本地通道。
-- 服务只绑环回地址；禁止转发、代理或公开其端口。
-- 看不到实例时，`gda list --all` 列出已知项目，`gda start --project <dir>` 启动编辑器；每次重启后重新读取 `mcp_url`。
-- MCP 面是已有原生工具列表的客户端兼容通道：`search_tools`、`get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`。规则相同；客户端没有原生工具时默认用 CLI。
+```bash
+gda ping
+gda status --format json
+gda commands --json
+```
 
-## 引擎文档
-
-禁止凭记忆写不熟悉的引擎 API。属性名、方法签名、枚举值与默认值会随 Godot 版本变化，凭记忆写出的签名是静默失败的常见来源。
-
-- 写或改涉及不熟悉 API 的脚本、设置名称或可接受值不清楚的属性、或排查 “unknown property” 与解析错误前，先运行 `gda docs search <query>`。
-- 再用 `gda docs class <name> --member <text>` 或 `gda docs member <class> <name>` 缩小范围。
-- 文档来自本机引擎二进制，按引擎 minor 缓存在 GDA home 下；首次查询可能导出缓存，之后很快。
-- 项目 pin 与可用二进制不一致时命令会报错并建议 `--godot`；传入匹配的 Godot 二进制，不要猜。
-- `gda docs status` 显示项目 pin、解析到的引擎与缓存状态；`gda docs sync` 强制导出；`--docs-file <path>` 读取外部 dump。
+`gda ping` 是健康探测，不是握手；它只证明控制面可达。`gda status --format json` 是连接记录。`gda commands --json` 是已实现命令与 flag 的权威清单；清单里没有的命令一律不要臆造。
 
 ## 发现工具，不要猜名字
 
-工具名是 snake_case，通常动词在前，但段数会变，名字也会随工具集增长而变化。发现是强制步骤。
-
-live catalog 有 253 个 canonical 工具。另有 325 个弃用别名仍可经 `call_tool` 与 `batch_execute` 解析，但不进 `search_tools`，也不出现在 `gda tools list`。别名自 0.4.x 起弃用，将在 0.6.x 移除：始终调用 canonical 工具并传它的 action。常见旧名到新调用的映射见 `references/tools.md` 的别名说明。
+工具目录随 CLI 变化，名字和数量都不固定。先用 CLI 发现，首次调用前读 schema。
 
 ```bash
-gda search "tilemap cell"
-gda describe set_tilemap_cells
-gda call set_tilemap_cells --args '{"node_path": "Level", "cells": [{"x": 0, "y": 0, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}]}'
+gda tool list
+gda tool search <query>
+gda tool describe <tool>
+gda tool call <tool> --args '<json>'
 ```
 
-1. `gda search <query>` 按名称、描述、分类与标签搜索 live 服务，默认最多 20 条。
-2. `gda describe <name>` 打印 schema 与 `side_effect` 标记；首次调用前必读，禁止推断参数名。
-3. `gda call <name> --args '<json>'` 或 `--args-file <path>` 对 live 编辑器执行一次调用。
-4. 需要完整清单时，`gda tools list` 列出全部可直接调用的工具；弃用别名不在其中。
+1. `gda tool list` 列出当前 canonical 目录；可用 `--category` 或 `--tags` 过滤。`gda tool categories` 列出分类。
+2. `gda tool search <query>` 先按对象搜索（“tile cell”“audio track”），结果太宽再补动词；下结论说工具缺失前先换同义词重试。
+3. `gda tool describe <tool>` 显示 schema、必填的 `action` 值与副作用。首次调用前必读，禁止推断参数名。
+4. `gda tool call <tool>` 执行一次调用。短参数用 `--args '<json>'`，长 JSON 用 `--args-file <path>`（或 `-` 从 stdin 读取）。
+5. 记忆中的工具名可能是 legacy alias。用 `gda tool describe` 或 `gda tool search` 解析，优先使用 canonical 名称与 action；不要依赖记忆中的迁移清单。
 
-发现只针对 live 实例，没有离线 catalog；没有实例时先 `gda start --project <dir>`。先按对象搜索（“tilemap cell”“animation track”“import sidecar”），结果太宽再补动词；下结论说工具缺失前换同义词重试：tile/cell、sprite/texture、log/output、delete/remove/erase、create/add/new。
+## 引擎文档
 
-许多工具用必填 `action`（`create_scene_node` 与 `physics_query` 用 `mode`）把相关操作收进一个工具。读 `gda describe` 里的枚举，不要记单独的一次性工具名。
+禁止凭记忆写不熟悉的引擎 API。先查：
 
-## 任务路由
+```bash
+gda docs search <query>
+gda docs class <name> --member <text>
+```
 
-先把任务归约到对象与意图，再读对应参考。首次调用前用 `gda search` 与 `gda describe` 确认名称和 schema。
-
-| 任务 | 参考 | 首步 |
-|---|---|---|
-| 安装、启动、连接、安装技能 | `references/setup.md` | `gda status --json`；缺失则安装插件 |
-| 调用协议、confirm、错误、docs CLI | `references/tools.md` | 首次调用前 `gda describe <tool>` |
-| 场景、节点、属性、信号、undo | `references/scene-system.md` | `get_scene_tree` 与 `property_get` |
-| GDScript 生命周期、执行通道、重载 | `references/scripting.md` | 检查 `@tool` 并选择通道 |
-| 资源、导入、重命名/移动、UID | `references/resources.md` | 移动前检查依赖 |
-| 运行游戏、注入输入、调试、日志 | `references/runtime.md` | `get_game_state` 的 action=status 与错误水位线 |
-| TileMap、动画、音频、UI 主题 | `references/content.md` | 编辑前检查现有资源 |
-| C#、csproj、构建环、反射桥 | `references/csharp.md` | 探测 `dotnet_environment` 后构建 |
-| 服务器、RID、物理、导航 | `references/servers.md` | 检查 RID 生命周期与线程 |
-
-## 症状直达
-
-| 症状 | 参考 | 首步 |
-|---|---|---|
-| 属性写不进去 | `references/scene-system.md` | 读回；检查 owner 与值形状 |
-| 场景保存后丢节点 | `references/scene-system.md` | 检查父节点、owner 与保存目标 |
-| 游戏忽略注入的输入 | `references/runtime.md` | `get_game_state` 的 action=status；对齐输入帧 |
-| 脚本在编辑器里不执行 | `references/scripting.md` | 加 `@tool` 或改用编辑器通道 |
-| C# 改动没有生效 | `references/csharp.md` | 重新构建并读 `diagnostics.instantiable` |
-| 重命名后资源路径断裂 | `references/resources.md` | 检查 UID、依赖与引用 |
-| 瓦片或动画显示不对 | `references/content.md` | 检查 TileSet、轨道与 SpriteFrames |
-| 服务器调用静默失败 | `references/servers.md` | 检查 RID 有效性与主线程执行 |
+`gda docs status` 显示解析到的引擎与缓存；`gda docs sync` 刷新缓存。项目 pin 与可用二进制不一致时传入 `--godot`。
 
 ## 确认与安全
 
-高风险副作用不执行，而是返回结构化 `confirmation_required`。类别为 `destructive`、`process`、`code_execute` 与 `game_runtime`。审查工具描述与确切目标后重试：
+高风险副作用不会执行，而是返回 `confirmation_required`，附带工具、目标、风险与参数摘要；审查该摘要后用 `--confirm` 重跑同一条命令。非交互会话缺少 `--confirm` 会停止命令且不发送任何内容。
 
 ```bash
-gda call code_execute --args '{"source_code": "return 1"}' --confirm
+gda tool call <tool> --args '<json>' --confirm
 ```
 
-使用原生 MCP 工具时，在参数对象里传 `confirm: true`。文件与场景写入（`writes_file`、`writes_config`、`writes_scene`）不需要确认，但仍会改变项目内容：每次写入后读回目标。禁止换一个效果相同的工具绕过确认错误，包括弃用别名。把 `destructive` 与 `game_runtime` 注解视为停下审查的信号，而不是形式。
+- `destructive`、`process`、`code_execute` 与 `game_runtime` 注解是停下审查的信号，不是形式。
+- 结果未知时不要重发有副作用的调用；先读回状态。
+- 每次文件或场景写入后读回；批量任务中的高风险项逐项确认。覆盖写需显式确认。
+- 细节见 `references/safety.md`。
 
-## 观察引擎状态
+## 观察引擎与恢复
 
-禁止盲目串联写入。每次改动都落在带导入队列、调试器与引擎日志的 live 编辑器里；没有观测到的状态就是未知状态。
+```bash
+gda doctor
+gda job
+```
 
-- 每次调用后读 `new_errors_since_last_call`。非零表示记录了新错误；拉取真实日志行，修复或解释后再继续。计数器一次性，读取后重置。
-- 游戏运行时，`get_debugger_stream` 的 action=errors 与 action=output 提供其错误与打印；没有运行游戏时，action=log 读编辑器输出与引擎日志，`get_game_log_entries` 在会话结束后读磁盘日志。
-- 问题在插件自身（确认被拒、超时、响应丢失）时，读 `get_plugin_log` 或 `get_debugger_stream` 的 action=log 并设 source=plugin。
-- 优先相信观测输出——日志行、截图、读回——而不是假设调用名等于效果。`ok` 只表示调用通过了。
+`gda doctor` 诊断环境；`gda doctor run --offline --ci` 给出稳定的机器可读报告。长任务会返回 job id：用 `gda job list`、`gda job wait <id>` 与 `gda job status <id>` 跟踪；用 `gda job cancel <id> --confirm` 停止。日志用 `gda logs editor`、`gda logs game`、`gda logs plugin` 或 `gda logs cli` 读取。
 
-## 变更-观测-验证环
+## 变更 / 观测 / 验证
 
-1. 通过工具改变项目，或用 `batch_execute` / `code_execute` 编排确定性序列。
-2. 用截图（`capture_editor_viewport`，运行中的游戏用 target=game）、读回（`property_get`、`get_scene_tree`、`resource_property` 的 action=get）或输出（`get_debugger_stream` 的 action=log，游戏运行时用 action=errors / action=output）观测。
+1. 用 CLI 命令或工具调用改变项目。
+2. 用读回（`gda scene tree`、`gda resource get`）、截图（`gda game capture`）或日志（`gda logs editor`）观测。
 3. 根据观测诊断、修复，再次观测，直到结果符合意图。
-4. 用错误水位线归零确认修复，再运行相关验证工具（`analyze_project` 的 action=validate_scene、内联 GDScript 测试或游戏探针）后才宣布成功。
+4. 宣布成功前用 `gda test run`、`gda debug errors` 或 `gda scene verify` 验证。
 
-## 参考索引
+## 任务路由
 
-- `references/setup.md` —— 安装、启动、连接、技能安装、`--prune`。
-- `references/tools.md` —— CLI 协议、confirm、错误、限制、docs CLI、别名窗口。
-- `references/scene-system.md` —— 场景、节点、属性、信号、undo。
-- `references/scripting.md` —— GDScript 生命周期与执行通道。
-- `references/resources.md` —— 资源、导入、重命名/移动、UID。
-- `references/runtime.md` —— 运行游戏、输入、日志、调试。
-- `references/content.md` —— tilemap、动画、音频、UI 主题。
-- `references/csharp.md` —— C# 构建环与反射桥。
-- `references/servers.md` —— RID、物理、导航、渲染。
+| 任务 | 参考 | 首步 |
+|---|---|---|
+| 安装、连接、技能、插件 | `references/setup.md` | `gda setup status` |
+| CLI 语法、envelope、args-file、job | `references/cli.md` | `gda commands --json` |
+| 确认与错误恢复 | `references/safety.md` | `gda tool describe <tool>` |
+| 离线与空气隔离使用 | `references/offline.md` | `gda doctor run --offline` |
+| 工具发现与别名 | `references/tools.md` | `gda tool search <query>` |
+| 场景、节点、属性、信号 | `references/scene.md` | `gda scene tree` |
+| GDScript 创建、补丁、运行、重载 | `references/scripting.md` | `gda script list` |
+| 资源、导入、重命名、UID | `references/resources.md` | `gda resource inspect --path <path>` |
+| 运行游戏、输入、截图、日志 | `references/runtime.md` | `gda game status` |
+| 调试、trace、报告 | `references/debugging.md` | `gda debug status` |
+| 测试与运行 | `references/testing.md` | `gda test list` |
+| 工作流与长任务 | `references/workflows.md` | `gda workflow list` |
+| TileMap、动画、音频、UI | `references/content.md` | `gda tool search <query>` |
+| C# 构建环 | `references/csharp.md` | `gda doctor run --ci` |
+| 服务器、RID、物理、导航 | `references/servers.md` | `gda tool search <query>` |

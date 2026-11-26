@@ -8,15 +8,29 @@ import { collectTree } from "../../../tests/guard/skills_guard";
 const root = path.resolve(import.meta.dir, "..", "..", "..");
 const EXPECTED_TREE = [
   "godot-autopilot/SKILL.md",
+  "godot-autopilot/references/cli.md",
   "godot-autopilot/references/content.md",
   "godot-autopilot/references/csharp.md",
+  "godot-autopilot/references/debugging.md",
+  "godot-autopilot/references/offline.md",
+  "godot-autopilot/references/recipes/asset-pipeline.md",
+  "godot-autopilot/references/recipes/bootstrap.md",
+  "godot-autopilot/references/recipes/error-recovery.md",
+  "godot-autopilot/references/recipes/long-task.md",
+  "godot-autopilot/references/recipes/playtest-debug.md",
+  "godot-autopilot/references/recipes/safe-refactor.md",
+  "godot-autopilot/references/recipes/scene-script.md",
+  "godot-autopilot/references/recipes/skills-sync.md",
   "godot-autopilot/references/resources.md",
   "godot-autopilot/references/runtime.md",
-  "godot-autopilot/references/scene-system.md",
+  "godot-autopilot/references/safety.md",
+  "godot-autopilot/references/scene.md",
   "godot-autopilot/references/scripting.md",
   "godot-autopilot/references/servers.md",
   "godot-autopilot/references/setup.md",
+  "godot-autopilot/references/testing.md",
   "godot-autopilot/references/tools.md",
+  "godot-autopilot/references/workflows.md",
 ];
 
 type SkillsAsset = {
