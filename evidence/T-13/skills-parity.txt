@@ -1,0 +1,44 @@
+T-13 EN/ZH Skills parity 与守卫证据
+====================================
+
+执行环境
+- 工作目录：.worktrees/cli-native-control-plane-skills
+- 分支：feature/cli-native-control-plane-skills
+- 版本：0.3.5（0.3.6-dev 版本同步在 T-17 执行）
+
+守卫 self-test
+- 命令：bun tests/guard/skills_guard.ts --root . --self-test
+- 退出码：0
+- 输出：skills-guard self-test OK (162 sample violations detected)
+
+全量守卫（旧技能基线 → 重写后转绿）
+- 命令：bun tests/guard/skills_guard.ts --root .
+- T-12 旧技能基线：exit 1，120 violation（mcp/recipe-missing/entry-cli-only/drift-* 等）
+- T-13 重写后：exit 0，输出 skills-guard OK (24 EN files, 24 ZH files, 128 commands)
+- 资产重建：bun cli/scripts/build-skills-asset.ts → embedded 24 EN files and 24 ZH files (version 0.3.5)
+
+EN/ZH 结构
+- EN 文件数：24；ZH 文件数：24；路径一一对应
+- 8 个 recipe（bootstrap/scene-script/asset-pipeline/playtest-debug/safe-refactor/error-recovery/skills-sync/long-task）均存在且首行 # <id>、八段 ## 1.~## 8. 按序
+- 命令/flag 集合与顺序 EN/ZH parity：由 checkParity 校验通过
+- 预算：单文件 ≤2000 tokens、总计 ≤24000 tokens，守卫通过
+
+零 MCP / 零漂移
+- MCP 关键词命中：0（守卫 mcp 规则）
+- 252/253/325、0.4.x/0.6.x 命中：0（守卫 drift-* 规则）
+- 工具/别名数量改为动态发现规则；无完整迁移表
+
+C++ ctest
+- ctest --preset debug -R "Skill|skill|comment_guard|migration_guard"：34/34 pass
+- ctest --preset debug -E "cli_contract|cli_unit"：1391/1391 pass（全量非 CLI 回归）
+- 构建：cmake --preset debug && cmake --build --preset debug 成功
+
+CLI 契约测试
+- bun test cli/tests（短路径 junction C:\gda-cli）：548 pass / 26 skip / 0 fail
+- skills_contract.test.ts：严格断言（已移除 T-11/T-12 临时过滤），1 pass
+- tree.test.ts：EXPECTED_TREE 快照更新为新 24 文件布局，EN/ZH/资产三处一致
+
+集成修复
+- cli/scripts/build-skills-asset.ts：validateTree 允许 references 下任意深度 .md（recipes 子目录）
+- tools/embed_skills.ts：支持 references/recipes/ 嵌套目录（C++ 构建期嵌入脚本），孤儿检测覆盖嵌套文件
+- C++ 测试常量同步：kSkillFileCount=24、kExpectedSkillResourceCount=26
