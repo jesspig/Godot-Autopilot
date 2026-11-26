@@ -1,0 +1,43 @@
+T-14 技能升级树与 sync 证据
+============================
+
+执行环境
+- 工作目录：.worktrees/cli-native-control-plane-skills
+- 分支：feature/cli-native-control-plane-skills
+- 版本：0.3.5（T-17 升 0.3.6-dev 后须重建 asset，否则 digest 校验拒绝）
+
+manifest 扩展（cli/assets/skills.json，仅由 build 脚本生成）
+- schema_version=1
+- file_count=24
+- content_digest=fc54ecdddb8595ec5bb2b3580795d2c542ec77c3fa228e6cea87e9a2ad2147fc
+- files / files_zh：各 24 文件（含 references/recipes/）
+- retired：原有退役书清单保留
+
+sync 实现（gda skills sync）
+- --check 或位置 --dry-run：只读预演，输出 would_delete / would_overwrite / would_remove_retired / preserved
+- --force-install（opts.force）或位置 --force：强制修复，prune 退役目录
+- 命令已注册到 command-spec.ts 的 skill.sync spec（含 --path/--zh/--dry-run/--force-install/--prune）
+- 升级 diff 只删同一受管书内清单声明的旧 reference；跨书/../绝对路径/非 .md 越界即拒绝
+- 写盘：每文件 .tmp + rename 原子替换；失败逆序回滚并清理临时文件；退役目录先改名 .gda-backup，全成功才删
+
+升级树验证（来自 skills-sync.test.ts / archive.test.ts，563 pass 覆盖）
+- 旧版本技能目录升级后 MCP reference 清零：通过
+- EN/ZH 切换：通过
+- 离线安装：通过（builtin 源，不触网）
+- digest 损坏拒绝安装 / sync 提示 --force：通过
+- 自建技能目录保留：通过（清单外顶层目录只列 preserved）
+- dry-run 不写盘：通过
+- 写盘中途失败回滚到旧安装并清理临时文件：通过（monkey-patch fs.renameSync 注入第 2 次失败）
+
+update 接线
+- commands/update.ts：skills 结果项改用 skillsUpdateItem（真实 installed_version→cache/asset version）
+- update skills 前调用 assertSkillsAssetIntegrity（digest 不符即拒绝）
+- updateCheck() 增加 skills 状态（asset_version/content_digest/cache_version/installed_ok）
+
+覆盖范围
+- 只处理 manifest 声明的受管技能书；用户自建技能目录绝不删除
+- 越界删除被拒绝；原子替换失败保留旧安装
+
+C++/CLI 验证
+- ctest --preset debug -R "skill|guard"：19/19 pass
+- bun test cli/tests（短路径 junction）：563 pass / 26 skip / 0 fail

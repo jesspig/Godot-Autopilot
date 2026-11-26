@@ -1,0 +1,28 @@
+T-14 digest 与资产完整性证据
+=============================
+
+content_digest 算法
+- 输入：EN/ZH 规范化文件树（相对路径 + 内容）+ version
+- 输出：SHA-256 = fc54ecdddb8595ec5bb2b3580795d2c542ec77c3fa228e6cea87e9a2ad2147fc
+
+资产重建幂等性
+- 命令：bun run build:skills-asset
+- 输出：embedded 24 EN files and 24 ZH files (version 0.3.5, digest fc54ec...)
+- 重建前后 cli/assets/skills.json SHA-256：
+  BEFORE=8AD4C37162FD6AF7F5B461341B0441B9FCC599E930F39298D47EBD6344E7E3B9
+  AFTER =8AD4C37162FD6AF7F5B461341B0441B9FCC599E930F39298D47EBD6344E7E3B9
+- 结论：幂等（IDEMPOTENT=True）
+
+digest 安全行为（cli/tests/skills-sync.test.ts）
+- 安装前校验 asset digest，不符即拒绝安装
+- 已安装内容 digest 不符时 sync 拒绝并提示 --force 修复
+- --force 可重建受管文件与清单，但不碰清单外目录
+- assertSkillsAssetIntegrity 接入 update skills：digest 损坏时拒绝并回报 failed item
+
+版本联动注意
+- digest 覆盖 version；T-17 升 0.3.6-dev 后必须重新运行 build:skills-asset
+- 否则 content_digest 与源不匹配，安装/更新被拒绝
+
+typecheck / 测试
+- bun run typecheck：pass
+- bun test cli/tests：563 pass / 26 skip / 0 fail（含 skills-sync.test.ts 12 例、archive.test.ts 3 例）
