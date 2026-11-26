@@ -11,8 +11,12 @@ import {
 } from "../src/command-spec";
 import { run as runDoctor } from "../src/commands/doctor";
 import { run as runEditor } from "../src/commands/editor";
+import { run as runGame } from "../src/commands/game";
 import { run as runManifest } from "../src/commands/manifest";
 import { run as runProject } from "../src/commands/project";
+import { run as runResource } from "../src/commands/resource";
+import { runGenericToolCall, run as runScene } from "../src/commands/scene";
+import { run as runScript } from "../src/commands/script";
 import { run as runShell } from "../src/commands/shell";
 import { run as runTool } from "../src/commands/tool";
 import { CliError, ExitCode } from "../src/errors";
@@ -20,13 +24,28 @@ import { main } from "../src/main";
 
 type GroupRunner = (positional: string[], opts: GlobalOptions) => Promise<number>;
 
+async function runToolGroup(positional: string[], opts: GlobalOptions): Promise<number> {
+  if (positional[0] === "call") {
+    const toolName = positional[1];
+    if (toolName === undefined) {
+      throw new CliError(ExitCode.Usage, "gda tool call requires a <tool> argument.");
+    }
+    return runGenericToolCall(toolName, opts);
+  }
+  return runTool(positional, opts);
+}
+
 const GROUP_RUNNERS: Readonly<Record<string, GroupRunner>> = {
   editor: runEditor,
   project: runProject,
-  tool: runTool,
+  tool: runToolGroup,
   doctor: runDoctor,
   diagnose: (positional, opts) => runDoctor(["diagnose", ...positional], opts),
   shell: runShell,
+  scene: runScene,
+  script: runScript,
+  resource: runResource,
+  game: runGame,
 };
 
 const DEFAULT_SUBCOMMAND: Readonly<Record<string, string>> = {
@@ -36,6 +55,10 @@ const DEFAULT_SUBCOMMAND: Readonly<Record<string, string>> = {
   doctor: "run",
   diagnose: "diagnose",
   shell: "run",
+  scene: "tree",
+  script: "list",
+  resource: "list",
+  game: "status",
 };
 
 const FLAG_TO_OPTION: Readonly<Record<string, keyof GlobalOptions>> = {
@@ -59,6 +82,8 @@ const FLAG_TO_OPTION: Readonly<Record<string, keyof GlobalOptions>> = {
   "--timeout": "timeoutText",
   "--pretty": "pretty",
   "--raw": "raw",
+  "--args": "argsJson",
+  "--args-file": "argsFile",
 };
 
 function asGlobalOptions(options: Record<string, string | number | boolean>): GlobalOptions {

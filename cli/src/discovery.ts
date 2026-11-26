@@ -46,6 +46,12 @@ export interface GcpEnvelopeLike {
   error_message?: string;
   task_id?: string;
   request_id?: string;
+  confirmation?: {
+    ttl_ms?: number;
+    issued_at_ms?: number;
+    param_digest?: string;
+    nonce?: string;
+  };
 }
 
 export interface NativeCatalogEntry {
@@ -270,11 +276,12 @@ export async function nativeRequest(
   params: Record<string, string> = {},
   instanceId = "",
   timeoutMs = DEFAULT_NATIVE_TIMEOUT_MS,
+  id?: string,
 ): Promise<GcpEnvelopeLike> {
   const session = new GcpIpcSession(endpoint, timeoutMs);
   try {
     await session.open();
-    return await session.request(buildGcpRequest(method, params, instanceId, timeoutMs));
+    return await session.request(buildGcpRequest(method, params, instanceId, timeoutMs, id));
   } finally {
     session.close();
   }
@@ -464,4 +471,136 @@ export function filterCatalogEntries(
 
 export function catalogCategories(tools: NativeCatalogEntry[]): string[] {
   return [...new Set(tools.map((entry) => entry.category).filter((category) => category !== ""))].sort();
+}
+
+export interface NativeCallChallenge {
+  ttl_ms: number;
+  issued_at_ms: number;
+  param_digest: string;
+  nonce: string;
+}
+
+export interface NativeCallOutcome {
+  ok: boolean;
+  status: string;
+  payload: unknown;
+  task_id: string;
+  request_id: string;
+  artifact_id: string;
+  digest: string;
+  challenge?: NativeCallChallenge;
+  error_code: number;
+  error_message: string;
+}
+
+export interface NativeCallOptions {
+  confirm?: boolean;
+  timeoutMs?: number;
+}
+
+let callCounter = 0;
+
+function callParamValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === undefined || value === null) return "";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
+}
+
+export function encodeCallParams(args: Record<string, unknown>): Record<string, string> {
+  const encoded: Record<string, string> = {};
+  for (const key of Object.keys(args).sort()) {
+    encoded[key] = callParamValue(args[key]);
+  }
+  return encoded;
+}
+
+function callOutcome(response: GcpEnvelopeLike, requestId: string): NativeCallOutcome {
+  const status = typeof response.status === "string" ? response.status : "";
+  let raw: unknown;
+  const resultParam = (response.params ?? []).find((entry) => entry.key === "result");
+  if (resultParam !== undefined) {
+    try {
+      raw = JSON.parse(resultParam.value);
+    } catch {
+      raw = undefined;
+    }
+  }
+  const record: Record<string, unknown> = raw !== null && typeof raw === "object" && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {};
+  const challenge = response.confirmation;
+  return {
+    ok: status === "ok",
+    status,
+    payload: record.payload !== undefined ? record.payload : raw ?? null,
+    task_id: typeof record.task_id === "string" ? record.task_id : "",
+    request_id: typeof record.request_id === "string" ? record.request_id : requestId,
+    artifact_id: typeof record.artifact_id === "string" ? record.artifact_id : "",
+    digest: typeof record.digest === "string" ? record.digest : "",
+    challenge: challenge === undefined ? undefined : {
+      ttl_ms: typeof challenge.ttl_ms === "number" ? challenge.ttl_ms : 0,
+      issued_at_ms: typeof challenge.issued_at_ms === "number" ? challenge.issued_at_ms : 0,
+      param_digest: typeof challenge.param_digest === "string" ? challenge.param_digest : "",
+      nonce: typeof challenge.nonce === "string" ? challenge.nonce : "",
+    },
+    error_code: typeof response.error === "number" ? response.error : 0,
+    error_message: typeof response.error_message === "string" ? response.error_message : "",
+  };
+}
+
+export async function nativeCallStart(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  tool: string,
+  args: Record<string, unknown>,
+  options: NativeCallOptions = {},
+): Promise<NativeCallOutcome> {
+  callCounter += 1;
+  const requestId = `gda-call-${process.pid}-${callCounter}`;
+  const params: Record<string, string> = { tool, ...encodeCallParams(args) };
+  if (options.confirm === true) params.confirm = "true";
+  const response = await nativeRequest(
+    endpoint, "call.start", params, instanceId, options.timeoutMs, requestId,
+  );
+  return callOutcome(response, requestId);
+}
+
+export async function nativeCallConfirm(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  requestId: string,
+  options: NativeCallOptions = {},
+): Promise<NativeCallOutcome> {
+  const response = await nativeRequest(
+    endpoint, "call.confirm", { confirm: "true", request_id: requestId },
+    instanceId, options.timeoutMs,
+  );
+  return callOutcome(response, requestId);
+}
+
+export async function nativeCallGet(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  taskId: string,
+  options: NativeCallOptions = {},
+): Promise<NativeCallOutcome> {
+  const response = await nativeRequest(
+    endpoint, "call.get", { task_id: taskId }, instanceId, options.timeoutMs,
+  );
+  return callOutcome(response, taskId);
+}
+
+export async function nativeToolInvoke(
+  endpoint: IpcEndpoint,
+  instanceId: string,
+  tool: string,
+  args: Record<string, unknown>,
+  options: NativeCallOptions = {},
+): Promise<NativeCallOutcome> {
+  const started = await nativeCallStart(endpoint, instanceId, tool, args, options);
+  if (started.status === "needs_confirmation" && options.confirm === true) {
+    return nativeCallConfirm(endpoint, instanceId, started.request_id, options);
+  }
+  return started;
 }
