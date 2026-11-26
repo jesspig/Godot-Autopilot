@@ -1,0 +1,47 @@
+# T-09 写后读回证据（静态记录，未运行测试）
+
+按任务约束，子代理未运行 `bun test` / `tsc` / 构建；以下为测试设计与静态事实，
+是否通过由主代理统一执行后判定。
+
+## 测试文件
+`cli/tests/readback.test.ts`
+
+## Fake native GCP 服务器状态模型
+测试进程内 `net.createServer` 接受 4 字节长度前缀帧，解析 GCP request，
+把 `call.start` 的扁平 params 记录在 `requests`/`callTools` 中；服务器内部维护一个
+`Map<string,string>` 模拟工具侧状态：
+- `property_set` 写 `path.property -> value`，返回 `scene_path` / `revision`；
+- `get_scene_tree` 返回当前 map 作为 properties；
+- `resource_property` action=set 写入、action=get 读取；
+- `resource_file` action=rename 记录 `from->to` 事务；`resource_query` action=references 则返回该记录。
+
+每个用例通过临时 `GODOT_AUTOPILOT_HOME` 写入 plugin index（含 tcp/ipc endpoint），
+`resolveNativeTarget` 用 `--port` 命中该实例，全部调用走原生 `call.start`，不发送 MCP initialize。
+
+## 用例一：scene.property 写后 scene.tree 读回
+- 写：`gda scene property Root/Label text "saved"`（处理器直调）
+- 断言写 envelope 含 `scene_path=res://main.tscn`、`revision=rev-1`、非空 `receipt.request_id`
+- 读：`gda scene tree`
+- 断言读 envelope 的 `result.properties["Root/Label.text"]` 等于写入值
+- 断言原生调用序列严格为 `property_set` 然后 `get_scene_tree`
+
+## 用例二：resource.set 写后 resource.get 读回
+- 写：`resource set --path res://a.tres --property speed --value 12`，断言 `revision=rev-r`
+- 读：`resource get --path res://a.tres --property speed`，断言 `result.value === "12"`
+- 断言两次工具名均为 `resource_property`（由 action 区分读写）
+
+## 用例三：高危事务确认不绕过，且写后可读回
+- 未带 `--confirm` 的 `resource rename` 抛 Usage 错误，服务器 `callTools` 为空（未建立调用）
+- 带 `--confirm` 的同名命令执行，服务器收到 `call.start`，params 含 `confirm=true`
+- 随后 `resource references --path res://b.tres` 读回事务记录
+- 断言 `call.start` 共 2 次：第一次带 confirm，第二次不带 confirm（读命令不继承确认标记）
+
+## 覆盖要点
+- 写命令返回可观察字段：`scene_path` / `revision` / `receipt`
+- 写后读回走同一 canonical 工具链，未切换到别名或其他工具
+- 高危确认是前置门禁：缺确认不产生网络/原生调用
+- 读命令不会被写命令的确认状态污染
+
+## 未运行验证原因与风险
+同 `domain-tests.txt`。需主代理用真实 Godot 编辑器补一次最小场景 smoke，确认
+`property_set` / `resource_property` 的真实返回字段与读回一致性；本任务未连接引擎。
