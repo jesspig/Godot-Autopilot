@@ -1,0 +1,33 @@
+T-11 证据：确认、目标模型与 stdin
+==================================
+
+状态：代码与新增测试已写入；本子代理未运行 bun test / tsc / 构建。
+
+1. --confirm 只走业务确认
+- output.ts：ConfirmationSummary {command, tool, target, risk, args, items?}
+  - confirmationText() 输出工具/目标/风险/参数摘要，recordConfirmation() 写入 stderr。
+  - requireConfirmation()：缺确认抛 ConfirmationRequiredError（exit 4，details.confirmation 带摘要）。
+  - promptConfirmation()：已确认→记录摘要；TTY→promptInteractive()；非 TTY→停止（exit 4）。
+  - confirmOrDecline()：拒绝抛 UserDeclinedError（exit 5），接受才继续。
+- 接入点：scene.invokeDomainCommand、debug.repro、job.cancel、test.scenario、
+  call.ts 高风险工具、batch.ts 高风险逐项确认。
+- MCP elicitation / inputResponses 入口已从 CLI 删除；server 返回 needs_confirmation 时
+  抛 ConfirmationRequiredError，不重发请求（no-resend）。
+
+2. 目标模型收口
+- target.ts ResolvedTarget 删除 mcpUrl 与 transport 字段；status.ts 输出同步删除
+  mcp_url / transport / mcp，保留 instance_id、port、port_source、ipc_kind 等原生字段。
+- 公开 CLI JSON 不再含 MCP 字段；内部 mcp/client.ts 保留至 T-16。
+
+3. stdin 与 batch
+- payload.loadToolArguments() 与 scene.readArgsPayload() 支持 --args-file -（fd 0）。
+- batch.readBatchFile() 支持 --args-file -；高风险项逐项检查 confirm=true，
+  缺失则记录 CONFIRMATION_REQUIRED 失败项并置 exit 4，不发送该工具调用。
+
+4. 覆盖测试（新增，未运行）
+  cli/tests/confirmation.test.ts：摘要字段、--confirm 记录、非 TTY 停止、拒绝=5、退出码矩阵。
+  cli/tests/boundary.test.ts：130 中断、--args-file -、batch 逐项确认退出码优先级。
+
+5. 风险
+  未实际构造 TTY 交互与真实 IPC 会话；TTY 提示路径需主代理在集成环境复验。
+  旧 capabilities/tty_mrtr 测试依赖 --input/--direct，需归并时迁移。
