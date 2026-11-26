@@ -1,4 +1,10 @@
-import { GLOBAL_BOOLEAN_FLAGS, GLOBAL_STRING_FLAGS } from "./args";
+import {
+  GLOBAL_BOOLEAN_FLAGS,
+  GLOBAL_SCOPE_FLAGS,
+  GLOBAL_STRING_FLAGS,
+  repeatableFlag,
+  VALUE_ALIASES,
+} from "./args";
 import { CliError, ExitCode } from "./errors";
 
 export type FlagType = "string" | "number" | "boolean";
@@ -11,6 +17,7 @@ export interface CommandFlag {
   description: string;
   required?: boolean;
   conflictsWith?: string[];
+  repeatable?: boolean;
 }
 
 export interface CommandPositional {
@@ -55,7 +62,7 @@ export interface CommandGroup {
 
 export interface ParsedCommandArgs {
   spec: CommandSpec;
-  options: Record<string, string | number | boolean>;
+  options: Record<string, string | number | boolean | string[]>;
   positionals: string[];
 }
 
@@ -98,6 +105,10 @@ function boolFlag(name: string, description: string, conflictsWith?: string[]): 
   return conflictsWith === undefined
     ? { name, type: "boolean", scope: "command", description }
     : { name, type: "boolean", scope: "command", description, conflictsWith };
+}
+
+function repeatableStringFlag(name: string, description: string): CommandFlag {
+  return { name, type: "string", scope: "command", description, repeatable: true };
 }
 
 function targetFlags(): CommandFlag[] {
@@ -176,9 +187,10 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "List running Godot instances",
     tools: ["instance_list"],
     flags: [
-      boolFlag("--all", "Include projects with no running instance"),
+      boolFlag("--all-projects", "Include projects with no running instance"),
       boolFlag("--projects", "Aggregate entries by project"),
       boolFlag("--stale", "Keep only non-live entries"),
+      stringFlag("--probe-port", "Probe a specific port 1-65535"),
     ],
   }),
   define({
@@ -192,7 +204,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
       boolFlag("--play", "Play the current scene when ready"),
       boolFlag("--no-import", "Skip the asset import pre-step"),
       stringFlag("--wait", "Readiness wait in seconds"),
-      stringFlag("--probe", "Liveness level: light or strict"),
+      stringFlag("--probe-level", "Liveness level: light or strict"),
     ],
   }),
   define({
@@ -205,8 +217,8 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
       stringFlag("--id", "Target instance id"),
       stringFlag("--port", "Target connection port"),
       stringFlag("--project", "Target project directory"),
-      boolFlag("--force", "Force-stop the process", ["--wait"]),
-      stringFlag("--wait", "Stop wait in seconds", ["--force"]),
+      boolFlag("--force-stop", "Force-stop the process", ["--wait"]),
+      stringFlag("--wait", "Stop wait in seconds", ["--force-stop"]),
       stringFlag("--socket", "Target native IPC socket"),
     ],
     risk: "high",
@@ -217,8 +229,8 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Restart a Godot editor with the same settings",
     tools: ["editor_restart"],
     flags: [
-      boolFlag("--force", "Force-stop the process", ["--wait"]),
-      stringFlag("--wait", "Stop wait in seconds", ["--force"]),
+      boolFlag("--force-stop", "Force-stop the process", ["--wait"]),
+      stringFlag("--wait", "Stop wait in seconds", ["--force-stop"]),
       boolFlag("--no-import", "Skip the asset import pre-step"),
       ...targetFlags(),
     ],
@@ -237,7 +249,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     subcommand: "list",
     description: "List known Godot projects",
     tools: ["project_list"],
-    flags: [boolFlag("--all", "Include projects without instances")],
+    flags: [boolFlag("--all-projects", "Include projects without instances")],
   }),
   define({
     group: "project",
@@ -305,12 +317,9 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     positional: [positional("tool", "Tool name")],
     flags: [
       stringFlag("--args", "Arguments as JSON", ["--args-file"]),
-      stringFlag("--args-file", "Arguments from a JSON file", ["--args"]),
-      stringFlag("--input", "MRTR input responses"),
-      boolFlag("--async", "Run as an asynchronous job"),
-      boolFlag("--progress", "Print progress notifications"),
-      boolFlag("--confirm", "Confirm a high-risk call"),
-      boolFlag("--direct", "Invoke a full-surface tool"),
+      stringFlag("--args-file", "Arguments from a JSON file (- reads stdin)", ["--args"]),
+      boolFlag("--progress", "Print progress diagnostics to stderr"),
+      boolFlag("--confirm", "Confirm the shown tool/target/risk/argument summary"),
       stringFlag("--timeout", "Call timeout in seconds"),
     ],
     risk: "high",
@@ -381,9 +390,9 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Remove cached docs",
     tools: ["docs_clear"],
     flags: [
-      stringFlag("--engine", "Remove one engine bucket", ["--all"]),
-      boolFlag("--all", "Remove every bucket", ["--engine"]),
-      boolFlag("--force", "Confirm removal"),
+      stringFlag("--engine", "Remove one engine bucket", ["--all-buckets"]),
+      boolFlag("--all-buckets", "Remove every bucket", ["--engine"]),
+      boolFlag("--force-clear", "Confirm removal"),
     ],
     risk: "high",
   }),
@@ -458,7 +467,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     tools: ["get_debugger_stream", "get_game_log_entries", "trace.get", "game_monitor"],
     flags: [
       stringFlag("--label", "Incident label"),
-      stringFlag("--file", "Write the report as JSON to this path"),
+      stringFlag("--report-file", "Write the report as JSON to this path"),
       stringFlag("--image", "Path of an existing PNG evidence image"),
       ...targetFlags(),
     ],
@@ -753,11 +762,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Read one resource",
     tools: ["resource_load"],
     positional: [positional("uri", "Resource uri")],
-    flags: [
-      boolFlag("--json", "Pretty JSON output", ["--raw"]),
-      boolFlag("--raw", "Raw payload output", ["--json"]),
-      stringFlag("--save", "Write blobs to a directory"),
-    ],
+    flags: [stringFlag("--save", "Write blobs to a directory")],
   }),
   define({
     group: "resource",
@@ -1060,7 +1065,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     subcommand: "clean",
     description: "Remove terminal jobs",
     tools: ["job_clean"],
-    flags: [boolFlag("--force", "Confirm removal")],
+    flags: [boolFlag("--force-clear", "Confirm removal")],
     risk: "high",
   }),
 
@@ -1106,7 +1111,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     subcommand: "export",
     description: "Export traces",
     tools: ["trace_export"],
-    flags: [stringFlag("--format", "Export format: jsonl or otlp")],
+    flags: [stringFlag("--export-format", "Export format: jsonl or otlp")],
   }),
 
   define({
@@ -1129,7 +1134,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Analyze one monitor session",
     tools: ["game_monitor"],
     positional: [positional("id", "Session id", false)],
-    flags: [stringFlag("--file", "Offline JSONL path"), numberFlag("--slow", "Slow frame threshold in ms"), ...targetFlags()],
+    flags: [stringFlag("--input-file", "Offline JSONL path"), numberFlag("--slow", "Slow frame threshold in ms"), ...targetFlags()],
   }),
   define({
     group: "monitor",
@@ -1178,7 +1183,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Print one skill book",
     tools: ["skill_show"],
     positional: [positional("name", "Skill book name")],
-    flags: [stringFlag("--file", "Auxiliary file path"), boolFlag("--zh", "Use the Chinese archive")],
+    flags: [stringFlag("--skill-file", "Auxiliary file path"), boolFlag("--zh", "Use the Chinese archive")],
   }),
   define({
     group: "skill",
@@ -1215,7 +1220,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     subcommand: "clear",
     description: "Remove old cache entries",
     tools: ["cache_clear"],
-    flags: [boolFlag("--force", "Confirm removal")],
+    flags: [boolFlag("--force-clear", "Confirm removal")],
     risk: "high",
   }),
 
@@ -1232,7 +1237,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Update cli, skills, plugin, or all",
     tools: ["update_run"],
     positional: [positional("target", "Update target: cli, skills, plugin, or all")],
-    flags: [boolFlag("--check", "Report status without applying"), boolFlag("--force", "Force the update")],
+    flags: [boolFlag("--check", "Report status without applying"), boolFlag("--force-install", "Force the update")],
     risk: "high",
   }),
 
@@ -1326,6 +1331,36 @@ export const LEGACY_ALIASES: ReadonlyArray<readonly [string, string]> = [
   ["monitor", "monitor.status"],
 ];
 
+export interface FlagMigration {
+  from: string;
+  to: string;
+  reason: string;
+}
+
+export const FLAG_MIGRATIONS: ReadonlyArray<FlagMigration> = [
+  { from: "--transport", to: "", reason: "native IPC only; no transport selection" },
+  { from: "--no-fallback", to: "", reason: "no HTTP fallback exists" },
+  { from: "--direct", to: "gda tool call", reason: "one generic call surface" },
+  { from: "--input", to: "--confirm", reason: "business confirmation replaces MCP input responses" },
+  { from: "--async", to: "gda job", reason: "jobs are a first-class command group" },
+  { from: "--json", to: "--format json", reason: "one output format flag with a compatibility alias" },
+  { from: "--force", to: "--force-stop / --force-clear / --force-install", reason: "one meaning per command" },
+  { from: "--all", to: "--all-projects / --all-buckets", reason: "one meaning per command" },
+  { from: "--file", to: "--report-file / --skill-file / --input-file", reason: "one meaning per command" },
+  { from: "--probe", to: "--probe-level / --probe-port", reason: "one meaning per command" },
+  { from: "--format (trace export)", to: "--export-format", reason: "output format and export format separated" },
+];
+
+export const EXIT_CODE_HELP: ReadonlyArray<readonly [number, string]> = [
+  [0, "success"],
+  [1, "tool or business failure"],
+  [2, "transport or environment failure"],
+  [3, "usage error"],
+  [4, "confirmation required"],
+  [5, "user declined confirmation"],
+  [130, "interrupted"],
+];
+
 const SPEC_BY_PATH = new Map<string, CommandSpec>(COMMAND_SPECS.map((spec) => [spec.path, spec]));
 const GROUP_NAMES = new Set<string>(COMMAND_GROUPS.map((group) => group.name));
 
@@ -1335,6 +1370,13 @@ export function findSpec(path: string): CommandSpec | undefined {
 
 export function isGroup(name: string | undefined): boolean {
   return name !== undefined && GROUP_NAMES.has(name);
+}
+
+export function toolRisk(tool: string): RiskLevel {
+  for (const spec of COMMAND_SPECS) {
+    if (spec.tools.includes(tool)) return spec.risk;
+  }
+  return "none";
 }
 
 export function buildAliasMap(entries: ReadonlyArray<readonly [string, string]>): Map<string, string> {
@@ -1391,16 +1433,25 @@ export function extractCommandTokens(argv: string[]): CommandTokens {
 
 function globalFlagTypes(): Map<string, FlagType> {
   const types = new Map<string, FlagType>();
-  for (const name of Object.keys(GLOBAL_STRING_FLAGS)) types.set(name, "string");
-  for (const name of Object.keys(GLOBAL_BOOLEAN_FLAGS)) types.set(name, "boolean");
+  for (const name of GLOBAL_SCOPE_FLAGS) {
+    if (GLOBAL_STRING_FLAGS[name] !== undefined) types.set(name, "string");
+    else if (GLOBAL_BOOLEAN_FLAGS[name] !== undefined) types.set(name, "boolean");
+  }
   return types;
 }
 
 export function globalFlags(): CommandFlag[] {
   const types = globalFlagTypes();
+  for (const name of Object.keys(VALUE_ALIASES)) types.set(name, "boolean");
   return [...types.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, type]) => ({ name, type, scope: "global" as const, description: "Global option" }));
+    .map(([name, type]) => ({
+      name,
+      type,
+      scope: "global" as const,
+      description: name === "--json" ? "Alias for --format json" : "Global option",
+      repeatable: repeatableFlag(name),
+    }));
 }
 
 function usageError(spec: CommandSpec, message: string): CliError {
@@ -1409,10 +1460,18 @@ function usageError(spec: CommandSpec, message: string): CliError {
 
 export function parseCommandArgs(spec: CommandSpec, argv: string[]): ParsedCommandArgs {
   const allowed = globalFlagTypes();
+  const repeatable = new Set<string>();
   for (const flag of spec.flags) {
-    if (flag.scope === "command") allowed.set(flag.name, flag.type);
+    if (flag.scope === "command") {
+      allowed.set(flag.name, flag.type);
+      if (flag.repeatable === true || repeatableFlag(flag.name)) repeatable.add(flag.name);
+    }
   }
-  const options: Record<string, string | number | boolean> = {};
+  for (const name of GLOBAL_SCOPE_FLAGS) {
+    if (repeatableFlag(name)) repeatable.add(name);
+  }
+  const options: Record<string, string | number | boolean | string[]> = {};
+  const seen = new Set<string>();
   const positionals: string[] = [];
   let onlyPositionals = false;
   let i = 0;
@@ -1435,10 +1494,18 @@ export function parseCommandArgs(spec: CommandSpec, argv: string[]): ParsedComma
     }
     const eq = token.indexOf("=");
     const name = eq === -1 ? token : token.slice(0, eq);
+    const alias = VALUE_ALIASES[name];
     const type = allowed.get(name);
-    if (type === undefined) throw usageError(spec, `unknown option ${name}`);
+    if (alias === undefined && type === undefined) throw usageError(spec, `unknown option ${name}`);
+    if (!repeatable.has(name) && seen.has(name)) {
+      throw usageError(spec, `option ${name} specified more than once`);
+    }
+    seen.add(name);
     const flag = spec.flags.find((entry) => entry.name === name);
-    if (type === "boolean") {
+    if (alias !== undefined) {
+      if (eq !== -1) throw usageError(spec, `option ${name} does not take a value`);
+      (options as Record<string, unknown>)[alias.key] = alias.value;
+    } else if (type === "boolean") {
       if (eq !== -1) throw usageError(spec, `boolean option ${name} does not take a value`);
       options[name] = true;
     } else {
@@ -1447,11 +1514,14 @@ export function parseCommandArgs(spec: CommandSpec, argv: string[]): ParsedComma
         value = token.slice(eq + 1);
       } else {
         const next = argv[i + 1];
-        if (next === undefined || next.startsWith("-")) throw usageError(spec, `option ${name} requires a value`);
+        if (next === undefined || (next.startsWith("-") && next !== "-")) throw usageError(spec, `option ${name} requires a value`);
         value = next;
         i += 1;
       }
-      if (type === "number") {
+      if (repeatable.has(name)) {
+        const existing = options[name];
+        options[name] = Array.isArray(existing) ? [...existing, value] : [value];
+      } else if (type === "number") {
         const parsed = Number(value);
         if (!Number.isFinite(parsed)) throw usageError(spec, `option ${name} requires a number, got: ${value}`);
         options[name] = parsed;
@@ -1486,8 +1556,9 @@ export function parseCommandArgs(spec: CommandSpec, argv: string[]): ParsedComma
 
 function flagLine(flag: CommandFlag): string {
   const value = flag.type === "boolean" ? "" : flag.type === "number" ? " <n>" : " <text>";
+  const repeat = flag.repeatable === true ? " (repeatable)" : "";
   const conflicts = flag.conflictsWith === undefined ? "" : ` (conflicts: ${flag.conflictsWith.join(", ")})`;
-  return `  ${flag.name}${value}  ${flag.description}${conflicts}`;
+  return `  ${flag.name}${value}  ${flag.description}${repeat}${conflicts}`;
 }
 
 export function leafHelpText(spec: CommandSpec): string {
@@ -1517,6 +1588,9 @@ export function leafHelpText(spec: CommandSpec): string {
     `Output: ${spec.output.schema} (${spec.output.envelope ? "envelope" : "raw"})`,
     `Risk: ${spec.risk}`,
     `Long running: ${spec.long_running ? "yes" : "no"}`,
+    "",
+    "Exit codes:",
+    ...EXIT_CODE_HELP.map(([code, label]) => `  ${code}  ${label}`),
     "",
     "Examples:",
     ...spec.examples.map((example) => `  ${example.argv}${example.description === "" ? "" : `  ${example.description}`}`),
@@ -1576,7 +1650,9 @@ export function completionCandidates(argv: string[]): string[] {
   const leaves = (group: string): string[] =>
     COMMAND_SPECS.filter((spec) => spec.group === group).map((spec) => spec.subcommand);
   if (current.startsWith("--")) {
-    return flags.filter((name) => name.startsWith(current)).sort();
+    const spec = resolveCommand(tokens);
+    const candidates = spec === undefined ? flags : [...spec.flags.map((flag) => flag.name), ...flags];
+    return candidates.filter((name) => name.startsWith(current)).sort();
   }
   if (tokens.length === 0) {
     return domains.filter((name) => name.startsWith(current)).sort();
@@ -1620,6 +1696,8 @@ export interface CommandManifest {
     invoke: string;
   }>;
   aliases: Array<{ from: string; to: string }>;
+  flag_migrations: ReadonlyArray<FlagMigration>;
+  exit_codes: ReadonlyArray<{ code: number; meaning: string }>;
 }
 
 export function buildManifest(): CommandManifest {
@@ -1648,5 +1726,7 @@ export function buildManifest(): CommandManifest {
         invoke: `gda ${spec.path.replace(".", " ")}`,
       })),
     aliases: [...COMMAND_ALIASES.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([from, to]) => ({ from, to })),
+    flag_migrations: FLAG_MIGRATIONS,
+    exit_codes: EXIT_CODE_HELP.map(([code, meaning]) => ({ code, meaning })),
   };
 }

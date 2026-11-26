@@ -39,8 +39,6 @@ export interface ResolvedTarget {
   instance?: InstanceEntry;
   pluginRecord?: PluginInstanceRecord;
   ipcEndpoint?: IpcEndpoint;
-  mcpUrl: string;
-  transport: "ipc" | "http";
   portSource: string;
   pluginVersion: string;
   instanceId?: string;
@@ -131,8 +129,6 @@ function resolved(
     ...(instance !== undefined ? { instance } : {}),
     ...(record !== undefined ? { pluginRecord: record } : {}),
     ...(ipcEndpoint !== undefined ? { ipcEndpoint } : {}),
-    mcpUrl: `http://127.0.0.1:${port}/mcp`,
-    transport: ipcEndpoint !== undefined ? "ipc" : "http",
     portSource: record?.portSource ?? "",
     pluginVersion: record?.version ?? "",
   };
@@ -239,7 +235,7 @@ function nativeBySocket(socketText: string): ResolvedTarget {
     ?? { kind: "unix", path: socketPath };
   const port = record?.port ?? 0;
   const result = resolved(port, "socket", "socket", record);
-  return pin({ ...result, ipcEndpoint: endpoint, transport: "ipc" }, record?.instanceId);
+  return pin({ ...result, ipcEndpoint: endpoint }, record?.instanceId);
 }
 
 function nativeByPort(port: number): ResolvedTarget {

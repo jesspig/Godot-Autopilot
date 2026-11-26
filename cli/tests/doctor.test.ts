@@ -150,13 +150,16 @@ describe("doctor --ci", () => {
     const opts = { "--ci": true } as unknown as GlobalOptions;
     const { code, stdout } = await captureRun(() => doctor(opts));
     expect(code).toBe(0);
-    const body = JSON.parse(stdout);
-    expect(body.mode).toBe("ci");
+    const body = JSON.parse(stdout) as {
+      ok: boolean;
+      data: { mode: string; checks: Array<{ code: string; detail: string; remediation: string }> };
+    };
+    expect(body.data.mode).toBe("ci");
     expect(body.ok).toBe(true);
-    const codes = body.checks.map((check: { code: string }) => check.code);
+    const codes = body.data.checks.map((check) => check.code);
     expect(codes).toContain("GDA_NO_INSTANCE");
     expect(codes).toContain("GDA_CATALOG_MISSING");
-    for (const check of body.checks) {
+    for (const check of body.data.checks) {
       expect(check.remediation.length).toBeGreaterThan(0);
       expect(check.detail).not.toContain(tmp);
     }
@@ -166,7 +169,9 @@ describe("doctor --ci", () => {
     writeRegistry(tmp, 0);
     const { code, stdout } = await captureRun(() => doctor({ "--ci": true } as unknown as GlobalOptions));
     expect(code).toBe(2);
-    const codes = JSON.parse(stdout).checks.map((check: { code: string }) => check.code);
+    const codes = (JSON.parse(stdout) as { data: { checks: Array<{ code: string }> } }).data.checks.map(
+      (check) => check.code,
+    );
     expect(codes).toContain("GDA_STALE_INSTANCE");
   });
 
@@ -177,14 +182,16 @@ describe("doctor --ci", () => {
     fs.writeFileSync(catalogPath(), JSON.stringify(stored));
     const { code, stdout } = await captureRun(() => doctor({ "--ci": true } as unknown as GlobalOptions));
     expect(code).toBe(2);
-    const codes = JSON.parse(stdout).checks.map((check: { code: string }) => check.code);
+    const codes = (JSON.parse(stdout) as { data: { checks: Array<{ code: string }> } }).data.checks.map(
+      (check) => check.code,
+    );
     expect(codes).toContain("GDA_CATALOG_HASH_MISMATCH");
   });
 
   test("doctor 子命令路由到 run", async () => {
     const { code, stdout } = await captureRun(() => runDoctor(["run"], { "--ci": true } as unknown as GlobalOptions));
     expect(code).toBe(0);
-    expect(JSON.parse(stdout).mode).toBe("ci");
+    expect((JSON.parse(stdout) as { data: { mode: string } }).data.mode).toBe("ci");
   });
 });
 
@@ -192,10 +199,13 @@ describe("diagnose", () => {
   test("无目标时报 GDA_TARGET_FAILED 且给出可操作提示", async () => {
     const { code, stdout } = await captureRun(() => diagnose([], { "--ci": true } as unknown as GlobalOptions));
     expect(code).toBe(2);
-    const body = JSON.parse(stdout);
-    const targetCheck = body.checks.find((check: { id: string }) => check.id === "target");
-    expect(targetCheck.code).toBe("GDA_TARGET_FAILED");
-    expect(targetCheck.remediation).toContain("--id");
+    const body = JSON.parse(stdout) as {
+      data: { checks: Array<{ id: string; code: string; remediation: string }> };
+    };
+    const targetCheck = body.data.checks.find((check) => check.id === "target");
+    expect(targetCheck).toBeDefined();
+    expect(targetCheck!.code).toBe("GDA_TARGET_FAILED");
+    expect(targetCheck!.remediation).toContain("--id");
   });
 
   test("活实例经原生 hello 诊断成功且不发送 MCP initialize", async () => {
@@ -207,8 +217,8 @@ describe("diagnose", () => {
         diagnose([], { portText: String(native.port), "--ci": true } as unknown as GlobalOptions),
       );
       expect(code).toBe(0);
-      const body = JSON.parse(stdout);
-      const codes = body.checks.map((check: { code: string }) => check.code);
+      const body = JSON.parse(stdout) as { data: { checks: Array<{ code: string }> } };
+      const codes = body.data.checks.map((check) => check.code);
       expect(codes).toContain("GDA_TARGET_OK");
       expect(codes).toContain("GDA_NATIVE_OK");
       expect(native.requests.map((request) => request.method)).not.toContain("initialize");

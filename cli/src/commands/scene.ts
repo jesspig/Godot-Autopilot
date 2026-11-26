@@ -3,7 +3,8 @@ import fs from "node:fs";
 import type { GlobalOptions } from "../args";
 import type { RiskLevel } from "../command-spec";
 import { nativeToolInvoke, type NativeCallOutcome } from "../discovery";
-import { CliError, ExitCode } from "../errors";
+import { CliError, ConfirmationRequiredError, ExitCode } from "../errors";
+import { promptConfirmation, type ConfirmationSummary } from "../output";
 import { findById, findLiveByProject } from "../registry";
 import { resolveNativeTarget } from "../target";
 import { writeJson } from "./json-output";
@@ -136,13 +137,6 @@ export async function invokeDomainCommand(
   opts: GlobalOptions,
   positional: string[],
 ): Promise<number> {
-  if (spec.risk === "high" && !confirmed(opts)) {
-    throw new CliError(
-      ExitCode.Usage,
-      `gda ${command} is high-risk and requires --confirm; no tool call was sent.`,
-      "re-run with --confirm after reviewing the exact target.",
-    );
-  }
   const target = resolveNativeTarget(opts, TARGET_CONTEXT);
   if (target.ipcEndpoint === undefined) {
     throw new CliError(
@@ -154,16 +148,30 @@ export async function invokeDomainCommand(
   const tool = typeof spec.tool === "function" ? spec.tool(opts) : spec.tool;
   const args = spec.build(opts, positional);
   if (spec.action !== undefined && args.action === undefined) args.action = spec.action;
-  if (spec.risk === "high") {
+  if (spec.risk === "high" || opts.confirm === true) {
+    const summary: ConfirmationSummary = {
+      command,
+      tool,
+      target: instanceId !== "" ? `instance:${instanceId}` : `port:${target.port}`,
+      risk: spec.risk,
+      args: { ...args },
+    };
+    await promptConfirmation(summary, opts);
     args.confirm = true;
   }
   const outcome = await nativeToolInvoke(target.ipcEndpoint, instanceId, tool, args, {
-    confirm: spec.risk === "high",
+    confirm: spec.risk === "high" || opts.confirm === true,
   });
   if (outcome.status === "needs_confirmation") {
-    throw new CliError(
-      ExitCode.ToolFailure,
+    throw new ConfirmationRequiredError(
       `gda ${command} was denied: confirmation_required (${outcome.error_message || "no confirmation"}).`,
+      {
+        command,
+        tool,
+        target: instanceId !== "" ? `instance:${instanceId}` : `port:${target.port}`,
+        risk: spec.risk,
+        args: { ...args },
+      },
     );
   }
   emitDomainEnvelope(command, spec, tool, outcome, args, opts);

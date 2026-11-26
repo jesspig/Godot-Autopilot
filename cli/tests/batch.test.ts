@@ -165,10 +165,10 @@ describe("gda batch", () => {
       cap.restore();
     }
     expect(code).toBe(ExitCode.Success);
-    const output = JSON.parse(cap.stdout()) as { results: unknown[] };
-    expect(output.results).toHaveLength(2);
-    expect(output.results[0]).toMatchObject({ index: 0, tool: "alpha", ok: true });
-    expect(output.results[1]).toMatchObject({ index: 1, tool: "beta", ok: true });
+    const output = JSON.parse(cap.stdout()) as { data: { results: unknown[] } };
+    expect(output.data.results).toHaveLength(2);
+    expect(output.data.results[0]).toMatchObject({ index: 0, tool: "alpha", ok: true });
+    expect(output.data.results[1]).toMatchObject({ index: 1, tool: "beta", ok: true });
     expect(state.initializeCount).toBe(1);
     expect(state.calls).toEqual(["alpha", "beta"]);
   });
@@ -188,9 +188,9 @@ describe("gda batch", () => {
       cap.restore();
     }
     expect(code).toBe(ExitCode.ToolFailure);
-    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean }[] };
-    expect(output.results[0].ok).toBe(true);
-    expect(output.results[1].ok).toBe(false);
+    const output = JSON.parse(cap.stdout()) as { data: { results: { ok: boolean }[] } };
+    expect(output.data.results[0].ok).toBe(true);
+    expect(output.data.results[1].ok).toBe(false);
     expect(state.seenConfirm).toBe(true);
     expect(state.calls).toEqual(["alpha", "fail_tool"]);
     expect(state.initializeCount).toBe(1);
@@ -209,11 +209,11 @@ describe("gda batch", () => {
       cap.restore();
     }
     expect(code).toBe(ExitCode.Transport);
-    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean; error?: string }[] };
-    expect(output.results).toHaveLength(1);
-    expect(output.results[0].ok).toBe(false);
-    expect(output.results[0].error).toContain("timed out");
-    expect(output.results[0].error).toContain("execution result is unknown");
+    const output = JSON.parse(cap.stdout()) as { data: { results: { ok: boolean; error?: string }[] } };
+    expect(output.data.results).toHaveLength(1);
+    expect(output.data.results[0].ok).toBe(false);
+    expect(output.data.results[0].error).toContain("timed out");
+    expect(output.data.results[0].error).toContain("execution result is unknown");
     expect(state.calls).toEqual(["alpha"]);
     expect(state.initializeCount).toBe(1);
     await expectSessionClosed();
@@ -232,10 +232,10 @@ describe("gda batch", () => {
       cap.restore();
     }
     expect(code).toBe(ExitCode.Transport);
-    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean; error?: string }[] };
-    expect(output.results).toHaveLength(1);
-    expect(output.results[0].ok).toBe(false);
-    expect(output.results[0].error).toContain("execution result is unknown");
+    const output = JSON.parse(cap.stdout()) as { data: { results: { ok: boolean; error?: string }[] } };
+    expect(output.data.results).toHaveLength(1);
+    expect(output.data.results[0].ok).toBe(false);
+    expect(output.data.results[0].error).toContain("execution result is unknown");
     expect(state.calls).toEqual(["alpha"]);
     expect(state.initializeCount).toBe(1);
   });
@@ -253,10 +253,10 @@ describe("gda batch", () => {
       cap.restore();
     }
     expect(code).toBe(ExitCode.Transport);
-    const output = JSON.parse(cap.stdout()) as { results: { ok: boolean; error?: string }[] };
-    expect(output.results).toHaveLength(1);
-    expect(output.results[0].ok).toBe(false);
-    expect(output.results[0].error).toContain("no result.content");
+    const output = JSON.parse(cap.stdout()) as { data: { results: { ok: boolean; error?: string }[] } };
+    expect(output.data.results).toHaveLength(1);
+    expect(output.data.results[0].ok).toBe(false);
+    expect(output.data.results[0].error).toContain("no result.content");
     expect(state.calls).toEqual(["alpha"]);
     expect(state.initializeCount).toBe(1);
     await expectSessionClosed();

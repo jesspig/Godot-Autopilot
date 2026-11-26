@@ -25,10 +25,15 @@ import { run as runShell } from "../src/commands/shell";
 import { run as runTest } from "../src/commands/test";
 import { run as runTool } from "../src/commands/tool";
 import { run as runTrace } from "../src/commands/trace";
-import { CliError, ExitCode } from "../src/errors";
+import { CliError, ExitCode, errorMessage } from "../src/errors";
 import { main } from "../src/main";
+import { setActiveCommand, writeFailure } from "../src/output";
 
 type GroupRunner = (positional: string[], opts: GlobalOptions) => Promise<number>;
+
+process.on("SIGINT", () => {
+  process.exit(ExitCode.Interrupted);
+});
 
 async function runToolGroup(positional: string[], opts: GlobalOptions): Promise<number> {
   if (positional[0] === "call") {
@@ -36,6 +41,7 @@ async function runToolGroup(positional: string[], opts: GlobalOptions): Promise<
     if (toolName === undefined) {
       throw new CliError(ExitCode.Usage, "gda tool call requires a <tool> argument.");
     }
+    setActiveCommand("tool.call");
     return runGenericToolCall(toolName, opts);
   }
   return runTool(positional, opts);
@@ -87,24 +93,37 @@ const FLAG_TO_OPTION: Readonly<Record<string, keyof GlobalOptions>> = {
   "--offline": "offline",
   "--category": "category",
   "--tags": "tagsText",
-  "--force": "force",
+  "--tag": "tag",
+  "--include": "include",
+  "--force-stop": "force",
+  "--force-clear": "force",
+  "--force-install": "force",
+  "--all-projects": "all",
+  "--all-buckets": "all",
+  "--probe-level": "probe",
+  "--probe-port": "probe",
+  "--report-file": "file",
+  "--skill-file": "file",
+  "--input-file": "file",
+  "--export-format": "exportFormat",
+  "--format": "formatText",
   "--wait": "waitText",
   "--godot": "godot",
   "--headless": "headless",
   "--play": "play",
   "--no-import": "noImport",
-  "--probe": "probe",
-  "--all": "all",
   "--projects": "projectsView",
   "--stale": "stale",
   "--timeout": "timeoutText",
   "--pretty": "pretty",
   "--raw": "raw",
+  "--confirm": "confirm",
+  "--progress": "progress",
   "--args": "argsJson",
   "--args-file": "argsFile",
 };
 
-function asGlobalOptions(options: Record<string, string | number | boolean>): GlobalOptions {
+function asGlobalOptions(options: Record<string, string | number | boolean | string[]>): GlobalOptions {
   const mapped: Record<string, unknown> = { ...options };
   for (const [flag, key] of Object.entries(FLAG_TO_OPTION)) {
     if (options[flag] !== undefined) mapped[key] = options[flag];
@@ -113,20 +132,18 @@ function asGlobalOptions(options: Record<string, string | number | boolean>): Gl
 }
 
 function reportGroupError(error: unknown, tokens: string[]): number {
-  if (error instanceof CliError) {
-    process.stderr.write(`[gda] ${error.message}\n`);
-    if (error.suggestion !== undefined) {
-      process.stderr.write(`[gda] suggestion: ${error.suggestion}\n`);
-    }
-    const help = helpTextForTokens(tokens.slice(0, 2));
-    if (help !== undefined) process.stderr.write(`${help}\n`);
-    return error.code;
-  }
-  process.stderr.write(`[gda] ${(error as Error).message ?? String(error)}\n`);
-  return ExitCode.Transport;
+  const command = tokens.join(".");
+  const code = error instanceof CliError ? error.code : ExitCode.ToolFailure;
+  const failure = error instanceof CliError
+    ? error
+    : new CliError(ExitCode.ToolFailure, errorMessage(error));
+  writeFailure(command, failure, {});
+  const help = helpTextForTokens(tokens.slice(0, 2));
+  if (help !== undefined) process.stderr.write(`${help}\n`);
+  return code;
 }
 
-async function runGroup(argv: string[], tokens: string[], rest: string[]): Promise<number | undefined> {
+async function runGroup(tokens: string[], rest: string[]): Promise<number | undefined> {
   const group = tokens[0];
   const runner = GROUP_RUNNERS[group];
   if (runner === undefined) return undefined;
@@ -139,6 +156,7 @@ async function runGroup(argv: string[], tokens: string[], rest: string[]): Promi
   }
   const parsed = parseCommandArgs(spec, rest);
   const positional = group === "diagnose" ? parsed.positionals : [sub, ...parsed.positionals];
+  setActiveCommand(spec.path);
   return runner(positional, asGlobalOptions(parsed.options));
 }
 
@@ -148,6 +166,7 @@ const rest = argv.filter((_, index) => !indexes.includes(index));
 
 if (tokens[0] === "commands") {
   const { opts } = parseArgv(rest);
+  setActiveCommand("commands");
   process.exit(await runManifest([], opts));
 }
 
@@ -161,7 +180,7 @@ if (argv.includes("--help")) {
 
 if (GROUP_RUNNERS[tokens[0]] !== undefined) {
   try {
-    const code = await runGroup(argv, tokens, rest);
+    const code = await runGroup(tokens, rest);
     if (code !== undefined) process.exit(code);
   } catch (error) {
     process.exit(reportGroupError(error, tokens));
@@ -174,16 +193,7 @@ if (isGroup(tokens[0])) {
     try {
       parseCommandArgs(spec, rest);
     } catch (error) {
-      if (error instanceof CliError) {
-        process.stderr.write(`[gda] ${error.message}\n`);
-        if (error.suggestion !== undefined) {
-          process.stderr.write(`[gda] suggestion: ${error.suggestion}\n`);
-        }
-        const help = helpTextForTokens(tokens.slice(0, 2));
-        if (help !== undefined) process.stderr.write(`${help}\n`);
-        process.exit(error.code);
-      }
-      throw error;
+      process.exit(reportGroupError(error, tokens));
     }
   }
 }

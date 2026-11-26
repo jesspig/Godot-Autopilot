@@ -102,9 +102,10 @@ describe("请求形状", () => {
     const code = await ping([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].method).toBe("tools/call");
-    expect(requests[0].params).toEqual({ name: "ping", arguments: {} });
-    expect(cap.stdout()).toBe('{"ok":true}\n');
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.method).toBe("tools/call");
+    expect(toolCall?.params).toEqual({ name: "ping", arguments: {} });
+    expect(JSON.parse(cap.stdout()).data).toEqual({ ok: true });
   });
 
   test("status 经 call_tool 包装调 system_status", async () => {
@@ -115,12 +116,18 @@ describe("请求形状", () => {
     expect(code).toBe(ExitCode.Success);
     const toolCall = requests.find((request) => request.method === "tools/call");
     expect(toolCall?.params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
-    const statusJson = JSON.parse(cap.stdout()) as Record<string, unknown>;
+    const statusJson = JSON.parse(cap.stdout()) as {
+      schema_version: number;
+      ok: boolean;
+      command: string;
+      data: { port: number; server: Record<string, unknown> };
+    };
     expect(statusJson.schema_version).toBe(1);
     expect(statusJson.ok).toBe(true);
-    expect(statusJson.port).toBe(port);
-    expect(statusJson.mcp_url).toBe(`http://127.0.0.1:${port}/mcp`);
-    expect(statusJson.transport).toBe("http");
+    expect(statusJson.command).toBe("editor.status");
+    expect(statusJson.data.port).toBe(port);
+    expect(statusJson.data.server).toEqual({ status: "ready" });
+    // mcp_url / transport 等 MCP 专属字段已随 T-11 删除
   });
 
   test("categories 直达 list_categories", async () => {
@@ -153,17 +160,20 @@ describe("请求形状", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(requests[0].params).toEqual({ name: "list_categories", arguments: {} });
-    expect(JSON.parse(cap.stdout())).toEqual({ categories: [{ id: "Scene" }] });
+    expect(JSON.parse(cap.stdout()).data).toEqual({ categories: [{ id: "Scene" }] });
   });
 
-  test("call --direct 直调 full 工具", async () => {
+  test("call 忽略已删除的 --direct，仍经 call_tool 包装", async () => {
     const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
-    const code = await call(["delete_scene_node"], { portText: String(port), direct: true });
+    const code = await call(["delete_scene_node"], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     const toolCall = requests.find((request) => request.method === "tools/call");
-    expect(toolCall?.params).toEqual({ name: "delete_scene_node", arguments: {} });
+    expect(toolCall?.params).toEqual({
+      name: "call_tool",
+      arguments: { name: "delete_scene_node", arguments: {} },
+    });
   });
 
   test("describe 直达 get_tool_detail", async () => {
@@ -181,7 +191,8 @@ describe("请求形状", () => {
     const code = await call(["ping"], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "ping", arguments: {} });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "ping", arguments: {} });
   });
 
   test("call 领域工具经 call_tool 包装", async () => {
@@ -190,7 +201,8 @@ describe("请求形状", () => {
     const code = await call(["move_agent"], { portText: String(port), argsJson: '{"x":1}' });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
   });
 
   test("call --confirm 将 confirm 写入工具参数", async () => {
@@ -199,10 +211,10 @@ describe("请求形状", () => {
     const code = await call(["delete_scene_node"], { portText: String(port), confirm: true });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({
       name: "call_tool",
       arguments: { name: "delete_scene_node", arguments: { confirm: true } },
-      inputResponses: { confirm: { action: "accept" } },
     });
   });
 
@@ -212,7 +224,8 @@ describe("请求形状", () => {
     const code = await call(["move_agent"], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: {} } });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: {} } });
   });
 
   test("call --args-file 读取文件作为参数", async () => {
@@ -224,7 +237,8 @@ describe("请求形状", () => {
     cap.restore();
     fs.rmSync(file, { force: true });
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 2 } } });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 2 } } });
   });
 });
 
@@ -235,7 +249,7 @@ describe("载荷提取", () => {
     const code = await ping([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(cap.stdout()).toBe(JSON.stringify([{ a: 1 }, { b: 2 }]) + "\n");
+    expect(JSON.parse(cap.stdout()).data).toEqual([{ a: 1 }, { b: 2 }]);
   });
 
   test("仅 image 载荷输出空对象并合并图片报告", async () => {
@@ -247,7 +261,7 @@ describe("载荷提取", () => {
     const code = await ping([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    const display = JSON.parse(cap.stdout());
+    const display = JSON.parse(cap.stdout()).data;
     expect(display.images).toEqual([{ mimeType: "image/png", bytes: 8, saved: false }]);
   });
 
@@ -260,7 +274,7 @@ describe("载荷提取", () => {
     const code = await ping([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    const display = JSON.parse(cap.stdout());
+    const display = JSON.parse(cap.stdout()).data;
     expect(display.ok).toBe(true);
     expect(display.images).toEqual([{ mimeType: "image/png", bytes: 8, saved: false }]);
   });
@@ -275,7 +289,7 @@ describe("载荷提取", () => {
     const code = await ping([], { portText: String(port), saveImages: dir } as GlobalOptions);
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    const display = JSON.parse(cap.stdout());
+    const display = JSON.parse(cap.stdout()).data;
     expect(display.images[0].saved).toBe(true);
     expect(display.images[0].path).toBe(path.join(dir, path.basename(display.images[0].path!)));
     expect(fs.existsSync(display.images[0].path!)).toBe(true);
@@ -289,7 +303,9 @@ describe("载荷提取", () => {
     const code = await ping([], { portText: String(port), pretty: true });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(cap.stdout()).toBe(JSON.stringify({ a: 1 }, null, 2) + "\n");
+    const envelope = JSON.parse(cap.stdout());
+    expect(cap.stdout()).toBe(JSON.stringify(envelope, null, 2) + "\n");
+    expect(envelope.data).toEqual({ a: 1 });
   });
 
   test("--raw 输出脱敏信封", async () => {
@@ -305,7 +321,7 @@ describe("载荷提取", () => {
     const code = await ping([], { portText: String(port), raw: true });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    const display = JSON.parse(cap.stdout());
+    const display = JSON.parse(cap.stdout()).data;
     expect(display.id).toBe(42);
     expect(display.result.content[1].data).toBe("<redacted 8 bytes>");
     expect(cap.stdout()).not.toContain(png.toString("base64"));
@@ -346,7 +362,7 @@ describe("search 投影", () => {
     const code = await search(["spawn"], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(cap.stdout()).toBe(JSON.stringify({ results: [{ name: "move_agent", score: 0.9 }] }) + "\n");
+    expect(JSON.parse(cap.stdout()).data).toEqual({ results: [{ name: "move_agent", score: 0.9 }] });
   });
 });
 
@@ -450,10 +466,18 @@ describe("toolFailed", () => {
     expect(code).toBe(ExitCode.ToolFailure);
     expect(cap.stderr()).toContain("mock top-level error");
     expect(cap.stderr()).toContain("-32602");
-    expect(JSON.parse(cap.stdout())).toEqual({ error: { code: -32602, message: "mock top-level error" } });
+    const envelope = JSON.parse(cap.stdout()) as {
+      ok: boolean;
+      data: unknown;
+      error: { code: string; message: string; request_sent: boolean };
+    };
+    expect(envelope.ok).toBe(false);
+    expect(envelope.data).toBeNull();
+    expect(envelope.error.code).toBe("TOOL_FAILURE");
+    expect(envelope.error.request_sent).toBe(false);
   });
 
-  test("JSON-RPC 顶层 error 信封在 --raw 下仍输出脱敏信封并 exit 1", async () => {
+  test("JSON-RPC 顶层 error 信封在 --raw 下 exit 1，服务端消息保留在 stderr（失败时 data 为空）", async () => {
     const { port } = recordingServer(() =>
       sseResponse({ jsonrpc: "2.0", id: 7, error: { code: -32602, message: "mock top-level error" } }),
     );
@@ -461,9 +485,16 @@ describe("toolFailed", () => {
     const code = await ping([], { portText: String(port), raw: true });
     cap.restore();
     expect(code).toBe(ExitCode.ToolFailure);
-    const display = JSON.parse(cap.stdout());
-    expect(display.id).toBe(7);
-    expect(display.error.code).toBe(-32602);
+    const envelope = JSON.parse(cap.stdout()) as {
+      ok: boolean;
+      data: unknown;
+      error: { code: string };
+    };
+    expect(envelope.ok).toBe(false);
+    expect(envelope.data).toBeNull();
+    expect(envelope.error.code).toBe("TOOL_FAILURE");
+    expect(cap.stderr()).toContain("mock top-level error");
+    expect(cap.stderr()).toContain("-32602");
   });
 });
 
@@ -564,7 +595,7 @@ describe("连接与端口", () => {
       const code = await ping([], {});
       cap.restore();
       expect(code).toBe(ExitCode.Success);
-      expect(cap.stdout()).toBe('{"ok":true}\n');
+      expect(JSON.parse(cap.stdout()).data).toEqual({ ok: true });
     } finally {
       if (old === undefined) delete process.env.GODOT_AUTOPILOT_PORT;
       else process.env.GODOT_AUTOPILOT_PORT = old;

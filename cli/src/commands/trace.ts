@@ -174,7 +174,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     return ExitCode.Success;
   }
   if (sub === "export") {
-    const format = opts.formatText ?? "jsonl";
+    const format = opts.exportFormat ?? "jsonl";
     const page = paginate(records, opts, Number.MAX_SAFE_INTEGER);
     if (format === "jsonl") {
       for (const record of page.events) {

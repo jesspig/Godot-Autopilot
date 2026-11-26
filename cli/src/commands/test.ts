@@ -9,11 +9,11 @@ import {
 } from "../discovery";
 import { CliError, ExitCode } from "../errors";
 import type { IpcEndpoint } from "../ipc/client";
+import { promptConfirmation, type ConfirmationSummary } from "../output";
 import { findById, findLiveByProject } from "../registry";
 import { resolveNativeTarget } from "../target";
 import { writeJson } from "./json-output";
 import {
-  confirmed,
   flagBool,
   flagNumber,
   flagString,
@@ -289,14 +289,16 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     return finish("test.script", target, opts, commonArgs(opts, { tests }), "run_gdscript_tests");
   }
   if (sub === "scenario") {
-    if (!confirmed(opts)) {
-      throw new CliError(
-        ExitCode.Usage,
-        "gda test scenario is high-risk and requires --confirm; no tool call was sent.",
-        "re-run with --confirm after reviewing the scenario.",
-      );
-    }
-    const args = commonArgs(opts, { ...readArgsPayload(opts), action: "sequence" });
+    const scenarioArgs = { ...readArgsPayload(opts), action: "sequence" };
+    const confirmationSummary: ConfirmationSummary = {
+      command: "test.scenario",
+      tool: "game_input",
+      target: target.instanceId !== "" ? `instance:${target.instanceId}` : "native-ipc",
+      risk: "high",
+      args: { ...scenarioArgs },
+    };
+    await promptConfirmation(confirmationSummary, opts);
+    const args = commonArgs(opts, scenarioArgs);
     const { outcome } = await invokeTest(target, "test.scenario", "game_input", args, opts);
     const errors = await nativeToolInvoke(target.endpoint, target.instanceId, "get_debugger_stream", {
       action: "errors", limit: 50,

@@ -9,12 +9,12 @@ import {
   type NativeTraceContext,
 } from "../discovery";
 import { CliError, ExitCode } from "../errors";
+import { promptConfirmation, type ConfirmationSummary } from "../output";
 import { findById, findLiveByProject } from "../registry";
 import { resolveNativeTarget } from "../target";
 import { readTraceRecords, summarize, type TraceRecord } from "../trace";
 import { writeJson } from "./json-output";
 import {
-  confirmed,
   flagBool,
   flagNumber,
   flagString,
@@ -243,16 +243,17 @@ async function runTrace(target: NativeBinding, opts: GlobalOptions): Promise<num
 }
 
 async function runRepro(target: NativeBinding, opts: GlobalOptions): Promise<number> {
-  if (!confirmed(opts)) {
-    throw new CliError(
-      ExitCode.Usage,
-      "gda debug repro is high-risk and requires --confirm; no tool call was sent.",
-      "re-run with --confirm after reviewing the exact target.",
-    );
-  }
   const args = readArgsPayload(opts);
   const path = flagString(opts, "--path");
   const captureTarget = flagString(opts, "--target") ?? "game";
+  const summary: ConfirmationSummary = {
+    command: "debug.repro",
+    tool: "editor_scene_control + game_input + capture",
+    target: target.instanceId !== "" ? `instance:${target.instanceId}` : "native-ipc",
+    risk: "high",
+    args: { ...args, path: path ?? "", target: captureTarget },
+  };
+  await promptConfirmation(summary, opts);
   const steps: Step[] = [];
   const record = async (name: string, tool: string, callArgs: Record<string, unknown>): Promise<void> => {
     const step = await invokeStep(target, name, tool, callArgs, opts);

@@ -1,4 +1,4 @@
-import { parseTransport, type GlobalOptions } from "../args";
+import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { request } from "../mcp/client";
 import { callTimeoutSec } from "../payload";
@@ -36,9 +36,9 @@ async function call(
   const response = await request(method, params, {
     port: target.port,
     timeoutSec: callTimeoutSec(opts),
-    transport: parseTransport(opts.transportText),
+    transport: "auto" as const,
     ipcEndpoint,
-    noFallback: opts.noFallback,
+    noFallback: false,
   });
   if (response.error !== undefined) {
     throw new CliError(
@@ -104,7 +104,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       writeJson({ saved }, opts);
       return ExitCode.Success;
     }
-    if (opts.json === true) {
+    if (opts.formatText === "json") {
       writeJson({ contents: redactContents(contents) }, opts);
       return ExitCode.Success;
     }
@@ -124,11 +124,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       const fingerprint = JSON.stringify(contents);
       if (fingerprint !== previous) {
         previous = fingerprint;
-        if (opts.json === true) {
-          writeJson({ contents: redactContents(contents) }, opts);
-        } else {
-          outputContents(contents, opts);
-        }
+        writeJson({ contents: redactContents(contents) }, opts);
       }
       await new Promise((resolve) => setTimeout(resolve, delay));
     }

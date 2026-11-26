@@ -136,7 +136,7 @@ describe("严格参数解析", () => {
   });
 
   test("互斥 flags 被拒绝", () => {
-    const error = usageError("resource.read", ["uri", "--json", "--raw"]);
+    const error = usageError("editor.stop", ["id", "--force-stop", "--wait", "5"]);
     expect(error.message).toContain("conflicts");
   });
 
@@ -171,7 +171,7 @@ describe("alias 与补全", () => {
   test("补全候选来自同一 spec", () => {
     expect(completionCandidates([])).toContain("editor");
     expect(completionCandidates(["editor"])).toContain("status");
-    expect(completionCandidates(["editor", "stop", "--f"])).toContain("--force");
+    expect(completionCandidates(["editor", "stop", "--f"])).toContain("--force-stop");
     expect(completionCandidates(["editor", "stop", "--f"])).not.toContain("--extends");
   });
 });

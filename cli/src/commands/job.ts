@@ -16,11 +16,12 @@ import {
 } from "../discovery";
 import { CliError, ExitCode, isIpcRequestSent } from "../errors";
 import type { IpcEndpoint } from "../ipc/client";
+import { promptConfirmation, type ConfirmationSummary } from "../output";
 import { gdaRoot } from "../platform";
 import { findById, findLiveByProject } from "../registry";
 import { resolveNativeTarget } from "../target";
 import { writeJson } from "./json-output";
-import { confirmed, flagBool, flagNumber, flagString } from "./scene";
+import { flagBool, flagNumber, flagString } from "./scene";
 
 const TARGET_CONTEXT = { findById, findLiveByProject };
 const TERMINAL_STATES = new Set(["succeeded", "failed", "cancelled", "interrupted", "expired", "not_found"]);
@@ -330,15 +331,16 @@ async function runWait(positional: string[], opts: GlobalOptions, target: Bindin
 }
 
 async function runCancel(positional: string[], opts: GlobalOptions, target: Binding): Promise<number> {
-  if (!confirmed(opts)) {
-    throw new CliError(
-      ExitCode.Usage,
-      "gda job cancel is high-risk and requires --confirm; no tool call was sent.",
-      "re-run with --confirm after reviewing the exact task and instance.",
-    );
-  }
   const taskId = positional[1] ?? flagString(opts, "--task-id") ?? "";
   if (taskId === "") throw new CliError(ExitCode.Usage, "job cancel requires a <task-id>");
+  const summary: ConfirmationSummary = {
+    command: "job.cancel",
+    tool: "task.cancel",
+    target: target.instanceId !== "" ? `instance:${target.instanceId}` : "native-ipc",
+    risk: "high",
+    args: { task_id: taskId, generation: target.generation },
+  };
+  await promptConfirmation(summary, opts);
   const previous = persistedFor(taskId);
   if (previous !== undefined && (previous.instance_id !== target.instanceId || previous.generation !== target.generation)) {
     return interrupted(opts, "job.cancel", taskId, previous);

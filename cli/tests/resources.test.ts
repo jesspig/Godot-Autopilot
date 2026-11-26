@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { run as runPrompts } from "../src/commands/prompts";
 import { run as runResources } from "../src/commands/resources";
+import { parseArgv, type GlobalOptions } from "../src/args";
 import { CliError, ExitCode } from "../src/errors";
 import { pluginIndexPath } from "../src/instances";
 
@@ -188,7 +189,7 @@ describe("gda resources", () => {
       "resources/list",
       "resources/templates/list",
     ]);
-    expect(JSON.parse(result.stdout)).toEqual({
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual({
       resources: [{ uri: "godot://editor/output-log", name: "editor" }],
       templates: [{ uriTemplate: "godot://scene/{path}", name: "scene" }],
     });
@@ -237,18 +238,22 @@ describe("gda resources", () => {
     const saved = await captured(() =>
       runResources(["read", "godot://capture/frame.png"], { portText: String(port), saveText: tmp }),
     );
-    const payload = JSON.parse(saved.stdout) as { saved: Array<{ path: string; bytes: number }> };
+    const payload = (JSON.parse(saved.stdout) as { data: { saved: Array<{ path: string; bytes: number }> } }).data;
     expect(payload.saved[0].bytes).toBe(5);
     expect(fs.readFileSync(payload.saved[0].path, "utf8")).toBe("hello");
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  test("非法 --transport 值报 usage 错误", async () => {
-    const error = await rejectWith(() =>
-      runResources(["list"], { portText: "9601", transportText: "bogus" }),
-    );
-    expect(error.code).toBe(ExitCode.Usage);
-    expect(error.message).toContain("--transport must be auto, ipc, or http");
+  test("已删除的 --transport 被解析为 usage 错误", () => {
+    let caught: unknown;
+    try {
+      parseArgv(["--transport", "bogus", "resources", "list"]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).code).toBe(ExitCode.Usage);
+    expect((caught as CliError).message).toContain("--transport");
   });
 
   test("IPC 鉴权失败不静默降级到无认证 HTTP", async () => {
@@ -267,7 +272,7 @@ describe("gda resources", () => {
     writeIndexWithIpc(httpPort, ipcPort, "correct-token");
     try {
       const error = await rejectWith(() =>
-        runResources(["list"], { transportText: "ipc", noFallback: false }),
+        runResources(["list"], { transportText: "ipc", noFallback: false } as unknown as GlobalOptions),
       );
       expect(error.code).toBe(ExitCode.Transport);
       expect(error.message).toContain("IPC authentication failed");
@@ -298,7 +303,7 @@ describe("gda prompts", () => {
       sse({ prompts: [{ name: "tool-usage", description: "usage" }] }),
     );
     const result = await captured(() => runPrompts(["list"], { portText: String(port) }));
-    expect(JSON.parse(result.stdout)).toEqual({ prompts: [{ name: "tool-usage", description: "usage" }] });
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual({ prompts: [{ name: "tool-usage", description: "usage" }] });
   });
 
   test("get 按 role 渲染并转换参数", async () => {
@@ -351,7 +356,7 @@ describe("gda prompts", () => {
     writeIndexWithIpc(httpPort, ipcPort, "correct-token");
     try {
       const error = await rejectWith(() =>
-        runPrompts(["list"], { transportText: "ipc", noFallback: false }),
+        runPrompts(["list"], { transportText: "ipc", noFallback: false } as unknown as GlobalOptions),
       );
       expect(error.code).toBe(ExitCode.Transport);
       expect(error.message).toContain("IPC authentication failed");

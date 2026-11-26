@@ -27,10 +27,13 @@ describe("帮助输出快照", () => {
     expect(help).toContain("Tools: editor_stop");
     expect(help).toContain("Action: gcp.editor.stop");
     expect(help).toContain("Flags for editor.stop:");
-    expect(help).toContain("--force");
+    expect(help).toContain("--force-stop");
+    expect(help).not.toContain("\n  --force  ");
     expect(help).toContain("Output: gda.result.v1 (envelope)");
     expect(help).toContain("Risk: high");
     expect(help).toContain("Long running: no");
+    expect(help).toContain("Exit codes:");
+    expect(help).toContain("130  interrupted");
   });
 
   test("每个 spec 有独立子命令帮助且首行与路径一致", () => {

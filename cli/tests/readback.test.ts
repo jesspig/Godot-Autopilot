@@ -172,14 +172,14 @@ describe("T-09 写后读回", () => {
     ));
     expect(write.code).toBe(ExitCode.Success);
     const writeBody = JSON.parse(write.stdout);
-    expect(writeBody.scene_path).toBe("res://main.tscn");
-    expect(writeBody.revision).toBe("rev-1");
-    expect(writeBody.receipt.request_id).toBeString();
+    expect(writeBody.data.scene_path).toBe("res://main.tscn");
+    expect(writeBody.data.revision).toBe("rev-1");
+    expect(writeBody.data.receipt.request_id).toBeString();
 
     const read = await captureRun(() => runScene(["tree"], opts));
     expect(read.code).toBe(ExitCode.Success);
     const readBody = JSON.parse(read.stdout);
-    expect(readBody.result.properties["Root/Label.text"]).toBe("saved");
+    expect(readBody.data.result.properties["Root/Label.text"]).toBe("saved");
 
     expect(native!.callTools).toEqual(["property_set", "get_scene_tree"]);
   });
@@ -191,13 +191,13 @@ describe("T-09 写后读回", () => {
       ...opts, "--path": "res://a.tres", "--property": "speed", "--value": "12",
     } as GlobalOptions));
     expect(write.code).toBe(ExitCode.Success);
-    expect(JSON.parse(write.stdout).revision).toBe("rev-r");
+    expect(JSON.parse(write.stdout).data.revision).toBe("rev-r");
 
     const read = await captureRun(() => runResource(["get"], {
       ...opts, "--path": "res://a.tres", "--property": "speed",
     } as GlobalOptions));
     expect(read.code).toBe(ExitCode.Success);
-    expect(JSON.parse(read.stdout).result.value).toBe("12");
+    expect(JSON.parse(read.stdout).data.result.value).toBe("12");
     expect(native!.callTools).toEqual(["resource_property", "resource_property"]);
   });
 
@@ -212,7 +212,7 @@ describe("T-09 写后读回", () => {
     expect(denied.error!.message).toContain("--confirm");
 
     const accepted = await captureRun(() => runResource(["rename"], {
-      ...opts, "--path": "res://a.tres", "--to": "res://b.tres", "--confirm": true,
+      ...opts, "--path": "res://a.tres", "--to": "res://b.tres", confirm: true,
     } as GlobalOptions));
     expect(accepted.code).toBe(ExitCode.Success);
 
@@ -220,7 +220,7 @@ describe("T-09 写后读回", () => {
       ...opts, "--path": "res://b.tres",
     } as GlobalOptions));
     expect(read.code).toBe(ExitCode.Success);
-    expect(JSON.parse(read.stdout).result.references).toContain("res://a.tres->res://b.tres");
+    expect(JSON.parse(read.stdout).data.result.references).toContain("res://a.tres->res://b.tres");
 
     const startRequests = native!.requests.filter((request) => request.method === "call.start");
     expect(startRequests).toHaveLength(2);

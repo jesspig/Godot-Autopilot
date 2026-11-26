@@ -219,25 +219,25 @@ describe("tool 子命令与离线 catalog", () => {
     const result = await runToolCaptured(["list"], { offline: true, category: "Scene", tagsText: "node,create" });
     expect(result.code).toBe(ExitCode.Success);
     const body = JSON.parse(result.stdout);
-    expect(body.source).toBe("offline");
-    expect(body.hash).toBe(doc.hash);
-    expect(body.tools).toEqual(["scene_open"]);
-    expect(body.total).toBe(1);
+    expect(body.data.source).toBe("offline");
+    expect(body.data.hash).toBe(doc.hash);
+    expect(body.data.tools).toEqual(["scene_open"]);
+    expect(body.data.total).toBe(1);
   });
 
   test("离线 search/describe/categories 共用同一 catalog", async () => {
     const doc = writeOfflineCatalog(OFFLINE_TOOLS);
     const search = JSON.parse((await runToolCaptured(["search", "script"], { offline: true })).stdout);
-    expect(search.source).toBe("offline");
-    expect(search.results[0].name).toBe("script_read");
+    expect(search.data.source).toBe("offline");
+    expect(search.data.results[0].name).toBe("script_read");
 
     const describe = JSON.parse((await runToolCaptured(["describe", "open_scene"], { offline: true })).stdout);
-    expect(describe.found).toBe(true);
-    expect(describe.name).toBe("scene_open");
-    expect(describe.hash).toBe(doc.hash);
+    expect(describe.data.found).toBe(true);
+    expect(describe.data.name).toBe("scene_open");
+    expect(describe.data.hash).toBe(doc.hash);
 
     const categories = JSON.parse((await runToolCaptured(["categories"], { offline: true })).stdout);
-    expect(categories.categories).toEqual(["Scene", "Script"]);
+    expect(categories.data.categories).toEqual(["Scene", "Script"]);
   });
 
   test("catalog hash 被篡改时拒绝离线读取", async () => {
@@ -263,9 +263,9 @@ describe("tool 子命令与离线 catalog", () => {
       const result = await runToolCaptured(["list"], { portText: String(native.port) });
       expect(result.code).toBe(ExitCode.Success);
       const body = JSON.parse(result.stdout);
-      expect(body.source).toBe("live");
-      expect(body.tools).toContain("scene_open");
-      expect(body.hash).toBe(readOfflineCatalog().hash);
+      expect(body.data.source).toBe("live");
+      expect(body.data.tools).toContain("scene_open");
+      expect(body.data.hash).toBe(readOfflineCatalog().hash);
       expect(native.requests.map((request) => request.method)).toContain("catalog.list");
       expect(native.requests.every((request) => request.kind === "request" && request.v === 1)).toBe(true);
       expect(native.requests.map((request) => request.method)).not.toContain("initialize");
@@ -297,7 +297,7 @@ describe("tools list (live)", () => {
       name: "search_tools",
       arguments: { limit: 0 },
     });
-    expect(JSON.parse(result.stdout)).toEqual({
+    expect(JSON.parse(result.stdout).data).toEqual({
       tools: ["create_scene_node", "batch_execute", "code_execute"],
       total: 3,
     });

@@ -137,16 +137,16 @@ describe("editor status 原生状态", () => {
       expect(code).toBe(0);
       const body = JSON.parse(stdout);
       expect(body.ok).toBe(true);
-      expect(body.instance.id).toBe("native-1");
-      expect(typeof body.instance.pid).toBe("number");
-      expect(body.project).toBe(path.join(tmp, "proj"));
-      expect(body.version).toBe("0.3.5");
-      expect(body.ipc_kind).toBe("tcp");
-      expect(body.ready).toBe(true);
-      expect(body.tool_count).toBe(1);
-      expect(body.capabilities.protocol_version).toBe(1);
+      expect(body.data.instance.id).toBe("native-1");
+      expect(typeof body.data.instance.pid).toBe("number");
+      expect(body.data.project).toBe(path.join(tmp, "proj"));
+      expect(body.data.version).toBe("0.3.5");
+      expect(body.data.ipc_kind).toBe("tcp");
+      expect(body.data.ready).toBe(true);
+      expect(body.data.tool_count).toBe(1);
+      expect(body.data.capabilities.protocol_version).toBe(1);
       for (const forbidden of ["mcp_url", "mcp", "port", "port_source", "transport"]) {
-        expect(Object.keys(body)).not.toContain(forbidden);
+        expect(Object.keys(body.data)).not.toContain(forbidden);
       }
       for (const request of native.requests) {
         expect(request.v).toBe(1);
@@ -165,9 +165,9 @@ describe("editor status 原生状态", () => {
     expect(code).toBe(2);
     const body = JSON.parse(stdout);
     expect(body.ok).toBe(false);
-    expect(body.ready).toBe(false);
-    expect(body.tool_count).toBe(0);
-    expect(body.error).toContain("no running Godot Autopilot instance");
+    expect(body.data.ready).toBe(false);
+    expect(body.data.tool_count).toBe(0);
+    expect(body.error.message).toContain("no running Godot Autopilot instance");
   });
 
   test("editor ping 走原生 hello，不发送 MCP initialize", async () => {
@@ -178,7 +178,7 @@ describe("editor status 原生状态", () => {
       writePluginIndex(tmp, native.port);
       const { code, stdout } = await captureRun(() => editorPing({ portText: String(native.port) }));
       expect(code).toBe(0);
-      expect(JSON.parse(stdout).pong).toBe(true);
+      expect(JSON.parse(stdout).data.pong).toBe(true);
       expect(native.requests.map((request) => request.method)).toEqual(["hello"]);
       expect(native.requests.every((request) => request.kind === "request" && request.v === 1)).toBe(true);
     } finally {

@@ -58,7 +58,7 @@ describe("skills", () => {
   test("list 离线列出 1 张入口技能卡并带路径与文件数", async () => {
     const result = await runCaptured(["list"], {});
     expect(result.code).toBe(ExitCode.Success);
-    const books = JSON.parse(result.stdout) as Array<{ name: string; path: string; files: number }>;
+    const books = (JSON.parse(result.stdout) as { data: Array<{ name: string; path: string; files: number }> }).data;
     expect(Array.isArray(books)).toBe(true);
     expect(books.length).toBe(1);
     for (const book of books) {
@@ -72,7 +72,7 @@ describe("skills", () => {
   test("--zh 列出中文入口卡", async () => {
     const result = await runCaptured(["list"], { zh: true });
     expect(result.code).toBe(ExitCode.Success);
-    const books = JSON.parse(result.stdout) as Array<{ name: string; path: string; files: number }>;
+    const books = (JSON.parse(result.stdout) as { data: Array<{ name: string; path: string; files: number }> }).data;
     expect(books.length).toBe(1);
     expect(books[0]?.name).toBe("godot-autopilot");
   });

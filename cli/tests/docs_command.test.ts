@@ -46,6 +46,10 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
   }
 }
 
+function envelopeData<T>(stdout: string): T {
+  return (JSON.parse(stdout) as { data: T }).data;
+}
+
 function meta(key: string): DocsMeta {
   return {
     schema: 1,
@@ -97,11 +101,11 @@ describe("docs command", () => {
     });
     expect(result.code).toBe(ExitCode.Success);
     expect(result.stderr).toBe("");
-    const payload = JSON.parse(result.stdout) as {
+    const payload = envelopeData<{
       cache: { status: string };
       results: Array<{ name: string }>;
       total: number;
-    };
+    }>(result.stdout);
     expect(payload.cache.status).toBe("external");
     expect(payload.results.length).toBe(2);
     expect(payload.total).toBeGreaterThan(2);
@@ -112,13 +116,13 @@ describe("docs command", () => {
       docsFile: fixture,
       kind: "method",
     });
-    const methodPayload = JSON.parse(methods.stdout) as { results: Array<{ kind: string }> };
+    const methodPayload = envelopeData<{ results: Array<{ kind: string }> }>(methods.stdout);
     expect(methodPayload.results.every((item) => item.kind === "method")).toBe(true);
     const scoped = await runCaptured(["search", "position"], {
       docsFile: fixture,
       classFilter: "Node2D",
     });
-    const scopedPayload = JSON.parse(scoped.stdout) as { results: Array<{ className: string }> };
+    const scopedPayload = envelopeData<{ results: Array<{ className: string }> }>(scoped.stdout);
     expect(scopedPayload.results.every((item) => item.className === "Node2D")).toBe(true);
   });
 
@@ -128,38 +132,38 @@ describe("docs command", () => {
 
   test("class 默认给摘要，--section/--member 展开", async () => {
     const base = await runCaptured(["class", "Node2D"], { docsFile: fixture });
-    const basePayload = JSON.parse(base.stdout) as {
+    const basePayload = envelopeData<{
       class: { counts: { methods: number }; sections?: unknown };
-    };
+    }>(base.stdout);
     expect(basePayload.class.counts.methods).toBeGreaterThan(0);
     expect(basePayload.class.sections).toBeUndefined();
     const methods = await runCaptured(["class", "Node2D"], {
       docsFile: fixture,
       section: "methods",
     });
-    const methodsPayload = JSON.parse(methods.stdout) as {
+    const methodsPayload = envelopeData<{
       class: { sections: { methods: unknown[] } };
-    };
+    }>(methods.stdout);
     expect(Array.isArray(methodsPayload.class.sections.methods)).toBe(true);
     const member = await runCaptured(["class", "Node2D"], {
       docsFile: fixture,
       member: "position",
     });
-    const memberPayload = JSON.parse(member.stdout) as {
+    const memberPayload = envelopeData<{
       class: { members: Array<{ name: string; kind: string }> };
-    };
+    }>(member.stdout);
     expect(memberPayload.class.members.some((item) => item.name === "position" && item.kind === "property")).toBe(true);
   });
 
   test("member 命中方法，未命中返回 1", async () => {
     const hit = await runCaptured(["member", "Node2D", "look_at"], { docsFile: fixture });
-    const hitPayload = JSON.parse(hit.stdout) as { matches: Array<{ kind: string; signature: string }>; total: number };
+    const hitPayload = envelopeData<{ matches: Array<{ kind: string; signature: string }>; total: number }>(hit.stdout);
     expect(hit.code).toBe(ExitCode.Success);
     expect(hitPayload.total).toBe(1);
     expect(hitPayload.matches[0]?.kind).toBe("method");
     expect(hitPayload.matches[0]?.signature).toBe("look_at(point: Vector2)");
     const miss = await runCaptured(["member", "Node2D", "no_such_member"], { docsFile: fixture });
-    const missPayload = JSON.parse(miss.stdout) as { total: number; suggestion?: string };
+    const missPayload = envelopeData<{ total: number; suggestion?: string }>(miss.stdout);
     expect(miss.code).toBe(ExitCode.ToolFailure);
     expect(missPayload.total).toBe(0);
     expect(missPayload.suggestion).toBeDefined();
@@ -174,11 +178,11 @@ describe("docs command", () => {
       "utf8",
     );
     const result = await runCaptured(["status"], { project });
-    const payload = JSON.parse(result.stdout) as {
+    const payload = envelopeData<{
       project: { pinned: string | null };
       cache: { exists: boolean };
       buckets: unknown[];
-    };
+    }>(result.stdout);
     expect(result.code).toBe(ExitCode.Success);
     expect(payload.project.pinned).toBe("4.7");
     expect(payload.cache.exists).toBe(false);
@@ -192,7 +196,7 @@ describe("docs command", () => {
     await expectUsage(() => runDocs(["clear"], { engine: "bad" }));
     writeBucket("4.7", fixtureText, meta("4.7"));
     const cleared = await runCaptured(["clear"], { engine: "4.7" });
-    const payload = JSON.parse(cleared.stdout) as { removed: string[]; remaining: string[] };
+    const payload = envelopeData<{ removed: string[]; remaining: string[] }>(cleared.stdout);
     expect(payload.removed).toEqual(["4.7"]);
     expect(payload.remaining).toEqual([]);
   });

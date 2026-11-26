@@ -189,11 +189,11 @@ describe("T-09 领域命令映射", () => {
     expect(code).toBe(ExitCode.Success);
     const body = JSON.parse(stdout);
     expect(body.command).toBe("scene.property");
-    expect(body.tool).toBe("property_set");
-    expect(body.scene_path).toBe("res://main.tscn");
-    expect(body.revision).toBe("rev-9");
-    expect(body.receipt.request_id).toBeString();
-    expect(body.receipt.digest).toBe("digest-1");
+    expect(body.data.tool).toBe("property_set");
+    expect(body.data.scene_path).toBe("res://main.tscn");
+    expect(body.data.revision).toBe("rev-9");
+    expect(body.data.receipt.request_id).toBeString();
+    expect(body.data.receipt.digest).toBe("digest-1");
     const start = ctx.requests.find((request) => request.method === "call.start");
     expect(start).toBeDefined();
     const params = gcpParams(start!);
@@ -289,9 +289,9 @@ describe("T-09 领域命令映射", () => {
     const cases: Array<{ sub: string; flags: Record<string, unknown>; tool: string; action: string; confirm: boolean }> = [
       { sub: "status", flags: {}, tool: "get_game_state", action: "status", confirm: false },
       { sub: "capture", flags: { "--target": "game" }, tool: "capture_editor_viewport", action: "", confirm: false },
-      { sub: "input", flags: { "--type": "key", "--mode": "event", "--event": "{}", "--confirm": true }, tool: "game_input", action: "queue", confirm: true },
-      { sub: "eval", flags: { "--source": "return 1", "--confirm": true }, tool: "game_script", action: "execute", confirm: true },
-      { sub: "scenario", flags: { argsJson: '{"events":[]}', "--confirm": true }, tool: "game_input", action: "sequence", confirm: true },
+      { sub: "input", flags: { "--type": "key", "--mode": "event", "--event": "{}", confirm: true }, tool: "game_input", action: "queue", confirm: true },
+      { sub: "eval", flags: { "--source": "return 1", confirm: true }, tool: "game_script", action: "execute", confirm: true },
+      { sub: "scenario", flags: { argsJson: '{"events":[]}', confirm: true }, tool: "game_input", action: "sequence", confirm: true },
     ];
     for (const entry of cases) {
       const ctx = await withNative(() => ({ result: invocation({ ok: true }) }));
@@ -366,7 +366,7 @@ describe("T-09 领域命令映射", () => {
       ["scene", "tree", "--port", String(ctx.port)], tmp,
     );
     expect(result.status).toBe(ExitCode.Success);
-    expect(JSON.parse(result.stdout).tool).toBe("get_scene_tree");
+    expect(JSON.parse(result.stdout).data.tool).toBe("get_scene_tree");
     const params = gcpParams(ctx.requests.find((request) => request.method === "call.start")!);
     expect(params.tool).toBe("get_scene_tree");
   });
@@ -391,7 +391,7 @@ describe("T-09 领域命令映射", () => {
       env: { ...process.env, GODOT_AUTOPILOT_CLI_HOME: tmp, GODOT_AUTOPILOT_HOME: tmp },
       encoding: "utf8",
     });
-    expect(result.status).toBe(ExitCode.Usage);
+    expect(result.status).toBe(ExitCode.ConfirmationRequired);
     expect(result.stderr).toContain("--confirm");
     expect(ctx.requests).toHaveLength(0);
   });
@@ -399,7 +399,7 @@ describe("T-09 领域命令映射", () => {
 
 describe("T-09 统一高危确认", () => {
   const highRisk: Array<{ sub: string; flags: Record<string, unknown>; run: (a: string[], o: GlobalOptions) => Promise<number> }> = [
-    { sub: "exec", flags: { "--source": "return 1" }, run: runScript },
+    { sub: "exec", flags: { "--source": '"return 1"' }, run: runScript },
     { sub: "rename", flags: { "--path": "res://a.tres", "--to": "res://b.tres" }, run: runResource },
     { sub: "move", flags: { "--path": "res://a.tres", "--to": "res://sub" }, run: runResource },
     { sub: "eval", flags: { "--source": "return 1" }, run: runGame },
@@ -416,7 +416,7 @@ describe("T-09 统一高危确认", () => {
         [entry.sub], { ...ctx.opts, ...entry.flags } as GlobalOptions,
       ));
       expect(result.error).toBeInstanceOf(CliError);
-      expect(result.error!.code).toBe(ExitCode.Usage);
+      expect(result.error!.code).toBe(ExitCode.ConfirmationRequired);
       expect(result.error!.message).toContain("--confirm");
       expect(ctx.requests).toHaveLength(0);
       await native!.close();
@@ -427,7 +427,7 @@ describe("T-09 统一高危确认", () => {
   test("高危命令带 --confirm 时执行并携带 confirm=true", async () => {
     const ctx = await withNative(() => ({ result: invocation({ ok: true }) }));
     const { code } = await captureRun(() => runResource(["rename"], {
-      ...ctx.opts, "--path": "res://a.tres", "--to": "res://b.tres", "--confirm": true,
+      ...ctx.opts, "--path": "res://a.tres", "--to": "res://b.tres", confirm: true,
     } as GlobalOptions));
     expect(code).toBe(ExitCode.Success);
     const params = gcpParams(ctx.requests.find((request) => request.method === "call.start")!);
@@ -444,10 +444,10 @@ describe("T-09 统一高危确认", () => {
       confirmation: { ttl_ms: 1000, issued_at_ms: 0, param_digest: "d", nonce: "n" },
     }));
     const result = await captureRun(() => runScene(
-      ["property", "Root", "x", "1"], { ...ctx.opts, confirm: true },
+      ["property", "Root", "x", "1"], ctx.opts,
     ));
     expect(result.error).toBeInstanceOf(CliError);
-    expect(result.error!.code).toBe(ExitCode.ToolFailure);
+    expect(result.error!.code).toBe(ExitCode.ConfirmationRequired);
     expect(ctx.requests.filter((request) => request.method === "call.confirm")).toHaveLength(0);
   });
 });

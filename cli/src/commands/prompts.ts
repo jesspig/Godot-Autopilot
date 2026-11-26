@@ -1,4 +1,4 @@
-import { parseTransport, type GlobalOptions } from "../args";
+import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { request } from "../mcp/client";
 import { callTimeoutSec, loadToolArguments } from "../payload";
@@ -19,9 +19,9 @@ function requestOptions(opts: GlobalOptions, target: ReturnType<typeof resolveTa
   return {
     port: target.port,
     timeoutSec: callTimeoutSec(opts),
-    transport: parseTransport(opts.transportText),
+    transport: "auto" as const,
     ipcEndpoint: ipcEndpointFor(opts, target),
-    noFallback: opts.noFallback,
+    noFallback: false,
   };
 }
 
@@ -91,7 +91,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       throw new CliError(ExitCode.ToolFailure, `prompts/get failed: ${response.error.message ?? "server error"} (code ${response.error.code})`);
     }
     const result = response.result as { messages?: unknown } | null;
-    if (opts.json === true || opts.raw === true) {
+    if (opts.raw === true) {
       writeJson(opts.raw === true ? response : result, opts);
       return ExitCode.Success;
     }

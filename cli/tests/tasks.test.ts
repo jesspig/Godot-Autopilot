@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { run as call } from "../src/commands/call";
 import { run as tasks } from "../src/commands/tasks";
 import { listTasks, tasksDir } from "../src/tasks-index";
+import type { GlobalOptions } from "../src/args";
 import { ExitCode } from "../src/errors";
 
 const servers: ReturnType<typeof Bun.serve>[] = [];
@@ -75,10 +76,11 @@ afterEach(() => {
 });
 
 describe("gda tasks", () => {
-  test("call --async 写入本地索引", async () => {
+  // --async 已删除，改由 gda job 承担
+  test.skip("call --async 写入本地索引", async () => {
     const port = server(() => ({ resultType: "task", taskId: "t-1", status: "working" }));
     const cap = capture();
-    const code = await call(["ping"], { portText: String(port), async: true });
+    const code = await call(["ping"], { portText: String(port), async: true } as unknown as GlobalOptions);
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(JSON.parse(cap.stdout()).task_id).toBe("t-1");
@@ -88,10 +90,11 @@ describe("gda tasks", () => {
     expect(fs.existsSync(path.join(tasksDir(), "t-1.json"))).toBe(true);
   });
 
-  test("call --async 同步退化时提示", async () => {
+  // --async 已删除，改由 gda job 承担
+  test.skip("call --async 同步退化时提示", async () => {
     const port = server(() => ({ content: [{ type: "text", text: JSON.stringify({ result: "pong" }) }] }));
     const cap = capture();
-    const code = await call(["ping"], { portText: String(port), async: true });
+    const code = await call(["ping"], { portText: String(port), async: true } as unknown as GlobalOptions);
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(cap.stderr()).toContain("executed synchronously");
@@ -112,7 +115,7 @@ describe("gda tasks", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(cap.stderr()).toContain("working");
-    expect(JSON.parse(cap.stdout()).status).toBe("completed");
+    expect(JSON.parse(cap.stdout()).data.status).toBe("completed");
     expect(polls).toBeGreaterThan(1);
   });
 
@@ -134,7 +137,7 @@ describe("gda tasks", () => {
     const code = await tasks(["wait", "t-fail"], { portText: String(port), timeoutText: "5" });
     cap.restore();
     expect(code).toBe(ExitCode.ToolFailure);
-    expect(JSON.parse(cap.stdout()).status).toBe("completed");
+    expect(JSON.parse(cap.stdout()).data.status).toBe("completed");
   });
 
   test("wait 遇到 completed 且内层内容含结构化错误返回 ToolFailure", async () => {
@@ -178,7 +181,7 @@ describe("gda tasks", () => {
     const code = await tasks(["clean"], {});
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(cap.stdout()).removed).toEqual(["done"]);
+    expect(JSON.parse(cap.stdout()).data.removed).toEqual(["done"]);
     expect(listTasks().map((entry) => entry.task_id)).toEqual(["work"]);
   });
 });

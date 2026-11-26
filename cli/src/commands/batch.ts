@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 import type { GlobalOptions } from "../args";
+import { toolRisk } from "../command-spec";
 import { CliError, ExitCode, isIpcRequestSent } from "../errors";
 import type { IpcEndpoint } from "../ipc/client";
 import {
@@ -9,10 +10,11 @@ import {
   createBatchIpcSession,
   META_DIRECT_TOOLS,
 } from "../mcp/client";
+import { normalizeEnvelope, recordConfirmation, writeEnvelope, batchStatus } from "../output";
+import type { ConfirmationSummary } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, extractPayload } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type TargetContext } from "../target";
-import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 
@@ -36,8 +38,16 @@ export function batchExitCode(
   results: readonly { ok: boolean }[],
   errorCodes: readonly number[] = [],
 ): number {
-  if (errorCodes.includes(ExitCode.Usage)) return ExitCode.Usage;
-  if (errorCodes.includes(ExitCode.Transport)) return ExitCode.Transport;
+  const priority = [
+    ExitCode.Usage,
+    ExitCode.Transport,
+    ExitCode.Interrupted,
+    ExitCode.UserDeclined,
+    ExitCode.ConfirmationRequired,
+  ];
+  for (const code of priority) {
+    if (errorCodes.includes(code)) return code;
+  }
   return results.every((result) => result.ok) && !errorCodes.includes(ExitCode.ToolFailure)
     ? ExitCode.Success
     : ExitCode.ToolFailure;
@@ -52,7 +62,7 @@ interface BatchOperation {
 function readBatchFile(filePath: string): BatchOperation[] {
   let text: string;
   try {
-    text = fs.readFileSync(filePath, "utf8");
+    text = filePath === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(filePath, "utf8");
   } catch {
     throw new CliError(ExitCode.Usage, `cannot read --args-file: ${filePath}`);
   }
@@ -114,10 +124,21 @@ function resolveIpcEndpoint(opts: GlobalOptions): IpcEndpoint {
     throw new CliError(
       ExitCode.Transport,
       "batch requires a reachable IPC endpoint; pass --socket or ensure the target instance exposes one.",
-      "Run 'gda status --json' to inspect the instance endpoint.",
+      "Run 'gda editor status' to inspect the instance endpoint.",
     );
   }
   return target.ipcEndpoint;
+}
+
+function confirmationSummary(operation: BatchOperation, endpoint: IpcEndpoint, index: number): ConfirmationSummary {
+  return {
+    command: `tool.batch[${index}]`,
+    tool: operation.tool,
+    target: endpoint.path !== undefined && endpoint.path !== "" ? `socket:${endpoint.path}` : `port:${endpoint.port}`,
+    risk: toolRisk(operation.tool),
+    args: { ...operation.args },
+    items: index + 1,
+  };
 }
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
@@ -126,7 +147,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     throw new CliError(ExitCode.Usage, "batch takes a single --args-file and no positional arguments.");
   }
   if (opts.argsFile === undefined) {
-    throw new CliError(ExitCode.Usage, "batch requires --args-file <path>.");
+    throw new CliError(ExitCode.Usage, "batch requires --args-file <path> (use - for stdin).");
   }
   if (opts.argsJson !== undefined) {
     throw new CliError(ExitCode.Usage, "batch uses --args-file only; --args is not supported.");
@@ -141,6 +162,20 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     for (let index = 0; index < operations.length; index += 1) {
       const operation = operations[index];
       const args: Record<string, unknown> = { ...operation.args };
+      const risk = toolRisk(operation.tool);
+      const summary = confirmationSummary(operation, endpoint, index);
+      if (risk === "high") {
+        if (operation.confirm !== true) {
+          results.push(batchFailureEntry(
+            index,
+            operation.tool,
+            `CONFIRMATION_REQUIRED: each high-risk batch item needs confirm=true (${summary.command}).`,
+          ));
+          errorCodes.push(ExitCode.ConfirmationRequired);
+          continue;
+        }
+        recordConfirmation(summary);
+      }
       if (operation.confirm === true) {
         args.confirm = true;
       }
@@ -171,7 +206,23 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
         }
       }
     }
-    writeJson({ results }, opts);
+    const status = batchStatus(results);
+    const envelope = normalizeEnvelope(
+      {
+        schema_version: 1,
+        ok: status.failed === 0,
+        data: {
+          results,
+          status: status.partial ? "partial" : "complete",
+          partial: status.partial,
+        },
+      },
+      "tool.batch",
+      opts,
+      status.failed === 0,
+    );
+    envelope.meta = { ...envelope.meta, ...status };
+    writeEnvelope(envelope, opts);
     return batchExitCode(results, errorCodes);
   } finally {
     closeBatchIpcSession(session);
