@@ -937,3 +937,76 @@ describe.serial("CLI 端到端", () => {
     expect(result.stderr).toContain("gda list");
   });
 });
+
+describe.serial("T-08 命令树与 alias", () => {
+  function cliRoot(): string {
+    return path.resolve(import.meta.dir, "..", "..");
+  }
+
+  function invoke(args: string[]) {
+    return spawnSync(process.execPath, ["cli/bin/gda.ts", ...args], {
+      cwd: cliRoot(),
+      env: { ...process.env, GODOT_AUTOPILOT_CLI_HOME: tmp, GODOT_AUTOPILOT_HOME: tmp },
+      encoding: "utf8",
+    });
+  }
+
+  test("gda editor list 空登记输出 []", () => {
+    const result = invoke(["editor", "list"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect(result.stdout.trim()).toBe("[]");
+  });
+
+  test("gda editor status 无实例输出原生状态错误且无 mcp_url", () => {
+    const result = invoke(["editor", "status"]);
+    expect(result.status).toBe(ExitCode.Transport);
+    const body = JSON.parse(result.stdout);
+    expect(body.ok).toBe(false);
+    for (const forbidden of ["mcp_url", "mcp", "port", "port_source"]) {
+      expect(Object.keys(body)).not.toContain(forbidden);
+    }
+  });
+
+  test("gda editor stop 未命中 exit 2", () => {
+    const result = invoke(["editor", "stop", "nope"]);
+    expect(result.status).toBe(ExitCode.Transport);
+  });
+
+  test("projects 旧顶层 alias 仍可用", () => {
+    const result = invoke(["projects"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect(result.stdout.trim()).toBe("[]");
+  });
+
+  test("ping 旧顶层 alias 帮助指向 editor ping", () => {
+    const result = invoke(["ping", "--help"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect(result.stdout).toContain("Invoke: gda editor ping");
+    expect(result.stdout).toContain("Subcommand: ping");
+  });
+
+  test("gda tool categories --offline 无缓存报传输错误", () => {
+    const result = invoke(["tool", "categories", "--offline"]);
+    expect(result.status).toBe(ExitCode.Transport);
+    expect(result.stderr).toContain("offline catalog");
+  });
+
+  test("gda shell 缺少 --protocol ndjson 报用法错误", () => {
+    const result = invoke(["shell", "run", "echo hi", "--protocol", "text"]);
+    expect(result.status).toBe(ExitCode.Usage);
+    expect(result.stderr).toContain("--protocol ndjson");
+  });
+
+  test("gda doctor --ci 输出稳定字段", () => {
+    const result = invoke(["doctor", "--ci"]);
+    expect(result.status).toBe(ExitCode.Success);
+    const body = JSON.parse(result.stdout);
+    expect(body.schema_version).toBe(1);
+    expect(body.mode).toBe("ci");
+    expect(Array.isArray(body.checks)).toBe(true);
+    for (const check of body.checks) {
+      expect(typeof check.code).toBe("string");
+      expect(typeof check.remediation).toBe("string");
+    }
+  });
+});

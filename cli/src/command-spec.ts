@@ -100,6 +100,15 @@ function boolFlag(name: string, description: string, conflictsWith?: string[]): 
     : { name, type: "boolean", scope: "command", description, conflictsWith };
 }
 
+function targetFlags(): CommandFlag[] {
+  return [
+    stringFlag("--id", "Target instance id"),
+    stringFlag("--socket", "Target native IPC socket"),
+    stringFlag("--port", "Target connection port"),
+    stringFlag("--project", "Target project directory"),
+  ];
+}
+
 function define(input: SpecInput): CommandSpec {
   const path = `${input.group}.${input.subcommand}`;
   const examples = (input.examples ?? [`gda ${input.group} ${input.subcommand}`]).map((example) =>
@@ -154,7 +163,13 @@ export const COMMAND_GROUPS: ReadonlyArray<CommandGroup> = [
 ];
 
 export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
-  define({ group: "editor", subcommand: "status", description: "Show editor and server status", tools: ["system_status"] }),
+  define({
+    group: "editor",
+    subcommand: "status",
+    description: "Show native editor status",
+    tools: ["system_status"],
+    flags: targetFlags(),
+  }),
   define({
     group: "editor",
     subcommand: "list",
@@ -192,6 +207,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
       stringFlag("--project", "Target project directory"),
       boolFlag("--force", "Force-stop the process", ["--wait"]),
       stringFlag("--wait", "Stop wait in seconds", ["--force"]),
+      stringFlag("--socket", "Target native IPC socket"),
     ],
     risk: "high",
   }),
@@ -204,8 +220,16 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
       boolFlag("--force", "Force-stop the process", ["--wait"]),
       stringFlag("--wait", "Stop wait in seconds", ["--force"]),
       boolFlag("--no-import", "Skip the asset import pre-step"),
+      ...targetFlags(),
     ],
     risk: "high",
+  }),
+  define({
+    group: "editor",
+    subcommand: "ping",
+    description: "Check native connectivity to a running editor",
+    tools: ["ping"],
+    flags: targetFlags(),
   }),
 
   define({
@@ -236,18 +260,34 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
   define({
     group: "tool",
     subcommand: "list",
-    description: "List direct tools from a live instance",
+    description: "List canonical tools from the native catalog",
     tools: ["tool_list"],
-    flags: [stringFlag("--category", "Restrict by category"), stringFlag("--tags", "Restrict by tags")],
+    flags: [
+      stringFlag("--category", "Restrict by category"),
+      stringFlag("--tags", "Restrict by tags"),
+      boolFlag("--offline", "Use the hash-verified offline catalog only"),
+      ...targetFlags(),
+    ],
   }),
-  define({ group: "tool", subcommand: "categories", description: "List tool categories", tools: ["tool_categories"] }),
+  define({
+    group: "tool",
+    subcommand: "categories",
+    description: "List tool categories",
+    tools: ["tool_categories"],
+    flags: [boolFlag("--offline", "Use the hash-verified offline catalog only"), ...targetFlags()],
+  }),
   define({
     group: "tool",
     subcommand: "search",
     description: "Search canonical tools",
     tools: ["tool_search"],
     positional: [positional("query", "Search query")],
-    flags: [stringFlag("--category", "Restrict by category"), stringFlag("--tags", "Restrict by tags")],
+    flags: [
+      stringFlag("--category", "Restrict by category"),
+      stringFlag("--tags", "Restrict by tags"),
+      boolFlag("--offline", "Use the hash-verified offline catalog only"),
+      ...targetFlags(),
+    ],
   }),
   define({
     group: "tool",
@@ -255,6 +295,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Show one tool schema and side effects",
     tools: ["tool_describe"],
     positional: [positional("tool", "Tool name")],
+    flags: [boolFlag("--offline", "Use the hash-verified offline catalog only"), ...targetFlags()],
   }),
   define({
     group: "tool",
@@ -670,7 +711,14 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     subcommand: "run",
     description: "Run environment diagnostics",
     tools: ["doctor_run"],
-    flags: [boolFlag("--offline", "Never use the network")],
+    flags: [boolFlag("--offline", "Never use the network"), boolFlag("--ci", "Stable machine-readable checks with codes and remediation")],
+  }),
+  define({
+    group: "doctor",
+    subcommand: "diagnose",
+    description: "Diagnose one target instance",
+    tools: ["doctor_diagnose"],
+    flags: [boolFlag("--ci", "Stable machine-readable checks with codes and remediation"), ...targetFlags()],
   }),
 
   define({ group: "config", subcommand: "list", description: "List CLI configuration", tools: ["config_list"] }),
@@ -693,10 +741,10 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
   define({
     group: "shell",
     subcommand: "run",
-    description: "Run a shell command",
+    description: "Run a shell session",
     tools: ["shell_run"],
     positional: [positional("command", "Command to execute", false)],
-    flags: [stringFlag("--timeout", "Command timeout in seconds")],
+    flags: [stringFlag("--timeout", "Command timeout in seconds"), stringFlag("--protocol", "Shell protocol: ndjson")],
     risk: "high",
     long_running: true,
   }),
@@ -707,7 +755,8 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
 ];
 
 export const LEGACY_ALIASES: ReadonlyArray<readonly [string, string]> = [
-  ["ping", "tool.ping"],
+  ["ping", "editor.ping"],
+  ["diagnose", "doctor.diagnose"],
   ["status", "editor.status"],
   ["categories", "tool.categories"],
   ["search", "tool.search"],
