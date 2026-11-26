@@ -5,7 +5,7 @@ import { checkAll, collectTree, readContract, type Violation } from "../../tests
 
 const root = path.resolve(import.meta.dir, "..", "..");
 
-const MIGRATED_FLAGS = [
+const MIGRATED_FLAGS = new Set([
   "--all",
   "--force",
   "--async",
@@ -15,11 +15,13 @@ const MIGRATED_FLAGS = [
   "--input",
   "--probe",
   "--file",
-];
+]);
 
-function isDeferredFlagViolation(violation: Violation): boolean {
-  return violation.rule === "unknown-flag" &&
-    MIGRATED_FLAGS.some((flag) => violation.message.startsWith(`${flag} is not registered`));
+function isDeferredMigration(violation: Violation): boolean {
+  if (violation.rule === "migrated-flag") {
+    return true;
+  }
+  return violation.rule === "mcp" && violation.token !== undefined && MIGRATED_FLAGS.has(violation.token);
 }
 
 describe("skills contract", () => {
@@ -30,10 +32,9 @@ describe("skills contract", () => {
       collectTree(path.join(root, "skills-zh")),
       contract,
     );
-    // 这些 flag 在 T-11 已从 cli/src/args.ts 删除或拆分（--all → --all-projects/--all-buckets，
-    // --force → --force-stop/--force-clear/--force-install，--async 移除等）。skill 文档暂仍引用
-    // 旧名，将在 T-13 更新 skill 文档时修复；此处只忽略该类 unknown-flag，其余 violation 仍断言为空。
-    const remaining = violations.filter((violation) => !isDeferredFlagViolation(violation));
+    // T-11 已删除这些 flag；守卫现在把它们分类为 migrated-flag（或带 token 的 mcp），
+    // 而不是裸 unknown-flag。技能正文仍引用旧名，待 T-13 重写后移除本过滤并恢复严格断言。
+    const remaining = violations.filter((violation) => !isDeferredMigration(violation));
     expect(remaining).toEqual([]);
   });
 });

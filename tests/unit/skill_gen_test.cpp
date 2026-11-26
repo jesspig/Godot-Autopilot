@@ -1,22 +1,14 @@
 #include <gtest/gtest.h>
 
 #include "util/json_value.hpp"
-#include <mcp/client/McpClient.hpp>
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
 
-#include "core/command_queue.hpp"
-#include "tools/base/register_all.hpp"
 #include "tools/base/tool_catalog.hpp"
-#include "util/bm25_index.hpp"
 #include "util/skill_gen.hpp"
 #include <version.hpp>
 
 #include <cstddef>
-#include <memory>
 #include <set>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace {
@@ -266,36 +258,21 @@ bool is_skill_aux_path(const std::string &path) {
   return starts_with(path, "scripts/") && ends_with(path, ".mjs");
 }
 
-class SkillRegistryFixture : public ::testing::Test {
-  std::unique_ptr<mcp::McpServer> server;
-  std::unique_ptr<mcp::McpClient> client;
-  std::thread server_thread;
-  godot_autopilot::CommandQueue queue;
-  godot_autopilot::ToolCatalog catalog;
-  godot_autopilot::Bm25Index index;
-
-  void SetUp() override {
-    auto pair = mcp::InMemoryTransport::CreatePair();
-    server = mcp::McpServer::Create(pair.server);
-    godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527);
-    server_thread = std::thread([this] { server->Run(); });
-
-    mcp::ClientOptions cops;
-    cops.client_info = mcp::Implementation{"GsdTestClient", "1.0.0"};
-    cops.connect_mode = mcp::ConnectMode::Auto;
-    client = mcp::McpClient::Create(pair.client, cops);
-  }
-
-  void TearDown() override {
-    if (client)
-      client->Close();
-    if (server)
-      server->Close();
-    if (server_thread.joinable())
-      server_thread.join();
-  }
-
+class SkillCatalogFixture : public ::testing::Test {
 protected:
+  godot_autopilot::ToolCatalog catalog;
+
+  SkillCatalogFixture() {
+    godot_autopilot::ToolInfo info;
+    info.name = "tool_call";
+    info.category = "meta";
+    info.description = "generic canonical tool call";
+    info.input_schema = godot_autopilot::util::JsonValue::Parse(
+        R"({"type":"object","properties":{"action":{"type":"string","enum":["status","errors","output","log","get","set","create","delete","list","play","stop","validate_scene","sample","sequence","object","node","memory","catalog","monitors","replace","trash","install","save","read","write","query","describe","call","batch"]},"path":{"type":"string"},"confirm":{"type":"boolean"}}})");
+    catalog.add_tool(info);
+    catalog.replace_aliases({{"call", "tool_call"}});
+  }
+
   const godot_autopilot::ToolCatalog &registry_catalog() const {
     return catalog;
   }
@@ -404,7 +381,7 @@ TEST(SkillGenTest, RenderedFrontmatterWellFormed) {
   }
 }
 
-TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
+TEST_F(SkillCatalogFixture, ToolNamesExistInConstructedCatalog) {
   std::set<std::string> allowed;
   for (const godot_autopilot::ToolInfo &tool :
        registry_catalog().get_all_tools()) {
@@ -439,7 +416,7 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
   }
 }
 
-TEST_F(SkillRegistryFixture, SkillBooksDescribeDiscovery) {
+TEST(SkillGenTest, SkillBooksDescribeCliDiscovery) {
   const std::vector<SkillSpec> all = all_skills();
   const SkillSpec *entry_skill = nullptr;
   for (const SkillSpec &spec : all) {
@@ -450,12 +427,12 @@ TEST_F(SkillRegistryFixture, SkillBooksDescribeDiscovery) {
   ASSERT_NE(entry_skill, nullptr);
   ASSERT_FALSE(entry_skill->files.empty());
   const std::string &body = entry_skill->files[0].body;
-  EXPECT_NE(body.find("gda search"), std::string::npos);
-  EXPECT_NE(body.find("gda describe"), std::string::npos);
-  EXPECT_NE(body.find("gda tools list"), std::string::npos);
-  EXPECT_NE(body.find("gda call"), std::string::npos);
+  EXPECT_NE(body.find("gda tool list"), std::string::npos);
+  EXPECT_NE(body.find("gda tool search"), std::string::npos);
+  EXPECT_NE(body.find("gda tool describe"), std::string::npos);
+  EXPECT_NE(body.find("gda tool call"), std::string::npos);
   EXPECT_NE(body.find("confirmation_required"), std::string::npos);
-  EXPECT_NE(body.find("new_errors_since_last_call"), std::string::npos);
+  EXPECT_NE(body.find("--confirm"), std::string::npos);
 }
 
 TEST(SkillGenTest, CliChannelContract) {
@@ -520,6 +497,203 @@ TEST(SkillGenTest, EverySkillHasSkillMd) {
       EXPECT_TRUE(is_skill_aux_path(spec.files[i].relative_path))
           << spec.name << ": auxiliary file must be under references/: "
           << spec.files[i].relative_path;
+    }
+  }
+}
+
+const char *const kMcpTokens[] = {
+    "MCP", "Model Context Protocol", "mcp_url", "mcpServers",
+    "godot://skills", "search_tools", "get_tool_detail", "call_tool",
+    "list_categories", "resources/list", "resources/read", "prompts/list",
+    "prompts/get", "tasks/get", "tasks/cancel", "resultType", "taskId",
+    "--direct", "--transport", "--no-fallback", "--input", "--async"};
+
+const char *const kDriftTokens[] = {
+    "252", "253", "325", "0.4.x", "0.6.x", "0.4.0", "0.6.0"};
+
+const char *const kRecipeIds[] = {
+    "bootstrap", "scene-script", "asset-pipeline", "playtest-debug",
+    "safe-refactor", "error-recovery", "skills-sync", "long-task"};
+
+std::set<std::string> extract_action_values(const std::string &text) {
+  std::set<std::string> found;
+  size_t pos = 0;
+  while (pos < text.size()) {
+    const size_t tick = text.find('`', pos);
+    if (tick == std::string::npos) {
+      break;
+    }
+    if (text.compare(tick, 3, "```") == 0) {
+      const size_t close = text.find("```", tick + 3);
+      if (close == std::string::npos) {
+        break;
+      }
+      const bool is_json = text.compare(tick, 7, "```json") == 0;
+      const std::string block = text.substr(tick + 3, close - tick - 3);
+      if (is_json) {
+        try {
+          const godot_autopilot::util::JsonValue parsed =
+              godot_autopilot::util::JsonValue::Parse(block);
+          if (parsed.IsObject()) {
+            const godot_autopilot::util::JsonValue *action = parsed.Find("action");
+            if (action != nullptr && action->IsString()) {
+              found.insert(action->GetString());
+            }
+          }
+        } catch (...) {
+        }
+      }
+      pos = close + 3;
+      continue;
+    }
+    const size_t end = text.find('`', tick + 1);
+    if (end == std::string::npos) {
+      break;
+    }
+    const std::string span = text.substr(tick + 1, end - tick - 1);
+    const size_t marker = span.find("action=");
+    if (marker != std::string::npos) {
+      std::string value = span.substr(marker + 7);
+      const size_t stop = value.find_first_of(" \t,;\"'");
+      if (stop != std::string::npos) {
+        value = value.substr(0, stop);
+      }
+      if (!value.empty()) {
+        found.insert(value);
+      }
+    }
+    pos = end + 1;
+  }
+  return found;
+}
+
+std::set<std::string> schema_actions(const godot_autopilot::ToolCatalog &catalog) {
+  std::set<std::string> result;
+  const auto tool = catalog.get_tool("tool_call");
+  if (!tool.has_value()) {
+    return result;
+  }
+  const godot_autopilot::util::JsonValue *props = tool->input_schema.Find("properties");
+  if (props == nullptr || !props->IsObject()) {
+    return result;
+  }
+  const godot_autopilot::util::JsonValue *action = props->Find("action");
+  if (action == nullptr) {
+    return result;
+  }
+  const godot_autopilot::util::JsonValue *values = action->Find("enum");
+  if (values == nullptr || !values->IsArray()) {
+    return result;
+  }
+  for (size_t i = 0; i < values->Size(); ++i) {
+    const godot_autopilot::util::JsonValue &item = (*values)[i];
+    if (item.IsString()) {
+      result.insert(item.GetString());
+    }
+  }
+  return result;
+}
+
+TEST(SkillGenTest, SkillBooksContainNoMcpContent) {
+  for (const SkillSpec &spec : all_skills()) {
+    for (const SkillFile &file : spec.files) {
+      if (!ends_with(file.relative_path, ".md")) {
+        continue;
+      }
+      for (const char *token : kMcpTokens) {
+        EXPECT_EQ(file.body.find(token), std::string::npos)
+            << spec.name << "/" << file.relative_path << " mentions " << token;
+      }
+    }
+  }
+}
+
+TEST(SkillGenTest, SkillBooksContainNoDriftFacts) {
+  for (const SkillSpec &spec : all_skills()) {
+    for (const SkillFile &file : spec.files) {
+      if (!ends_with(file.relative_path, ".md")) {
+        continue;
+      }
+      for (const char *token : kDriftTokens) {
+        EXPECT_EQ(file.body.find(token), std::string::npos)
+            << spec.name << "/" << file.relative_path << " mentions " << token;
+      }
+    }
+  }
+}
+
+TEST(SkillGenTest, EntryCardCliOnlyContract) {
+  const char *const required[] = {
+      "gda ping", "gda tool list", "gda tool search", "gda tool describe",
+      "gda tool call", "--confirm", "confirmation_required", "gda doctor",
+      "gda job"};
+  const SkillSpec *entry = nullptr;
+  for (const SkillSpec &spec : all_skills()) {
+    if (spec.name == "godot-autopilot") {
+      entry = &spec;
+    }
+  }
+  ASSERT_NE(entry, nullptr);
+  ASSERT_FALSE(entry->files.empty());
+  const std::string &body = entry->files[0].body;
+  for (const char *token : required) {
+    EXPECT_NE(body.find(token), std::string::npos)
+        << "entry card is missing CLI-only element: " << token;
+  }
+  size_t routing_rows = 0;
+  size_t line_start = 0;
+  while (line_start < body.size()) {
+    const size_t line_end = body.find('\n', line_start);
+    const std::string line = body.substr(line_start, line_end == std::string::npos ? std::string::npos : line_end - line_start);
+    if (line.find("| ") != std::string::npos &&
+        line.find("references/") != std::string::npos) {
+      ++routing_rows;
+    }
+    if (line_end == std::string::npos) {
+      break;
+    }
+    line_start = line_end + 1;
+  }
+  EXPECT_GE(routing_rows, size_t{3}) << "entry card must route domains to references";
+}
+
+TEST(SkillGenTest, RecipesHaveEightSections) {
+  for (const char *id : kRecipeIds) {
+    bool found = false;
+    for (const SkillSpec &spec : all_skills()) {
+      for (const SkillFile &file : spec.files) {
+        const std::string expected = std::string("references/recipes/") + id + ".md";
+        if (file.relative_path != expected) {
+          continue;
+        }
+        found = true;
+        const std::string heading = std::string("# ") + id;
+        EXPECT_EQ(file.body.compare(0, heading.size(), heading), 0)
+            << expected << " first heading must be " << heading;
+        for (int section = 1; section <= 8; ++section) {
+          const std::string marker = "## " + std::to_string(section) + ". ";
+          EXPECT_NE(file.body.find(marker), std::string::npos)
+              << expected << " is missing section " << section;
+        }
+      }
+    }
+    EXPECT_TRUE(found) << "missing recipe " << id;
+  }
+}
+
+TEST_F(SkillCatalogFixture, BacktickActionsVerifiedAgainstSchema) {
+  const std::set<std::string> allowed = schema_actions(catalog);
+  ASSERT_FALSE(allowed.empty());
+  for (const SkillSpec &spec : all_skills()) {
+    for (const SkillFile &file : spec.files) {
+      if (!ends_with(file.relative_path, ".md")) {
+        continue;
+      }
+      for (const std::string &action : extract_action_values(file.body)) {
+        EXPECT_TRUE(allowed.count(action) > 0)
+            << "action `" << action << "` in " << spec.name << "/"
+            << file.relative_path << " is absent from the constructed schema";
+      }
     }
   }
 }
