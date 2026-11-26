@@ -139,3 +139,116 @@ export function writeTree(
     fs.renameSync(tmp, target);
   }
 }
+
+export interface ManagedTreeChange {
+  writes: Record<string, string>;
+  deletes: string[];
+}
+
+export interface ManagedTreeResult {
+  applied: boolean;
+  written: string[];
+  deleted: string[];
+  rolled_back: boolean;
+  error: string;
+}
+
+interface ManagedBackup {
+  target: string;
+  relative: string;
+  original: string | null;
+}
+
+function assertManagedRelative(relative: string): void {
+  if (relative === "" || relative.includes("\\") || relative.includes("\0")) {
+    throw new CliError(ExitCode.Transport, `unsafe managed path: ${relative}`);
+  }
+  const normalized = path.posix.normalize(relative);
+  if (normalized !== relative || normalized.startsWith("..") || path.posix.isAbsolute(normalized)) {
+    throw new CliError(ExitCode.Transport, `unsafe managed path: ${relative}`);
+  }
+}
+
+export function applyManagedTree(
+  targetRoot: string,
+  change: ManagedTreeChange,
+  options: { force?: boolean; dryRun?: boolean } = {},
+): ManagedTreeResult {
+  const force = options.force === true;
+  const writeEntries = Object.entries(change.writes);
+  const written: string[] = [];
+  const deleted: string[] = [];
+  if (options.dryRun === true) {
+    return {
+      applied: false,
+      written: writeEntries.map(([relative]) => relative).sort(),
+      deleted: [...change.deletes].sort(),
+      rolled_back: false,
+      error: "",
+    };
+  }
+  const writeBackups: ManagedBackup[] = [];
+  const deleteBackups: ManagedBackup[] = [];
+  const tempFiles: string[] = [];
+  try {
+    for (const [relative, content] of writeEntries) {
+      assertManagedRelative(relative);
+      const target = path.join(targetRoot, ...relative.split("/"));
+      if (fs.existsSync(target) && !fs.statSync(target).isFile()) {
+        throw new CliError(ExitCode.Transport, `managed path is not a file: ${relative}`);
+      }
+      const original = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : null;
+      if (original !== null && original !== content && !force) {
+        throw new CliError(
+          ExitCode.Transport,
+          `target already exists with different content: ${target}`,
+          "Pass --force to overwrite.",
+        );
+      }
+      writeBackups.push({ target, relative, original });
+    }
+    for (const relative of change.deletes) {
+      assertManagedRelative(relative);
+      const target = path.join(targetRoot, ...relative.split("/"));
+      if (!fs.existsSync(target)) continue;
+      if (!fs.statSync(target).isFile()) {
+        throw new CliError(ExitCode.Transport, `refusing to delete a non-file managed path: ${relative}`);
+      }
+      deleteBackups.push({ target, relative, original: fs.readFileSync(target, "utf8") });
+    }
+    for (const [index, [relative, content]] of writeEntries.entries()) {
+      const backup = writeBackups[index];
+      if (backup === undefined) continue;
+      const tmp = `${backup.target}.${process.pid}.tmp`;
+      tempFiles.push(tmp);
+      fs.mkdirSync(path.dirname(backup.target), { recursive: true });
+      fs.writeFileSync(tmp, content, "utf8");
+      fs.renameSync(tmp, backup.target);
+      written.push(relative);
+    }
+    for (const backup of deleteBackups) {
+      fs.rmSync(backup.target, { force: true });
+      deleted.push(backup.relative);
+    }
+    return { applied: true, written, deleted, rolled_back: false, error: "" };
+  } catch (error) {
+    for (const backup of [...deleteBackups.reverse(), ...writeBackups.reverse()]) {
+      try {
+        if (backup.original === null) {
+          if (fs.existsSync(backup.target)) fs.rmSync(backup.target, { force: true });
+          continue;
+        }
+        const tmp = `${backup.target}.${process.pid}.restore.tmp`;
+        tempFiles.push(tmp);
+        fs.mkdirSync(path.dirname(backup.target), { recursive: true });
+        fs.writeFileSync(tmp, backup.original, "utf8");
+        fs.renameSync(tmp, backup.target);
+      } catch {
+      }
+    }
+    for (const tmp of tempFiles) fs.rmSync(tmp, { force: true });
+    throw error;
+  } finally {
+    for (const tmp of tempFiles) fs.rmSync(tmp, { force: true });
+  }
+}

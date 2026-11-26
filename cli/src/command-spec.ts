@@ -1193,6 +1193,20 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     flags: [stringFlag("--path", "Install target directory"), boolFlag("--zh", "Use the Chinese archive"), boolFlag("--prune", "Remove retired books")],
     risk: "high",
   }),
+  define({
+    group: "skill",
+    subcommand: "sync",
+    description: "Preview or apply managed skill-tree upgrades",
+    tools: ["skill_sync"],
+    flags: [
+      stringFlag("--path", "Install target directory"),
+      boolFlag("--zh", "Use the Chinese archive"),
+      boolFlag("--dry-run", "Preview changes without writing"),
+      boolFlag("--force-install", "Force a managed repair"),
+      boolFlag("--prune", "Remove retired books"),
+    ],
+    risk: "high",
+  }),
 
   define({ group: "plugin", subcommand: "list", description: "List installed plugins", tools: ["plugin_list"] }),
   define({

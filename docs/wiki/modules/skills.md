@@ -70,10 +70,21 @@ resource:
 
 ## 构建管线
 
-- `bun run build:skills-asset` 执行 [`cli/scripts/build-skills-asset.ts`](../../../cli/scripts/build-skills-asset.ts)，生成 `cli/assets/skills.json`：`{version, files, files_zh, retired}`。
-- 构建期 [`cmake/skill_gen.cmake`](../../../cmake/skill_gen.cmake) 调用 [`tools/embed_skills.ts`](../../../tools/embed_skills.ts)，把 `skills/` 嵌入 `build/generated/skill_content_embedded.h`；`SKILL_COUNT=1`。
+- `bun run build:skills-asset` 执行 [`cli/scripts/build-skills-asset.ts`](../../../cli/scripts/build-skills-asset.ts)，生成 `cli/assets/skills.json`：`{schema_version, version, file_count, content_digest, files, files_zh, retired}`。
+- `schema_version` 固定为 1；`file_count` 是 EN/ZH 各自的文件数（生成时校验相等）；`content_digest` 是版本与两种语言规范化文件树的 SHA-256，安装前复算，不匹配即拒绝安装。
 - `retired` 是退役目录名数组，供安装器精确清理；不参与内容嵌入。
+- 构建期 [`cmake/skill_gen.cmake`](../../../cmake/skill_gen.cmake) 调用 [`tools/embed_skills.ts`](../../../tools/embed_skills.ts)，把 `skills/` 嵌入 `build/generated/skill_content_embedded.h`；`SKILL_COUNT=1`。
 - 两个生成物都由脚本产出，禁止手工编辑；改内容后重新运行构建脚本或重新 configure。
+
+## 安装、升级同步与回滚
+
+- 安装入口 `install skills` / `skill install` 与 `update skills` 共用受管同步：`cli/src/skills.ts` 计算旧清单与新清单 diff，`cli/src/archive.ts` 的 `applyManagedTree` 负责逐文件临时文件写入 + 原子替换，失败按备份反向恢复并清理 `*.tmp`。
+- 安装目录内的 `.gda-skills-manifest.json` 记录实际使用的 `version`、`content_digest`、单语言 `tree_digest`、`lang` 与受管文件清单；安装报告输出真实 asset 版本与 digest，不回报 CLI 版本或缓存假版本。
+- 删除范围仅限同一受管书内、以 `.md` 结尾且不在新清单中的旧 reference；跨技能书、清单外路径、`..` 逃逸与非文件路径一律拒绝。清单外的顶层目录（用户自建技能）只列入 `preserved`，永不删除。
+- `retired` 目录只在 `--prune`（sync 的 `--force` 亦隐含）下清理，先原子改名到临时备份，全部写盘成功后删除备份；失败恢复原目录。
+- 内容 digest 损坏、旧清单 schema 非法或越界声明时拒绝同步；`--force` 可重建受管文件与清单，但不会碰清单外目录。
+- CLI 预演：`gda skills sync --check`（等价于子动作 `--dry-run`），输出 `would_delete` / `would_overwrite` / `preserved`，全程只读；强制写入用 `--force-install`（等价于子动作 `--force`）。
+- 当前 `skills sync` 作为 `skills` 命令的子动作实现；`command-spec.ts` 与 `args.ts` 中一等公民的 `gda skill sync --dry-run` / `--force` 注册待补（见 T-14 遗留项）。
 
 ## Guard 与测试
 

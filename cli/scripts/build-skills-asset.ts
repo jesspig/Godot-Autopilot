@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+
+const SCHEMA_VERSION = 1;
 
 const RETIRED_SKILLS = [
   "godot-autopilot-content",
@@ -20,6 +23,25 @@ const BOOKS = [
 interface SkillFile {
   relative: string;
   content: string;
+}
+
+function treeDigest(files: Record<string, string>): string {
+  const keys = Object.keys(files).sort();
+  const parts: string[] = [String(SCHEMA_VERSION), String(keys.length)];
+  for (const key of keys) {
+    const content = files[key] ?? "";
+    parts.push(`${key}\t${content.length}`, content);
+  }
+  return createHash("sha256").update(parts.join("\n"), "utf8").digest("hex");
+}
+
+function contentDigest(
+  version: string,
+  en: Record<string, string>,
+  zh: Record<string, string>,
+): string {
+  const parts = [String(SCHEMA_VERSION), version, treeDigest(en), treeDigest(zh)];
+  return createHash("sha256").update(parts.join("\n"), "utf8").digest("hex");
 }
 
 function walk(root: string, prefix = ""): SkillFile[] {
@@ -144,11 +166,16 @@ if (enPaths.join("\n") !== zhPaths.join("\n")) {
 }
 
 const output = {
+  schema_version: SCHEMA_VERSION,
   version,
+  file_count: enPaths.length,
+  content_digest: contentDigest(version, en, zh),
   files: en,
   files_zh: zh,
   retired: RETIRED_SKILLS,
 };
 const target = path.join(root, "cli", "assets", "skills.json");
 fs.writeFileSync(target, `${JSON.stringify(output, null, 2)}\n`, "utf8");
-process.stdout.write(`embedded ${enPaths.length} EN files and ${zhPaths.length} ZH files (version ${version})\n`);
+process.stdout.write(
+  `embedded ${enPaths.length} EN files and ${zhPaths.length} ZH files (version ${version}, digest ${output.content_digest})\n`,
+);
