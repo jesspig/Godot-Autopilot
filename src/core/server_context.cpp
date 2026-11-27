@@ -103,6 +103,10 @@ public:
         arguments[param.key] =
             JsonValue(param.value == "true" || param.value == "1" ||
                       param.value == "yes");
+      } else if (param.value == "true") {
+        arguments[param.key] = JsonValue(true);
+      } else if (param.value == "false") {
+        arguments[param.key] = JsonValue(false);
       } else {
         arguments[param.key] = JsonValue(param.value);
       }
