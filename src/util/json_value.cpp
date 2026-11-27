@@ -41,23 +41,38 @@ const char* JsonTypeName(const JsonValue& value) noexcept {
 }
 
 std::string FormatDouble(double d) {
+  std::string repr;
 #if defined(_MSC_VER) || (defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE >= 11) || defined(__cpp_lib_to_chars)
   std::array<char, 64> buf;
   auto res = std::to_chars(buf.data(), buf.data() + buf.size(), d, std::chars_format::general);
-  if (res.ec == std::errc()) return std::string(buf.data(), res.ptr);
+  if (res.ec == std::errc()) repr.assign(buf.data(), res.ptr);
 #endif
-  std::array<char, 64> fallback_buf;
-  for (int precision = 1;
-       precision <= std::numeric_limits<double>::max_digits10; ++precision) {
-    int len = std::snprintf(fallback_buf.data(), fallback_buf.size(), "%.*g",
-                            precision, d);
-    if (std::strtod(fallback_buf.data(), nullptr) == d) {
-      return std::string(fallback_buf.data(), static_cast<size_t>(len));
+  if (repr.empty()) {
+    std::array<char, 64> fallback_buf;
+    for (int precision = 1;
+         precision <= std::numeric_limits<double>::max_digits10; ++precision) {
+      int len = std::snprintf(fallback_buf.data(), fallback_buf.size(), "%.*g",
+                              precision, d);
+      if (std::strtod(fallback_buf.data(), nullptr) == d) {
+        repr.assign(fallback_buf.data(), static_cast<size_t>(len));
+        break;
+      }
+    }
+    if (repr.empty()) {
+      int len = std::snprintf(fallback_buf.data(), fallback_buf.size(), "%.*g",
+                              std::numeric_limits<double>::max_digits10, d);
+      repr.assign(fallback_buf.data(), static_cast<size_t>(len));
     }
   }
-  int len = std::snprintf(fallback_buf.data(), fallback_buf.size(), "%.*g",
-                          std::numeric_limits<double>::max_digits10, d);
-  return std::string(fallback_buf.data(), static_cast<size_t>(len));
+  if (repr.find_first_of("eE") != std::string::npos && std::isfinite(d) &&
+      std::floor(d) == d && std::abs(d) < 1e15) {
+    std::array<char, 64> fixed_buf;
+    int len = std::snprintf(fixed_buf.data(), fixed_buf.size(), "%.0f", d);
+    if (std::strtod(fixed_buf.data(), nullptr) == d) {
+      return std::string(fixed_buf.data(), static_cast<size_t>(len));
+    }
+  }
+  return repr;
 }
 
 void AppendEscapedString(std::string& out, const std::string& s) {
