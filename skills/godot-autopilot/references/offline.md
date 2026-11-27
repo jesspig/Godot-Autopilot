@@ -28,7 +28,7 @@ calls.
 ## 操作：技能与更新检查
 
 ```bash
-gda skill list --zh --offline
+gda skill list --offline
 gda update check --offline
 ```
 

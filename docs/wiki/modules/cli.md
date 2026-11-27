@@ -78,7 +78,7 @@ resource:
 
 | 命令 | 说明 |
 |---|---|
-| `skills list|show` | 列出/打印 1 张入口技能卡与 9 篇 references（`--zh` 中文；`show --file <rel>` 读参考文件） |
+| `skills list|show` | 列出/打印 1 张入口技能卡与 23 篇 references（`show --file <rel>` 读参考文件） |
 | `tools list` | 列出运行实例的全部工具，过滤 5 个协议元工具，输出 `{tools, total}`；`--category`/`--tags` 可过滤 |
 | `resources list|templates|read|watch` | 原生资源命令：list 可带 `--templates`；read 默认文本直出/JSON pretty/blob 摘要，`--save <dir>` 落盘，`--json` 脱敏 base64，`--raw` 原始信封；watch 轮询 `--interval` 秒；与 `prompts` 一样走 `--socket` 指定的本机通道 |
 | `prompts list|get` | 原生提示词命令：list 输出 `{prompts}`；get 用 `--args` 传字符串参数，默认按 `[role] text` 渲染，`--json` 保留 messages；支持本机通道 |
@@ -143,7 +143,6 @@ resource:
 | `--path <dir>` | 字符串 | install skills | 安装目标目录 |
 | `--source <mode>` | 字符串 | install/update | `auto`（默认）/ `online` / `cache` / `builtin` |
 | `--offline` | 布尔 | install/skills | 不访问网络，按缓存→内置回退 |
-| `--zh` | 布尔 | install/skills | 使用中文技能册 |
 | `--all` / `--projects` / `--stale` | 布尔 | list | 含未运行工程 / 按工程聚合 / 仅非存活 |
 | `--socket <path>` | 字符串 | 连接命令 | 直连插件本机 IPC 通道 |
 | `--transport <mode>` | 字符串 | 连接命令 | `auto`（默认）/ `ipc` / `http` |
@@ -173,9 +172,9 @@ resource:
 
 ### 离线与资产命令（2026-11-13 更新）
 
-- 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>] [--zh]` 列出/打印 1 张入口技能卡与 9 篇 references；`gda projects` 按 `<集中根>/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
+- 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>]` 列出/打印 1 张入口技能卡与 23 篇 references；`gda projects` 按 `<集中根>/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
 - 工具发现（live，2026-11-14 T-04/T-05）：`gda tools list [--category] [--tags]` 输出 `{tools: string[], total}`；`gda search [query]` 无 query 输出 `{categories}`、有 query 输出 `{results: [{name, score}]}`（服务端默认 20 条）。CLI 无离线 catalog，也没有 `gda tools search|describe` 或 `--refresh`。
-- 资产安装、更新与缓存：`gda install skills [--zh] [--offline] [--path <dir>] [--prune]` 安装 1 张入口卡 + 9 篇 references（`--prune` 清理退役目录）；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`；`gda cache list|info|clear`（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills 三类资产；`cli` 资产按当前平台键筛选）。归档解压后做 zip-slip 防护：逐项以 realpath 校验是否越界，越界即报传输错误。
+- 资产安装、更新与缓存：`gda install skills [--offline] [--path <dir>] [--prune]` 安装 1 张入口卡 + 23 篇 references（`--prune` 清理退役目录）；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`；`gda cache list|info|clear`（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills 三类资产；`cli` 资产按当前平台键筛选）。归档解压后做 zip-slip 防护：逐项以 realpath 校验是否越界，越界即报传输错误。
 - `gda list` 支持 `--all`（含未运行工程）、`--projects`（按工程聚合）、`--stale`（仅非存活）；条目 `live` 保留布尔并新增 `liveDetail {pid, endpoint}` 两级。
 - IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。**请求一旦写出即不因丢响应而重发**：超时或连接中断时若请求已发出，按传输错误退出码 2 并提示「the execution result is unknown and the call was not retried」，避免重复副作用；IPC 返回令牌错误（code -32001/-32002）时不回退到无鉴权的 HTTP。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/rpc/client.ts`](../../../cli/src/rpc/client.ts)。
 
@@ -320,7 +319,7 @@ resource:
 2. **工具调用命令**（`gda tool call <tool>`，本载体；`bunx`、全局安装、独立二进制是同一载体的三种分发方式）
 3. **手动兜底**（无 CLI 可用时，按 `gda --help` 与日志手工操作）
 
-技能结构为 1 张入口卡 + 9 篇 references（CLI-first EN/ZH 自包含）；`gda install skills [--zh] [--prune]` 安装到 `~/.agents/skills`，`--path <dir>` 可装到项目级目录（如 `<project>/.agents/skills`），`gda skills list|show` 读取内置副本。
+技能结构为 1 张入口卡 + 23 篇 references（CLI-first 自包含）；`gda install skills [--prune]` 安装到 `~/.agents/skills`，`--path <dir>` 可装到项目级目录（如 `<project>/.agents/skills`），`gda skills list|show` 读取内置副本。
 
 `version_sync_guard` 扫描 `skills/` 下全部文本文件与根 `README*.md` / `INSTALL*.md`，断言其中每一处版本钉均与根 `VERSION` 同值（`VERSION` 与 `CLI_VERSION` 两个值源一并核对），非版本引用（如 `#develop`）只登记、不参与比对；覆盖范围以守卫脚本为准。
 
@@ -342,7 +341,7 @@ resource:
 ## 相关页面
 
 - [端口与实例登记](ports.md) — 端口模型、实例登记结构与五级发现链
-- [支撑模块](support.md) — 技能卡与 references（1 + 9，资源与提示词 12）
+- [支撑模块](support.md) — 技能卡与 references（1 张入口卡 + 23 篇，资源与提示词由嵌入内容动态注册）
 - [安全边界与并发契约](../security_contract.md) — CLI 安全包络（§3.4）
 - [测试体系](../tests.md) — ctest 注册点与 TS 单测计数
 - [项目总览](../overview.md) — 目录树中的 `cli/`

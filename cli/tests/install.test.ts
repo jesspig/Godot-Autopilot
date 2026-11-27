@@ -77,10 +77,9 @@ describe("install skills", () => {
     expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "tools.md"))).toBe(true);
   });
 
-  test("zh 内置源与 --offline 写入中文入口与参考", async () => {
-    const target = path.join(tmp, "skills-zh");
+  test("内置源与 --offline 写入入口与参考", async () => {
+    const target = path.join(tmp, "skills-offline");
     const code = await runInstall(["skills"], {
-      zh: true,
       offline: true,
       pathText: target,
       force: true,

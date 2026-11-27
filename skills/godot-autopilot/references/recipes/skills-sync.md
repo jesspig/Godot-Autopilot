@@ -1,7 +1,7 @@
 # skills-sync
 
 ## 1. Trigger and inputs
-Use this recipe when installing, updating, or verifying the bundled skill books and their engine documentation. Inputs: the book name, an auxiliary file path, the install target directory, the artifact to install, and whether the Chinese archive is wanted.
+Use this recipe when installing, updating, or verifying the bundled skill books and their engine documentation. Inputs: the book name, an auxiliary file path, the install target directory, and the artifact to install.
 
 ## 2. Preconditions
 You know whether the local skills should come from the embedded archive or a refreshed install. You have permission to write to the chosen install directory. You have recorded the current book list so you can compare after the change.
@@ -12,7 +12,7 @@ gda skill list
 gda skill show godot-autopilot
 gda skill show godot-autopilot --skill-file references/recipes/bootstrap.md
 gda setup status
-gda setup install --artifact skills --zh
+gda setup install --artifact skills
 gda skill install --path .agents/skills --prune
 gda doctor run --offline
 gda docs sync

@@ -13,19 +13,17 @@ import {
   readSkillFile,
   resolveSkillsRoot,
   verifyInstalledSkills,
-  type SkillLanguage,
 } from "../skills";
 import { writeJson } from "./json-output";
 
 async function runSync(positional: string[], opts: GlobalOptions): Promise<number> {
-  const lang: SkillLanguage = opts.zh === true ? "zh" : "en";
   const target = opts.pathText !== undefined
     ? path.resolve(opts.pathText)
     : path.join(os.homedir(), ".agents", "skills");
   const dryRun = opts.check === true || positional.includes("--dry-run");
   const force = opts.force === true || positional.includes("--force");
 
-  const verification = verifyInstalledSkills(target, lang);
+  const verification = verifyInstalledSkills(target);
   if (!dryRun && !force && !verification.ok && verification.reason !== "not_installed") {
     throw new CliError(
       ExitCode.Transport,
@@ -33,8 +31,8 @@ async function runSync(positional: string[], opts: GlobalOptions): Promise<numbe
       "Run 'gda skills sync --force' to repair the managed files.",
     );
   }
-  const files = builtinSkillsFiles(lang);
-  const plan = planSkillSync(target, files, lang, {
+  const files = builtinSkillsFiles();
+  const plan = planSkillSync(target, files, {
     version: builtinSkillsVersion(),
     content_digest: builtinSkillsDigest(),
     dryRun,
@@ -60,7 +58,6 @@ async function runSync(positional: string[], opts: GlobalOptions): Promise<numbe
       force: plan.force,
       version: builtinSkillsVersion(),
       content_digest: builtinSkillsDigest(),
-      lang,
       target,
       managed_books: plan.managed_books,
       old_version: plan.old_version,
@@ -88,10 +85,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   if (sub === undefined) {
     throw new CliError(ExitCode.Usage, "skills requires a subcommand: list, show <name>, or sync");
   }
-  const lang: SkillLanguage = opts.zh === true ? "zh" : "en";
-  const root = resolveSkillsRoot(lang);
+  const root = resolveSkillsRoot();
   if (sub === "list") {
-    writeJson(listSkills(root, lang), opts);
+    writeJson(listSkills(root), opts);
     return ExitCode.Success;
   }
   if (sub === "show") {
@@ -99,7 +95,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     if (name === undefined) {
       throw new CliError(ExitCode.Usage, "skills show requires a skill name");
     }
-    process.stdout.write(readSkillFile(root, name, opts.file, lang));
+    process.stdout.write(readSkillFile(root, name, opts.file));
     return ExitCode.Success;
   }
   if (sub === "sync") {

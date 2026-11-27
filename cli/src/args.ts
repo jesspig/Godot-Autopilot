@@ -17,7 +17,6 @@ export interface GlobalOptions {
   sourceText?: string;
   offline?: boolean;
   withCsharpRuntime?: boolean;
-  zh?: boolean;
   check?: boolean;
   confirm?: boolean;
   argsJson?: string;
@@ -129,7 +128,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--progress": "progress",
   "--offline": "offline",
   "--with-csharp-runtime": "withCsharpRuntime",
-  "--zh": "zh",
   "--check": "check",
   "--confirm": "confirm",
   "--full": "full",
@@ -268,7 +266,7 @@ Commands:
   docs class <name>   Show one class (--section/--member/--full)
   docs member <class> <name> Show one member by name (--kind)
   docs clear          Remove cached docs (--engine <x.y> or --all-buckets --force-clear)
-  skills list         List the bundled skill books (offline, --zh for Chinese)
+  skills list         List the bundled skill books (offline)
   skills show <name>  Print one skill book's SKILL.md; --skill-file <rel> reads an auxiliary file
   tools list          List canonical tools from a live instance (--category/--tag)
   projects            List known Godot projects (offline)
@@ -312,7 +310,6 @@ Global options:
   --source <mode>     auto (default), online, cache, or builtin
   --offline           Never touch the network; use cache, then builtin
   --with-csharp-runtime  Install time: add the GdaCSharpRuntime autoload in C# projects
-  --zh                Use the Chinese skills archive (install, skills list/show)
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file (- reads stdin)
   --save-images <dir> Write returned images to a local directory

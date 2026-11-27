@@ -17,13 +17,12 @@ GITHUB_BASE="${GDA_GITHUB_BASE:-https://github.com/jesspig/Godot-Autopilot/relea
 
 usage() {
   printf 'usage: install.sh [--version V] [--prefix DIR] [--archive PATH] [--project DIR]\n'
-  printf '                  [--skills | --skills-project] [--zh] [--no-path] [--no-plugin]\n'
+  printf '                  [--skills | --skills-project] [--no-path] [--no-plugin]\n'
   printf '                  [--skip-checksum] [--dry-run]\n'
   printf '\n'
   printf '  --project DIR       Godot project root (contains project.godot); auto-detected from cwd\n'
   printf '  --skills            install skill books globally to ~/.agents/skills\n'
   printf '  --skills-project    install skill books into <project>/.agents/skills\n'
-  printf '  --zh                use Chinese skill books (requires --skills or --skills-project)\n'
 }
 
 fail() {
@@ -47,7 +46,6 @@ while [ "$#" -gt 0 ]; do
       SKILLS_MODE="project"
       shift
       ;;
-    --zh) ZH=1; shift ;;
     --no-path) NO_PATH=1; shift ;;
     --no-plugin) NO_PLUGIN=1; shift ;;
     --skip-checksum) NO_VERIFY=1; shift ;;
@@ -56,10 +54,6 @@ while [ "$#" -gt 0 ]; do
     *) fail "unknown option: $1" ;;
   esac
 done
-
-if [ "$ZH" -eq 1 ] && [ -z "$SKILLS_MODE" ]; then
-  fail "--zh requires --skills or --skills-project"
-fi
 
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -287,8 +281,6 @@ else
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
-  ZH_SUFFIX=""
-  if [ "$ZH" -eq 1 ]; then ZH_SUFFIX=" --zh"; fi
   TARGET_LABEL="$PREFIX/gda"
   if [ "$EXT" = "zip" ]; then TARGET_LABEL="$PREFIX/gda.exe"; fi
   printf '[dry-run] install gda %s to %s\n' "$VERSION" "$TARGET_LABEL"
@@ -298,9 +290,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
     printf '[dry-run] plugin skipped\n'
   fi
   if [ "$SKILLS_MODE" = "global" ]; then
-    printf '[dry-run] %s install skills --force%s\n' "$TARGET_LABEL" "$ZH_SUFFIX"
+    printf '[dry-run] %s install skills --force\n' "$TARGET_LABEL"
   elif [ "$SKILLS_MODE" = "project" ]; then
-    printf '[dry-run] %s install skills --path %s --force%s\n' "$TARGET_LABEL" "$PROJECT/.agents/skills" "$ZH_SUFFIX"
+    printf '[dry-run] %s install skills --path %s --force\n' "$TARGET_LABEL" "$PROJECT/.agents/skills"
   else
     printf '[dry-run] skills skipped\n'
   fi
@@ -386,7 +378,6 @@ fi
 
 if [ -n "$SKILLS_MODE" ]; then
   SKILL_ARGS=(install skills --force)
-  if [ "$ZH" -eq 1 ]; then SKILL_ARGS+=(--zh); fi
   if [ "$SKILLS_MODE" = "project" ]; then
     SKILLS_DIR="$PROJECT/.agents/skills"
     SKILL_ARGS+=(--path "$SKILLS_DIR")

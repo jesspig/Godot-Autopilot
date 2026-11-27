@@ -37,10 +37,9 @@ function treeDigest(files: Record<string, string>): string {
 
 function contentDigest(
   version: string,
-  en: Record<string, string>,
-  zh: Record<string, string>,
+  files: Record<string, string>,
 ): string {
-  const parts = [String(SCHEMA_VERSION), version, treeDigest(en), treeDigest(zh)];
+  const parts = [String(SCHEMA_VERSION), version, treeDigest(files)];
   return createHash("sha256").update(parts.join("\n"), "utf8").digest("hex");
 }
 
@@ -155,27 +154,20 @@ function validateTree(tree: Record<string, string>, label: string): void {
 const root = path.resolve(import.meta.dir, "..", "..");
 const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
 const en = readTree(path.join(root, "skills"), "skills");
-const zh = readTree(path.join(root, "skills-zh"), "skills-zh");
 validateTree(en, "skills");
-validateTree(zh, "skills-zh");
 
 const enPaths = Object.keys(en).sort();
-const zhPaths = Object.keys(zh).sort();
-if (enPaths.join("\n") !== zhPaths.join("\n")) {
-  throw new Error("skills and skills-zh do not have the same relative paths");
-}
 
 const output = {
   schema_version: SCHEMA_VERSION,
   version,
   file_count: enPaths.length,
-  content_digest: contentDigest(version, en, zh),
+  content_digest: contentDigest(version, en),
   files: en,
-  files_zh: zh,
   retired: RETIRED_SKILLS,
 };
 const target = path.join(root, "cli", "assets", "skills.json");
 fs.writeFileSync(target, `${JSON.stringify(output, null, 2)}\n`, "utf8");
 process.stdout.write(
-  `embedded ${enPaths.length} EN files and ${zhPaths.length} ZH files (version ${version}, digest ${output.content_digest})\n`,
+  `embedded ${enPaths.length} EN files (version ${version}, digest ${output.content_digest})\n`,
 );

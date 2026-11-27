@@ -69,14 +69,6 @@ describe("skills", () => {
     }
   });
 
-  test("--zh 列出中文入口卡", async () => {
-    const result = await runCaptured(["list"], { zh: true });
-    expect(result.code).toBe(ExitCode.Success);
-    const books = (JSON.parse(result.stdout) as { data: Array<{ name: string; path: string; files: number }> }).data;
-    expect(books.length).toBe(1);
-    expect(books[0]?.name).toBe("godot-autopilot");
-  });
-
   test("show 输出 SKILL.md 正文", async () => {
     const result = await runCaptured(["show", "godot-autopilot"], {});
     expect(result.code).toBe(ExitCode.Success);
@@ -89,12 +81,6 @@ describe("skills", () => {
     });
     expect(result.code).toBe(ExitCode.Success);
     expect(result.stdout).toContain("# Tools");
-  });
-
-  test("--zh show 输出中文正文", async () => {
-    const result = await runCaptured(["show", "godot-autopilot"], { zh: true });
-    expect(result.code).toBe(ExitCode.Success);
-    expect(result.stdout).toContain("# Godot Autopilot");
   });
 
   test("未知册名报用法错误", async () => {

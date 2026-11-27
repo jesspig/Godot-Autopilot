@@ -8,8 +8,6 @@ import { applyManagedTree } from "./archive";
 import { CliError, ExitCode } from "./errors";
 import { isPathInside, isSafeSkillName } from "./security-policy";
 
-export type SkillLanguage = "en" | "zh";
-
 export const SKILLS_MANIFEST_SCHEMA_VERSION = 1;
 export const SKILLS_MANIFEST_FILE = ".gda-skills-manifest.json";
 
@@ -30,7 +28,6 @@ export interface SkillAssetManifest {
   file_count: number;
   content_digest: string;
   files: Record<string, string>;
-  files_zh?: Record<string, string>;
   retired?: string[];
 }
 
@@ -39,14 +36,12 @@ export interface InstalledSkillsManifest {
   version: string;
   content_digest: string;
   tree_digest: string;
-  lang: SkillLanguage;
   files: string[];
   installed_at: string;
 }
 
 export interface SkillSyncPlan {
   target: string;
-  lang: SkillLanguage;
   version: string;
   content_digest: string;
   managed_books: string[];
@@ -100,13 +95,11 @@ export function skillTreeDigest(files: Record<string, string>): string {
 export function skillsContentDigest(
   version: string,
   files: Record<string, string>,
-  filesZh: Record<string, string>,
 ): string {
   const parts = [
     String(SKILLS_MANIFEST_SCHEMA_VERSION),
     version,
     skillTreeDigest(files),
-    skillTreeDigest(filesZh),
   ];
   return createHash("sha256").update(parts.join("\n"), "utf8").digest("hex");
 }
@@ -121,14 +114,11 @@ export function verifySkillAssetManifest(value: unknown): boolean {
   if (typeof value.version !== "string" || value.version === "") return false;
   if (typeof value.file_count !== "number" || !Number.isInteger(value.file_count)) return false;
   if (typeof value.content_digest !== "string" || !/^[0-9a-f]{64}$/.test(value.content_digest)) return false;
-  if (!isRecord(value.files) || !isRecord(value.files_zh)) return false;
+  if (!isRecord(value.files)) return false;
   if (Object.keys(value.files).length !== value.file_count) return false;
-  if (Object.keys(value.files_zh).length !== value.file_count) return false;
   const files = value.files as Record<string, string>;
-  const filesZh = value.files_zh as Record<string, string>;
   if (Object.values(files).some((content) => typeof content !== "string")) return false;
-  if (Object.values(filesZh).some((content) => typeof content !== "string")) return false;
-  return skillsContentDigest(value.version, files, filesZh) === value.content_digest;
+  return skillsContentDigest(value.version, files) === value.content_digest;
 }
 
 export function verifyBuiltinSkillsAsset(): boolean {
@@ -139,12 +129,8 @@ export function builtinSkillsManifest(): SkillAssetManifest {
   return asset;
 }
 
-export function builtinSkillsFiles(lang: SkillLanguage = "en"): Record<string, string> {
-  const files = lang === "zh" ? asset.files_zh : asset.files;
-  if (files === undefined) {
-    throw new CliError(ExitCode.Transport, `the builtin skills archive has no ${lang} content (version ${asset.version}).`);
-  }
-  return files;
+export function builtinSkillsFiles(): Record<string, string> {
+  return asset.files;
 }
 
 export function builtinSkillsVersion(): string {
@@ -183,8 +169,8 @@ function countFiles(dir: string): number {
   return total;
 }
 
-export function resolveSkillsRoot(lang: SkillLanguage = "en"): SkillsRoot {
-  const repoDir = lang === "zh" ? "skills-zh" : "skills";
+export function resolveSkillsRoot(): SkillsRoot {
+  const repoDir = "skills";
   const candidates: SkillsRoot[] = [
     { path: path.resolve(import.meta.dir, "..", "..", repoDir), source: "repo" },
     { path: path.join(process.cwd(), ".agents", "skills"), source: "project" },
@@ -197,9 +183,9 @@ export function resolveSkillsRoot(lang: SkillLanguage = "en"): SkillsRoot {
   return { path: "builtin", source: "builtin" };
 }
 
-export function listSkills(root: SkillsRoot, lang: SkillLanguage = "en"): SkillSummary[] {
+export function listSkills(root: SkillsRoot): SkillSummary[] {
   if (root.source === "builtin") {
-    const files = builtinSkillsFiles(lang);
+    const files = builtinSkillsFiles();
     const names = new Set<string>();
     for (const file of Object.keys(files)) {
       const [name, ...rest] = file.split("/");
@@ -234,7 +220,6 @@ export function readSkillFile(
   root: SkillsRoot,
   name: string,
   relative?: string,
-  lang: SkillLanguage = "en",
 ): string {
   if (!isSafeSkillName(name)) {
     throw new CliError(ExitCode.Usage, `invalid skill name: ${name}`);
@@ -246,7 +231,7 @@ export function readSkillFile(
       throw new CliError(ExitCode.Usage, `--file must stay inside the skill directory: ${relative}`);
     }
     const key = `${name}/${normalized}`;
-    const content = builtinSkillsFiles(lang)[key];
+    const content = builtinSkillsFiles()[key];
     if (content === undefined) {
       throw new CliError(ExitCode.Usage, `skill file not found: ${name}/${target}`);
     }
@@ -303,7 +288,6 @@ function parseInstalledManifest(raw: unknown): InstalledSkillsManifest | null {
   if (typeof raw.version !== "string" || raw.version === "") return null;
   if (typeof raw.content_digest !== "string" || raw.content_digest === "") return null;
   if (typeof raw.tree_digest !== "string" || !/^[0-9a-f]{64}$/.test(raw.tree_digest)) return null;
-  if (raw.lang !== "en" && raw.lang !== "zh") return null;
   if (!Array.isArray(raw.files) || raw.files.some((item) => typeof item !== "string")) return null;
   if (typeof raw.installed_at !== "string") return null;
   return {
@@ -311,7 +295,6 @@ function parseInstalledManifest(raw: unknown): InstalledSkillsManifest | null {
     version: raw.version,
     content_digest: raw.content_digest,
     tree_digest: raw.tree_digest,
-    lang: raw.lang,
     files: [...(raw.files as string[])].sort(),
     installed_at: raw.installed_at,
   };
@@ -351,7 +334,7 @@ export function writeInstalledManifest(root: string, manifest: InstalledSkillsMa
   }
 }
 
-export function verifyInstalledSkills(root: string, lang: SkillLanguage = "en"): InstalledVerification {
+export function verifyInstalledSkills(root: string): InstalledVerification {
   const inspected = inspectInstalledManifest(root);
   if (inspected.manifest === null) {
     return { ok: !inspected.corrupt, reason: inspected.reason, version: null };
@@ -377,7 +360,7 @@ export function verifyInstalledSkills(root: string, lang: SkillLanguage = "en"):
   }
   return {
     ok: true,
-    reason: manifest.lang === lang ? "ok" : `installed language is ${manifest.lang}`,
+    reason: "ok",
     version: manifest.version,
   };
 }
@@ -400,7 +383,6 @@ function walkManagedFiles(dir: string, prefix: string): string[] {
 export function planSkillSync(
   target: string,
   files: Record<string, string>,
-  lang: SkillLanguage,
   options: {
     version: string;
     content_digest: string;
@@ -475,7 +457,6 @@ export function planSkillSync(
   const prune = options.prune === true;
   return {
     target,
-    lang,
     version: options.version,
     content_digest: options.content_digest,
     managed_books: books,
@@ -523,7 +504,6 @@ export function applySkillSync(plan: SkillSyncPlan): SkillSyncResult {
     version: plan.version,
     content_digest: plan.content_digest,
     tree_digest: skillTreeDigest(plan.writes),
-    lang: plan.lang,
     files: Object.keys(plan.writes).sort(),
     installed_at: new Date().toISOString(),
   };

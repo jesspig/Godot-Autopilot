@@ -140,7 +140,7 @@ resource:
 
 ### skill_gen（`src/util/skill_gen.cpp/hpp` + `skill_content_generated.cpp` + `skills/`，命名空间 `godot_autopilot::skill_gen`）
 
-> **当前口径（未升版）**：技能结构为 **1 张入口卡 + 9 篇 references**（`skills/` 与 `skills-zh/` 各 10 个 .md；references 无 frontmatter、无脚本、无版本钉）。构建期由 `tools/embed_skills.ts` 嵌入；`register_skill_resources` 注册 **12** 个资源（1 目录 + 1 技能 + 10 文件）。CLI 侧通过 `cli/assets/skills.json` 内置同一份内容，`gda install skills [--zh] [--prune]` 安装/清理，`gda skills list|show [--zh]` 读取。权威页见 [skills.md](skills.md)；以下 9 册/references 描述为历史口径。
+> **当前口径（未升版）**：技能结构为 **1 张入口卡 + 23 篇 references**（`skills/` 共 24 个 .md；references 无 frontmatter、无脚本、无版本钉）。构建期由 `tools/embed_skills.ts` 嵌入；`register_skill_resources` 按嵌入文件动态注册。CLI 侧通过 `cli/assets/skills.json` 内置同一份内容，`gda install skills [--prune]` 安装/清理，`gda skills list|show` 读取。权威页见 [skills.md](skills.md)；以下 9 册/references 描述为历史口径。
 
 历史职责：把 9 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载；与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，单元测试 可测）：
 

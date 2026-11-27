@@ -70,8 +70,6 @@ Do not choose silently. If the session is non-interactive and the user did not s
 - Project: pass `--skills-project`, or run `gda install skills --path "<project>/.agents/skills" --force`.
 - Skip: pass neither flag.
 
-Add `--zh` if the user wants Chinese skill books.
-
 ### Step 4 — Install
 
 Use the one-click script by default:
@@ -123,7 +121,7 @@ curl -fsSL https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scri
   | bash -s -- --project "$PWD" --skills
 ```
 
-Use `--skills-project` instead of `--skills` for project-only skill books. Add `--zh` for Chinese books.
+Use `--skills-project` instead of `--skills` for project-only skill books.
 
 ### Windows PowerShell
 
@@ -132,7 +130,7 @@ Use `--skills-project` instead of `--skills` for project-only skill books. Add `
   -Project (Get-Location).Path -Skills
 ```
 
-Use `-SkillsProject` instead of `-Skills` for project-only skill books. Add `-Zh` for Chinese books.
+Use `-SkillsProject` instead of `-Skills` for project-only skill books.
 
 If you prefer to review the script before running it:
 
@@ -165,13 +163,12 @@ The plugin step is project-scoped. If no project is found, the script installs o
 | `--project <dir>` | Godot project directory; must contain `project.godot` |
 | `--skills` | Install skill books globally to `~/.agents/skills` |
 | `--skills-project` | Install skill books only into `<project>/.agents/skills` |
-| `--zh` | Use Chinese skill books; requires `--skills` or `--skills-project` |
 | `--no-plugin` | Install the CLI only; skip the plugin even if a project is found |
 | `--no-path` | Do not modify the user `PATH` |
 | `--skip-checksum` | Allow missing checksum metadata; checksum mismatches still fail |
 | `--dry-run` | Print the planned actions without installing |
 
-PowerShell uses the same names with `-Version`, `-Prefix`, `-Archive`, `-Project`, `-Skills`, `-SkillsProject`, `-Zh`, `-NoPlugin`, `-NoPath`, `-SkipChecksum`, and `-DryRun`.
+PowerShell uses the same names with `-Version`, `-Prefix`, `-Archive`, `-Project`, `-Skills`, `-SkillsProject`, `-NoPlugin`, `-NoPath`, `-SkipChecksum`, and `-DryRun`.
 
 ### Version compatibility
 
@@ -303,8 +300,8 @@ gda install skills --force
 gda install skills --path "<project>/.agents/skills" --force
 
 # Chinese
-gda install skills --force --zh
-gda install skills --path "<project>/.agents/skills" --force --zh
+gda install skills --force
+gda install skills --path "<project>/.agents/skills" --force
 ```
 
 Do not install both scopes unless the user explicitly wants both; some clients may discover duplicate skills.

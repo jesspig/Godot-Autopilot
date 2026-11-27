@@ -5,7 +5,6 @@ param(
   [string]$Project = "",
   [switch]$Skills,
   [switch]$SkillsProject,
-  [switch]$Zh,
   [switch]$NoPath,
   [switch]$NoPlugin,
   [switch]$SkipChecksum,
@@ -17,9 +16,6 @@ $GithubBase = if ($env:GDA_GITHUB_BASE) { $env:GDA_GITHUB_BASE.TrimEnd("/") } el
 
 if ($Skills -and $SkillsProject) {
   throw "--skills and --skills-project are mutually exclusive"
-}
-if ($Zh -and -not ($Skills -or $SkillsProject)) {
-  throw "--zh requires --skills or --skills-project"
 }
 
 function Resolve-Latest {
@@ -213,11 +209,9 @@ if ($DryRun) {
     Write-Output "[dry-run] plugin skipped"
   }
   if ($Skills) {
-    $suffix = if ($Zh) { " --zh" } else { "" }
-    Write-Output "[dry-run] $Prefix\gda.exe install skills --force$suffix"
+    Write-Output "[dry-run] $Prefix\gda.exe install skills --force"
   } elseif ($SkillsProject) {
-    $suffix = if ($Zh) { " --zh" } else { "" }
-    Write-Output "[dry-run] $Prefix\gda.exe install skills --path $Project\.agents\skills --force$suffix"
+    Write-Output "[dry-run] $Prefix\gda.exe install skills --path $Project\.agents\skills --force"
   } else {
     Write-Output "[dry-run] skills skipped"
   }
@@ -279,7 +273,6 @@ if (-not [string]::IsNullOrEmpty($Project) -and -not $NoPlugin) {
 if ($Skills) {
   $skillsDir = Join-Path $HOME ".agents\skills"
   $skillArgs = @("install", "skills", "--force")
-  if ($Zh) { $skillArgs += "--zh" }
   Invoke-Process $target $skillArgs
   if (-not (Test-Path (Join-Path $skillsDir "godot-autopilot\SKILL.md"))) {
     throw "skills install did not produce $(Join-Path $skillsDir 'godot-autopilot\SKILL.md')"
@@ -288,7 +281,6 @@ if ($Skills) {
 } elseif ($SkillsProject) {
   $skillsDir = Join-Path $Project ".agents\skills"
   $skillArgs = @("install", "skills", "--force", "--path", $skillsDir)
-  if ($Zh) { $skillArgs += "--zh" }
   Invoke-Process $target $skillArgs
   if (-not (Test-Path (Join-Path $skillsDir "godot-autopilot\SKILL.md"))) {
     throw "skills install did not produce $(Join-Path $skillsDir 'godot-autopilot\SKILL.md')"

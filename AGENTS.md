@@ -17,7 +17,7 @@ Godot Autopilot（GDA）项目指令。项目事实、数值口径与文档维�
 - 源码禁止注释（仅 `// namespace` 结尾标记）；`comment_guard` 在 ctest 拦截。
 - 默认安全姿态不可静默放宽：仅绑环回、脱敏默认开、高风险工具需 `confirm=true`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
 - 数值一律以运行时统计为准，唯一口径见 `docs/wiki/tests.md`「数值核算总表」。
-- 发布另产 5 平台二进制与 `sha256sums.txt`；技能书 EN/ZH parity 由守卫校验。
+- 发布另产 5 平台二进制与 `sha256sums.txt`；技能书内容与 CLI 命令面一致性由守卫校验。
 
 ## 版本与提交
 

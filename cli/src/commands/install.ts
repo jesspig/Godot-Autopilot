@@ -16,7 +16,6 @@ import {
   planSkillSync,
   skillTreeDigest,
   verifyBuiltinSkillsAsset,
-  type SkillLanguage,
 } from "../skills";
 import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
@@ -37,8 +36,8 @@ function parseSource(text: string | undefined): Source {
   throw new CliError(ExitCode.Usage, `--source must be auto, online, cache, or builtin, got: ${text}`);
 }
 
-function skillsArchiveUrl(lang: string): string {
-  return `skills-${lang}.zip`;
+function skillsArchiveUrl(): string {
+  return "skills.zip";
 }
 
 function normalizeSkillFiles(files: Record<string, string>): Record<string, string> {
@@ -52,10 +51,10 @@ function normalizeSkillFiles(files: Record<string, string>): Record<string, stri
   return out;
 }
 
-async function onlineSkills(lang: string): Promise<Record<string, string>> {
+async function onlineSkills(): Promise<Record<string, string>> {
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "skills-online-"));
   try {
-    const downloaded = await downloadAsset(skillsArchiveUrl(lang), CLI_VERSION, temp);
+    const downloaded = await downloadAsset(skillsArchiveUrl(), CLI_VERSION, temp);
     const dest = path.join(temp, "unpacked");
     extractZip(downloaded.path, dest);
     return normalizeSkillFiles(readTree(dest));
@@ -64,10 +63,10 @@ async function onlineSkills(lang: string): Promise<Record<string, string>> {
   }
 }
 
-function cacheSkills(lang: string): { files: Record<string, string>; version: string } {
-  const manifest = selectLatest("skills", lang);
+function cacheSkills(): { files: Record<string, string>; version: string } {
+  const manifest = selectLatest("skills");
   if (manifest === undefined) {
-    throw new CliError(ExitCode.Transport, `no cached ${lang} skills archive is available.`);
+    throw new CliError(ExitCode.Transport, "no cached skills archive is available.");
   }
   if (!verifyManifest(manifest)) {
     throw new CliError(ExitCode.Transport, `cached skills archive failed integrity check: ${manifest.asset}`);
@@ -83,21 +82,20 @@ function cacheSkills(lang: string): { files: Record<string, string>; version: st
   }
 }
 
-function builtinSkills(lang: SkillLanguage): Record<string, string> {
+function builtinSkills(): Record<string, string> {
   try {
-    return builtinSkillsFiles(lang);
+    return builtinSkillsFiles();
   } catch (error) {
     throw new CliError(
       ExitCode.Transport,
-      `the builtin skills archive has no ${lang} content (version ${builtinSkillsVersion()}).`,
-      "Use --source online or --source cache for this language.",
+      `the builtin skills archive is unavailable (version ${builtinSkillsVersion()}).`,
+      "Use --source online or --source cache.",
     );
   }
 }
 
 async function installSkills(opts: GlobalOptions): Promise<number> {
   const source = opts.offline === true ? "offline" : parseSource(opts.sourceText);
-  const lang: SkillLanguage = opts.zh === true ? "zh" : "en";
   const target = opts.pathText !== undefined
     ? path.resolve(opts.pathText)
     : path.join(os.homedir(), ".agents", "skills");
@@ -115,7 +113,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   let cacheVersion: string | undefined;
   const tryOnline = async (): Promise<void> => {
     try {
-      files = await onlineSkills(lang);
+      files = await onlineSkills();
       origin = "online";
     } catch (error) {
       if (source === "online" || source === "auto") {
@@ -130,7 +128,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   }
   if (files === undefined && (source === "cache" || source === "auto" || source === "offline")) {
     try {
-      const cached = cacheSkills(lang);
+      const cached = cacheSkills();
       files = cached.files;
       cacheVersion = cached.version;
       origin = "cache";
@@ -139,7 +137,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
     }
   }
   if (files === undefined && (source === "builtin" || source === "auto" || source === "offline")) {
-    files = builtinSkills(lang);
+    files = builtinSkills();
     origin = "builtin";
   }
   if (files === undefined) {
@@ -152,7 +150,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   const digest = origin === "builtin" || version === assetVersion
     ? assetDigest
     : skillTreeDigest(files);
-  const plan = planSkillSync(target, files, lang, {
+  const plan = planSkillSync(target, files, {
     version,
     content_digest: digest,
     force: opts.force === true,
@@ -177,7 +175,6 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
       content_digest: digest,
       tree_digest: skillTreeDigest(files),
       origin,
-      lang,
       target,
       files: Object.keys(files).length,
       skills: [...new Set(Object.keys(files).map((file) => file.split("/")[0]))].sort(),

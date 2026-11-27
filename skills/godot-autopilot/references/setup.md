@@ -25,18 +25,18 @@ project directory; `status` confirms a live instance and its connection record.
 ## 操作：技能与插件
 
 ```bash
-gda skill list --zh
+gda skill list
 gda skill show <name> --skill-file <rel>
 gda skill install --path <dir> --prune
-gda setup install --artifact skills --zh
+gda setup install --artifact skills
 gda plugin install --with-csharp-runtime
 ```
 
 Skills are embedded in the CLI, so list and show work offline. Skill install
 writes the books to an agent skills directory; `--path` overrides the target and
 `--prune` removes retired books. Setup install with the skills artifact installs
-the archive, and `--zh` selects the Chinese one. Plugin install needs explicit
-acknowledgement before managed files are replaced.
+the archive. Plugin install needs explicit acknowledgement before managed files
+are replaced.
 
 ## 观察
 

@@ -82,7 +82,7 @@ resource: src/
 | `tool_domain_guard` | `tests/guard/tool_domain_guard.ts` | 各域 `handle_*` 回调定义在对应 `<域>_ops.cpp` / `<域>_*_ops.cpp` |
 | `install_docs_guard` | `tests/guard/install_docs_guard.ts` | 安装文档与两个安装脚本的关键要素齐全 |
 | `zip_layout_guard` | `tests/guard/zip_layout_guard.ts` | `writeZip` 产物的 EOCD/中央目录布局可校验 |
-| `skills_guard` | `tests/guard/skills_guard.ts` | 技能书内容与 CLI 命令面一致、EN/ZH parity |
+| `skills_guard` | `tests/guard/skills_guard.ts` | 技能书内容与 CLI 命令面一致 |
 | `cli_contract` | `cli/tests/contract.test.ts` | CLI 载体与 MCP 服务端的调用契约一致 |
 | `cli_unit` | `tests/CMakeLists.txt`（直接执行 `bun test cli/tests`） | CLI 单测 |
 

@@ -121,9 +121,8 @@ describe("skill asset manifest", () => {
     expect(asset.version).toBe(builtinSkillsVersion());
     expect(asset.content_digest).toBe(builtinSkillsDigest());
     expect(asset.file_count).toBe(Object.keys(asset.files).length);
-    expect(asset.file_count).toBe(Object.keys(asset.files_zh).length);
     expect(asset.content_digest).toBe(
-      skillsContentDigest(asset.version, asset.files, asset.files_zh),
+      skillsContentDigest(asset.version, asset.files),
     );
     expect(verifySkillAssetManifest({ ...asset, content_digest: "0".repeat(64) })).toBe(false);
     expect(verifySkillAssetManifest({ ...asset, file_count: asset.file_count + 1 })).toBe(false);
@@ -166,23 +165,13 @@ describe("gda skills sync", () => {
     expect(result.data.deleted).toContain("godot-autopilot/references/legacy.md");
     expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "legacy.md"))).toBe(false);
     expect(fs.readFileSync(path.join(target, "godot-autopilot", "SKILL.md"), "utf8")).toBe(
-      builtinSkillsFiles("en")["godot-autopilot/SKILL.md"],
+      builtinSkillsFiles()["godot-autopilot/SKILL.md"],
     );
     expect(fs.existsSync(path.join(target, "my-notes", "note.md"))).toBe(true);
     const manifest = readInstalledManifest(target);
     expect(manifest?.version).toBe(builtinSkillsVersion());
     expect(manifest?.content_digest).toBe(builtinSkillsDigest());
-    expect(verifyInstalledSkills(target, "en").ok).toBe(true);
-  });
-
-  test("EN/ZH 切换覆盖同一受管书", async () => {
-    const target = path.join(tmp, "switch");
-    await runSkills(["sync", "--force"], { pathText: target, zh: true });
-    const skillFile = path.join(target, "godot-autopilot", "SKILL.md");
-    expect(fs.readFileSync(skillFile, "utf8")).toBe(builtinSkillsFiles("zh")["godot-autopilot/SKILL.md"]);
-    await runSkills(["sync", "--force"], { pathText: target });
-    expect(fs.readFileSync(skillFile, "utf8")).toBe(builtinSkillsFiles("en")["godot-autopilot/SKILL.md"]);
-    expect(verifyInstalledSkills(target, "en").ok).toBe(true);
+    expect(verifyInstalledSkills(target).ok).toBe(true);
   });
 
   test("内容 digest 损坏时拒绝并要求 --force 修复", async () => {
@@ -190,7 +179,7 @@ describe("gda skills sync", () => {
     await runSkills(["sync", "--force"], { pathText: target });
     const skillFile = path.join(target, "godot-autopilot", "SKILL.md");
     fs.writeFileSync(skillFile, "tampered\n", "utf8");
-    expect(verifyInstalledSkills(target, "en").ok).toBe(false);
+    expect(verifyInstalledSkills(target).ok).toBe(false);
     let caught: unknown;
     try {
       await runSkills(["sync"], { pathText: target });
@@ -201,7 +190,7 @@ describe("gda skills sync", () => {
     expect((caught as CliError).suggestion).toContain("--force");
     expect(fs.readFileSync(skillFile, "utf8")).toBe("tampered\n");
     await runSkills(["sync", "--force"], { pathText: target });
-    expect(verifyInstalledSkills(target, "en").ok).toBe(true);
+    expect(verifyInstalledSkills(target).ok).toBe(true);
   });
 
   test("旧 manifest 越界声明时拒绝且保留旧文件", async () => {
@@ -297,7 +286,7 @@ describe("install skills upgrade", () => {
     expect(result.data.origin).toBe("builtin");
     expect(result.data.asset_version).toBe(builtinSkillsVersion());
     expect(result.data.content_digest).toBe(builtinSkillsDigest());
-    expect(verifyInstalledSkills(target, "en").ok).toBe(true);
+    expect(verifyInstalledSkills(target).ok).toBe(true);
   });
 });
 
@@ -309,7 +298,7 @@ describe("update skills status", () => {
     expect(status.asset_ok).toBe(true);
     expect(status.asset_version).toBe(builtinSkillsVersion());
     expect(status.content_digest).toBe(builtinSkillsDigest());
-    expect(status.file_count).toBe(Object.keys(builtinSkillsFiles("en")).length);
+    expect(status.file_count).toBe(Object.keys(builtinSkillsFiles()).length);
     expect(status.installed_version).toBe(builtinSkillsVersion());
     expect(status.installed_ok).toBe(true);
     const item = skillsUpdateItem(true, "", target);

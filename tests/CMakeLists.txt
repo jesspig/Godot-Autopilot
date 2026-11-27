@@ -257,7 +257,7 @@ set_tests_properties(cli_contract PROPERTIES
     TIMEOUT 300)
 
 # ── ctest 注册: skills 契约守卫（Bun 直跑；失败输出文件:行号）──
-# 校验 EN/ZH 10 册 parity、旧关键词、gda 命令/参数与 status 字段契约；
+# 校验技能书旧关键词、gda 命令/参数与 status 字段契约；
 # 与 cli_unit 里的 skills_contract.test.ts 共享同一实现。
 find_program(GDA_BUN_EXECUTABLE NAMES bun)
 if(GDA_BUN_EXECUTABLE)

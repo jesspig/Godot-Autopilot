@@ -1162,7 +1162,6 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     flags: [
       stringFlag("--artifact", "Artifact to install: cli, plugin, or skills"),
       stringFlag("--path", "Install target directory"),
-      boolFlag("--zh", "Use the Chinese skills archive"),
       boolFlag("--prune", "Remove retired skill directories"),
       boolFlag("--with-csharp-runtime", "Add the C# runtime autoload"),
     ],
@@ -1175,7 +1174,7 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     subcommand: "list",
     description: "List bundled skill books",
     tools: ["skill_list"],
-    flags: [boolFlag("--zh", "Use the Chinese archive"), boolFlag("--offline", "Never use the network")],
+    flags: [boolFlag("--offline", "Never use the network")],
   }),
   define({
     group: "skill",
@@ -1183,14 +1182,14 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     description: "Print one skill book",
     tools: ["skill_show"],
     positional: [positional("name", "Skill book name")],
-    flags: [stringFlag("--skill-file", "Auxiliary file path"), boolFlag("--zh", "Use the Chinese archive")],
+    flags: [stringFlag("--skill-file", "Auxiliary file path")],
   }),
   define({
     group: "skill",
     subcommand: "install",
     description: "Install skill books",
     tools: ["skill_install"],
-    flags: [stringFlag("--path", "Install target directory"), boolFlag("--zh", "Use the Chinese archive"), boolFlag("--prune", "Remove retired books")],
+    flags: [stringFlag("--path", "Install target directory"), boolFlag("--prune", "Remove retired books")],
     risk: "high",
   }),
   define({
@@ -1200,7 +1199,6 @@ export const COMMAND_SPECS: ReadonlyArray<CommandSpec> = [
     tools: ["skill_sync"],
     flags: [
       stringFlag("--path", "Install target directory"),
-      boolFlag("--zh", "Use the Chinese archive"),
       boolFlag("--dry-run", "Preview changes without writing"),
       boolFlag("--force-install", "Force a managed repair"),
       boolFlag("--prune", "Remove retired books"),

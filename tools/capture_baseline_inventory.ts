@@ -43,7 +43,6 @@ const payload = {
   },
   skills: {
     en: collectSkillFiles("skills"),
-    zh: collectSkillFiles("skills-zh"),
   },
 };
 

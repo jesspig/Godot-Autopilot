@@ -65,12 +65,10 @@ describe("cache manifests", () => {
     expect(selectLatest("plugin")?.version).toBe("0.3.10");
   });
 
-  test("skills 按 fetched_at 选择且区分语言", () => {
+  test("skills 按 fetched_at 选择", () => {
     writeManifest(manifest({ artifact: "skills", version: "0.3.1", lang: "en", fetched_at: "2026-01-01T00:00:00Z" }));
     writeManifest(manifest({ artifact: "skills", version: "0.3.2", lang: "en", fetched_at: "2026-02-01T00:00:00Z" }));
-    writeManifest(manifest({ artifact: "skills", version: "0.3.2", lang: "zh", fetched_at: "2026-03-01T00:00:00Z" }));
-    expect(selectLatest("skills", "en")?.version).toBe("0.3.2");
-    expect(selectLatest("skills", "zh")?.fetched_at).toBe("2026-03-01T00:00:00Z");
+    expect(selectLatest("skills")?.version).toBe("0.3.2");
   });
 
   test("校验 SHA-256 与大小", () => {

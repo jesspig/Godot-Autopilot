@@ -6,13 +6,9 @@ import { checkAll, collectTree, readContract } from "../../tests/guard/skills_gu
 const root = path.resolve(import.meta.dir, "..", "..");
 
 describe("skills contract", () => {
-  test("EN/ZH skill books satisfy the CLI contract", () => {
+  test("skill book satisfies the CLI contract", () => {
     const contract = readContract(root);
-    const violations = checkAll(
-      collectTree(path.join(root, "skills")),
-      collectTree(path.join(root, "skills-zh")),
-      contract,
-    );
+    const violations = checkAll(collectTree(path.join(root, "skills")), contract);
     expect(violations).toEqual([]);
   });
 });

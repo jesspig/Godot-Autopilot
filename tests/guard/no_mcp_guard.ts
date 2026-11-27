@@ -72,7 +72,6 @@ const SCAN_TREES: ReadonlyArray<readonly [string, Area]> = [
   [".github", "build"],
   ["docs", "docs"],
   ["skills", "skills"],
-  ["skills-zh", "skills"],
   [".agents/skills", "skills"],
 ];
 const SCAN_FILES: ReadonlyArray<readonly [string, Area]> = [["cli/tsconfig.json", "cli"]];

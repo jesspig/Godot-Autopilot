@@ -259,8 +259,8 @@ export function skillsUpdateStatus(
   target: string = path.join(os.homedir(), ".agents", "skills"),
 ): SkillsUpdateStatus {
   const assetVersion = builtinSkillsVersion();
-  const cached = selectLatest("skills", "en") ?? selectLatest("skills", "zh");
-  const installed = verifyInstalledSkills(target, "en");
+  const cached = selectLatest("skills");
+  const installed = verifyInstalledSkills(target);
   return {
     asset_version: assetVersion,
     content_digest: builtinSkillsDigest(),

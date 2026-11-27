@@ -4932,12 +4932,6 @@
           "description": "Install target directory"
         },
         {
-          "name": "--zh",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Use the Chinese skills archive"
-        },
-        {
           "name": "--prune",
           "type": "boolean",
           "scope": "command",
@@ -5058,12 +5052,6 @@
           "description": "Install target directory"
         },
         {
-          "name": "--zh",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Use the Chinese archive"
-        },
-        {
           "name": "--prune",
           "type": "boolean",
           "scope": "command",
@@ -5097,12 +5085,6 @@
       "action": "gcp.skill.list",
       "positional": [],
       "flags": [
-        {
-          "name": "--zh",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Use the Chinese archive"
-        },
         {
           "name": "--offline",
           "type": "boolean",
@@ -5149,12 +5131,6 @@
           "type": "string",
           "scope": "command",
           "description": "Auxiliary file path"
-        },
-        {
-          "name": "--zh",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Use the Chinese archive"
         }
       ],
       "output": {
@@ -5189,12 +5165,6 @@
           "type": "string",
           "scope": "command",
           "description": "Install target directory"
-        },
-        {
-          "name": "--zh",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Use the Chinese archive"
         },
         {
           "name": "--dry-run",

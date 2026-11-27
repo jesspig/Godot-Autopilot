@@ -26,7 +26,7 @@
 | [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组：场景/属性/输入/物理/导航/资源/脚本/配置/编辑器等域，action 表与旧名别名 | `src/tools/domains/*/*_ops.cpp` |
 | [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组：调试/显示/OS/运行时/音频/渲染/图像/网格/瓦片等域，action 表与旧名别名 | `src/tools/domains/*/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、资源面、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
-| [modules/skills.md](modules/skills.md) | 技能卡与 references：目录结构、词数预算、构建管线、guard 规则、资源面、安装与 `--prune` | `skills/`、`skills-zh/`、`cli/scripts/build-skills-asset.ts`、`tools/embed_skills.ts`、`tests/guard/skills_guard.ts` |
+| [modules/skills.md](modules/skills.md) | 技能卡与 references：目录结构、词数预算、构建管线、guard 规则、资源面、安装与 `--prune` | `skills/`、`cli/scripts/build-skills-asset.ts`、`tools/embed_skills.ts`、`tests/guard/skills_guard.ts` |
 | [modules/cli.md](modules/cli.md) | CLI 载体（gda）：命令参考、寻址链、注册表、IPC 通道、生命周期、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位与 P0–P3 批次交付状态 | 全仓库 |
 | [.agents/skills/](../../.agents/skills/) | 项目级可执行技能：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
@@ -50,7 +50,7 @@
 | 做法 | 根 `.agents/skills/*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
 
 - 维护时机：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
-- 技能与交付给 CLI 使用者的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`（EN）与 `skills-zh/`（ZH，同结构 parity）、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`，教的是「怎么用这套工具」；前者存于 `.agents/skills/`、教的是「怎么改这个仓库」，两者按目录隔离，互不删除。
+- 技能与交付给 CLI 使用者的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`，教的是「怎么用这套工具」；前者存于 `.agents/skills/`、教的是「怎么改这个仓库」，两者按目录隔离，互不删除。
 - 归属不确定时按此判据：不写下来 agent 会做错动作 → 技能；写下来只是让人知道现状 → wiki；两者都不需要、但每次会话都要遵守 → `AGENTS.md`。
 
 ## 编写规则

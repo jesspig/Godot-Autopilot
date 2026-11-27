@@ -651,94 +651,16 @@ function parseFrontmatter(content: string, label: string): { name: string; descr
   return { name, description };
 }
 
-function commandTokens(content: string): string[] {
-  const tokens = new Set<string>();
-  for (const match of content.matchAll(/(?:^[ \t]*|`)(gda[ \t]+[a-z][a-z0-9-]*)/gm)) {
-    tokens.add(match[1].replace(/[ \t]+/g, " "));
-  }
-  for (const match of content.matchAll(/(?:^[ \t]*gda\b[^\n]*|`gda[^`]*`)/gm)) {
-    for (const flag of match[0].matchAll(/--[a-z][a-z0-9-]*/g)) {
-      tokens.add(flag[0]);
-    }
-  }
-  return [...tokens].sort();
-}
-
-function orderedCodeCommands(content: string, contract: Contract): string[] {
-  const commands: string[] = [];
-  for (const span of commandSpans(content)) {
-    const tokens = span.text.trim().split(/\s+/).filter((token) => token !== "");
-    if (tokens[0] !== "gda") {
-      continue;
-    }
-    const afterGda = tokens.slice(1);
-    if (afterGda.length > 0 && afterGda[0].startsWith("--") && contract.globalFlags.has(afterGda[0])) {
-      continue;
-    }
-    const resolved = resolveCommand(afterGda, contract);
-    commands.push(resolved === undefined ? afterGda.join(" ") : resolved.path);
-  }
-  return commands;
-}
-
-function checkParity(en: Tree, zh: Tree, contract: Contract, violations: Violation[]): void {
-  const enPaths = Object.keys(en).sort();
-  const zhPaths = Object.keys(zh).sort();
-  for (const file of enPaths) {
-    if (zh[file] === undefined) {
-      violations.push({ file: `skills-zh/${file}`, line: 1, rule: "parity", message: "missing Chinese counterpart" });
-      continue;
-    }
-    const enTokens = commandTokens(en[file]);
-    const zhTokens = commandTokens(zh[file]);
-    const missing = enTokens.filter((token) => !zhTokens.includes(token));
-    const extra = zhTokens.filter((token) => !enTokens.includes(token));
-    if (missing.length > 0) {
-      violations.push({
-        file: `skills-zh/${file}`,
-        line: 1,
-        rule: "command-parity",
-        message: `missing commands/flags from the English book: ${missing.join(", ")}`,
-      });
-    }
-    if (extra.length > 0) {
-      violations.push({
-        file: `skills-zh/${file}`,
-        line: 1,
-        rule: "command-parity",
-        message: `commands/flags not present in the English book: ${extra.join(", ")}`,
-      });
-    }
-    const enOrder = orderedCodeCommands(en[file], contract);
-    const zhOrder = orderedCodeCommands(zh[file], contract);
-    if (enOrder.join("\n") !== zhOrder.join("\n")) {
-      violations.push({
-        file: `skills-zh/${file}`,
-        line: 1,
-        rule: "command-order-parity",
-        message: "code-span commands are not in the same order as the English book",
-      });
-    }
-  }
-  for (const file of zhPaths) {
-    if (en[file] === undefined) {
-      violations.push({ file: `skills/${file}`, line: 1, rule: "parity", message: "missing English counterpart" });
-    }
-  }
-}
-
-export function checkAll(en: Tree, zh: Tree, contract: Contract): Violation[] {
+export function checkAll(en: Tree, contract: Contract): Violation[] {
   const violations: Violation[] = [];
   checkTree("skills", en, contract, violations);
-  checkTree("skills-zh", zh, contract, violations);
-  checkParity(en, zh, contract, violations);
   return violations.sort((a, b) => `${a.file}:${a.line}:${a.rule}`.localeCompare(`${b.file}:${b.line}:${b.rule}`));
 }
 
-function checkAsset(root: string, en: Tree, zh: Tree, violations: Violation[]): void {
+function checkAsset(root: string, en: Tree, violations: Violation[]): void {
   const assetPath = path.join(root, "cli", "assets", "skills.json");
   const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
-  let asset: { version?: unknown; files?: unknown; files_zh?: unknown };
+  let asset: { version?: unknown; files?: unknown };
   try {
     asset = JSON.parse(fs.readFileSync(assetPath, "utf8")) as typeof asset;
   } catch (error) {
@@ -760,7 +682,6 @@ function checkAsset(root: string, en: Tree, zh: Tree, violations: Violation[]): 
   }
   for (const [label, files, key] of [
     ["files", en, "files"],
-    ["files_zh", zh, "files_zh"],
   ] as const) {
     const embedded = asset[key];
     if (embedded === null || typeof embedded !== "object") {
@@ -821,18 +742,16 @@ function runSelfTest(contract: Contract): void {
   const overrides: Record<string, string> = {
     "godot-autopilot/SKILL.md": "---\nname: godot-autopilot\ndescription: \"sample\"\n---\n\n# godot-autopilot\n",
     "godot-autopilot/references/bad.md": badReference,
+    "godot-autopilot/OTHER.md": "unexpected file in the book root",
     "godot-autopilot/references/recipes/bootstrap.md": "# wrong-id\n\n## Intro\n\nno sections\n",
     "godot-autopilot-bad/SKILL.md": "---\nname: bad\ndescription: \"bad\"\n---\n\n# bad\n",
   };
   const en = sampleTree(overrides);
-  const zh = sampleTree({
-    "godot-autopilot/OTHER.md": "---\nname: godot-autopilot\ndescription: \"sample\"\n---\n",
-  });
   const withoutCard = { ...en };
   delete withoutCard["godot-autopilot/SKILL.md"];
   const violations = [
-    ...checkAll(withoutCard, zh, contract),
-    ...checkAll(en, zh, contract),
+    ...checkAll(withoutCard, contract),
+    ...checkAll(en, contract),
   ];
   const rules = new Set(violations.map((violation) => violation.rule));
   for (const expected of [
@@ -865,9 +784,8 @@ function main(): void {
     return;
   }
   const en = collectTree(path.join(root, "skills"));
-  const zh = collectTree(path.join(root, "skills-zh"));
-  const violations = checkAll(en, zh, contract);
-  checkAsset(root, en, zh, violations);
+  const violations = checkAll(en, contract);
+  checkAsset(root, en, violations);
   if (violations.length > 0) {
     for (const violation of violations) {
       process.stderr.write(`${violation.file}:${violation.line}: [${violation.rule}] ${violation.message}\n`);
@@ -875,7 +793,7 @@ function main(): void {
     process.stderr.write(`skills-guard FAILED with ${violations.length} violation(s)\n`);
     process.exit(1);
   }
-  process.stdout.write(`skills-guard OK (${Object.keys(en).length} EN files, ${Object.keys(zh).length} ZH files, ${contract.commands.size} commands)\n`);
+  process.stdout.write(`skills-guard OK (${Object.keys(en).length} EN files, ${contract.commands.size} commands)\n`);
 }
 
 if (import.meta.main) {
