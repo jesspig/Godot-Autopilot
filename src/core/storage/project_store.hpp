@@ -20,7 +20,7 @@ struct IpcEndpointEntry {
   std::string host;
   int port{0};
   std::string token;
-  std::string protocol{"mcp-jsonrpc"};
+  std::string protocol{"gcp-native"};
   std::string framing{"length-prefixed-json"};
   std::string auth{"token"};
   int version{1};

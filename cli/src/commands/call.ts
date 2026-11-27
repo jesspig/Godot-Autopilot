@@ -1,7 +1,7 @@
 import type { GlobalOptions } from "../args";
 import { toolRisk } from "../command-spec";
 import { CliError, ConfirmationRequiredError, ExitCode } from "../errors";
-import { callTool, ensureConnection, META_DIRECT_TOOLS } from "../mcp/client";
+import { callTool, META_DIRECT_TOOLS } from "../rpc/client";
 import { err, promptConfirmation, writeJson, type ConfirmationSummary } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, extractPayload, loadToolArguments } from "../payload";
 import { findById, findLiveByProject } from "../registry";
@@ -106,21 +106,13 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     timeoutSec,
     direct: META_DIRECT_TOOLS.has(tool),
     ipcEndpoint,
-    transport: "auto" as const,
-    noFallback: false,
     traceparent,
     progressSink,
   };
 
-  let envelope: { error?: { code?: number; message?: string }; result?: unknown };
-  if (ipcEndpoint !== undefined) {
-    envelope = await callTool(tool, args, { ...callOptions, port: 0, ipcEndpoint });
-    recordCliCall(traceId, tool, envelope, startedAt, "ipc");
-  } else {
-    await ensureConnection(target.port, timeoutSec);
-    envelope = await callTool(tool, args, callOptions);
-    recordCliCall(traceId, tool, envelope, startedAt, "ipc");
-  }
+  const envelope: { error?: { code?: number; message?: string }; result?: unknown } =
+    await callTool(tool, args, callOptions);
+  recordCliCall(traceId, tool, envelope, startedAt, "ipc");
 
   if (needsConfirmation(envelope)) {
     throw new ConfirmationRequiredError(

@@ -3,21 +3,12 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/Capabilities.hpp>
-#include <mcp/McpError.hpp>
-#include <mcp/Methods.hpp>
-#include <mcp/storage/FileTaskStore.hpp>
-#include <mcp/client/McpClient.hpp>
-#include <mcp/protocol/McpSessionHandler.hpp>
-#include <mcp/protocol/WireCodec.hpp>
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
 
 #include <atomic>
 #include <chrono>
-#include <filesystem>
 #include <future>
 #include <memory>
+#include <mutex>
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
@@ -27,13 +18,11 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_catalog.hpp"
 #include "tools/base/tool_registry.hpp"
-#include "adapters/mcp_json_bridge.hpp"
 #include "support/tool_catalog_baseline.hpp"
 #include "util/json_value.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace {
@@ -66,77 +55,60 @@ bool is_valid_category(const std::string &category) {
   return false;
 }
 
-struct RegisteredServerFixture : ::testing::Test {
-  std::unique_ptr<mcp::McpServer> server;
-  std::unique_ptr<mcp::McpClient> client;
-  std::thread server_thread;
+struct NativeRegistrationFixture : ::testing::Test {
   godot_autopilot::CommandQueue queue;
   godot_autopilot::ToolCatalog catalog;
   godot_autopilot::Bm25Index index;
 
   void SetUp() override {
-    auto pair = mcp::InMemoryTransport::CreatePair();
-    server = mcp::McpServer::Create(pair.server);
-    godot_autopilot::register_all_tools(*server, queue, catalog, index,
-                                           9527);
-    server_thread = std::thread([this] { server->Run(); });
-
-    mcp::ClientOptions cops;
-    cops.client_info = mcp::Implementation{"GsdTestClient", "1.0.0"};
-    cops.connect_mode = mcp::ConnectMode::Auto;
-    client = mcp::McpClient::Create(pair.client, cops);
-
+    godot_autopilot::install_tool_handlers(queue, catalog, index, 9527);
     queue.drain();
     godot_autopilot::runtime_ops::set_editor_queue(&queue);
   }
 
   void TearDown() override {
     godot_autopilot::runtime_ops::set_editor_queue(nullptr);
-    if (client)
-      client->Close();
-    if (server)
-      server->Close();
-    if (server_thread.joinable())
-      server_thread.join();
+    godot_autopilot::dispatch::clear_handlers();
+    godot_autopilot::clear_active_registry();
   }
 };
 
 } // namespace
 
-TEST_F(RegisteredServerFixture, ListToolsReturnsExactlyFiveMetaTools) {
-  auto result = client->ListTools();
-  ASSERT_EQ(result.tools.size(), kMetaToolCount);
+TEST_F(NativeRegistrationFixture, RegistryExposesExactlyFiveMetaTools) {
+  const auto registry = godot_autopilot::get_active_registry();
+  ASSERT_NE(registry, nullptr);
+  ASSERT_EQ(registry->meta_size(), kMetaToolCount);
+  EXPECT_EQ(registry->all_meta().size(), kMetaToolCount);
 }
 
-TEST_F(RegisteredServerFixture, AllMetaToolNamesPresent) {
-  auto result = client->ListTools();
+TEST_F(NativeRegistrationFixture, AllMetaToolNamesPresent) {
+  const auto registry = godot_autopilot::get_active_registry();
+  ASSERT_NE(registry, nullptr);
   for (const char *name : kMetaToolNames) {
-    bool found = false;
-    for (const auto &tool : result.tools) {
-      if (tool.name == name)
-        found = true;
-    }
-    EXPECT_TRUE(found) << "meta tool missing from ListTools: " << name;
+    const auto tool = registry->find_meta(name);
+    ASSERT_NE(tool, nullptr) << "meta tool missing from registry: " << name;
+    EXPECT_EQ(tool->meta().name, name);
   }
 }
 
-TEST_F(RegisteredServerFixture, MetaToolAttributesNonEmpty) {
-  auto result = client->ListTools();
-  for (const auto &tool : result.tools) {
-    EXPECT_FALSE(tool.name.empty());
-    EXPECT_TRUE(tool.description.has_value())
-        << "tool has no description: " << tool.name;
-    if (tool.description.has_value()) {
-      EXPECT_FALSE(tool.description->empty());
-    }
+TEST_F(NativeRegistrationFixture, MetaToolAttributesNonEmpty) {
+  const auto registry = godot_autopilot::get_active_registry();
+  ASSERT_NE(registry, nullptr);
+  for (const auto &tool : registry->all_meta()) {
+    EXPECT_FALSE(tool->meta().name.empty());
+    EXPECT_FALSE(tool->meta().description.empty())
+        << "meta tool has no description: " << tool->meta().name;
+    EXPECT_TRUE(catalog.get_tool(tool->meta().name).has_value())
+        << "meta tool missing from catalog: " << tool->meta().name;
   }
 }
 
-TEST_F(RegisteredServerFixture, CatalogToolCountMatches) {
+TEST_F(NativeRegistrationFixture, CatalogToolCountMatches) {
   EXPECT_EQ(catalog.size(), catalog.get_all_tools().size());
 }
 
-TEST_F(RegisteredServerFixture, CatalogEntriesWellFormed) {
+TEST_F(NativeRegistrationFixture, CatalogEntriesWellFormed) {
   auto tools = catalog.get_all_tools();
   ASSERT_EQ(tools.size(), catalog.size());
   for (const auto &tool : tools) {
@@ -150,7 +122,7 @@ TEST_F(RegisteredServerFixture, CatalogEntriesWellFormed) {
   }
 }
 
-TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
+TEST_F(NativeRegistrationFixture, SchemaStatisticsBaseline) {
   size_t non_empty = 0;
   size_t empty = 0;
   std::string empty_names;
@@ -176,7 +148,7 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
   EXPECT_GT(empty, 0);
 }
 
-TEST_F(RegisteredServerFixture, ReloadScriptSchemaExposesKeepStateOptional) {
+TEST_F(NativeRegistrationFixture, ReloadScriptSchemaExposesKeepStateOptional) {
   auto info = catalog.get_tool("reload_script");
   ASSERT_TRUE(info.has_value());
   const godot_autopilot::util::JsonValue *props = info->input_schema.Find("properties");
@@ -194,7 +166,7 @@ TEST_F(RegisteredServerFixture, ReloadScriptSchemaExposesKeepStateOptional) {
   }
 }
 
-TEST_F(RegisteredServerFixture, ToolDetailSideEffectIsMachineReadable) {
+TEST_F(NativeRegistrationFixture, ToolDetailSideEffectIsMachineReadable) {
   godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   args["name"] = godot_autopilot::util::JsonValue("code_execute");
   auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
@@ -207,7 +179,7 @@ TEST_F(RegisteredServerFixture, ToolDetailSideEffectIsMachineReadable) {
   EXPECT_EQ(side_effect->GetString(), "code_execute");
 }
 
-TEST_F(RegisteredServerFixture, EveryToolDetailReportsNonEmptySideEffect) {
+TEST_F(NativeRegistrationFixture, EveryToolDetailReportsNonEmptySideEffect) {
   const auto tools = catalog.get_all_tools();
   ASSERT_GT(tools.size(), size_t{0});
   for (const auto &tool : tools) {
@@ -223,7 +195,7 @@ TEST_F(RegisteredServerFixture, EveryToolDetailReportsNonEmptySideEffect) {
   }
 }
 
-TEST_F(RegisteredServerFixture, SchemaSampledTools) {
+TEST_F(NativeRegistrationFixture, SchemaSampledTools) {
   const char *const kNonEmpty[] = {
       "property_get",          "intersect_physics_2d_ray",
       "execute_script",        "call_scene_tree_group",
@@ -245,11 +217,16 @@ TEST_F(RegisteredServerFixture, SchemaSampledTools) {
   }
 }
 
-TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
-  auto result = client->ListTools();
-  for (const auto &tool : result.tools) {
-    EXPECT_TRUE(catalog.get_tool(tool.name).has_value())
-        << "tool registered on server but missing from catalog: " << tool.name;
+TEST_F(NativeRegistrationFixture, CatalogCoversMetaTools) {
+  for (const char *name : kMetaToolNames) {
+    EXPECT_TRUE(catalog.get_tool(name).has_value())
+        << "meta tool registered but missing from catalog: " << name;
+  }
+  const auto registry = godot_autopilot::get_active_registry();
+  ASSERT_NE(registry, nullptr);
+  for (const auto &tool : registry->all_any()) {
+    EXPECT_TRUE(catalog.get_tool(tool->meta().name).has_value())
+        << "registry tool missing from catalog: " << tool->meta().name;
   }
 }
 
@@ -284,7 +261,7 @@ TEST(ToolResultIsErrorTest, DetectsRuntimeErrorFlag) {
   EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
 }
 
-TEST_F(RegisteredServerFixture, BatchExecuteSchemaDeclaresRollbackOnError) {
+TEST_F(NativeRegistrationFixture, BatchExecuteSchemaDeclaresRollbackOnError) {
   auto info = catalog.get_tool("batch_execute");
   ASSERT_TRUE(info.has_value());
   const auto *properties = info->input_schema.Find("properties");
@@ -313,23 +290,14 @@ TEST_F(RegisteredServerFixture, BatchExecuteSchemaDeclaresRollbackOnError) {
   }
 }
 
-TEST_F(RegisteredServerFixture,
+TEST_F(NativeRegistrationFixture,
        ExportStartingAfterSubmissionBlocksFinalToolExecution) {
   godot_autopilot::ExportState export_state;
   std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
-  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
-  params["name"] = godot_autopilot::util::JsonValue("search_tools");
-  params["arguments"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
-  std::promise<godot_autopilot::util::JsonValue> completed;
-  auto completed_future = completed.get_future();
-  std::thread worker([&] {
-    try {
-      completed.set_value(godot_autopilot::adapters::FromSdk(
-          client->SendRequest("tools/call",
-                              godot_autopilot::adapters::ToSdk(params)).get()));
-    } catch (...) {
-      completed.set_exception(std::current_exception());
-    }
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["query"] = godot_autopilot::util::JsonValue("scene");
+  auto completed = queue.submit([&args]() {
+    return godot_autopilot::dispatch::call_handler("search_tools", args);
   });
 
   const auto deadline = std::chrono::steady_clock::now() +
@@ -344,20 +312,14 @@ TEST_F(RegisteredServerFixture,
   queue.drain();
   export_scope.reset();
 
-  std::string response;
-  try {
-    response = completed_future.get().Dump();
-  } catch (const std::exception &error) {
-    response = error.what();
-  }
-  worker.join();
+  const std::string response = completed.get().Dump();
 
   ASSERT_TRUE(queued);
   EXPECT_NE(response.find(godot_autopilot::dispatch::export_blocked_error_text()),
             std::string::npos);
 }
 
-TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
+TEST_F(NativeRegistrationFixture, CallHandlerUnknownToolReturnsError) {
   godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
@@ -368,7 +330,7 @@ TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
             std::string::npos);
 }
 
-TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
+TEST_F(NativeRegistrationFixture, CallHandlerOversizedArgsKeepsFixedError) {
   std::string big(600, 'x');
   godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
   args["payload"] = godot_autopilot::util::JsonValue(big);
@@ -384,120 +346,60 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
       << "error message must not echo back oversized arguments";
 }
 
-TEST_F(RegisteredServerFixture, ReRegisterOnSameServerRejectsDuplicateTools) {
-  EXPECT_THROW(
-      godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527),
-      mcp::McpError);
-
-  auto result = client->ListTools();
-  EXPECT_EQ(result.tools.size(), kMetaToolCount);
+TEST_F(NativeRegistrationFixture, ReinstallHandlersIsIdempotent) {
+  const auto registry = godot_autopilot::install_tool_handlers(
+      queue, catalog, index, 9527);
+  ASSERT_NE(registry, nullptr);
+  EXPECT_EQ(registry->meta_size(), kMetaToolCount);
   EXPECT_EQ(catalog.size(), catalog.get_all_tools().size());
   EXPECT_EQ(index.size(), catalog.size());
+
+  const auto result = godot_autopilot::dispatch::call_handler(
+      "get_tool_detail",
+      godot_autopilot::util::JsonValue::Parse(R"({"name":"search_tools"})"));
+  const auto *tool = result.Find("tool");
+  ASSERT_NE(tool, nullptr);
+  EXPECT_EQ((*tool)["name"].GetString(), "search_tools");
 }
 
-TEST_F(RegisteredServerFixture, TwoIndependentServersRegisterIdentically) {
-  auto pair2 = mcp::InMemoryTransport::CreatePair();
-  auto server2 = mcp::McpServer::Create(pair2.server);
-
+TEST_F(NativeRegistrationFixture, TwoIndependentRegistrationsAreIsolated) {
   godot_autopilot::CommandQueue queue2;
   godot_autopilot::ToolCatalog catalog2;
   godot_autopilot::Bm25Index index2;
-  godot_autopilot::register_all_tools(*server2, queue2, catalog2, index2,
-                                         9528);
-
-  std::thread thread2([&server2] { server2->Run(); });
-
-  mcp::ClientOptions cops2;
-  cops2.client_info = mcp::Implementation{"GsdTestClient2", "1.0.0"};
-  cops2.connect_mode = mcp::ConnectMode::Auto;
-  auto client2 = mcp::McpClient::Create(pair2.client, cops2);
-
-  auto result1 = client->ListTools();
-  auto result2 = client2->ListTools();
-  EXPECT_EQ(result1.tools.size(), kMetaToolCount);
-  EXPECT_EQ(result2.tools.size(), kMetaToolCount);
+  const auto registry2 = godot_autopilot::install_tool_handlers(queue2, catalog2, index2, 9528);
+  ASSERT_NE(registry2, nullptr);
+  EXPECT_EQ(registry2->meta_size(), kMetaToolCount);
+  EXPECT_EQ(registry2->all_any().size(), catalog2.size());
   EXPECT_EQ(catalog2.size(), catalog.size());
-
-  client2->Close();
-  server2->Close();
-  if (thread2.joinable())
-    thread2.join();
+  EXPECT_EQ(index2.size(), catalog2.size());
+  godot_autopilot::dispatch::clear_handlers();
+  godot_autopilot::clear_active_registry();
 }
 
-TEST(RegisterAllSurfaceTest, FullSurfaceRegistersAllToolsAcrossPages) {
-  auto pair = mcp::InMemoryTransport::CreatePair();
-  mcp::ServerOptions full_options;
-  full_options.enable_progressive_discovery = true;
-  auto full_server = mcp::McpServer::Create(pair.server, full_options);
-
+TEST(RegisterAllSurfaceTest, FullSurfaceRegistersAllTools) {
   godot_autopilot::CommandQueue full_queue;
   godot_autopilot::ToolCatalog full_catalog;
   godot_autopilot::Bm25Index full_index;
-  godot_autopilot::register_all_tools(
-      *full_server, full_queue, full_catalog, full_index, 9530,
+  const auto registry = godot_autopilot::install_tool_handlers(
+      full_queue, full_catalog, full_index, 9530,
       godot_autopilot::ToolSurface::Full);
-
-  std::thread full_thread([&full_server] { full_server->Run(); });
-
-  mcp::ClientOptions cops;
-  cops.client_info = mcp::Implementation{"GsdFullSurfaceClient", "1.0.0"};
-  cops.connect_mode = mcp::ConnectMode::Auto;
-  auto full_client = mcp::McpClient::Create(pair.client, cops);
-
-  auto all_tools = full_client->ListToolsAll();
-  EXPECT_EQ(all_tools.tools.size(), full_catalog.size());
+  ASSERT_NE(registry, nullptr);
+  EXPECT_EQ(full_catalog.size(), full_index.size());
+  EXPECT_EQ(registry->all_any().size(), full_catalog.size());
   EXPECT_GT(full_catalog.size(), static_cast<size_t>(7));
-
-  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
-  godot_autopilot::util::JsonValue first_json =
-      godot_autopilot::adapters::FromSdk(
-          full_client->SendRequest("tools/list",
-                                   godot_autopilot::adapters::ToSdk(params)).get());
-  const auto *first_tools = first_json.Find("tools");
-  ASSERT_NE(first_tools, nullptr) << first_json.Dump();
-  ASSERT_TRUE(first_tools->IsArray()) << first_json.Dump();
-  EXPECT_EQ(first_tools->GetArray().size(), static_cast<size_t>(100));
-  const auto *next_cursor = first_json.Find("nextCursor");
-  ASSERT_NE(next_cursor, nullptr) << first_json.Dump();
-  EXPECT_TRUE(next_cursor->IsString()) << first_json.Dump();
-
-  bool has_scene_node = false;
-  for (const auto &tool : all_tools.tools) {
-    if (tool.name == "create_scene_node") {
-      has_scene_node = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(has_scene_node);
-
-  full_client->Close();
-  full_server->Close();
-  if (full_thread.joinable()) full_thread.join();
+  EXPECT_TRUE(full_catalog.get_tool("create_scene_node").has_value());
+  godot_autopilot::dispatch::clear_handlers();
+  godot_autopilot::clear_active_registry();
 }
 
-TEST(RegisterAllSurfaceTest, FullSurfaceSendsListChangedOnDynamicRefresh) {
-  auto pair = mcp::InMemoryTransport::CreatePair();
-  mcp::ServerOptions full_options;
-  full_options.enable_progressive_discovery = true;
-  auto full_server = mcp::McpServer::Create(pair.server, full_options);
-
+TEST(RegisterAllSurfaceTest, FullSurfaceDynamicRefreshKeepsRegistryInSync) {
   godot_autopilot::CommandQueue full_queue;
   godot_autopilot::ToolCatalog full_catalog;
   godot_autopilot::Bm25Index full_index;
-  godot_autopilot::register_all_tools(
-      *full_server, full_queue, full_catalog, full_index, 9531,
+  godot_autopilot::install_tool_handlers(
+      full_queue, full_catalog, full_index, 9531,
       godot_autopilot::ToolSurface::Full);
-
-  auto session = std::make_shared<mcp::McpSessionHandler>(
-      std::move(pair.client), mcp::MakeWireCodec("2025-03-26"));
-  session->Start();
-
-  auto received = std::make_shared<std::promise<void>>();
-  auto received_future = received->get_future();
-  session->SetNotificationHandler(
-      mcp::notifications::kToolListChanged,
-      [received](const mcp::JsonRpcNotification &) { received->set_value(); });
-
+  const size_t before = full_catalog.size();
   {
     std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
     godot_autopilot::ToolSpec spec{
@@ -509,75 +411,46 @@ TEST(RegisterAllSurfaceTest, FullSurfaceSendsListChangedOnDynamicRefresh) {
     godot_autopilot::dynamic_specs::store().push_back(std::move(spec));
   }
   godot_autopilot::refresh_dynamic_tools();
-
-  EXPECT_EQ(received_future.wait_for(std::chrono::seconds(3)),
-            std::future_status::ready);
-
+  auto registry = godot_autopilot::get_active_registry();
+  EXPECT_TRUE(full_catalog.get_tool("gda_test_dynamic_tool").has_value());
+  EXPECT_NE(registry->find_any("gda_test_dynamic_tool"), nullptr);
   {
     std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
     godot_autopilot::dynamic_specs::store().clear();
   }
   godot_autopilot::refresh_dynamic_tools();
-
-  session->Close();
-  full_server->Close();
+  registry = godot_autopilot::get_active_registry();
+  EXPECT_FALSE(full_catalog.get_tool("gda_test_dynamic_tool").has_value());
+  EXPECT_EQ(registry->find_any("gda_test_dynamic_tool"), nullptr);
+  EXPECT_EQ(full_catalog.size(), before);
+  godot_autopilot::dispatch::clear_handlers();
+  godot_autopilot::clear_active_registry();
 }
 
-TEST(RegisterAllSurfaceTest, TasksExtensionIsAdvertisedAndCallToolIsTaskOptional) {
-  auto pair = mcp::InMemoryTransport::CreatePair();
-  const std::filesystem::path task_path =
-      std::filesystem::temp_directory_path() /
-      "gda_tasks_test_register_all.jsonl";
-  std::filesystem::remove(task_path);
-  mcp::ServerOptions task_options;
-  task_options.enable_tasks_extension = true;
-  task_options.task_store = std::make_shared<mcp::FileTaskStore>(task_path);
-  auto task_server = mcp::McpServer::Create(pair.server, task_options);
-
+TEST(RegisterAllSurfaceTest, CallToolMetaToolIsRegisteredForNativeTasks) {
   godot_autopilot::CommandQueue task_queue;
   godot_autopilot::ToolCatalog task_catalog;
   godot_autopilot::Bm25Index task_index;
-  godot_autopilot::register_all_tools(*task_server, task_queue, task_catalog,
-                                      task_index, 9532);
-
-  std::thread task_thread([&task_server] { task_server->Run(); });
-
-  mcp::ClientOptions cops;
-  cops.client_info = mcp::Implementation{"GsdTaskClient", "1.0.0"};
-  cops.connect_mode = mcp::ConnectMode::Auto;
-  cops.enable_tasks_extension = true;
-  auto task_client = mcp::McpClient::Create(pair.client, cops);
-
-  const mcp::ServerCapabilities capabilities =
-      task_client->GetServerCapabilities();
-  ASSERT_TRUE(capabilities.extensions.has_value());
-  const auto tasks_extension =
-      capabilities.extensions->find(std::string(mcp::kTasksExtensionId));
-  EXPECT_NE(tasks_extension, capabilities.extensions->end());
-
-  auto tools = task_client->ListToolsAll();
-  bool found_call_tool = false;
-  for (const auto &tool : tools.tools) {
-    if (tool.name != "call_tool") continue;
-    found_call_tool = true;
-    ASSERT_TRUE(tool.execution.has_value());
-    EXPECT_EQ(tool.execution->mode, mcp::ToolExecutionMode::Task);
-    ASSERT_TRUE(tool.execution->task_support.has_value());
-    EXPECT_EQ(*tool.execution->task_support, mcp::TaskSupport::Optional);
-  }
-  EXPECT_TRUE(found_call_tool);
-
-  task_client->Close();
-  task_server->Close();
-  if (task_thread.joinable()) task_thread.join();
-  std::filesystem::remove(task_path);
+  const auto registry = godot_autopilot::install_tool_handlers(
+      task_queue, task_catalog, task_index, 9532);
+  ASSERT_NE(registry, nullptr);
+  ASSERT_NE(registry->find_meta("call_tool"), nullptr);
+  const auto info = task_catalog.get_tool("call_tool");
+  ASSERT_TRUE(info.has_value());
+  const auto *props = info->input_schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  ASSERT_TRUE(props->IsObject());
+  EXPECT_NE(props->Find("name"), nullptr);
+  EXPECT_NE(props->Find("arguments"), nullptr);
+  godot_autopilot::dispatch::clear_handlers();
+  godot_autopilot::clear_active_registry();
 }
 
-TEST_F(RegisteredServerFixture, Bm25IndexPopulatedAfterRegistration) {
+TEST_F(NativeRegistrationFixture, Bm25IndexPopulatedAfterRegistration) {
   EXPECT_EQ(index.size(), catalog.size());
 }
 
-TEST_F(RegisteredServerFixture, JsonValueParametersOmitTypeInSchema) {
+TEST_F(NativeRegistrationFixture, JsonValueParametersOmitTypeInSchema) {
   const char *const kJsonValueTools[] = {
       "property_set",
       "set_script_property",
@@ -606,7 +479,7 @@ TEST_F(RegisteredServerFixture, JsonValueParametersOmitTypeInSchema) {
   }
 }
 
-TEST_F(RegisteredServerFixture, SceneWritingToolsDeclareWritesScene) {
+TEST_F(NativeRegistrationFixture, SceneWritingToolsDeclareWritesScene) {
   const char *const kSceneWriters[] = {
       "property_set",
       "set_properties_batch",
@@ -648,7 +521,7 @@ TEST_F(RegisteredServerFixture, SceneWritingToolsDeclareWritesScene) {
   }
 }
 
-TEST_F(RegisteredServerFixture, ClickGameUiElementSchemaDeclaresStrictHit) {
+TEST_F(NativeRegistrationFixture, ClickGameUiElementSchemaDeclaresStrictHit) {
   auto info = catalog.get_tool("click_game_ui_element");
   ASSERT_TRUE(info.has_value());
   const auto *props = info->input_schema.Find("properties");
@@ -675,7 +548,7 @@ TEST_F(RegisteredServerFixture, ClickGameUiElementSchemaDeclaresStrictHit) {
   }
 }
 
-TEST_F(RegisteredServerFixture, GetGameUiElementsDescriptionDocumentsMouseFilterAndZIndex) {
+TEST_F(NativeRegistrationFixture, GetGameUiElementsDescriptionDocumentsMouseFilterAndZIndex) {
   auto info = catalog.get_tool("get_game_ui_elements");
   ASSERT_TRUE(info.has_value());
   EXPECT_NE(info->description.find("mouse_filter"), std::string::npos);
@@ -683,7 +556,7 @@ TEST_F(RegisteredServerFixture, GetGameUiElementsDescriptionDocumentsMouseFilter
   EXPECT_NE(info->description.find("z_index"), std::string::npos);
 }
 
-TEST_F(RegisteredServerFixture, ClickGameUiElementDescriptionDocumentsHitDiagnostics) {
+TEST_F(NativeRegistrationFixture, ClickGameUiElementDescriptionDocumentsHitDiagnostics) {
   auto info = catalog.get_tool("click_game_ui_element");
   ASSERT_TRUE(info.has_value());
   const char *const kExpected[] = {"hit_path",   "hit_mismatch", "warning",
@@ -693,7 +566,7 @@ TEST_F(RegisteredServerFixture, ClickGameUiElementDescriptionDocumentsHitDiagnos
   }
 }
 
-TEST_F(RegisteredServerFixture, ValidateGameUiLayoutDescriptionDocumentsOccluderFields) {
+TEST_F(NativeRegistrationFixture, ValidateGameUiLayoutDescriptionDocumentsOccluderFields) {
   auto info = catalog.get_tool("validate_game_ui_layout");
   ASSERT_TRUE(info.has_value());
   const char *const kExpected[] = {
@@ -721,7 +594,7 @@ TEST_F(RegisteredServerFixture, ValidateGameUiLayoutDescriptionDocumentsOccluder
             std::string::npos);
 }
 
-TEST_F(RegisteredServerFixture, RegistryIsSingleSourceOfTools) {
+TEST_F(NativeRegistrationFixture, RegistryIsSingleSourceOfTools) {
   auto reg = godot_autopilot::get_active_registry();
 
   EXPECT_EQ(reg->meta_size(), kMetaToolCount);

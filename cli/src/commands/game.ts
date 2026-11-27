@@ -69,7 +69,14 @@ const GAME_COMMANDS: Readonly<Record<string, DomainCommand>> = {
       const duration = flagNumber(opts, "--duration");
       if (type !== undefined) args.type = type;
       if (mode !== undefined) args.mode = mode;
-      if (event !== undefined) args.event = parseJsonValue(event, "--event");
+      if (event !== undefined) {
+        const parsed = parseJsonValue(event, "--event");
+        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+          Object.assign(args, parsed as Record<string, unknown>);
+        } else {
+          args.event = parsed;
+        }
+      }
       if (duration !== undefined) args.duration_ms = duration;
       return args;
     },

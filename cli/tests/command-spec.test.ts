@@ -129,10 +129,10 @@ describe("严格参数解析", () => {
     expect(error.suggestion).toContain("gda tool.search --help");
   });
 
-  test("MCP 专属 flag 不被 spec 接受", () => {
-    const error = usageError("tool.call", ["ping", "--mcp-url", "http://localhost"]);
+  test("传输专属 flag 不被 spec 接受", () => {
+    const error = usageError("tool.call", ["ping", "--remote-url", "http://localhost"]);
     expect(error.code).toBe(ExitCode.Usage);
-    expect(error.message).toContain("unknown option --mcp-url");
+    expect(error.message).toContain("unknown option --remote-url");
   });
 
   test("互斥 flags 被拒绝", () => {
@@ -159,7 +159,7 @@ describe("严格参数解析", () => {
 describe("alias 与补全", () => {
   test("alias 解析到新子命令路径", () => {
     expect(resolveCommand(["projects"])!.path).toBe("project.list");
-    expect(resolveCommand(["tasks", "wait"])!.path).toBe("job.wait");
+    expect(resolveCommand(["logs"])!.path).toBe("logs.show");
     expect(resolveCommand(["editor", "restart"])!.path).toBe("editor.restart");
   });
 

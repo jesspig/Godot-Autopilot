@@ -71,7 +71,6 @@ function pluginRecord(port: number, overrides: Record<string, unknown> = {}): Re
     project_path: path.join(tmpHome, "plugin-project"),
     api_token: "plugin-token",
     endpoints: {
-      mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
       api: { host: "127.0.0.1", port, path: "/api", protocol: "http", auth: "bearer" },
     },
     gda_home: tmpHome,

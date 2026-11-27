@@ -64,7 +64,7 @@ TEST(ErrorPathLogTest, LogErrorPathWritesTransportErrorEntry) {
     ASSERT_EQ(entries.size(), 1u);
     EXPECT_EQ(entries[0].level, LogLevel::Error);
     EXPECT_EQ(entries[0].category, LogCategory::Transport);
-    EXPECT_EQ(entries[0].message, "MCP error path");
+    EXPECT_EQ(entries[0].message, "native error path");
     EXPECT_NE(entries[0].detail.find("method=\"tools/call\""),
               std::string::npos);
     EXPECT_NE(entries[0].detail.find("error_code=-32603"), std::string::npos);

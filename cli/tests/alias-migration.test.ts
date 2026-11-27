@@ -21,17 +21,15 @@ describe("Alias 与迁移映射", () => {
   test("每个旧顶层命令保留 alias", () => {
     for (const name of [
       "ping", "status", "categories", "search", "describe", "call", "batch", "list",
-      "start", "stop", "restart", "logs", "docs", "skills", "tools", "resources",
-      "prompts", "tasks", "projects", "cache", "install", "update", "trace", "monitor",
+      "start", "stop", "restart", "logs", "docs", "skills", "tools",
+      "projects", "cache", "install", "update", "trace", "monitor",
     ]) {
       expect(COMMAND_ALIASES.has(name)).toBe(true);
     }
   });
 
-  test("MCP 专属 flag 迁移映射完整", () => {
+  test("已退役 flag 迁移映射完整", () => {
     const entries = new Map(FLAG_MIGRATIONS.map((entry) => [entry.from, entry.to]));
-    expect(entries.get("--transport")).toBe("");
-    expect(entries.get("--no-fallback")).toBe("");
     expect(entries.get("--direct")).toBe("gda tool call");
     expect(entries.get("--input")).toBe("--confirm");
     expect(entries.get("--async")).toBe("gda job");
@@ -43,7 +41,7 @@ describe("Alias 与迁移映射", () => {
 
   test("公开帮助与 manifest 迁移信息一致", () => {
     const help = usageText();
-    for (const removed of ["--transport", "--no-fallback", "--direct", "--input", "--async"]) {
+    for (const removed of ["--direct", "--input", "--async"]) {
       expect(help).not.toMatch(new RegExp(`(^|\\s)${removed}(?=\\s|$)`));
     }
     expect(help).toContain("--format <json>");

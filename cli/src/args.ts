@@ -52,7 +52,6 @@ export interface GlobalOptions {
   limitText?: string;
   saveText?: string;
   intervalText?: string;
-  templates?: boolean;
   progress?: boolean;
   docsFile?: string;
   section?: string;
@@ -127,7 +126,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--all-buckets": "all",
   "--projects": "projectsView",
   "--stale": "stale",
-  "--templates": "templates",
   "--progress": "progress",
   "--offline": "offline",
   "--with-csharp-runtime": "withCsharpRuntime",
@@ -273,17 +271,6 @@ Commands:
   skills list         List the bundled skill books (offline, --zh for Chinese)
   skills show <name>  Print one skill book's SKILL.md; --skill-file <rel> reads an auxiliary file
   tools list          List canonical tools from a live instance (--category/--tag)
-  resources list      List project resources (--templates)
-  resources templates List resource templates
-  resources read <uri> Read one resource (--pretty/--raw/--save <dir>)
-  resources watch <uri> Poll a resource and print changes (--interval sec)
-  prompts list        List prompt templates
-  prompts get <name>  Render one prompt (--args JSON)
-  tasks list          List locally recorded tasks
-  tasks get <id>      Get one task
-  tasks wait <id>     Wait for a task to finish (--timeout)
-  tasks cancel <id>   Cancel a task
-  tasks clean         Remove terminal tasks from the local index
   projects            List known Godot projects (offline)
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
@@ -330,8 +317,6 @@ Global options:
   --args-file <path>  Tool arguments from a JSON file (- reads stdin)
   --save-images <dir> Write returned images to a local directory
   --save <dir>        Write blobs to a directory
-  --templates         resources list: include resource templates
-  --interval <sec>    resources watch polling interval (default 1)
   --godot <path>      Explicit Godot executable (start)
   --headless          Start the editor headless (start)
   --play              Play the current scene once ready (start)

@@ -1,0 +1,604 @@
+#include "gda_log_dock.hpp"
+
+#include <chrono>
+#include <cstddef>
+#include <cstdio>
+#include <ctime>
+#include <string>
+#include <unordered_map>
+
+#include "core/observability/log_persist.hpp"
+#include "core/observability/monitor.hpp"
+#include "core/plugin_config.hpp"
+#include "core/observability/trace_recorder.hpp"
+#include "util/input_guards.hpp"
+
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/font.hpp>
+#include <godot_cpp/classes/h_box_container.hpp>
+#include <godot_cpp/classes/h_flow_container.hpp>
+#include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/theme.hpp>
+#include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+
+namespace godot_autopilot {
+
+static const char *LEVEL_ICON_NAMES[4] = {"Debug", "Popup", "StatusWarning",
+                                          "StatusError"};
+
+static const char *LEVEL_TOOLTIPS[4] = {"Toggle visibility of debug messages.",
+                                        "Toggle visibility of info messages.",
+                                        "Toggle visibility of warnings.",
+                                        "Toggle visibility of errors."};
+
+GdaLogDock::GdaLogDock() : log_system(&LogSystem::instance()) {
+  set_title("GDA Log");
+  show_time_ = PluginConfig::load_show_time();
+  set_icon_name("Node");
+  set_default_slot(EditorDock::DOCK_SLOT_BOTTOM);
+  set_closable(true);
+  set_global(false);
+  set_custom_minimum_size(godot::Vector2(0, DEFAULT_DOCK_HEIGHT));
+
+  auto *main_vbox = memnew(godot::VBoxContainer);
+  main_vbox->set_anchors_and_offsets_preset(godot::Control::PRESET_FULL_RECT);
+  add_child(main_vbox);
+
+  log_display = memnew(godot::RichTextLabel);
+  log_display->set_threaded(true);
+  log_display->set_use_bbcode(true);
+  log_display->set_scroll_follow(true);
+  log_display->set_selection_enabled(true);
+  log_display->set_context_menu_enabled(true);
+  log_display->set_focus_mode(godot::Control::FOCUS_CLICK);
+  log_display->set_v_size_flags(godot::Control::SIZE_EXPAND_FILL);
+  log_display->set_h_size_flags(godot::Control::SIZE_EXPAND_FILL);
+  log_display->set_deselect_on_focus_loss_enabled(false);
+  main_vbox->add_child(log_display);
+
+  auto *bottom_hf = memnew(godot::HFlowContainer);
+  bottom_hf->set_alignment(godot::FlowContainer::ALIGNMENT_END);
+  main_vbox->add_child(bottom_hf);
+
+  clear_button = memnew(godot::Button);
+  clear_button->set_theme_type_variation("BottomPanelButton");
+  clear_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  clear_button->set_tooltip_text("Clear all messages");
+  bottom_hf->add_child(clear_button);
+
+  collapse_button = memnew(godot::Button);
+  collapse_button->set_theme_type_variation("BottomPanelButton");
+  collapse_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  collapse_button->set_toggle_mode(true);
+  collapse_button->set_tooltip_text(
+      "Collapse consecutive identical messages into one entry. Shows number of "
+      "occurrences.");
+  bottom_hf->add_child(collapse_button);
+
+  detail_button = memnew(godot::Button);
+  detail_button->set_theme_type_variation("BottomPanelButton");
+  detail_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  detail_button->set_toggle_mode(true);
+  detail_button->set_pressed(false);
+  detail_button->set_text("Detail");
+  detail_button->set_tooltip_text(
+      "Show the detail line under each message when available.");
+  bottom_hf->add_child(detail_button);
+
+  open_logs_button = memnew(godot::Button);
+  open_logs_button->set_theme_type_variation("BottomPanelButton");
+  open_logs_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  open_logs_button->set_text("Open Logs");
+  std::string log_tooltip = "Open the GDA log directory.";
+  const std::string log_dir_path = LogPersist::instance().log_dir();
+  if (!log_dir_path.empty()) {
+    log_tooltip = "Open the GDA log directory: " + log_dir_path;
+  }
+  open_logs_button->set_tooltip_text(godot::String::utf8(log_tooltip.c_str()));
+  bottom_hf->add_child(open_logs_button);
+
+  open_traces_button = memnew(godot::Button);
+  open_traces_button->set_theme_type_variation("BottomPanelButton");
+  open_traces_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  open_traces_button->set_text("Open Traces");
+  std::string trace_tooltip = "Open the GDA trace directory.";
+  const std::string trace_dir_path = LogPersist::instance().trace_dir();
+  if (!trace_dir_path.empty()) {
+    trace_tooltip = "Open the GDA trace directory: " + trace_dir_path;
+  }
+  open_traces_button->set_tooltip_text(
+      godot::String::utf8(trace_tooltip.c_str()));
+  bottom_hf->add_child(open_traces_button);
+
+  trace_button = memnew(godot::Button);
+  trace_button->set_theme_type_variation("BottomPanelButton");
+  trace_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  trace_button->set_toggle_mode(true);
+  trace_button->set_pressed(false);
+  trace_button->set_text("Trace");
+  trace_button->set_tooltip_text(
+      "Show trace events instead of human log lines.");
+  bottom_hf->add_child(trace_button);
+
+  search_box = memnew(godot::LineEdit);
+  search_box->set_custom_minimum_size(godot::Vector2(150, 0));
+  search_box->set_h_size_flags(godot::Control::SIZE_EXPAND_FILL);
+  search_box->set_placeholder("Filter Messages");
+  search_box->set_clear_button_enabled(true);
+  bottom_hf->add_child(search_box);
+
+  category_filter = memnew(godot::OptionButton);
+  category_filter->add_item("All");
+  category_filter->add_item("System");
+  category_filter->add_item("Transport");
+  category_filter->add_item("Tools");
+  category_filter->add_item("Resources");
+  category_filter->add_item("Prompts");
+  category_filter->select(0);
+  bottom_hf->add_child(category_filter);
+
+  auto *filter_box = memnew(godot::HBoxContainer);
+  bottom_hf->add_child(filter_box);
+  for (int i = 0; i < 4; i++) {
+    filter_buttons[i] = memnew(godot::Button);
+    filter_buttons[i]->set_toggle_mode(true);
+    filter_buttons[i]->set_pressed(true);
+    filter_buttons[i]->set_text("0");
+    filter_buttons[i]->set_tooltip_text(LEVEL_TOOLTIPS[i]);
+    filter_buttons[i]->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+    filter_buttons[i]->set_theme_type_variation("EditorLogFilterButton");
+    filter_box->add_child(filter_buttons[i]);
+  }
+
+  search_box->connect("text_changed",
+                      callable_mp(this, &GdaLogDock::_on_search_changed));
+  for (int i = 0; i < 4; i++) {
+    filter_buttons[i]->connect(
+        "toggled", callable_mp(this, &GdaLogDock::_on_filter_toggled).bind(i));
+  }
+  category_filter->connect(
+      "item_selected", callable_mp(this, &GdaLogDock::_on_category_changed));
+  clear_button->connect("pressed", callable_mp(this, &GdaLogDock::_on_clear));
+  collapse_button->connect(
+      "toggled", callable_mp(this, &GdaLogDock::_on_collapse_toggled));
+  detail_button->connect(
+      "toggled", callable_mp(this, &GdaLogDock::_on_detail_toggled));
+  open_logs_button->connect("pressed",
+                            callable_mp(this, &GdaLogDock::_on_open_logs));
+  open_traces_button->connect("pressed",
+                              callable_mp(this, &GdaLogDock::_on_open_traces));
+  trace_button->connect("toggled",
+                        callable_mp(this, &GdaLogDock::_on_trace_toggled));
+  log_display->connect("meta_clicked",
+                       callable_mp(this, &GdaLogDock::_on_meta_clicked));
+
+  _update_theme();
+  _rebuild_log();
+}
+
+void GdaLogDock::_bind_methods() {}
+
+godot::String GdaLogDock::format_hms(std::chrono::system_clock::time_point tp) {
+  std::time_t t = std::chrono::system_clock::to_time_t(tp);
+  std::tm tm{};
+#ifdef _WIN32
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
+  char buf[16];
+  std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min,
+                tm.tm_sec);
+  return godot::String(buf);
+}
+
+void GdaLogDock::_notification(int p_what) {
+  switch (p_what) {
+  case NOTIFICATION_ENTER_TREE:
+  case NOTIFICATION_THEME_CHANGED:
+    _update_theme();
+    break;
+  }
+}
+
+void GdaLogDock::_update_theme() {
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor)
+    return;
+  auto theme = editor->get_editor_theme();
+  if (theme.is_null())
+    return;
+
+  const godot::StringName editor_icons("EditorIcons");
+  const godot::StringName editor_fonts("EditorFonts");
+  const godot::StringName editor_type("Editor");
+
+  theme_cache.error_color = theme->has_color("error_color", editor_type)
+                                ? theme->get_color("error_color", editor_type)
+                                : godot::Color(1, 0.3, 0.3);
+  theme_cache.warning_color =
+      theme->has_color("warning_color", editor_type)
+          ? theme->get_color("warning_color", editor_type)
+          : godot::Color(1, 0.85, 0.4);
+  theme_cache.info_color = theme->has_color("font_color", editor_type)
+                               ? theme->get_color("font_color", editor_type)
+                               : godot::Color(0.9, 0.9, 0.9);
+  theme_cache.debug_color = theme_cache.info_color * godot::Color(1, 1, 1, 0.6);
+
+  if (theme->has_font("output_source", editor_fonts))
+    log_display->add_theme_font_override(
+        "normal_font", theme->get_font("output_source", editor_fonts));
+  if (theme->has_font("output_source_bold", editor_fonts))
+    log_display->add_theme_font_override(
+        "bold_font", theme->get_font("output_source_bold", editor_fonts));
+  if (theme->has_font("output_source_italic", editor_fonts))
+    log_display->add_theme_font_override(
+        "italics_font", theme->get_font("output_source_italic", editor_fonts));
+  if (theme->has_font("output_source_mono", editor_fonts))
+    log_display->add_theme_font_override(
+        "mono_font", theme->get_font("output_source_mono", editor_fonts));
+  if (theme->has_font_size("output_source_size", editor_fonts)) {
+    int fs = theme->get_font_size("output_source_size", editor_fonts);
+    log_display->add_theme_font_size_override("normal_font_size", fs);
+    log_display->add_theme_font_size_override("bold_font_size", fs);
+    log_display->add_theme_font_size_override("italics_font_size", fs);
+    log_display->add_theme_font_size_override("mono_font_size", fs);
+  }
+  log_display->add_theme_constant_override("text_highlight_h_padding", 0);
+  log_display->add_theme_constant_override("text_highlight_v_padding", 0);
+
+  if (theme->has_icon("Clear", editor_icons))
+    clear_button->set_button_icon(theme->get_icon("Clear", editor_icons));
+  if (theme->has_icon("CombineLines", editor_icons))
+    collapse_button->set_button_icon(
+        theme->get_icon("CombineLines", editor_icons));
+  if (theme->has_icon("Search", editor_icons))
+    search_box->set_right_icon(theme->get_icon("Search", editor_icons));
+
+  for (int i = 0; i < 4; i++) {
+    if (theme->has_icon(LEVEL_ICON_NAMES[i], editor_icons))
+      filter_buttons[i]->set_button_icon(
+          theme->get_icon(LEVEL_ICON_NAMES[i], editor_icons));
+  }
+}
+
+void GdaLogDock::refresh() { _rebuild_log(); }
+
+void GdaLogDock::poll_new_entries() {
+  if (trace_mode_) {
+    return;
+  }
+  size_t next = last_index_;
+  auto entries = log_system->query_from(last_index_, &next);
+  if (entries.empty())
+    return;
+
+  last_index_ = next;
+  if (!collapse) {
+    for (const auto &e : entries) {
+      _add_log_line(e);
+    }
+    _update_filter_counts();
+    return;
+  }
+
+  _rebuild_log();
+}
+
+void GdaLogDock::_update_filter_counts() {
+  auto entries = log_system->query({});
+  int counts[4] = {0, 0, 0, 0};
+  for (const auto &e : entries) {
+    counts[static_cast<int>(e.level)]++;
+  }
+  for (int i = 0; i < 4; i++) {
+    filter_buttons[i]->set_text(godot::String::num_int64(counts[i]));
+  }
+}
+
+bool GdaLogDock::_add_log_line(const LogEntry &entry, int count) {
+  if (!_check_display(entry))
+    return false;
+
+  _apply_entry_style(entry.level);
+  godot::String text;
+  if (collapse && count > 1) {
+    text = "(" + godot::String::num_int64(count) + ") " + entry.message.c_str() +
+           "  [" + format_hms(entry.timestamp) + "]";
+  } else if (show_time_) {
+    text = "[" + format_hms(entry.timestamp) + "] " + entry.message.c_str();
+  } else {
+    text = entry.message.c_str();
+  }
+  const std::string escaped_text = util::escape_bbcode(text.utf8().get_data());
+  log_display->append_text(godot::String(escaped_text.c_str()));
+  if (!entry.trace_id.empty()) {
+    log_display->push_meta(godot::String(entry.trace_id.c_str()));
+    log_display->add_text(" [trace]");
+    log_display->pop();
+  }
+  log_display->newline();
+  if (show_detail_ && !entry.detail.empty()) {
+    const std::string escaped_detail =
+        util::escape_bbcode(std::string("    ") + entry.detail);
+    log_display->append_text(godot::String(escaped_detail.c_str()));
+    log_display->newline();
+  }
+  log_display->pop();
+
+  if (log_display->get_paragraph_count() > LINE_LIMIT) {
+    log_display->remove_paragraph(0);
+  }
+  return true;
+}
+
+void GdaLogDock::_apply_entry_style(LogLevel level) {
+  switch (level) {
+  case LogLevel::Error:
+    log_display->push_color(theme_cache.error_color);
+    break;
+  case LogLevel::Warning:
+    log_display->push_color(theme_cache.warning_color);
+    break;
+  case LogLevel::Info:
+    log_display->push_color(theme_cache.info_color);
+    break;
+  default:
+    log_display->push_color(theme_cache.debug_color);
+    break;
+  }
+}
+
+bool GdaLogDock::_check_display(const LogEntry &entry) const {
+  int level_idx = static_cast<int>(entry.level);
+  if (!filter_buttons[level_idx]->is_pressed())
+    return false;
+
+  if (category_filter->get_selected() > 0) {
+    LogCategory selected_cat =
+        static_cast<LogCategory>(category_filter->get_selected() - 1);
+    if (entry.category != selected_cat)
+      return false;
+  }
+
+  if (!search_box->get_text().is_empty()) {
+    godot::String filter = search_box->get_text();
+    godot::String msg = entry.message.c_str();
+    godot::String detail = entry.detail.c_str();
+    if (msg.findn(filter) == -1 && detail.findn(filter) == -1)
+      return false;
+  }
+
+  return true;
+}
+
+void GdaLogDock::_rebuild_log() {
+  if (trace_mode_) {
+    _rebuild_trace_view();
+    return;
+  }
+
+  log_display->clear();
+
+  size_t next = 0;
+  auto entries = log_system->query_from(0, &next);
+  last_index_ = next;
+
+  if (!collapse) {
+    for (const auto &e : entries) {
+      _add_log_line(e);
+    }
+    _update_filter_counts();
+    return;
+  }
+
+  std::unordered_map<std::string, LogLevel> msg_level;
+  std::unordered_map<std::string, LogCategory> msg_cat;
+  for (const auto &e : entries) {
+    if (!msg_level.count(e.message)) {
+      msg_level[e.message] = e.level;
+      msg_cat[e.message] = e.category;
+    }
+  }
+
+  {
+    std::unordered_map<std::string, int> freq;
+    for (const auto &e : entries) {
+      if (!_check_display(e))
+        continue;
+      freq[e.message]++;
+    }
+
+    struct SegInfo {
+      int count = 0;
+      std::chrono::system_clock::time_point last_ts{};
+    };
+    std::unordered_map<std::string, SegInfo> seg;
+    for (const auto &e : entries) {
+      if (!_check_display(e))
+        continue;
+
+      if (freq[e.message] == 1) {
+        for (auto &[msg, info] : seg) {
+          if (info.count == 0)
+            continue;
+          auto le = LogEntry{info.last_ts, msg_level[msg], msg_cat[msg], msg};
+          _add_log_line(le, info.count);
+          info.count = 0;
+        }
+        auto le = LogEntry{e.timestamp, msg_level[e.message],
+                           msg_cat[e.message], e.message};
+        _add_log_line(le, 1);
+        continue;
+      }
+
+      seg[e.message].count++;
+      seg[e.message].last_ts = e.timestamp;
+    }
+
+    for (auto &[msg, info] : seg) {
+      if (info.count == 0)
+        continue;
+      auto le = LogEntry{info.last_ts, msg_level[msg], msg_cat[msg], msg};
+      _add_log_line(le, info.count);
+    }
+  }
+
+  _update_filter_counts();
+}
+
+void GdaLogDock::_on_search_changed(const godot::String &text) {
+  _rebuild_log();
+}
+
+void GdaLogDock::_on_filter_toggled(bool active, int level_idx) {
+  monitor::ui_action("log_filter_toggle",
+                     monitor::build_attrs({{"level", std::to_string(level_idx)},
+                                           {"enabled", active ? "true" : "false"}}));
+  _rebuild_log();
+}
+
+void GdaLogDock::_on_category_changed(int index) {
+  monitor::ui_action("log_category_change",
+                     monitor::build_attrs({{"index", std::to_string(index)}}));
+  _rebuild_log();
+}
+
+void GdaLogDock::_on_clear() {
+  monitor::ui_action("log_clear", monitor::build_attrs({{"mode", trace_mode_ ? "trace" : "log"}}));
+  log_display->clear();
+  last_index_ = log_system->next_index();
+}
+
+void GdaLogDock::_on_collapse_toggled(bool enabled) {
+  collapse = enabled;
+  monitor::ui_action(
+      "log_collapse_toggle",
+      monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
+  _rebuild_log();
+}
+
+void GdaLogDock::_on_detail_toggled(bool enabled) {
+  show_detail_ = enabled;
+  monitor::ui_action("log_detail_toggle",
+                     monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
+  _rebuild_log();
+}
+
+void GdaLogDock::_on_open_logs() {
+  monitor::ui_action("log_open_dir", monitor::build_attrs({{"target", "logs"}}));
+  const std::string dir = LogPersist::instance().log_dir();
+  godot::OS *os = godot::OS::get_singleton();
+  godot::Error err = godot::Error::ERR_UNAVAILABLE;
+  if (os && !dir.empty()) {
+    err = os->shell_open(godot::String::utf8(dir.c_str()));
+  }
+  if (err != godot::Error::OK) {
+    log_system->log(LogLevel::Error, LogCategory::System,
+                    "Open logs directory failed: " + dir);
+  }
+}
+
+void GdaLogDock::_on_open_traces() {
+  monitor::ui_action("log_open_dir", monitor::build_attrs({{"target", "traces"}}));
+  const std::string dir = LogPersist::instance().trace_dir();
+  godot::OS *os = godot::OS::get_singleton();
+  godot::Error err = godot::Error::ERR_UNAVAILABLE;
+  if (os && !dir.empty()) {
+    err = os->shell_open(godot::String::utf8(dir.c_str()));
+  }
+  if (err != godot::Error::OK) {
+    log_system->log(LogLevel::Error, LogCategory::System,
+                    "Open traces directory failed: " + dir);
+  }
+}
+
+void GdaLogDock::_on_trace_toggled(bool enabled) {
+  trace_mode_ = enabled;
+  monitor::ui_action("log_trace_mode",
+                     monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
+  _rebuild_log();
+}
+
+void GdaLogDock::_on_meta_clicked(const godot::Variant &meta) {
+  godot::String meta_text = meta;
+  selected_trace_ = meta_text.utf8().get_data();
+  if (!trace_button->is_pressed()) {
+    trace_button->set_pressed(true);
+  }
+  detail_button->set_pressed(true);
+  search_box->set_text(meta_text);
+  _rebuild_log();
+}
+
+void GdaLogDock::_rebuild_trace_view() {
+  log_display->clear();
+
+  std::string id = selected_trace_;
+  if (id.empty()) {
+    id = search_box->get_text().utf8().get_data();
+  }
+
+  if (id.empty()) {
+    _apply_entry_style(LogLevel::Info);
+    log_display->add_text(
+        "No trace selected. Click a [trace] marker or type a trace id in the "
+        "filter box.");
+    log_display->newline();
+    log_display->pop();
+    _update_filter_counts();
+    return;
+  }
+
+  auto events =
+      TraceRecorder::instance().query_by_trace(id);
+  if (events.empty()) {
+    _apply_entry_style(LogLevel::Warning);
+    const std::string escaped_id =
+        util::escape_bbcode(std::string("No trace events for ") + id);
+    log_display->append_text(godot::String(escaped_id.c_str()));
+    log_display->newline();
+    log_display->pop();
+    _update_filter_counts();
+    return;
+  }
+
+  for (const auto &event : events) {
+    const bool bad = !event.ok || !event.error_code.empty();
+    _apply_entry_style(bad ? LogLevel::Error : LogLevel::Info);
+
+    godot::String line = "[";
+    line += godot::String::num_int64(static_cast<int64_t>(event.seq));
+    line += "] ";
+    line += godot::String(trace_kind_name(event.kind));
+    line += " ";
+    line += godot::String(event.name.c_str());
+    if (!event.tool.empty()) {
+      line += " tool=" + godot::String(event.tool.c_str());
+    }
+    if (!event.state.empty()) {
+      line += " state=" + godot::String(event.state.c_str());
+    }
+    line += " dur=" + godot::String::num_int64(event.duration_ms) + "ms";
+    if (!event.error_code.empty()) {
+      line += " err=" + godot::String(event.error_code.c_str());
+    }
+    line += " ok=" + godot::String(event.ok ? "true" : "false");
+
+    const std::string escaped_line = util::escape_bbcode(line.utf8().get_data());
+    log_display->append_text(godot::String(escaped_line.c_str()));
+    log_display->newline();
+    log_display->pop();
+
+    if (log_display->get_paragraph_count() > LINE_LIMIT) {
+      log_display->remove_paragraph(0);
+    }
+  }
+
+  _update_filter_counts();
+}
+
+} // namespace godot_autopilot

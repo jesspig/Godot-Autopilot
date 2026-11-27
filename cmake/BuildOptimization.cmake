@@ -80,7 +80,7 @@ else()
 endif()
 
 # ── 5. Create Ninja job pools ──
-# 使用 gda_ 前缀避免与 mcp-cpp-sdk 的 compile_pool/link_pool 冲突
+# 使用 gda_ 前缀避免与上游依赖的 compile_pool/link_pool 冲突
 if(CMAKE_GENERATOR MATCHES "Ninja")
     set_property(GLOBAL APPEND PROPERTY JOB_POOLS
         gda_compile_pool=${_compile_jobs}

@@ -2,13 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/Log.hpp>
-#include <mcp/McpError.hpp>
-#include <mcp/storage/FileTaskStore.hpp>
-
-#include "support/test_temp.hpp"
-
-#include <filesystem>
 #include <string>
 
 using godot_autopilot::LogCategory;
@@ -130,74 +123,22 @@ TEST(LogSystemTest, LegacyDetailedLogLeavesTraceIdEmpty) {
     EXPECT_TRUE(results[0].span_id.empty());
 }
 
-TEST(LogSystemTest, SdkLogBridgeRoutesStoreFailureReason) {
-    const mcp::LogLevel previous_level = mcp::GetLogLevel();
-    const mcp::LogHandler previous_handler = mcp::GetLogHandler();
-    godot_autopilot::route_sdk_logs();
+TEST(LogSystemTest, NativeLogKeepsToolAndTransportCategories) {
+    LogSystem& log = LogSystem::instance();
+    log.log(LogLevel::Error, LogCategory::Tools, "NATIVELOG_tool_9f3");
+    log.log(LogLevel::Error, LogCategory::Transport, "NATIVELOG_transport_9f3");
 
-    const std::filesystem::path blocked_parent =
-        gda_test::test_temp_root() / "gda_sdk_log_bridge_blocked";
-    std::error_code ec;
-    std::filesystem::remove_all(blocked_parent, ec);
-    ASSERT_FALSE(ec);
-    const std::filesystem::path blocked_path =
-        blocked_parent / "missing-dir" / "tasks.json";
-    MCP_LOG(Error,
-            "task store: failed to open " + blocked_path.string() +
-                " for append");
+    LogSystem::Query tools;
+    tools.filter_text = "NATIVELOG_tool_9f3";
+    const auto tool_entries = log.query(tools);
+    ASSERT_EQ(tool_entries.size(), 1u);
+    EXPECT_EQ(tool_entries[0].level, LogLevel::Error);
+    EXPECT_EQ(tool_entries[0].category, LogCategory::Tools);
 
-    LogSystem::Query q;
-    q.filter_text = "task store: failed to open";
-    const auto entries = LogSystem::instance().query(q);
-    ASSERT_FALSE(entries.empty());
-    bool found = false;
-    for (const auto& entry : entries) {
-        if (entry.message.find(blocked_path.string()) == std::string::npos) {
-            continue;
-        }
-        found = true;
-        EXPECT_EQ(entry.level, LogLevel::Error);
-        EXPECT_EQ(entry.category, LogCategory::Tools);
-    }
-    EXPECT_TRUE(found);
-
-    std::filesystem::remove_all(blocked_parent, ec);
-    mcp::SetLogHandler(previous_handler);
-    mcp::SetLogLevel(previous_level);
-}
-
-TEST(LogSystemTest, SdkLogBridgeRaisesLevelToErrorAtMinimum) {
-    const mcp::LogLevel previous_level = mcp::GetLogLevel();
-    const mcp::LogHandler previous_handler = mcp::GetLogHandler();
-
-    mcp::SetLogLevel(mcp::LogLevel::Off);
-    godot_autopilot::route_sdk_logs();
-    EXPECT_EQ(mcp::GetLogLevel(), mcp::LogLevel::Error);
-
-    mcp::SetLogLevel(mcp::LogLevel::Debug);
-    godot_autopilot::route_sdk_logs();
-    EXPECT_EQ(mcp::GetLogLevel(), mcp::LogLevel::Debug);
-
-    mcp::SetLogHandler(previous_handler);
-    mcp::SetLogLevel(previous_level);
-}
-
-TEST(LogSystemTest, SdkLogBridgeMapsNonStoreLogsToTransport) {
-    const mcp::LogLevel previous_level = mcp::GetLogLevel();
-    const mcp::LogHandler previous_handler = mcp::GetLogHandler();
-    godot_autopilot::route_sdk_logs();
-
-    mcp::LogWrite(mcp::LogLevel::Error, {}, "SDKBRIDGE_transport_9f3");
-
-    LogSystem::Query q;
-    q.filter_text = "SDKBRIDGE_transport_9f3";
-    const auto entries = LogSystem::instance().query(q);
-    ASSERT_EQ(entries.size(), 1u);
-    EXPECT_EQ(entries[0].level, LogLevel::Error);
-    EXPECT_EQ(entries[0].category, LogCategory::Transport);
-    EXPECT_NE(entries[0].message.find("MCP SDK: SDKBRIDGE_transport_9f3"),
-              std::string::npos);
-
-    mcp::SetLogHandler(previous_handler);
-    mcp::SetLogLevel(previous_level);
+    LogSystem::Query transport;
+    transport.filter_text = "NATIVELOG_transport_9f3";
+    const auto transport_entries = log.query(transport);
+    ASSERT_EQ(transport_entries.size(), 1u);
+    EXPECT_EQ(transport_entries[0].level, LogLevel::Error);
+    EXPECT_EQ(transport_entries[0].category, LogCategory::Transport);
 }

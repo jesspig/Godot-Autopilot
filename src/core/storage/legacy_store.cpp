@@ -8,8 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include <mcp/McpError.hpp>
-
 #include "core/path_util.hpp"
 
 namespace godot_autopilot {

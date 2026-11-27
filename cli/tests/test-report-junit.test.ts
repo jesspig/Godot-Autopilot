@@ -75,7 +75,7 @@ function writePluginIndex(tmp: string, port: number): void {
       pid: process.pid,
       project_path: path.join(tmp, "proj"),
       endpoints: {
-        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "mcp-jsonrpc", framing: "length-prefixed-json", auth: "token", version: 1 },
+        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "gda-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 },
       },
       started_at: Date.now(),
       version: "0.3.6",

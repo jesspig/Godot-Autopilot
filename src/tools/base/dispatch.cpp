@@ -14,7 +14,6 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "tools/base/tool_spec.hpp"
-#include <mcp/Content.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -737,14 +736,6 @@ godot_autopilot::util::JsonValue call_handler(const std::string &name,
         tools::set_queued_wait_ms(waited_ms);
         return call_handler_with_context(name, args, depth_ctx);
       });
-}
-
-mcp::CallToolResult export_blocked_result() {
-  mcp::CallToolResult err;
-  err.is_error = true;
-  err.content.push_back(
-      mcp::TextContent{"text", export_blocked_json_result().Dump()});
-  return err;
 }
 
 godot_autopilot::util::JsonValue export_blocked_json_result() {

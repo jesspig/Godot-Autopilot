@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "cli/src/command-spec.ts",
   "group_count": 24,
-  "command_count": 85,
+  "command_count": 129,
   "groups": [
     {
       "name": "editor",
@@ -115,7 +115,7 @@
       "positional": [],
       "flags": [
         {
-          "name": "--force",
+          "name": "--force-clear",
           "type": "boolean",
           "scope": "command",
           "description": "Confirm removal"
@@ -379,7 +379,7 @@
       "subcommand": "attach",
       "description": "Attach to a running instance",
       "tools": [
-        "debug_attach"
+        "get_debugger_stream"
       ],
       "action": "gcp.debug.attach",
       "positional": [
@@ -407,13 +407,78 @@
       "invoke": "gda debug attach"
     },
     {
+      "name": "errors",
+      "path": "debug.errors",
+      "group": "debug",
+      "subcommand": "errors",
+      "description": "Read debugger errors and cross-check the on-disk game log",
+      "tools": [
+        "get_debugger_stream",
+        "get_game_log_entries"
+      ],
+      "action": "gcp.debug.errors",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum number of entries"
+        },
+        {
+          "name": "--level",
+          "type": "string",
+          "scope": "command",
+          "description": "Minimum log level"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug errors",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug errors"
+    },
+    {
       "name": "eval",
       "path": "debug.eval",
       "group": "debug",
       "subcommand": "eval",
       "description": "Evaluate an expression in the editor",
       "tools": [
-        "debug_eval"
+        "execute_script"
       ],
       "action": "gcp.debug.eval",
       "positional": [
@@ -454,11 +519,42 @@
       "subcommand": "inspect",
       "description": "Inspect live editor state",
       "tools": [
-        "debug_inspect"
+        "get_debug_info",
+        "get_debug_object_info"
       ],
       "action": "gcp.debug.inspect",
       "positional": [],
       "flags": [
+        {
+          "name": "--action",
+          "type": "string",
+          "scope": "command",
+          "description": "Debug info action: object, node, memory, catalog, or monitors"
+        },
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Object or node path"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
         {
           "name": "--project",
           "type": "string",
@@ -480,6 +576,377 @@
         }
       ],
       "invoke": "gda debug inspect"
+    },
+    {
+      "name": "output",
+      "path": "debug.output",
+      "group": "debug",
+      "subcommand": "output",
+      "description": "Read captured debugger stdout and stderr",
+      "tools": [
+        "get_debugger_stream"
+      ],
+      "action": "gcp.debug.output",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum number of entries"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug output",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug output"
+    },
+    {
+      "name": "report",
+      "path": "debug.report",
+      "group": "debug",
+      "subcommand": "report",
+      "description": "Bundle evidence from status, errors, trace, and monitor into one report",
+      "tools": [
+        "get_debugger_stream",
+        "get_game_log_entries",
+        "trace.get",
+        "game_monitor"
+      ],
+      "action": "gcp.debug.report",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--label",
+          "type": "string",
+          "scope": "command",
+          "description": "Incident label"
+        },
+        {
+          "name": "--report-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Write the report as JSON to this path"
+        },
+        {
+          "name": "--image",
+          "type": "string",
+          "scope": "command",
+          "description": "Path of an existing PNG evidence image"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug report",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug report"
+    },
+    {
+      "name": "repro",
+      "path": "debug.repro",
+      "group": "debug",
+      "subcommand": "repro",
+      "description": "Orchestrate play, input, sampling, capture, and error collection",
+      "tools": [
+        "editor_scene_control",
+        "game_input",
+        "get_game_evidence",
+        "capture_editor_viewport",
+        "get_debugger_stream"
+      ],
+      "action": "gcp.debug.repro",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Scene path to play"
+        },
+        {
+          "name": "--target",
+          "type": "string",
+          "scope": "command",
+          "description": "Capture target: editor or game"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Return the task id immediately and stream progress to stderr"
+        },
+        {
+          "name": "--after-frames",
+          "type": "number",
+          "scope": "command",
+          "description": "Wait for N rendered frames before capture"
+        },
+        {
+          "name": "--when",
+          "type": "string",
+          "scope": "command",
+          "description": "GDScript condition for capture"
+        },
+        {
+          "name": "--timeout",
+          "type": "number",
+          "scope": "command",
+          "description": "Step timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda debug repro",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug repro"
+    },
+    {
+      "name": "stack",
+      "path": "debug.stack",
+      "group": "debug",
+      "subcommand": "stack",
+      "description": "Read the debug stack and the running scene tree",
+      "tools": [
+        "get_debug_stack",
+        "get_debugger_scene_tree"
+      ],
+      "action": "gcp.debug.stack",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug stack",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug stack"
+    },
+    {
+      "name": "status",
+      "path": "debug.status",
+      "group": "debug",
+      "subcommand": "status",
+      "description": "Assemble editor, game, and trace status into one incident snapshot",
+      "tools": [
+        "system_status",
+        "get_editor_state",
+        "get_game_state",
+        "trace.get"
+      ],
+      "action": "gcp.debug.status",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug status"
+    },
+    {
+      "name": "trace",
+      "path": "debug.trace",
+      "group": "debug",
+      "subcommand": "trace",
+      "description": "Read the live trace context and local trace summary",
+      "tools": [
+        "trace.get"
+      ],
+      "action": "gcp.debug.trace",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--traceparent",
+          "type": "string",
+          "scope": "command",
+          "description": "Explicit traceparent"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda debug trace",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda debug trace"
     },
     {
       "name": "class",
@@ -552,11 +1019,11 @@
           "scope": "command",
           "description": "Remove one engine bucket",
           "conflictsWith": [
-            "--all"
+            "--all-buckets"
           ]
         },
         {
-          "name": "--all",
+          "name": "--all-buckets",
           "type": "boolean",
           "scope": "command",
           "description": "Remove every bucket",
@@ -565,7 +1032,7 @@
           ]
         },
         {
-          "name": "--force",
+          "name": "--force-clear",
           "type": "boolean",
           "scope": "command",
           "description": "Confirm removal"
@@ -754,6 +1221,64 @@
       "invoke": "gda docs sync"
     },
     {
+      "name": "diagnose",
+      "path": "doctor.diagnose",
+      "group": "doctor",
+      "subcommand": "diagnose",
+      "description": "Diagnose one target instance",
+      "tools": [
+        "doctor_diagnose"
+      ],
+      "action": "gcp.doctor.diagnose",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--ci",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Stable machine-readable checks with codes and remediation"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda doctor diagnose",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda doctor diagnose"
+    },
+    {
       "name": "run",
       "path": "doctor.run",
       "group": "doctor",
@@ -770,6 +1295,12 @@
           "type": "boolean",
           "scope": "command",
           "description": "Never use the network"
+        },
+        {
+          "name": "--ci",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Stable machine-readable checks with codes and remediation"
         }
       ],
       "output": {
@@ -800,7 +1331,7 @@
       "positional": [],
       "flags": [
         {
-          "name": "--all",
+          "name": "--all-projects",
           "type": "boolean",
           "scope": "command",
           "description": "Include projects with no running instance"
@@ -816,6 +1347,12 @@
           "type": "boolean",
           "scope": "command",
           "description": "Keep only non-live entries"
+        },
+        {
+          "name": "--probe-port",
+          "type": "string",
+          "scope": "command",
+          "description": "Probe a specific port 1-65535"
         }
       ],
       "output": {
@@ -834,6 +1371,58 @@
       "invoke": "gda editor list"
     },
     {
+      "name": "ping",
+      "path": "editor.ping",
+      "group": "editor",
+      "subcommand": "ping",
+      "description": "Check native connectivity to a running editor",
+      "tools": [
+        "ping"
+      ],
+      "action": "gcp.editor.ping",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda editor ping",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda editor ping"
+    },
+    {
       "name": "restart",
       "path": "editor.restart",
       "group": "editor",
@@ -846,7 +1435,7 @@
       "positional": [],
       "flags": [
         {
-          "name": "--force",
+          "name": "--force-stop",
           "type": "boolean",
           "scope": "command",
           "description": "Force-stop the process",
@@ -860,7 +1449,7 @@
           "scope": "command",
           "description": "Stop wait in seconds",
           "conflictsWith": [
-            "--force"
+            "--force-stop"
           ]
         },
         {
@@ -868,6 +1457,30 @@
           "type": "boolean",
           "scope": "command",
           "description": "Skip the asset import pre-step"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
         }
       ],
       "output": {
@@ -928,7 +1541,7 @@
           "description": "Readiness wait in seconds"
         },
         {
-          "name": "--probe",
+          "name": "--probe-level",
           "type": "string",
           "scope": "command",
           "description": "Liveness level: light or strict"
@@ -954,13 +1567,38 @@
       "path": "editor.status",
       "group": "editor",
       "subcommand": "status",
-      "description": "Show editor and server status",
+      "description": "Show native editor status",
       "tools": [
         "system_status"
       ],
       "action": "gcp.editor.status",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1014,7 +1652,7 @@
           "description": "Target project directory"
         },
         {
-          "name": "--force",
+          "name": "--force-stop",
           "type": "boolean",
           "scope": "command",
           "description": "Force-stop the process",
@@ -1028,8 +1666,14 @@
           "scope": "command",
           "description": "Stop wait in seconds",
           "conflictsWith": [
-            "--force"
+            "--force-stop"
           ]
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
         }
       ],
       "output": {
@@ -1048,13 +1692,291 @@
       "invoke": "gda editor stop"
     },
     {
+      "name": "capture",
+      "path": "game.capture",
+      "group": "game",
+      "subcommand": "capture",
+      "description": "Capture an editor or game viewport image",
+      "tools": [
+        "capture_editor_viewport"
+      ],
+      "action": "gcp.game.capture",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--target",
+          "type": "string",
+          "scope": "command",
+          "description": "Capture target: editor or game"
+        },
+        {
+          "name": "--save",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Write the PNG to the capture folder"
+        },
+        {
+          "name": "--dir",
+          "type": "string",
+          "scope": "command",
+          "description": "Save directory"
+        },
+        {
+          "name": "--after-frames",
+          "type": "number",
+          "scope": "command",
+          "description": "Wait for N rendered frames"
+        },
+        {
+          "name": "--when",
+          "type": "string",
+          "scope": "command",
+          "description": "GDScript condition expression"
+        },
+        {
+          "name": "--scale",
+          "type": "number",
+          "scope": "command",
+          "description": "Nearest-neighbour upscale factor"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Capture timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game capture",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game capture"
+    },
+    {
+      "name": "eval",
+      "path": "game.eval",
+      "group": "game",
+      "subcommand": "eval",
+      "description": "Run GDScript inside the running game",
+      "tools": [
+        "game_script"
+      ],
+      "action": "gcp.game.eval",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "GDScript source",
+          "conflictsWith": [
+            "--args-file"
+          ]
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Execution arguments from a JSON file (use - for stdin)",
+          "conflictsWith": [
+            "--source"
+          ]
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Execution timeout in seconds"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game eval",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game eval"
+    },
+    {
+      "name": "input",
+      "path": "game.input",
+      "group": "game",
+      "subcommand": "input",
+      "description": "Queue one input event in the running game",
+      "tools": [
+        "game_input"
+      ],
+      "action": "gcp.game.input",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--type",
+          "type": "string",
+          "scope": "command",
+          "description": "Input type: key, mouse_button, wheel, mouse_motion, action"
+        },
+        {
+          "name": "--mode",
+          "type": "string",
+          "scope": "command",
+          "description": "Input mode: event, api, or hold"
+        },
+        {
+          "name": "--event",
+          "type": "string",
+          "scope": "command",
+          "description": "Input event as JSON"
+        },
+        {
+          "name": "--duration",
+          "type": "number",
+          "scope": "command",
+          "description": "Hold duration in milliseconds"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Input arguments from a JSON file (use - for stdin)"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game input",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game input"
+    },
+    {
+      "name": "play",
+      "path": "game.play",
+      "group": "game",
+      "subcommand": "play",
+      "description": "Play the edited scene",
+      "tools": [
+        "editor_scene_control"
+      ],
+      "action": "gcp.game.play",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Scene path to open first"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game play",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game play"
+    },
+    {
+      "name": "scenario",
+      "path": "game.scenario",
+      "group": "game",
+      "subcommand": "scenario",
+      "description": "Fire an input timeline in the running game",
+      "tools": [
+        "game_input"
+      ],
+      "action": "gcp.game.scenario",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Timeline arguments from a JSON file (use - for stdin)"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Execution timeout in seconds"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda game scenario",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda game scenario"
+    },
+    {
       "name": "start",
       "path": "game.start",
       "group": "game",
       "subcommand": "start",
       "description": "Run the game",
       "tools": [
-        "game_start"
+        "editor_scene_control"
       ],
       "action": "gcp.game.start",
       "positional": [],
@@ -1094,7 +2016,7 @@
       "subcommand": "status",
       "description": "Show game run status",
       "tools": [
-        "game_status"
+        "get_game_state"
       ],
       "action": "gcp.game.status",
       "positional": [],
@@ -1121,11 +2043,18 @@
       "subcommand": "stop",
       "description": "Stop the game",
       "tools": [
-        "game_stop"
+        "editor_scene_control"
       ],
       "action": "gcp.game.stop",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1146,9 +2075,9 @@
       "path": "job.cancel",
       "group": "job",
       "subcommand": "cancel",
-      "description": "Cancel a job",
+      "description": "Cancel a job and report the actual cancel stage",
       "tools": [
-        "job_cancel"
+        "task.cancel"
       ],
       "action": "gcp.job.cancel",
       "positional": [
@@ -1165,6 +2094,42 @@
           "type": "boolean",
           "scope": "command",
           "description": "Confirm cancellation"
+        },
+        {
+          "name": "--generation",
+          "type": "number",
+          "scope": "command",
+          "description": "Binding generation"
+        },
+        {
+          "name": "--reason",
+          "type": "string",
+          "scope": "command",
+          "description": "Cancellation reason"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
         }
       ],
       "output": {
@@ -1195,7 +2160,7 @@
       "positional": [],
       "flags": [
         {
-          "name": "--force",
+          "name": "--force-clear",
           "type": "boolean",
           "scope": "command",
           "description": "Confirm removal"
@@ -1223,7 +2188,7 @@
       "subcommand": "get",
       "description": "Get one job",
       "tools": [
-        "job_get"
+        "task.get"
       ],
       "action": "gcp.job.get",
       "positional": [
@@ -1234,7 +2199,14 @@
           "description": "Job id"
         }
       ],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--generation",
+          "type": "number",
+          "scope": "command",
+          "description": "Binding generation"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1257,11 +2229,18 @@
       "subcommand": "list",
       "description": "List jobs",
       "tools": [
-        "job_list"
+        "task.list"
       ],
       "action": "gcp.job.list",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--generation",
+          "type": "number",
+          "scope": "command",
+          "description": "Only show one generation"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1278,13 +2257,168 @@
       "invoke": "gda job list"
     },
     {
+      "name": "logs",
+      "path": "job.logs",
+      "group": "job",
+      "subcommand": "logs",
+      "description": "Resume job events from an event cursor",
+      "tools": [
+        "events.subscribe",
+        "events.resume"
+      ],
+      "action": "gcp.job.logs",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "Job id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--task-id",
+          "type": "string",
+          "scope": "command",
+          "description": "Task id filter"
+        },
+        {
+          "name": "--cursor",
+          "type": "number",
+          "scope": "command",
+          "description": "Event cursor (0 = from the beginning)"
+        },
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum events per page (0 = none)"
+        },
+        {
+          "name": "--event-type",
+          "type": "string",
+          "scope": "command",
+          "description": "Event type filter"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Fetch one page and return immediately"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda job logs",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job logs"
+    },
+    {
+      "name": "status",
+      "path": "job.status",
+      "group": "job",
+      "subcommand": "status",
+      "description": "Show one job with instance and generation binding",
+      "tools": [
+        "task.get"
+      ],
+      "action": "gcp.job.status",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Job id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--generation",
+          "type": "number",
+          "scope": "command",
+          "description": "Binding generation"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda job status",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda job status"
+    },
+    {
       "name": "wait",
       "path": "job.wait",
       "group": "job",
       "subcommand": "wait",
-      "description": "Wait for a job to finish",
+      "description": "Wait for a job to finish with reconnect and preserved terminal state",
       "tools": [
-        "job_wait"
+        "task.get"
       ],
       "action": "gcp.job.wait",
       "positional": [
@@ -1301,6 +2435,54 @@
           "type": "string",
           "scope": "command",
           "description": "Wait timeout in seconds"
+        },
+        {
+          "name": "--generation",
+          "type": "number",
+          "scope": "command",
+          "description": "Binding generation"
+        },
+        {
+          "name": "--retries",
+          "type": "number",
+          "scope": "command",
+          "description": "Reconnect attempts after a dropped read"
+        },
+        {
+          "name": "--progress",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Write NDJSON progress lines to stderr"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Return the task id immediately and stream progress to stderr"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
         }
       ],
       "output": {
@@ -1317,6 +2499,265 @@
         }
       ],
       "invoke": "gda job wait"
+    },
+    {
+      "name": "cli",
+      "path": "logs.cli",
+      "group": "logs",
+      "subcommand": "cli",
+      "description": "Read CLI-side trace and log records",
+      "tools": [
+        "os_file_text"
+      ],
+      "action": "gcp.logs.cli",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--tail",
+          "type": "number",
+          "scope": "command",
+          "description": "Number of trailing lines (0 = none)"
+        },
+        {
+          "name": "--level",
+          "type": "string",
+          "scope": "command",
+          "description": "Minimum level"
+        },
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "Source substring filter"
+        },
+        {
+          "name": "--since",
+          "type": "string",
+          "scope": "command",
+          "description": "ISO time or epoch-ms lower bound"
+        },
+        {
+          "name": "--follow",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Keep polling for new lines"
+        },
+        {
+          "name": "--interval",
+          "type": "number",
+          "scope": "command",
+          "description": "Follow polling interval in seconds"
+        },
+        {
+          "name": "--export",
+          "type": "string",
+          "scope": "command",
+          "description": "Write the selected lines to a file"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda logs cli",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda logs cli"
+    },
+    {
+      "name": "editor",
+      "path": "logs.editor",
+      "group": "logs",
+      "subcommand": "editor",
+      "description": "Read the editor engine log with filtering and export",
+      "tools": [
+        "os_file_text"
+      ],
+      "action": "gcp.logs.editor",
+      "positional": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "Instance id"
+        }
+      ],
+      "flags": [
+        {
+          "name": "--tail",
+          "type": "number",
+          "scope": "command",
+          "description": "Number of trailing lines (0 = none)"
+        },
+        {
+          "name": "--level",
+          "type": "string",
+          "scope": "command",
+          "description": "Minimum level: debug, info, warning, error"
+        },
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "Source substring filter"
+        },
+        {
+          "name": "--since",
+          "type": "string",
+          "scope": "command",
+          "description": "ISO time or epoch-ms lower bound"
+        },
+        {
+          "name": "--follow",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Keep polling for new lines"
+        },
+        {
+          "name": "--interval",
+          "type": "number",
+          "scope": "command",
+          "description": "Follow polling interval in seconds"
+        },
+        {
+          "name": "--export",
+          "type": "string",
+          "scope": "command",
+          "description": "Write the selected lines to a file"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda logs editor",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda logs editor"
+    },
+    {
+      "name": "game",
+      "path": "logs.game",
+      "group": "logs",
+      "subcommand": "game",
+      "description": "Read the on-disk game log through the native tool",
+      "tools": [
+        "get_game_log_entries"
+      ],
+      "action": "gcp.logs.game",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum number of entries (0 = none)"
+        },
+        {
+          "name": "--tail",
+          "type": "number",
+          "scope": "command",
+          "description": "Number of trailing lines (0 = none)"
+        },
+        {
+          "name": "--level",
+          "type": "string",
+          "scope": "command",
+          "description": "Minimum level"
+        },
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "Source substring filter"
+        },
+        {
+          "name": "--since",
+          "type": "string",
+          "scope": "command",
+          "description": "ISO time or epoch-ms lower bound"
+        },
+        {
+          "name": "--follow",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Keep polling for new lines"
+        },
+        {
+          "name": "--interval",
+          "type": "number",
+          "scope": "command",
+          "description": "Follow polling interval in seconds"
+        },
+        {
+          "name": "--export",
+          "type": "string",
+          "scope": "command",
+          "description": "Write the selected lines to a file"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda logs game",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda logs game"
     },
     {
       "name": "list",
@@ -1344,6 +2785,106 @@
         }
       ],
       "invoke": "gda logs list"
+    },
+    {
+      "name": "plugin",
+      "path": "logs.plugin",
+      "group": "logs",
+      "subcommand": "plugin",
+      "description": "Read plugin diagnostics",
+      "tools": [
+        "get_plugin_log"
+      ],
+      "action": "gcp.logs.plugin",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum number of entries (0 = none)"
+        },
+        {
+          "name": "--tail",
+          "type": "number",
+          "scope": "command",
+          "description": "Number of trailing lines (0 = none)"
+        },
+        {
+          "name": "--level",
+          "type": "string",
+          "scope": "command",
+          "description": "Minimum level"
+        },
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "Source substring filter"
+        },
+        {
+          "name": "--since",
+          "type": "string",
+          "scope": "command",
+          "description": "ISO time or epoch-ms lower bound"
+        },
+        {
+          "name": "--follow",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Keep polling for new lines"
+        },
+        {
+          "name": "--interval",
+          "type": "number",
+          "scope": "command",
+          "description": "Follow polling interval in seconds"
+        },
+        {
+          "name": "--export",
+          "type": "string",
+          "scope": "command",
+          "description": "Write the selected lines to a file"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda logs plugin",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda logs plugin"
     },
     {
       "name": "show",
@@ -1404,7 +2945,7 @@
       "subcommand": "export",
       "description": "Copy a monitor session into GDA home",
       "tools": [
-        "monitor_export"
+        "game_monitor"
       ],
       "action": "gcp.monitor.export",
       "positional": [
@@ -1415,7 +2956,38 @@
           "description": "Session id"
         }
       ],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--image",
+          "type": "string",
+          "scope": "command",
+          "description": "Attach a PNG evidence image"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1438,7 +3010,7 @@
       "subcommand": "report",
       "description": "Analyze one monitor session",
       "tools": [
-        "monitor_report"
+        "game_monitor"
       ],
       "action": "gcp.monitor.report",
       "positional": [
@@ -1451,10 +3023,40 @@
       ],
       "flags": [
         {
-          "name": "--file",
+          "name": "--input-file",
           "type": "string",
           "scope": "command",
           "description": "Offline JSONL path"
+        },
+        {
+          "name": "--slow",
+          "type": "number",
+          "scope": "command",
+          "description": "Slow frame threshold in ms"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
         }
       ],
       "output": {
@@ -1479,11 +3081,48 @@
       "subcommand": "sessions",
       "description": "List recorded monitor sessions",
       "tools": [
-        "monitor_sessions"
+        "game_monitor"
       ],
       "action": "gcp.monitor.sessions",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Page size (0 = none)"
+        },
+        {
+          "name": "--cursor",
+          "type": "number",
+          "scope": "command",
+          "description": "Session cursor offset"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1506,11 +3145,36 @@
       "subcommand": "status",
       "description": "Show monitor scope and recording directory",
       "tools": [
-        "monitor_status"
+        "game_monitor"
       ],
       "action": "gcp.monitor.status",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -1675,7 +3339,7 @@
       "positional": [],
       "flags": [
         {
-          "name": "--all",
+          "name": "--all-projects",
           "type": "boolean",
           "scope": "command",
           "description": "Include projects without instances"
@@ -1738,13 +3402,139 @@
       "invoke": "gda project open"
     },
     {
+      "name": "get",
+      "path": "resource.get",
+      "group": "resource",
+      "subcommand": "get",
+      "description": "Read one resource property",
+      "tools": [
+        "resource_property"
+      ],
+      "action": "gcp.resource.get",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--name",
+          "type": "string",
+          "scope": "command",
+          "description": "Registered memory name"
+        },
+        {
+          "name": "--property",
+          "type": "string",
+          "scope": "command",
+          "description": "Property name"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource get",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource get"
+    },
+    {
+      "name": "import",
+      "path": "resource.import",
+      "group": "resource",
+      "subcommand": "import",
+      "description": "Reimport one or more assets",
+      "tools": [
+        "resource_import"
+      ],
+      "action": "gcp.resource.import",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Asset path"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Asset paths from a JSON file (use - for stdin)"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource import",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource import"
+    },
+    {
+      "name": "inspect",
+      "path": "resource.inspect",
+      "group": "resource",
+      "subcommand": "inspect",
+      "description": "Inspect a resource type and metadata",
+      "tools": [
+        "resource_query"
+      ],
+      "action": "gcp.resource.inspect",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--uid",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource uid"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource inspect",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource inspect"
+    },
+    {
       "name": "list",
       "path": "resource.list",
       "group": "resource",
       "subcommand": "list",
       "description": "List project resources",
       "tools": [
-        "resource_list"
+        "resource_query"
       ],
       "action": "gcp.resource.list",
       "positional": [],
@@ -1765,13 +3555,59 @@
       "invoke": "gda resource list"
     },
     {
+      "name": "move",
+      "path": "resource.move",
+      "group": "resource",
+      "subcommand": "move",
+      "description": "Move a resource and rewrite references",
+      "tools": [
+        "resource_file"
+      ],
+      "action": "gcp.resource.move",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--to",
+          "type": "string",
+          "scope": "command",
+          "description": "New directory"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the move"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource move",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource move"
+    },
+    {
       "name": "prompts",
       "path": "resource.prompts",
       "group": "resource",
       "subcommand": "prompts",
       "description": "List or render prompt templates",
       "tools": [
-        "resource_prompts"
+        "os_file_text"
       ],
       "action": "gcp.resource.prompts",
       "positional": [
@@ -1812,7 +3648,7 @@
       "subcommand": "read",
       "description": "Read one resource",
       "tools": [
-        "resource_read"
+        "resource_load"
       ],
       "action": "gcp.resource.read",
       "positional": [
@@ -1824,24 +3660,6 @@
         }
       ],
       "flags": [
-        {
-          "name": "--json",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Pretty JSON output",
-          "conflictsWith": [
-            "--raw"
-          ]
-        },
-        {
-          "name": "--raw",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Raw payload output",
-          "conflictsWith": [
-            "--json"
-          ]
-        },
         {
           "name": "--save",
           "type": "string",
@@ -1865,13 +3683,221 @@
       "invoke": "gda resource read"
     },
     {
+      "name": "references",
+      "path": "resource.references",
+      "group": "resource",
+      "subcommand": "references",
+      "description": "Find references to a resource",
+      "tools": [
+        "resource_query"
+      ],
+      "action": "gcp.resource.references",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--uid",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource uid"
+        },
+        {
+          "name": "--class",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource class name"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource references",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource references"
+    },
+    {
+      "name": "rename",
+      "path": "resource.rename",
+      "group": "resource",
+      "subcommand": "rename",
+      "description": "Rename a resource and rewrite references",
+      "tools": [
+        "resource_file"
+      ],
+      "action": "gcp.resource.rename",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--to",
+          "type": "string",
+          "scope": "command",
+          "description": "New path"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the rename"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource rename",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource rename"
+    },
+    {
+      "name": "save",
+      "path": "resource.save",
+      "group": "resource",
+      "subcommand": "save",
+      "description": "Save a resource to disk",
+      "tools": [
+        "resource_save"
+      ],
+      "action": "gcp.resource.save",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--name",
+          "type": "string",
+          "scope": "command",
+          "description": "Registered memory name"
+        },
+        {
+          "name": "--object-id",
+          "type": "string",
+          "scope": "command",
+          "description": "Object id"
+        },
+        {
+          "name": "--dest",
+          "type": "string",
+          "scope": "command",
+          "description": "Destination path"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource save",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource save"
+    },
+    {
+      "name": "set",
+      "path": "resource.set",
+      "group": "resource",
+      "subcommand": "set",
+      "description": "Write one resource property",
+      "tools": [
+        "resource_property"
+      ],
+      "action": "gcp.resource.set",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Resource path"
+        },
+        {
+          "name": "--name",
+          "type": "string",
+          "scope": "command",
+          "description": "Registered memory name"
+        },
+        {
+          "name": "--property",
+          "type": "string",
+          "scope": "command",
+          "description": "Property name"
+        },
+        {
+          "name": "--value",
+          "type": "string",
+          "scope": "command",
+          "description": "Value as JSON",
+          "conflictsWith": [
+            "--args-file"
+          ]
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Arguments from a JSON file (use - for stdin)",
+          "conflictsWith": [
+            "--value"
+          ]
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda resource set",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda resource set"
+    },
+    {
       "name": "templates",
       "path": "resource.templates",
       "group": "resource",
       "subcommand": "templates",
       "description": "List resource templates",
       "tools": [
-        "resource_templates"
+        "resource_query"
       ],
       "action": "gcp.resource.templates",
       "positional": [],
@@ -1898,7 +3924,7 @@
       "subcommand": "watch",
       "description": "Poll a resource and print changes",
       "tools": [
-        "resource_watch"
+        "resource_query"
       ],
       "action": "gcp.resource.watch",
       "positional": [
@@ -1939,23 +3965,23 @@
       "subcommand": "add",
       "description": "Add a node to a scene",
       "tools": [
-        "scene_node_add"
+        "create_scene_node"
       ],
       "action": "gcp.scene.add",
       "positional": [
         {
           "name": "node",
           "type": "string",
-          "required": true,
-          "description": "Node type or path"
+          "required": false,
+          "description": "Node type"
         }
       ],
       "flags": [
         {
-          "name": "--scene",
+          "name": "--type",
           "type": "string",
           "scope": "command",
-          "description": "Target scene"
+          "description": "Node type"
         },
         {
           "name": "--parent",
@@ -1980,13 +4006,53 @@
       "invoke": "gda scene add"
     },
     {
+      "name": "diff",
+      "path": "scene.diff",
+      "group": "scene",
+      "subcommand": "diff",
+      "description": "Report scene tree differences with path hashes",
+      "tools": [
+        "get_scene_tree"
+      ],
+      "action": "gcp.scene.diff",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--max-depth",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum tree depth (-1 for unlimited)"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Extra arguments from a JSON file (use - for stdin)"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene diff",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene diff"
+    },
+    {
       "name": "list",
       "path": "scene.list",
       "group": "scene",
       "subcommand": "list",
       "description": "List open scenes",
       "tools": [
-        "scene_list"
+        "get_editor_state"
       ],
       "action": "gcp.scene.list",
       "positional": [],
@@ -2007,24 +4073,92 @@
       "invoke": "gda scene list"
     },
     {
+      "name": "node",
+      "path": "scene.node",
+      "group": "scene",
+      "subcommand": "node",
+      "description": "Create a node in the edited scene",
+      "tools": [
+        "create_scene_node"
+      ],
+      "action": "gcp.scene.node",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--type",
+          "type": "string",
+          "scope": "command",
+          "description": "Node type"
+        },
+        {
+          "name": "--name",
+          "type": "string",
+          "scope": "command",
+          "description": "Node name"
+        },
+        {
+          "name": "--parent",
+          "type": "string",
+          "scope": "command",
+          "description": "Parent node path"
+        },
+        {
+          "name": "--props",
+          "type": "string",
+          "scope": "command",
+          "description": "Node properties as JSON"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Node properties from a JSON file (use - for stdin)",
+          "conflictsWith": [
+            "--props"
+          ]
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene node",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene node"
+    },
+    {
       "name": "open",
       "path": "scene.open",
       "group": "scene",
       "subcommand": "open",
       "description": "Open a scene in the editor",
       "tools": [
-        "scene_open"
+        "editor_scene_control"
       ],
       "action": "gcp.scene.open",
       "positional": [
         {
           "name": "path",
           "type": "string",
-          "required": true,
+          "required": false,
           "description": "Scene path"
         }
       ],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Scene path"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -2041,17 +4175,88 @@
       "invoke": "gda scene open"
     },
     {
+      "name": "property",
+      "path": "scene.property",
+      "group": "scene",
+      "subcommand": "property",
+      "description": "Set one property on a scene node",
+      "tools": [
+        "property_set"
+      ],
+      "action": "gcp.scene.property",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Node path"
+        },
+        {
+          "name": "--property",
+          "type": "string",
+          "scope": "command",
+          "description": "Property name"
+        },
+        {
+          "name": "--value",
+          "type": "string",
+          "scope": "command",
+          "description": "Property value as JSON",
+          "conflictsWith": [
+            "--args-file"
+          ]
+        },
+        {
+          "name": "--type-hint",
+          "type": "string",
+          "scope": "command",
+          "description": "Explicit Variant type hint"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Properties from a JSON file (use - for stdin)",
+          "conflictsWith": [
+            "--value"
+          ]
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene property",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene property"
+    },
+    {
       "name": "save",
       "path": "scene.save",
       "group": "scene",
       "subcommand": "save",
       "description": "Save the current scene",
       "tools": [
-        "scene_save"
+        "save_editor_scene"
       ],
       "action": "gcp.scene.save",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Explicit save path"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -2068,13 +4273,268 @@
       "invoke": "gda scene save"
     },
     {
+      "name": "signal",
+      "path": "scene.signal",
+      "group": "scene",
+      "subcommand": "signal",
+      "description": "Connect or disconnect a scene signal",
+      "tools": [
+        "signal_connect",
+        "signal_disconnect"
+      ],
+      "action": "gcp.scene.signal",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--from",
+          "type": "string",
+          "scope": "command",
+          "description": "Source node path"
+        },
+        {
+          "name": "--signal",
+          "type": "string",
+          "scope": "command",
+          "description": "Signal name"
+        },
+        {
+          "name": "--to",
+          "type": "string",
+          "scope": "command",
+          "description": "Target node path"
+        },
+        {
+          "name": "--method",
+          "type": "string",
+          "scope": "command",
+          "description": "Target method"
+        },
+        {
+          "name": "--disconnect",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Disconnect instead of connect"
+        },
+        {
+          "name": "--no-persist",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Do not persist the connection"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene signal",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene signal"
+    },
+    {
+      "name": "tree",
+      "path": "scene.tree",
+      "group": "scene",
+      "subcommand": "tree",
+      "description": "Read the edited scene tree",
+      "tools": [
+        "get_scene_tree"
+      ],
+      "action": "gcp.scene.tree",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--max-depth",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum tree depth (-1 for unlimited)"
+        },
+        {
+          "name": "--pattern",
+          "type": "string",
+          "scope": "command",
+          "description": "Filter descendants by path pattern"
+        },
+        {
+          "name": "--type",
+          "type": "string",
+          "scope": "command",
+          "description": "Filter descendants by node type"
+        },
+        {
+          "name": "--group",
+          "type": "string",
+          "scope": "command",
+          "description": "Filter descendants by group"
+        },
+        {
+          "name": "--include-properties",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include filtered properties per node"
+        },
+        {
+          "name": "--include-groups",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include group membership"
+        },
+        {
+          "name": "--include-hash",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include FNV-1a hashes of node paths"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene tree",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene tree"
+    },
+    {
+      "name": "verify",
+      "path": "scene.verify",
+      "group": "scene",
+      "subcommand": "verify",
+      "description": "Compare the edited scene tree with its saved file",
+      "tools": [
+        "get_scene_tree"
+      ],
+      "action": "gcp.scene.verify",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--max-depth",
+          "type": "number",
+          "scope": "command",
+          "description": "Maximum tree depth (-1 for unlimited)"
+        },
+        {
+          "name": "--pattern",
+          "type": "string",
+          "scope": "command",
+          "description": "Filter by path pattern"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda scene verify",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda scene verify"
+    },
+    {
+      "name": "attach",
+      "path": "script.attach",
+      "group": "script",
+      "subcommand": "attach",
+      "description": "Attach a script to a scene node",
+      "tools": [
+        "attach_script_to_node"
+      ],
+      "action": "gcp.script.attach",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--node",
+          "type": "string",
+          "scope": "command",
+          "description": "Node path"
+        },
+        {
+          "name": "--script",
+          "type": "string",
+          "scope": "command",
+          "description": "Script path"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script attach",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script attach"
+    },
+    {
+      "name": "compile",
+      "path": "script.compile",
+      "group": "script",
+      "subcommand": "compile",
+      "description": "Compile-check a script without writing it",
+      "tools": [
+        "patch_script"
+      ],
+      "action": "gcp.script.compile",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Script path"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Patch arguments from a JSON file (use - for stdin)"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script compile",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script compile"
+    },
+    {
       "name": "create",
       "path": "script.create",
       "group": "script",
       "subcommand": "create",
       "description": "Create a project script",
       "tools": [
-        "script_create"
+        "create_script"
       ],
       "action": "gcp.script.create",
       "positional": [
@@ -2091,6 +4551,12 @@
           "type": "string",
           "scope": "command",
           "description": "Base class"
+        },
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "Script source"
         }
       ],
       "output": {
@@ -2115,7 +4581,7 @@
       "subcommand": "delete",
       "description": "Delete a project script",
       "tools": [
-        "script_delete"
+        "resource_file"
       ],
       "action": "gcp.script.delete",
       "positional": [
@@ -2150,13 +4616,65 @@
       "invoke": "gda script delete"
     },
     {
+      "name": "exec",
+      "path": "script.exec",
+      "group": "script",
+      "subcommand": "exec",
+      "description": "Run GDScript synchronously in the editor",
+      "tools": [
+        "execute_script"
+      ],
+      "action": "gcp.script.exec",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "GDScript source",
+          "conflictsWith": [
+            "--args-file"
+          ]
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Execution arguments from a JSON file (use - for stdin)",
+          "conflictsWith": [
+            "--source"
+          ]
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm this high-risk execution"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script exec",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script exec"
+    },
+    {
       "name": "list",
       "path": "script.list",
       "group": "script",
       "subcommand": "list",
       "description": "List project scripts",
       "tools": [
-        "script_list"
+        "get_editor_files"
       ],
       "action": "gcp.script.list",
       "positional": [],
@@ -2177,13 +4695,59 @@
       "invoke": "gda script list"
     },
     {
+      "name": "patch",
+      "path": "script.patch",
+      "group": "script",
+      "subcommand": "patch",
+      "description": "Patch a project script and compile it",
+      "tools": [
+        "patch_script"
+      ],
+      "action": "gcp.script.patch",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Script path"
+        },
+        {
+          "name": "--dry-run",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Validate and compile without writing"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Patch arguments from a JSON file (use - for stdin)"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script patch",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script patch"
+    },
+    {
       "name": "read",
       "path": "script.read",
       "group": "script",
       "subcommand": "read",
       "description": "Read a project script",
       "tools": [
-        "script_read"
+        "os_file_text"
       ],
       "action": "gcp.script.read",
       "positional": [
@@ -2209,6 +4773,98 @@
         }
       ],
       "invoke": "gda script read"
+    },
+    {
+      "name": "reload",
+      "path": "script.reload",
+      "group": "script",
+      "subcommand": "reload",
+      "description": "Reload a script from disk",
+      "tools": [
+        "reload_script"
+      ],
+      "action": "gcp.script.reload",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Script path"
+        },
+        {
+          "name": "--keep-state",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Keep static state"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "low",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script reload",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script reload"
+    },
+    {
+      "name": "test",
+      "path": "script.test",
+      "group": "script",
+      "subcommand": "test",
+      "description": "Run inline or file-based GDScript tests",
+      "tools": [
+        "run_gdscript_tests"
+      ],
+      "action": "gcp.script.test",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--directory",
+          "type": "string",
+          "scope": "command",
+          "description": "Test directory"
+        },
+        {
+          "name": "--pattern",
+          "type": "string",
+          "scope": "command",
+          "description": "File pattern"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Test timeout in seconds"
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Test cases from a JSON file (use - for stdin)"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda script test",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda script test"
     },
     {
       "name": "init",
@@ -2341,7 +4997,7 @@
       "path": "shell.run",
       "group": "shell",
       "subcommand": "run",
-      "description": "Run a shell command",
+      "description": "Run a shell session",
       "tools": [
         "shell_run"
       ],
@@ -2360,6 +5016,12 @@
           "type": "string",
           "scope": "command",
           "description": "Command timeout in seconds"
+        },
+        {
+          "name": "--protocol",
+          "type": "string",
+          "scope": "command",
+          "description": "Shell protocol: ndjson"
         }
       ],
       "output": {
@@ -2483,7 +5145,7 @@
       ],
       "flags": [
         {
-          "name": "--file",
+          "name": "--skill-file",
           "type": "string",
           "scope": "command",
           "description": "Auxiliary file path"
@@ -2511,13 +5173,71 @@
       "invoke": "gda skill show"
     },
     {
+      "name": "sync",
+      "path": "skill.sync",
+      "group": "skill",
+      "subcommand": "sync",
+      "description": "Preview or apply managed skill-tree upgrades",
+      "tools": [
+        "skill_sync"
+      ],
+      "action": "gcp.skill.sync",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--path",
+          "type": "string",
+          "scope": "command",
+          "description": "Install target directory"
+        },
+        {
+          "name": "--zh",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the Chinese archive"
+        },
+        {
+          "name": "--dry-run",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Preview changes without writing"
+        },
+        {
+          "name": "--force-install",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Force a managed repair"
+        },
+        {
+          "name": "--prune",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Remove retired books"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": false,
+      "examples": [
+        {
+          "argv": "gda skill sync",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda skill sync"
+    },
+    {
       "name": "list",
       "path": "test.list",
       "group": "test",
       "subcommand": "list",
       "description": "List test suites",
       "tools": [
-        "test_list"
+        "resource_query"
       ],
       "action": "gcp.test.list",
       "positional": [],
@@ -2542,9 +5262,9 @@
       "path": "test.run",
       "group": "test",
       "subcommand": "run",
-      "description": "Run a test suite",
+      "description": "Run a test suite with labels, sharding, retries, and JUnit output",
       "tools": [
-        "test_run"
+        "run_gdscript_tests"
       ],
       "action": "gcp.test.run",
       "positional": [
@@ -2556,6 +5276,66 @@
         }
       ],
       "flags": [
+        {
+          "name": "--label",
+          "type": "string",
+          "scope": "command",
+          "description": "Only run cases carrying this label"
+        },
+        {
+          "name": "--changed",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Only run cases touching changed files"
+        },
+        {
+          "name": "--failed-first",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Run previously failed cases first"
+        },
+        {
+          "name": "--shard",
+          "type": "string",
+          "scope": "command",
+          "description": "Shard selector: index/count"
+        },
+        {
+          "name": "--retries",
+          "type": "number",
+          "scope": "command",
+          "description": "Retry count for failed cases"
+        },
+        {
+          "name": "--junit",
+          "type": "string",
+          "scope": "command",
+          "description": "Write a JUnit XML report to this path"
+        },
+        {
+          "name": "--coverage",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include coverage data in the report"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Return the task id immediately and stream progress to stderr"
+        },
+        {
+          "name": "--directory",
+          "type": "string",
+          "scope": "command",
+          "description": "Test directory"
+        },
+        {
+          "name": "--pattern",
+          "type": "string",
+          "scope": "command",
+          "description": "File pattern"
+        },
         {
           "name": "--timeout",
           "type": "string",
@@ -2579,13 +5359,190 @@
       "invoke": "gda test run"
     },
     {
+      "name": "scenario",
+      "path": "test.scenario",
+      "group": "test",
+      "subcommand": "scenario",
+      "description": "Fire an input timeline and collect the resulting test evidence",
+      "tools": [
+        "game_input",
+        "get_debugger_stream"
+      ],
+      "action": "gcp.test.scenario",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Timeline arguments from a JSON file (use - for stdin)"
+        },
+        {
+          "name": "--label",
+          "type": "string",
+          "scope": "command",
+          "description": "Scenario label"
+        },
+        {
+          "name": "--retries",
+          "type": "number",
+          "scope": "command",
+          "description": "Retry count for the scenario"
+        },
+        {
+          "name": "--junit",
+          "type": "string",
+          "scope": "command",
+          "description": "Write a JUnit XML report to this path"
+        },
+        {
+          "name": "--coverage",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include coverage data in the report"
+        },
+        {
+          "name": "--confirm",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Confirm the game runtime change"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Return the task id immediately and stream progress to stderr"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Execution timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "high",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda test scenario",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda test scenario"
+    },
+    {
+      "name": "script",
+      "path": "test.script",
+      "group": "test",
+      "subcommand": "script",
+      "description": "Run inline GDScript test cases",
+      "tools": [
+        "run_gdscript_tests"
+      ],
+      "action": "gcp.test.script",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--source",
+          "type": "string",
+          "scope": "command",
+          "description": "Inline test source",
+          "conflictsWith": [
+            "--args-file"
+          ]
+        },
+        {
+          "name": "--args-file",
+          "type": "string",
+          "scope": "command",
+          "description": "Test cases from a JSON file (use - for stdin)",
+          "conflictsWith": [
+            "--source"
+          ]
+        },
+        {
+          "name": "--label",
+          "type": "string",
+          "scope": "command",
+          "description": "Only run cases carrying this label"
+        },
+        {
+          "name": "--changed",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Only run cases touching changed files"
+        },
+        {
+          "name": "--failed-first",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Run previously failed cases first"
+        },
+        {
+          "name": "--shard",
+          "type": "string",
+          "scope": "command",
+          "description": "Shard selector: index/count"
+        },
+        {
+          "name": "--retries",
+          "type": "number",
+          "scope": "command",
+          "description": "Retry count for failed cases"
+        },
+        {
+          "name": "--junit",
+          "type": "string",
+          "scope": "command",
+          "description": "Write a JUnit XML report to this path"
+        },
+        {
+          "name": "--coverage",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include coverage data in the report"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Return the task id immediately and stream progress to stderr"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Run timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda test script",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda test script"
+    },
+    {
       "name": "status",
       "path": "test.status",
       "group": "test",
       "subcommand": "status",
       "description": "Show a test run",
       "tools": [
-        "test_status"
+        "run_gdscript_tests"
       ],
       "action": "gcp.test.status",
       "positional": [
@@ -2611,6 +5568,65 @@
         }
       ],
       "invoke": "gda test status"
+    },
+    {
+      "name": "watch",
+      "path": "test.watch",
+      "group": "test",
+      "subcommand": "watch",
+      "description": "Poll game state and test results until the run finishes",
+      "tools": [
+        "get_game_state",
+        "run_gdscript_tests"
+      ],
+      "action": "gcp.test.watch",
+      "positional": [],
+      "flags": [
+        {
+          "name": "--interval",
+          "type": "number",
+          "scope": "command",
+          "description": "Polling interval in seconds"
+        },
+        {
+          "name": "--junit",
+          "type": "string",
+          "scope": "command",
+          "description": "Write a JUnit XML report to this path"
+        },
+        {
+          "name": "--coverage",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Include coverage data in the report"
+        },
+        {
+          "name": "--detach",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Return the task id immediately and stream progress to stderr"
+        },
+        {
+          "name": "--timeout",
+          "type": "string",
+          "scope": "command",
+          "description": "Watch timeout in seconds"
+        }
+      ],
+      "output": {
+        "schema": "gda.result.v1",
+        "envelope": true,
+        "description": "CLI envelope v1"
+      },
+      "risk": "none",
+      "long_running": true,
+      "examples": [
+        {
+          "argv": "gda test watch",
+          "description": "Example invocation"
+        }
+      ],
+      "invoke": "gda test watch"
     },
     {
       "name": "batch",
@@ -2678,40 +5694,22 @@
           "name": "--args-file",
           "type": "string",
           "scope": "command",
-          "description": "Arguments from a JSON file",
+          "description": "Arguments from a JSON file (- reads stdin)",
           "conflictsWith": [
             "--args"
           ]
         },
         {
-          "name": "--input",
-          "type": "string",
-          "scope": "command",
-          "description": "MRTR input responses"
-        },
-        {
-          "name": "--async",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Run as an asynchronous job"
-        },
-        {
           "name": "--progress",
           "type": "boolean",
           "scope": "command",
-          "description": "Print progress notifications"
+          "description": "Print progress diagnostics to stderr"
         },
         {
           "name": "--confirm",
           "type": "boolean",
           "scope": "command",
-          "description": "Confirm a high-risk call"
-        },
-        {
-          "name": "--direct",
-          "type": "boolean",
-          "scope": "command",
-          "description": "Invoke a full-surface tool"
+          "description": "Confirm the shown tool/target/risk/argument summary"
         },
         {
           "name": "--timeout",
@@ -2746,7 +5744,38 @@
       ],
       "action": "gcp.tool.categories",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the hash-verified offline catalog only"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -2780,7 +5809,38 @@
           "description": "Tool name"
         }
       ],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the hash-verified offline catalog only"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -2801,7 +5861,7 @@
       "path": "tool.list",
       "group": "tool",
       "subcommand": "list",
-      "description": "List direct tools from a live instance",
+      "description": "List canonical tools from the native catalog",
       "tools": [
         "tool_list"
       ],
@@ -2819,6 +5879,36 @@
           "type": "string",
           "scope": "command",
           "description": "Restrict by tags"
+        },
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the hash-verified offline catalog only"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
         }
       ],
       "output": {
@@ -2893,6 +5983,36 @@
           "type": "string",
           "scope": "command",
           "description": "Restrict by tags"
+        },
+        {
+          "name": "--offline",
+          "type": "boolean",
+          "scope": "command",
+          "description": "Use the hash-verified offline catalog only"
+        },
+        {
+          "name": "--id",
+          "type": "string",
+          "scope": "command",
+          "description": "Target instance id"
+        },
+        {
+          "name": "--socket",
+          "type": "string",
+          "scope": "command",
+          "description": "Target native IPC socket"
+        },
+        {
+          "name": "--port",
+          "type": "string",
+          "scope": "command",
+          "description": "Target connection port"
+        },
+        {
+          "name": "--project",
+          "type": "string",
+          "scope": "command",
+          "description": "Target project directory"
         }
       ],
       "output": {
@@ -2923,7 +6043,7 @@
       "positional": [],
       "flags": [
         {
-          "name": "--format",
+          "name": "--export-format",
           "type": "string",
           "scope": "command",
           "description": "Export format: jsonl or otlp"
@@ -2955,7 +6075,20 @@
       ],
       "action": "gcp.trace.failures",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Page size (0 = none)"
+        },
+        {
+          "name": "--cursor",
+          "type": "number",
+          "scope": "command",
+          "description": "Event cursor offset"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -2982,7 +6115,20 @@
       ],
       "action": "gcp.trace.list",
       "positional": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Page size (0 = none)"
+        },
+        {
+          "name": "--cursor",
+          "type": "number",
+          "scope": "command",
+          "description": "Event cursor offset"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -3016,7 +6162,20 @@
           "description": "Trace id"
         }
       ],
-      "flags": [],
+      "flags": [
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Page size (0 = none)"
+        },
+        {
+          "name": "--cursor",
+          "type": "number",
+          "scope": "command",
+          "description": "Event cursor offset"
+        }
+      ],
       "output": {
         "schema": "gda.result.v1",
         "envelope": true,
@@ -3049,6 +6208,18 @@
           "type": "number",
           "scope": "command",
           "description": "Threshold in milliseconds"
+        },
+        {
+          "name": "--limit",
+          "type": "number",
+          "scope": "command",
+          "description": "Page size (0 = none)"
+        },
+        {
+          "name": "--cursor",
+          "type": "number",
+          "scope": "command",
+          "description": "Event cursor offset"
         }
       ],
       "output": {
@@ -3153,7 +6324,7 @@
           "description": "Report status without applying"
         },
         {
-          "name": "--force",
+          "name": "--force-install",
           "type": "boolean",
           "scope": "command",
           "description": "Force the update"
@@ -3299,6 +6470,10 @@
       "to": "tool.describe"
     },
     {
+      "from": "diagnose",
+      "to": "doctor.diagnose"
+    },
+    {
       "from": "docs",
       "to": "docs.status"
     },
@@ -3328,39 +6503,11 @@
     },
     {
       "from": "ping",
-      "to": "tool.ping"
+      "to": "editor.ping"
     },
     {
       "from": "projects",
       "to": "project.list"
-    },
-    {
-      "from": "prompts",
-      "to": "resource.prompts"
-    },
-    {
-      "from": "prompts get",
-      "to": "resource.prompts"
-    },
-    {
-      "from": "prompts list",
-      "to": "resource.prompts"
-    },
-    {
-      "from": "resources",
-      "to": "resource.list"
-    },
-    {
-      "from": "resources read",
-      "to": "resource.read"
-    },
-    {
-      "from": "resources templates",
-      "to": "resource.templates"
-    },
-    {
-      "from": "resources watch",
-      "to": "resource.watch"
     },
     {
       "from": "restart",
@@ -3395,30 +6542,6 @@
       "to": "editor.stop"
     },
     {
-      "from": "tasks",
-      "to": "job.list"
-    },
-    {
-      "from": "tasks cancel",
-      "to": "job.cancel"
-    },
-    {
-      "from": "tasks clean",
-      "to": "job.clean"
-    },
-    {
-      "from": "tasks get",
-      "to": "job.get"
-    },
-    {
-      "from": "tasks list",
-      "to": "job.list"
-    },
-    {
-      "from": "tasks wait",
-      "to": "job.wait"
-    },
-    {
       "from": "tools",
       "to": "tool.list"
     },
@@ -3429,6 +6552,83 @@
     {
       "from": "update",
       "to": "update.run"
+    }
+  ],
+  "flag_migrations": [
+    {
+      "from": "--direct",
+      "to": "gda tool call",
+      "reason": "one generic call surface"
+    },
+    {
+      "from": "--input",
+      "to": "--confirm",
+      "reason": "business confirmation replaces interactive input responses"
+    },
+    {
+      "from": "--async",
+      "to": "gda job",
+      "reason": "jobs are a first-class command group"
+    },
+    {
+      "from": "--json",
+      "to": "--format json",
+      "reason": "one output format flag with a compatibility alias"
+    },
+    {
+      "from": "--force",
+      "to": "--force-stop / --force-clear / --force-install",
+      "reason": "one meaning per command"
+    },
+    {
+      "from": "--all",
+      "to": "--all-projects / --all-buckets",
+      "reason": "one meaning per command"
+    },
+    {
+      "from": "--file",
+      "to": "--report-file / --skill-file / --input-file",
+      "reason": "one meaning per command"
+    },
+    {
+      "from": "--probe",
+      "to": "--probe-level / --probe-port",
+      "reason": "one meaning per command"
+    },
+    {
+      "from": "--format (trace export)",
+      "to": "--export-format",
+      "reason": "output format and export format separated"
+    }
+  ],
+  "exit_codes": [
+    {
+      "code": 0,
+      "meaning": "success"
+    },
+    {
+      "code": 1,
+      "meaning": "tool or business failure"
+    },
+    {
+      "code": 2,
+      "meaning": "transport or environment failure"
+    },
+    {
+      "code": 3,
+      "meaning": "usage error"
+    },
+    {
+      "code": 4,
+      "meaning": "confirmation required"
+    },
+    {
+      "code": 5,
+      "meaning": "user declined confirmation"
+    },
+    {
+      "code": 130,
+      "meaning": "interrupted"
     }
   ]
 }

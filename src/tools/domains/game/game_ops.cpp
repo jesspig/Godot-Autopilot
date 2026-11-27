@@ -1080,7 +1080,7 @@ godot_autopilot::util::JsonValue wait_game_job(int64_t job_id, int64_t timeout_m
   if (on_editor_main_thread()) {
     return util::error_json(
         "get_game_job cannot wait for the game response on the editor main "
-        "thread — call the tool through the MCP channel so the wait runs on "
+        "thread — call the tool through the native control plane so the wait runs on "
         "the transport thread");
   }
   int64_t request_id = 0;

@@ -4,7 +4,6 @@
 #include <chrono>
 #include <cstdio>
 #include <initializer_list>
-#include <variant>
 
 #include "core/observability/log_persist.hpp"
 #include "core/observability/sanitize_policy.hpp"
@@ -547,13 +546,6 @@ LockProbe::~LockProbe() {
   event.state = "succeeded";
   event.attrs = sanitize_field(build_attrs({{"wait_ns", std::to_string(elapsed)}}));
   emit(std::move(event));
-}
-
-std::string request_id_text(const mcp::RequestId &id) {
-  if (std::holds_alternative<int64_t>(id)) {
-    return std::to_string(std::get<int64_t>(id));
-  }
-  return std::get<std::string>(id);
 }
 
 } // namespace monitor

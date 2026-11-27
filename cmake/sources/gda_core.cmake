@@ -28,18 +28,6 @@ set(GDA_CORE_SOURCES
     src/core/storage/gda_home.cpp
     src/core/storage/project_store.cpp
     src/core/storage/instance_registry.cpp
-    src/resources/resource_handlers.cpp
-    src/resources/resource_error_mapping.cpp
-    src/resources/debugger_resources.cpp
-    src/prompts/prompt_handlers.cpp
-    src/prompts/prompt_create_3d_scene.cpp
-    src/prompts/prompt_setup_character.cpp
-    src/prompts/prompt_debug_physics.cpp
-    src/prompts/prompt_setup_input_map.cpp
-    src/prompts/prompt_setup_gui.cpp
-    src/prompts/debugger_prompts.cpp
-    src/prompts/prompt_tool_usage.cpp
-    src/prompts/prompt_keycode_reference.cpp
     src/runtime/game_bridge.cpp
     src/runtime/game_bridge_input.cpp
     src/runtime/game_bridge_eval.cpp
@@ -110,7 +98,7 @@ set(GDA_CORE_SOURCES
     src/util/error_util.cpp
     src/util/readback_util.cpp
     src/util/scene_verify.cpp
-    src/ui/mcp_log_dock.cpp
+    src/ui/gda_log_dock.cpp
     src/core/observability/game_monitor.cpp
     src/core/observability/monitor_analysis.cpp
     src/tools/domains/monitor/monitor_ops.cpp)

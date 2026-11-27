@@ -61,7 +61,7 @@ function seedProjectLog(project: string, logText: string): void {
 
 describe("任务存储中毒签名判定", () => {
   test("命中：日志含 SDK 持久化失败签名", () => {
-    const line = `[1] [error] [tools] MCP SDK: ${TASK_STORE_POISON_SIGNATURE} C:/home/.godot-autopilot/tasks/tasks-1.jsonl`;
+    const line = `[1] [error] [tools] GDA SDK: ${TASK_STORE_POISON_SIGNATURE} C:/home/.godot-autopilot/tasks/tasks-1.jsonl`;
     expect(detectTaskStorePoisoning(line)).toBe(true);
   });
 
@@ -70,7 +70,7 @@ describe("任务存储中毒签名判定", () => {
   });
 
   test("未命中：无关日志与空文本", () => {
-    expect(detectTaskStorePoisoning("[1] [info] [transport] MCP server started")).toBe(false);
+    expect(detectTaskStorePoisoning("[1] [info] [transport] native server started")).toBe(false);
     expect(detectTaskStorePoisoning("")).toBe(false);
   });
 });
@@ -110,13 +110,13 @@ describe("graceful 失败提示增补", () => {
 describe("中毒证据采集（集中根插件日志）", () => {
   test("命中：项目日志含签名时判定中毒", () => {
     const project = path.join(tmp, "proj");
-    seedProjectLog(project, `MCP SDK: ${TASK_STORE_POISON_SIGNATURE} tasks-1.jsonl\n`);
+    seedProjectLog(project, `GDA SDK: ${TASK_STORE_POISON_SIGNATURE} tasks-1.jsonl\n`);
     expect(collectTaskStorePoisoning(makeEntry(project))).toBe(true);
   });
 
   test("未命中：项目日志无签名时不诊断", () => {
     const project = path.join(tmp, "proj");
-    seedProjectLog(project, "[1] [info] [transport] MCP server started\n");
+    seedProjectLog(project, "[1] [info] [transport] native server started\n");
     expect(collectTaskStorePoisoning(makeEntry(project))).toBe(false);
   });
 
@@ -127,7 +127,7 @@ describe("中毒证据采集（集中根插件日志）", () => {
 
   test("未命中：项目路径不匹配时不串读其他项目日志", () => {
     const project = path.join(tmp, "proj");
-    seedProjectLog(path.join(tmp, "other-proj"), `MCP SDK: ${TASK_STORE_POISON_SIGNATURE} x\n`);
+    seedProjectLog(path.join(tmp, "other-proj"), `GDA SDK: ${TASK_STORE_POISON_SIGNATURE} x\n`);
     expect(collectTaskStorePoisoning(makeEntry(project))).toBe(false);
   });
 });

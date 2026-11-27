@@ -9,8 +9,6 @@ set(GDA_API_TRANSPORT_SOURCES
     src/core/transport/http_route_table.cpp
     src/core/transport/http_transport.cpp
     src/core/transport/http_stream_registry.cpp
-    src/core/transport/godot_transport.cpp
-    src/core/transport/mcp_http_shim.cpp
     src/core/transport/api_token.cpp
     src/core/transport/ipc_endpoint.cpp
     src/core/transport/ipc_transport.cpp

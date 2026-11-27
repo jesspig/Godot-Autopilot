@@ -41,7 +41,7 @@
 #include "tools/base/autopilot_tools.hpp"
 #include "tools/domains/debugger/debugger_ops.hpp"
 #include "tools/base/runtime_ops.hpp"
-#include "ui/mcp_log_dock.hpp"
+#include "ui/gda_log_dock.hpp"
 
 static godot_autopilot::LogSystem &get_log_system() {
   return godot_autopilot::LogSystem::instance();
@@ -153,7 +153,7 @@ static bool gda_cmdline_mode() {
 class GodotAutopilotPlugin : public godot::EditorPlugin {
   GDCLASS(GodotAutopilotPlugin, godot::EditorPlugin)
 
-  godot_autopilot::McpLogDock *log_dock;
+  godot_autopilot::GdaLogDock *log_dock;
   godot_autopilot::AutopilotTools *tools_singleton;
   godot::Ref<godot_autopilot::debugger_ops::OutputCaptureLogger>
       output_logger_;
@@ -253,7 +253,7 @@ void GodotAutopilotPlugin::_enter_tree() {
   }
 
   try {
-    log_dock = memnew(godot_autopilot::McpLogDock);
+    log_dock = memnew(godot_autopilot::GdaLogDock);
     log_dock->set_title("GDA Log");
     add_dock(log_dock);
     get_log_system().log(LogLevel::Debug, LogCategory::System,
@@ -300,7 +300,7 @@ void GodotAutopilotPlugin::_enter_tree() {
     if (started) {
       auto port = g_server_ctx->get_port();
       get_log_system().log(LogLevel::Info, LogCategory::Transport,
-                            "MCP server listening on " +
+                            "Native control plane listening on " +
                                 g_server_ctx->get_host() + ":" +
                                 std::to_string(port));
       std::string ready = "{\"type\":\"server_ready\",\"host\":\"";
@@ -316,10 +316,10 @@ void GodotAutopilotPlugin::_enter_tree() {
                {"port", std::to_string(port)}}));
     } else {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
-                           "MCP server start failed: " +
+                           "Native control plane start failed: " +
                                g_server_ctx->last_error());
       godot::UtilityFunctions::print(
-          godot::String("[Godot Autopilot] MCP server start failed: ") +
+          godot::String("[Godot Autopilot] Native control plane start failed: ") +
           godot::String::utf8(g_server_ctx->last_error().c_str()));
       godot_autopilot::monitor::error_event("server_start_failed", "server",
                                             g_server_ctx->last_error());
@@ -441,7 +441,7 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
 
         godot_autopilot::debugger_ops::register_classes();
 
-        godot::ClassDB::register_class<godot_autopilot::McpLogDock>();
+        godot::ClassDB::register_class<godot_autopilot::GdaLogDock>();
         godot::ClassDB::register_class<godot_autopilot::AutopilotTools>();
         godot::ClassDB::register_class<godot_autopilot::ExportGuard>();
         godot::ClassDB::register_class<GodotAutopilotPlugin>();

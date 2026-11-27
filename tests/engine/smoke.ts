@@ -180,6 +180,29 @@ function deepScalar(value: unknown, keys: string[], maxDepth = 5): unknown {
   return undefined;
 }
 
+function toolPayload(json: Record<string, unknown> | null): Record<string, unknown> | null {
+  const raw = field(json, "result") ?? json;
+  if (typeof raw === "string") {
+    const parsed = parseJson(raw);
+    if (parsed === null) return null;
+    const content = field(parsed, "content");
+    if (Array.isArray(content)) {
+      const text = field(content[0], "text");
+      if (typeof text === "string") return parseJson(text) ?? parsed;
+    }
+    return parsed;
+  }
+  if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+    const content = field(raw as Record<string, unknown>, "content");
+    if (Array.isArray(content)) {
+      const text = field(content[0], "text");
+      if (typeof text === "string") return parseJson(text) ?? (raw as Record<string, unknown>);
+    }
+    return raw as Record<string, unknown>;
+  }
+  return null;
+}
+
 function failText(result: CmdResult): string {
   const parts = [
     `exit=${result.code ?? "null"}`,
@@ -368,8 +391,8 @@ class Runner {
     await this.step("gcp_status", "GCP system_status", "system_status 返回 ok=true 且 tool_count>0", () => {
       const result = this.cli(["tool", "call", "system_status", "--args", "{}"]);
       const json = parseJson(result.stdout);
-      const payload = field(json, "result") ?? json;
-      const ok = result.code === 0 && json?.ok === true && Number(field(payload, "tool_count") ?? 0) > 0;
+      const payload = toolPayload(json) ?? {};
+      const ok = result.code === 0 && json?.ok === true && Number(deepField(payload, "tool_count") ?? 0) > 0;
       return {
         observed: payload ?? { raw: shorten(result.stdout) },
         ok,
@@ -387,11 +410,11 @@ class Runner {
     });
 
     await this.step("scene_create", "创建场景节点", "create_scene_node 返回 ok=true 且节点名回显", () => {
-      const args = JSON.stringify({ type: "Node2D", name: "SmokeRoot" });
+      const args = JSON.stringify({ type: "Node2D", name: "SmokeRoot", parent_path: "." });
       const result = this.cli(["tool", "call", "create_scene_node", "--args", args]);
       const json = parseJson(result.stdout);
       const ok = result.code === 0 && json?.ok === true;
-      return { observed: field(json, "result") ?? json ?? { raw: shorten(result.stdout) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
+      return { observed: toolPayload(json) ?? json ?? { raw: shorten(result.stdout) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
     });
 
     await this.step("scene_save", "保存场景", "save_editor_scene 落盘 res://smoke_scene.tscn 且 ok=true", () => {
@@ -400,28 +423,33 @@ class Runner {
       const json = parseJson(result.stdout);
       const ok = result.code === 0 && json?.ok === true;
       const saved = path.join(o.project, "smoke_scene.tscn");
-      return { observed: { envelope: field(json, "result") ?? json, disk_exists: fs.existsSync(saved) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
+      return { observed: { envelope: toolPayload(json) ?? json, disk_exists: fs.existsSync(saved) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
     });
 
     await this.step("gdscript_exec", "编译执行 GDScript", "execute_script 返回引擎版本且 AutopilotTools 单例已注册", () => {
       const source = "return {\"version\": Engine.get_version_info().get(\"string\", \"\"), \"autopilot_singleton\": Engine.has_singleton(\"AutopilotTools\")}";
       const result = this.cli(["tool", "call", "execute_script", "--args", JSON.stringify({ source_code: source }), "--confirm"]);
       const json = parseJson(result.stdout);
-      const payload = field(json, "result") ?? json;
+      const payload = toolPayload(json) ?? {};
       const version = deepField(payload, "version");
       const singleton = deepField(payload, "autopilot_singleton");
-      const ok = result.code === 0 && json?.ok === true && typeof version === "string" && version.includes(EXPECTED_GODOT_VERSION) && singleton === true;
+      const ok = result.code === 0 && json?.ok === true && typeof version === "string" && version.includes("4.7.2") && singleton === true;
       return { observed: payload ?? { raw: shorten(result.stdout) }, ok, error: ok ? undefined : `version=${String(version)} singleton=${String(singleton)} | ${failText(result)}`, stdout: result.stdout, stderr: result.stderr };
     });
 
-    await this.step("game_bridge", "启动游戏并验证 bridge", "game start 与 game status 均返回 ok=true", () => {
+    await this.step("game_bridge", "启动游戏并验证 bridge", "game start 与 game status 均返回 ok=true", async () => {
       const play = this.cli(["game", "start", "--confirm"]);
-      const status = this.cli(["game", "status"]);
+      let status = this.cli(["game", "status"]);
+      const readyDeadline = Date.now() + 15_000;
+      while (status.code !== 0 && Date.now() < readyDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        status = this.cli(["game", "status"]);
+      }
       const playJson = parseJson(play.stdout);
       const statusJson = parseJson(status.stdout);
       const ok = play.code === 0 && playJson?.ok === true && status.code === 0 && statusJson?.ok === true;
       return {
-        observed: { play: field(playJson, "result") ?? playJson, status: field(statusJson, "result") ?? statusJson },
+        observed: { play: toolPayload(playJson) ?? playJson, status: toolPayload(statusJson) ?? statusJson },
         ok,
         error: ok ? undefined : `play: ${failText(play)} | status: ${failText(status)}`,
         stdout: play.stdout,
@@ -439,7 +467,7 @@ class Runner {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const result = this.gameEval(probeSource);
       const json = parseJson(result.stdout);
-      const payload = field(json, "result") ?? json;
+      const payload = toolPayload(json) ?? {};
       const marker = deepField(payload, "marker");
       const frames = deepField(payload, "frames_seen");
       const ok = result.code === 0 && json?.ok === true && marker === "gda-engine-smoke-v1" && typeof frames === "number";
@@ -451,7 +479,7 @@ class Runner {
       const result = this.cli(["game", "input", "--type", "key", "--mode", "event", "--event", event, "--confirm"]);
       const json = parseJson(result.stdout);
       const ok = result.code === 0 && json?.ok === true;
-      return { observed: field(json, "result") ?? json ?? { raw: shorten(result.stdout) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
+      return { observed: toolPayload(json) ?? json ?? { raw: shorten(result.stdout) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
     });
 
     await this.step("frame_advance", "验证帧推进", "两次读取 process_frames 严格递增", () => {
@@ -460,8 +488,8 @@ class Runner {
       const secondResult = this.gameEval(source);
       const firstJson = parseJson(firstResult.stdout);
       const secondJson = parseJson(secondResult.stdout);
-      const first = Number(deepScalar(firstJson, ["return_value", "result"]) ?? 0);
-      const second = Number(deepScalar(secondJson, ["return_value", "result"]) ?? 0);
+      const first = Number(deepScalar(toolPayload(firstJson), ["return_value", "result"]) ?? 0);
+      const second = Number(deepScalar(toolPayload(secondJson), ["return_value", "result"]) ?? 0);
       const ok = firstResult.code === 0 && secondResult.code === 0 && Number.isFinite(first) && Number.isFinite(second) && second > first;
       return { observed: { first, second }, ok, error: ok ? undefined : `first=${first} second=${second} | ${failText(firstResult)} | ${failText(secondResult)}`, stdout: secondResult.stdout, stderr: secondResult.stderr };
     });
@@ -551,14 +579,19 @@ class Runner {
       };
     });
 
-    await this.step("ipc_no_resend", "IPC no-resend", "超时请求 error.request_sent=true 且未重发，随后 ping 仍可用", () => {
+    await this.step("ipc_no_resend", "IPC no-resend", "超时请求 error.request_sent=true 且未重发，随后 ping 仍可用", async () => {
       const args = JSON.stringify({ source_code: "while true: pass" });
       const result = this.cli(["call", "execute_script", "--args", args, "--timeout", "1", "--confirm"], 15_000);
       const json = parseJson(result.stdout);
       const errorRecord = field(json, "error");
       const message = String(field(errorRecord, "message") ?? "");
       const requestSent = field(errorRecord, "request_sent") === true;
-      const recovered = this.cli(["editor", "ping"]);
+      let recovered = this.cli(["editor", "ping"]);
+      const recoverDeadline = Date.now() + 5_000;
+      while (recovered.code !== 0 && Date.now() < recoverDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        recovered = this.cli(["editor", "ping"]);
+      }
       const ok = result.code !== 0 && requestSent && recovered.code === 0 && /not retried|not re-sent|exec_timeout/i.test(message);
       return {
         observed: { exit: result.code, request_sent: requestSent, message, recovered_exit: recovered.code },

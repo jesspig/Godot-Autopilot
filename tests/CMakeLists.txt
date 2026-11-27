@@ -5,7 +5,7 @@
 
 # ── googletest (v1.15.2 / b514bdc, third_party submodule) ──
 # gda_require_submodule 与 GDA_THIRD_PARTY_DIR 由根 include(Dependencies) 提供。
-# 守卫保留: 若 SDK 侧已开启 MCP_BUILD_TESTS 并先声明了 googletest, 此处跳过避免重复声明。
+# 若上游依赖已先声明 googletest，此处跳过避免重复声明。
 if(NOT TARGET GTest::gtest_main)
     gda_require_submodule(googletest)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
@@ -80,10 +80,11 @@ if(GDA_UNIT_SOURCES)
 
     target_include_directories(gda_unit_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
-    # mcp-client: register_all_test.cpp 使用 McpClient::Create/ListTools/Close
-    # 做 ListTools 往返断言 (SDK 测试链接组合为 mcp-client + mcp-server)
     target_link_libraries(gda_unit_tests PRIVATE
-        godot-cpp mcp-server mcp-client GTest::gtest_main)
+        godot-cpp GTest::gtest_main)
+    if(WIN32)
+        target_link_libraries(gda_unit_tests PRIVATE ws2_32)
+    endif()
     if(MSVC)
         target_link_options(gda_unit_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
     endif()
@@ -117,7 +118,10 @@ if(GDA_BOUNDARY_TEST_SOURCES)
     target_include_directories(gda_boundary_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
     target_link_libraries(gda_boundary_tests PRIVATE
-        godot-cpp mcp-server mcp-http mcp-client GTest::gtest_main)
+        godot-cpp GTest::gtest_main)
+    if(WIN32)
+        target_link_libraries(gda_boundary_tests PRIVATE ws2_32)
+    endif()
     if(MSVC)
         target_link_options(gda_boundary_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
     endif()
@@ -151,7 +155,10 @@ if(GDA_INTEGRATION_TEST_SOURCES)
     target_include_directories(gda_integration_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
     target_link_libraries(gda_integration_tests PRIVATE
-        godot-cpp mcp-server mcp-http mcp-client GTest::gtest_main)
+        godot-cpp GTest::gtest_main)
+    if(WIN32)
+        target_link_libraries(gda_integration_tests PRIVATE ws2_32)
+    endif()
     if(MSVC)
         target_link_options(gda_integration_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
     endif()
@@ -225,10 +232,10 @@ add_test(NAME source_manifest_guard_self_test
 # ── ctest 注册: MCP 迁移基线守卫（默认统计，T-16 再启用 --strict） ──
 add_test(NAME no_mcp_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/no_mcp_guard.ts"
-            --root "${CMAKE_SOURCE_DIR}")
+            --root "${CMAKE_SOURCE_DIR}" --strict)
 add_test(NAME no_mcp_json_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/no_mcp_json_guard.ts"
-            --root "${CMAKE_SOURCE_DIR}")
+            --root "${CMAKE_SOURCE_DIR}" --strict)
 
 # ── ctest 注册: 工具域守卫（零依赖，读源码断言域规格与实现同名前缀） ──
 # 断言 src/tools/<X>_tools.hpp 存在同前缀 <X>_ops.cpp / <X>_*_ops.cpp，

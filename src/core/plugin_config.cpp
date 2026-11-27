@@ -14,7 +14,6 @@
 #include <godot_cpp/classes/file_access.hpp>
 
 #include "util/json_value.hpp"
-#include <mcp/McpError.hpp>
 
 #include "core/storage/legacy_store.hpp"
 #include "core/path_util.hpp"

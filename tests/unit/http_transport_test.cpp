@@ -1,5 +1,4 @@
 #include "core/config.hpp"
-#include "core/transport/godot_transport.hpp"
 #include "core/transport/http_parse.hpp"
 #include "core/transport/http_transport.hpp"
 #include "core/transport/http_transport_ext.hpp"
@@ -467,8 +466,6 @@ TEST(HttpPendingBudgetTest, EnforcesByteCapWithoutOverflow) {
 
 TEST(HttpTransportStreamingTest, FinalChunkIsZeroLengthBlock) {
   EXPECT_EQ(godot_autopilot::transport_final_chunk(), "0\r\n\r\n");
-  EXPECT_EQ(godot_autopilot::mcp_wire::build_close_event_frame(),
-            "event: close\ndata: {}\n\n");
 }
 
 TEST(HttpTransportIdleTest, IdleExpiredBeyondBudget) {

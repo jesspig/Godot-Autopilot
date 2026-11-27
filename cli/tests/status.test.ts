@@ -68,8 +68,7 @@ function writePluginIndex(tmp: string, port: number, instanceId = "native-1"): v
       pid: process.pid,
       project_path: path.join(tmp, "proj"),
       endpoints: {
-        mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
-        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "mcp-jsonrpc", framing: "length-prefixed-json", auth: "token", version: 1 },
+        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "gda-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 },
       },
       started_at: Date.now(),
       version: "0.3.5",
@@ -120,7 +119,7 @@ afterEach(() => {
 });
 
 describe("editor status 原生状态", () => {
-  test("输出 instance/project/version/ipc_kind/ready/tool_count/capabilities，无 mcp_url/mcp/port", async () => {
+  test("输出 instance/project/version/ipc_kind/ready/tool_count/capabilities，无传输专属字段", async () => {
     const native = await serveNative((request) => {
       if (request.method === "hello") {
         return { instance_id: "native-1", capabilities: { protocol_version: 1, methods: ["hello"], features: [] } };
@@ -145,7 +144,7 @@ describe("editor status 原生状态", () => {
       expect(body.data.ready).toBe(true);
       expect(body.data.tool_count).toBe(1);
       expect(body.data.capabilities.protocol_version).toBe(1);
-      for (const forbidden of ["mcp_url", "mcp", "port", "port_source", "transport"]) {
+      for (const forbidden of ["http_url", "endpoint_url", "protocol_version", "server_info"]) {
         expect(Object.keys(body.data)).not.toContain(forbidden);
       }
       for (const request of native.requests) {
@@ -170,7 +169,7 @@ describe("editor status 原生状态", () => {
     expect(body.error.message).toContain("no running Godot Autopilot instance");
   });
 
-  test("editor ping 走原生 hello，不发送 MCP initialize", async () => {
+  test("editor ping 走原生 hello，不发送 initialize 握手帧", async () => {
     const native = await serveNative((request) =>
       request.method === "hello" ? { instance_id: "native-1", capabilities: {} } : {},
     );

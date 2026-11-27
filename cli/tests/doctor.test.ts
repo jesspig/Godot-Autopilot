@@ -67,8 +67,7 @@ function writePluginIndex(tmp: string, port: number, pid = process.pid): void {
       pid,
       project_path: path.join(tmp, "proj"),
       endpoints: {
-        mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
-        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "mcp-jsonrpc", framing: "length-prefixed-json", auth: "token", version: 1 },
+        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "gda-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 },
       },
       started_at: 0,
       version: "0.3.5",
@@ -208,7 +207,7 @@ describe("diagnose", () => {
     expect(targetCheck!.remediation).toContain("--id");
   });
 
-  test("活实例经原生 hello 诊断成功且不发送 MCP initialize", async () => {
+  test("活实例经原生 hello 诊断成功且不发送 initialize 握手帧", async () => {
     const native = await serveHello();
     try {
       writePluginIndex(tmp, native.port);

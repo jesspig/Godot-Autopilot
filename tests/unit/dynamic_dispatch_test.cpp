@@ -1,11 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
 
 #include <atomic>
 #include <functional>
-#include <memory>
+#include <mutex>
 #include <string>
 
 #include "core/command_queue.hpp"
@@ -33,11 +31,9 @@ std::string code_of(const godot_autopilot::util::JsonValue &value) {
 class DynamicDispatchFixture : public ::testing::Test {
 protected:
   void SetUp() override {
-    pair_ = mcp::InMemoryTransport::CreatePair();
-    server_ = mcp::McpServer::Create(pair_.server);
     queue_.drain();
-    godot_autopilot::register_all_tools(*server_, queue_, catalog_, index_, 9540,
-                                        ToolSurface::Meta);
+    godot_autopilot::install_tool_handlers(queue_, catalog_, index_, 9540,
+                                           ToolSurface::Meta);
     godot_autopilot::runtime_ops::set_editor_queue(&queue_);
     godot_autopilot::dynamic_specs::enabled().store(true);
   }
@@ -52,9 +48,6 @@ protected:
     godot_autopilot::clear_active_registry();
     godot_autopilot::dispatch::clear_handlers();
     godot_autopilot::runtime_ops::set_editor_queue(nullptr);
-    if (server_) {
-      server_->Close();
-    }
   }
 
   void add_dynamic(
@@ -68,8 +61,6 @@ protected:
     godot_autopilot::dynamic_specs::store().push_back(std::move(spec));
   }
 
-  mcp::InMemoryTransport::Pair pair_;
-  std::unique_ptr<mcp::McpServer> server_;
   godot_autopilot::CommandQueue queue_;
   ToolCatalog catalog_;
   godot_autopilot::Bm25Index index_;

@@ -9,7 +9,7 @@ import { gdaRoot } from "./platform";
 import { makeTraceparent } from "./trace";
 import { CLI_VERSION } from "./version";
 
-export const MCP_PROTOCOL_TOOLS: ReadonlySet<string> = new Set([
+export const PROTOCOL_TOOLS: ReadonlySet<string> = new Set([
   "ping",
   "search_tools",
   "list_categories",
@@ -18,7 +18,7 @@ export const MCP_PROTOCOL_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 export function isProtocolTool(name: string): boolean {
-  return MCP_PROTOCOL_TOOLS.has(name);
+  return PROTOCOL_TOOLS.has(name);
 }
 
 export function filterProtocolToolNames(names: string[]): string[] {

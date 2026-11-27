@@ -26,17 +26,17 @@ function catchUsage(fn: () => unknown): CliError {
   throw new Error("expected CliError but none was thrown");
 }
 
-const REMOVED_FLAGS = ["--transport", "--no-fallback", "--direct", "--input", "--async"];
+const REMOVED_FLAGS = ["--direct", "--input", "--async"];
 
-describe("Flag 作用域与 MCP flag 删除", () => {
-  test("五个 MCP 专属 flag 不再被全局解析", () => {
+describe("Flag 作用域与已退役 flag 删除", () => {
+  test("已退役 flag 不再被全局解析", () => {
     for (const removed of REMOVED_FLAGS) {
       expect(catchUsage(() => parseArgv([removed, "value", "ping"])).code).toBe(ExitCode.Usage);
       expect(GLOBAL_SCOPE_FLAGS.has(removed)).toBe(false);
     }
   });
 
-  test("帮助文本不暴露 MCP 专属 flag", () => {
+  test("帮助文本不暴露已退役 flag", () => {
     const help = usageText();
     for (const removed of REMOVED_FLAGS) {
       expect(help).not.toMatch(new RegExp(`(^|\\s)${removed}(?=\\s|$)`));
@@ -68,11 +68,9 @@ describe("Flag 作用域与 MCP flag 删除", () => {
     expect(parseArgv(["--args-file", "-", "batch"]).opts.argsFile).toBe("-");
   });
 
-  test("命令局部 flag 由 spec 校验：tool.call 拒绝 MCP flag", () => {
+  test("命令局部 flag 由 spec 校验：tool.call 拒绝已退役 flag", () => {
     for (const removed of REMOVED_FLAGS) {
-      const args = removed === "--input" || removed === "--async" || removed === "--direct" || removed === "--transport"
-        ? [removed, "x"]
-        : [removed];
+      const args = [removed, "x"];
       expect(catchUsage(() => parseCommandArgs(spec("tool.call"), ["tool", ...args])).code)
         .toBe(ExitCode.Usage);
     }

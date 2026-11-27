@@ -78,6 +78,7 @@ const SCAN_TREES: ReadonlyArray<readonly [string, Area]> = [
 const SCAN_FILES: ReadonlyArray<readonly [string, Area]> = [["cli/tsconfig.json", "cli"]];
 const AREAS: Area[] = ["source", "cli", "build", "docs", "skills"];
 const MAX_EXCERPT = 240;
+const MCP_PATTERN = /\bmcp::|\bMcp(?:Server|Client|Error|SessionHandler|Transport|HttpShim|Json|JsonValue|CallToolResult|ToolOptions|RequestId)\b|\/mcp\b|\bmcp_url\b|\bmcpEndpoint\b|\bmcpServers\b|\bmcp-jsonrpc\b|\bMCP-Protocol-Version\b|\bmcp-cpp-sdk\b/gi;
 
 type Area = "source" | "cli" | "build" | "docs" | "skills";
 
@@ -197,9 +198,8 @@ function collectActiveFiles(root: string): { files: ActiveFile[]; errors: string
   return { files, errors };
 }
 
-function excerptAround(line: string): string {
-  const index = line.toLowerCase().indexOf("mcp");
-  if (index === -1) return "";
+function excerptAround(line: string, index: number): string {
+  if (index < 0) return "";
   const start = Math.max(0, index - 80);
   const end = Math.min(line.length, start + MAX_EXCERPT);
   const prefix = start > 0 ? "..." : "";
@@ -223,14 +223,21 @@ function scanRoot(root: string): ScanResult {
     }
     let fileTotal = totals.get(file.relative);
     for (const [index, line] of text.split(/\r?\n/).entries()) {
-      const occurrences = line.toLowerCase().split("mcp").length - 1;
+      MCP_PATTERN.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      let occurrences = 0;
+      let firstIndex = -1;
+      while ((match = MCP_PATTERN.exec(line)) !== null) {
+        occurrences += 1;
+        if (firstIndex < 0) firstIndex = match.index;
+      }
       if (occurrences === 0) continue;
       references.push({
         file: file.relative,
         line: index + 1,
         area: file.area,
         occurrences,
-        excerpt: excerptAround(line),
+        excerpt: excerptAround(line, firstIndex),
       });
       byArea[file.area] += occurrences;
       if (fileTotal === undefined) {

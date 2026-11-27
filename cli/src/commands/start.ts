@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { GlobalOptions } from "../args";
-import { callTool } from "../mcp/client";
+import { callTool } from "../rpc/client";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
 import { joinPath, projectPathKey } from "../platform";

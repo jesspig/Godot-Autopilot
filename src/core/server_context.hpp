@@ -4,12 +4,10 @@
 #include <cstdint>
 #include <string>
 
-#include <mcp/server/McpServer.hpp>
 #include <memory>
 
 #include "command_queue.hpp"
 #include "config.hpp"
-#include "core/transport/godot_transport.hpp"
 #include "core/transport/ipc_waiters.hpp"
 #include "core/transport/port_resolver.hpp"
 #include "core/storage/project_store.hpp"
@@ -47,22 +45,16 @@ public:
 
 protected:
   virtual bool bind_transport();
-  virtual std::unique_ptr<mcp::McpServer>
-  create_server(const std::shared_ptr<GodotTransport> &transport,
-                const mcp::ServerOptions &options);
 
 private:
   CommandQueue &queue_;
   std::unique_ptr<ToolCatalog> catalog_;
   std::unique_ptr<Bm25Index> bm25_index_;
-  std::shared_ptr<GodotTransport> transport_;
-  std::unique_ptr<mcp::McpServer> server_;
   std::unique_ptr<gda::control::ControlService> gcp_control_;
   std::unique_ptr<gda::control::InvocationSink> gcp_sink_;
   std::unique_ptr<gda::control::GcpDispatcher> gcp_dispatcher_;
   IpcWaiterSet ipc_waiters_;
   int port_ = 0;
-  int requested_port_ = 0;
   std::string host_ = "127.0.0.1";
   bool running_ = false;
   bool instance_started_ = false;
@@ -71,7 +63,6 @@ private:
   std::string gcp_instance_id_;
   std::string ipc_token_;
   PortAssignment port_assignment_;
-  EndpointTable endpoints_;
 
   void register_tools();
   void rollback_start();

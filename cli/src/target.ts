@@ -239,7 +239,7 @@ function nativeBySocket(socketText: string): ResolvedTarget {
 }
 
 function nativeByPort(port: number): ResolvedTarget {
-  const records = readPluginInstanceIndex().filter((record) => record.port === port || record.mcpEndpoint?.port === port);
+  const records = readPluginInstanceIndex().filter((record) => record.port === port || record.ipcEndpoint?.port === port);
   const live = records.filter((record) => record.pid !== null && isAlive(record.pid));
   rejectAmbiguous(`--port ${port}`, live.map((record) => ({
     id: record.instanceId,

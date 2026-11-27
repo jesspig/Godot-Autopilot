@@ -3,7 +3,6 @@
 #include "util/resource_fs.hpp"
 
 #include <gtest/gtest.h>
-#include <mcp/detail/sha256.hpp>
 
 #include <array>
 #include <atomic>
@@ -89,23 +88,7 @@ std::string read_bytes(const std::string &path) {
 }
 
 std::string hash_file(const fs::path &path) {
-  std::ifstream input(path, std::ios::binary);
-  mcp::detail::Sha256 sha;
-  std::array<char, 8192> buffer{};
-  while (input) {
-    input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-    sha.Update(std::string_view(buffer.data(),
-                                static_cast<size_t>(input.gcount())));
-  }
-  static const char digits[] = "0123456789abcdef";
-  const auto digest = sha.Final();
-  std::string out;
-  out.reserve(64);
-  for (uint8_t byte : digest) {
-    out.push_back(digits[byte >> 4]);
-    out.push_back(digits[byte & 0x0F]);
-  }
-  return out;
+  return godot_autopilot::resource_fs::sha256_hex(read_bytes(path.string()));
 }
 
 class StdFileTransactionFs : public FileTransactionFs {

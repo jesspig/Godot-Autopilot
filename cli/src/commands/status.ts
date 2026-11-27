@@ -2,7 +2,7 @@ import type { GlobalOptions } from "../args";
 import { fnv1a32 } from "../hash";
 import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
-import { callTool, ensureConnection } from "../mcp/client";
+import { callTool } from "../rpc/client";
 import { assertCallFamilyUsage, callTimeoutSec, extractPayload } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type ResolvedTarget, type TargetContext } from "../target";
@@ -48,15 +48,10 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
   assertCallFamilyUsage("status", opts);
   try {
     const target = resolveTarget(opts, TARGET_CONTEXT);
-    const ipcFirst = target.ipcEndpoint !== undefined;
-    if (!ipcFirst) {
-      await ensureConnection(target.port, callTimeoutSec(opts));
-    }
     const envelope = await callTool("system_status", {}, {
       port: target.port,
       timeoutSec: callTimeoutSec(opts),
       ipcEndpoint: target.ipcEndpoint,
-      transport: "auto",
       traceparent: undefined,
     });
     const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });

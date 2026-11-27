@@ -1,10 +1,6 @@
 import { parseProbePort, type GlobalOptions } from "../args";
 import { ExitCode } from "../errors";
-import {
-  deriveEndpoint,
-  endpointBaseUrl,
-  readPluginInstanceIndex,
-} from "../instances";
+import { readPluginInstanceIndex } from "../instances";
 import { err } from "../output";
 import { endpointAlive, probeEndpoint } from "../probe";
 import { isAlive } from "../process";
@@ -122,9 +118,7 @@ async function probeListEntries(port: number | null): Promise<ListEntry[]> {
   if (port === null) {
     return [];
   }
-  const endpoint = deriveEndpoint(port);
-  const target = { host: endpoint.host, port: endpoint.port, url: endpointBaseUrl(endpoint) };
-  if (!(await probeEndpoint(target, "light"))) {
+  if (!(await probeEndpoint({ host: "127.0.0.1", port }, "light"))) {
     return [];
   }
   return [

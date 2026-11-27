@@ -78,13 +78,13 @@ function createLegacyInstall(target: string): string {
   fs.mkdirSync(path.join(book, "references"), { recursive: true });
   fs.writeFileSync(
     path.join(book, "SKILL.md"),
-    '---\nname: godot-autopilot\ndescription: "old"\n---\n# Old\nUse mcp_url and call_tool.\n',
+    '---\nname: godot-autopilot\ndescription: "old"\n---\n# Old\nUse the legacy transport and call_tool.\n',
     "utf8",
   );
-  fs.writeFileSync(path.join(book, "references", "mcp.md"), "# MCP tools\ncall_tool\n", "utf8");
+  fs.writeFileSync(path.join(book, "references", "legacy.md"), "# Legacy helpers\ncall_tool\n", "utf8");
   fs.mkdirSync(path.join(target, "my-notes"), { recursive: true });
   fs.writeFileSync(path.join(target, "my-notes", "note.md"), "mine\n", "utf8");
-  return path.join(book, "references", "mcp.md");
+  return path.join(book, "references", "legacy.md");
 }
 
 function snapshot(dir: string): Record<string, string> {
@@ -153,7 +153,7 @@ describe("gda skills sync", () => {
     const result = await runSkillsCaptured(["sync", "--dry-run"], { pathText: target });
     expect(result.code).toBe(0);
     expect(result.data.dry_run).toBe(true);
-    expect(result.data.would_delete).toContain("godot-autopilot/references/mcp.md");
+    expect(result.data.would_delete).toContain("godot-autopilot/references/legacy.md");
     expect(snapshot(target)).toEqual(before);
   });
 
@@ -163,8 +163,8 @@ describe("gda skills sync", () => {
     const result = await runSkillsCaptured(["sync", "--force"], { pathText: target });
     expect(result.code).toBe(0);
     expect(result.data.written).toContain("godot-autopilot/references/recipes/skills-sync.md");
-    expect(result.data.deleted).toContain("godot-autopilot/references/mcp.md");
-    expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "mcp.md"))).toBe(false);
+    expect(result.data.deleted).toContain("godot-autopilot/references/legacy.md");
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "legacy.md"))).toBe(false);
     expect(fs.readFileSync(path.join(target, "godot-autopilot", "SKILL.md"), "utf8")).toBe(
       builtinSkillsFiles("en")["godot-autopilot/SKILL.md"],
     );
@@ -255,13 +255,13 @@ describe("gda skills sync", () => {
     expect(calls).toBeGreaterThanOrEqual(2);
     expect(caught).toBeInstanceOf(CliError);
     expect(fs.readFileSync(skillFile, "utf8")).toBe(before);
-    expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "mcp.md"))).toBe(true);
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "legacy.md"))).toBe(true);
     expect(findTempFiles(target)).toEqual([]);
   });
 });
 
 describe("install skills upgrade", () => {
-  test("旧版升级清零 MCP reference、写入 recipe 并保留自建目录", async () => {
+  test("旧版升级清零过期 reference、写入 recipe 并保留自建目录", async () => {
     const target = path.join(tmp, "upgrade");
     const stale = createLegacyInstall(target);
     const retiredName = builtinRetiredSkills()[0] ?? "godot-autopilot-tools";
@@ -281,9 +281,9 @@ describe("install skills upgrade", () => {
     expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "recipes", "skills-sync.md"))).toBe(true);
     expect(fs.existsSync(path.join(target, "my-notes", "note.md"))).toBe(true);
     const contents = Object.values(snapshot(path.join(target, "godot-autopilot"))).join("\n");
-    expect(contents).not.toContain("mcp_url");
+    expect(contents).not.toContain("legacy transport");
     expect(contents).not.toContain("call_tool");
-    expect(contents).not.toContain("Model Context Protocol");
+    expect(contents).not.toContain("legacy helpers");
   });
 
   test("offline 安装使用内置技能且报告真实 asset 版本", async () => {

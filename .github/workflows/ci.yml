@@ -90,7 +90,6 @@ jobs:
         with:
           path: |
             third_party/godot-cpp
-            third_party/mcp-cpp-sdk
             third_party/googletest
           key: submodules-debug-${{ runner.os }}-${{ steps.submodules.outputs.shas }}
 

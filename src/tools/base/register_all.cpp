@@ -1,14 +1,10 @@
 #include "tools/base/register_all.hpp"
-#include "tools/base/call_tool_elicitation.hpp"
 #include "core/command_queue.hpp"
 #include "core/error_watermark.hpp"
 #include "core/export_guard.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
-#include "core/transport/godot_transport.hpp"
 #include "util/input_guards.hpp"
-#include "adapters/mcp_error_bridge.hpp"
-#include "adapters/mcp_json_bridge.hpp"
 #include <version.hpp>
 #include "tools/base/code_exec_ops.hpp"
 #include "tools/base/dispatch.hpp"
@@ -56,8 +52,6 @@
 #include "tools/base/tool_registry.hpp"
 #include "tools/base/side_effect_policy.hpp"
 #include "tools/base/tool_spec.hpp"
-#include "util/mcp_image_content.hpp"
-#include <mcp/Content.hpp>
 #include "util/json_value.hpp"
 #include <algorithm>
 #include <cstdint>
@@ -79,8 +73,6 @@ static std::mutex g_active_registry_mutex;
 static ToolCatalog *g_catalog = nullptr;
 static Bm25Index *g_index = nullptr;
 static int g_port = 0;
-static mcp::McpServer *g_surface_server = nullptr;
-static ToolSurface g_tool_surface = ToolSurface::Meta;
 
 static godot_autopilot::util::JsonValue meta_categories_impl(ToolCatalog& catalog);
 
@@ -709,7 +701,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
                     LogSystem::instance().log_detailed(
                         LogLevel::Warning, LogCategory::Tools,
                         "user tool '" + spec.name +
-                            "' skipped: name collides with a built-in MCP tool",
+                            "' skipped: name collides with a built-in tool",
                         "tool=" + spec.name +
                             " params=" + std::to_string(spec.params.size()) +
                             " reason=collision");
@@ -770,301 +762,25 @@ void refresh_dynamic_tools() {
     monitor::lifecycle(
         "registry_refresh_dynamic",
         monitor::build_attrs({{"dynamic_tools", std::to_string(dynamic_count)}}));
-    if (g_tool_surface == ToolSurface::Full && g_surface_server != nullptr) {
-        try {
-            g_surface_server->SendToolListChanged();
-        } catch (const std::exception &error) {
-            LogSystem::instance().log(
-                LogLevel::Warning, LogCategory::Tools,
-                "failed to send tools/list_changed: " +
-                    std::string(error.what()));
-        } catch (...) {
-            LogSystem::instance().log(
-                LogLevel::Warning, LogCategory::Tools,
-                "failed to send tools/list_changed");
-        }
-    }
 }
 
-static void register_surface_tool(
-    mcp::McpServer& server, const std::shared_ptr<ToolRegistry>& registry,
-    const std::shared_ptr<ToolBase>& surface_tool) {
-    const std::string tool_name = surface_tool->meta().name;
-    mcp::ToolOptions opts;
-    opts.Description(surface_tool->meta().description)
-        .InputSchema(godot_autopilot::adapters::ToSdk(
-            surface_tool->input_schema()));
-    const SideEffect effect = side_effect_of(*surface_tool);
-    if (effect == SideEffect::None) {
-        opts.read_only_hint = true;
-    }
-    if (effect == SideEffect::Destructive) {
-        opts.destructive = true;
-    }
-    if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
-        opts.open_world_hint = true;
-    }
-    if (tool_name == "call_tool") {
-        mcp::ToolExecution execution;
-        execution.mode = mcp::ToolExecutionMode::Task;
-        execution.task_support = mcp::TaskSupport::Optional;
-        opts.execution = execution;
-    }
-    server.RegisterTool(
-        tool_name, opts,
-        [tool_name, registry, surface_tool](
-            const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
-            -> mcp::CallToolResult {
-            const std::string gda_request_key =
-                mcp_wire::request_id_key(ctx.GetRequest().id);
-            const std::string gda_request_id =
-                godot_transport_instance()->client_request_id_text(gda_request_key);
-            monitor::RequestScope gda_request_scope(gda_request_key);
-            monitor::RequestRecord gda_request_record;
-            std::string gda_request_trace;
-            std::string gda_request_span;
-            if (!gda_request_key.empty() &&
-                monitor::registry().get(gda_request_key, &gda_request_record)) {
-                gda_request_trace = gda_request_record.trace_id;
-                gda_request_span = gda_request_record.span_id;
-            }
-            tools::RequestSpanGuard gda_span_scope(gda_request_trace,
-                                                   gda_request_span);
-            if (godot_autopilot::ExportGuard::is_exporting()) {
-                return dispatch::export_blocked_result();
-            }
-            godot_autopilot::util::JsonValue args =
-                ctx.Params().arguments
-                    ? godot_autopilot::adapters::FromSdk(
-                          *ctx.Params().arguments)
-                    : godot_autopilot::util::JsonValue(
-                          godot_autopilot::util::JsonValue::object_tag);
-            {
-                SideEffect effect = side_effect_of(*surface_tool);
-                if (tool_name == "call_tool") {
-                    const godot_autopilot::util::JsonValue *target_p = args.Find("name");
-                    if (target_p != nullptr && target_p->IsString()) {
-                        const std::string target_name = target_p->GetString();
-                        if (auto registry = get_active_registry()) {
-                            auto target = registry->find_any(target_name);
-                            if (target == nullptr) {
-                                if (auto alias = registry->resolve_alias(target_name)) {
-                                    target = registry->find_any(alias->canonical);
-                                }
-                            }
-                            if (target != nullptr) {
-                                effect = elicitation_detail::effective_side_effect(
-                                    true, side_effect_of(*surface_tool),
-                                    side_effect_of(*target));
-                            }
-                        }
-                    }
-                }
-                bool client_elicitation = false;
-                if (auto capabilities = ctx.Server().GetClientCapabilities()) {
-                    client_elicitation = capabilities->elicitation.has_value();
-                }
-                const std::optional<godot_autopilot::util::JsonValue>
-                    responses_gda =
-                        godot_autopilot::adapters::FromSdkOptional(
-                            ctx.Params().input_responses);
-                const godot_autopilot::util::JsonValue *responses =
-                    responses_gda ? &*responses_gda : nullptr;
-                std::string confirm_error;
-                const confirmation::ConfirmationResolution resolution =
-                    confirmation::resolve_confirmation(
-                        args, tool_name == "call_tool", responses,
-                        &confirm_error);
-                if (resolution.decision ==
-                    confirmation::ConfirmationDecision::kMalformed) {
-                    mcp::CallToolResult invalid;
-                    invalid.is_error = true;
-                    godot_autopilot::util::JsonValue structured(godot_autopilot::util::JsonValue::object_tag);
-                    structured["code"] = godot_autopilot::util::JsonValue("invalid_input_response");
-                    structured["message"] = godot_autopilot::util::JsonValue(confirm_error);
-                    invalid.structured_content =
-                        godot_autopilot::adapters::ToSdk(structured);
-                    invalid.content.push_back(mcp::TextContent{
-                        "text", "invalid_input_response: " + confirm_error});
-                    return invalid;
-                }
-                if (resolution.decision ==
-                    confirmation::ConfirmationDecision::kDeclined) {
-                    mcp::CallToolResult declined;
-                    declined.is_error = true;
-                    declined.content.push_back(mcp::TextContent{
-                        "text",
-                        "confirmation declined: the tool was not executed"});
-                    return declined;
-                }
-                const bool decision_accepted =
-                    resolution.decision ==
-                    confirmation::ConfirmationDecision::kAccepted;
-                if (elicitation_detail::should_elicit(
-                        effect, decision_accepted, client_elicitation)) {
-                    mcp::CallToolResult required;
-                    required.input_required = mcp::InputRequiredResult{};
-                    mcp::InputRequest request;
-                    request.method = "elicitation/create";
-                    godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
-                    params["mode"] = godot_autopilot::util::JsonValue("form");
-                    params["message"] = godot_autopilot::util::JsonValue(
-                        "This tool has a " +
-                        std::string(side_effect_name(effect)) +
-                        " side effect. Confirm to continue.");
-                    godot_autopilot::util::JsonValue schema(godot_autopilot::util::JsonValue::object_tag);
-                    schema["type"] = godot_autopilot::util::JsonValue("object");
-                    godot_autopilot::util::JsonValue properties(godot_autopilot::util::JsonValue::object_tag);
-                    godot_autopilot::util::JsonValue confirm_property(godot_autopilot::util::JsonValue::object_tag);
-                    confirm_property["type"] = godot_autopilot::util::JsonValue("boolean");
-                    confirm_property["description"] =
-                        godot_autopilot::util::JsonValue("Confirm the high-risk tool call");
-                    properties["confirm"] = std::move(confirm_property);
-                    schema["properties"] = std::move(properties);
-                    godot_autopilot::util::JsonValue required_fields(godot_autopilot::util::JsonValue::array_tag);
-                    required_fields.PushBack(godot_autopilot::util::JsonValue("confirm"));
-                    schema["required"] = std::move(required_fields);
-                    params["requestedSchema"] = std::move(schema);
-                    request.params = godot_autopilot::adapters::ToSdk(params);
-                    required.input_required->input_requests["confirm"] =
-                        std::move(request);
-                    return required;
-                }
-                if (decision_accepted) {
-                    args["confirm"] = godot_autopilot::util::JsonValue(true);
-                    if (tool_name == "call_tool") {
-                        godot_autopilot::util::JsonValue *nested = args.Find("arguments");
-                        if (nested != nullptr && nested->IsObject())
-                            (*nested)["confirm"] = godot_autopilot::util::JsonValue(true);
-                    }
-                }
-            }
-            std::optional<mcp::ProgressToken> progress_token;
-            int64_t progress_total = 0;
-            if (tool_name == "batch_execute" && ctx.Params().meta &&
-                ctx.Params().meta->progress_token.has_value()) {
-                progress_token = ctx.Params().meta->progress_token;
-                if (auto* operations = args.Find("operations");
-                    operations && operations->IsArray()) {
-                    progress_total =
-                        static_cast<int64_t>(operations->GetArray().size());
-                }
-            }
-            const auto send_progress =
-                [&ctx, &progress_token, progress_total](
-                    double progress, const std::string& message) {
-                    if (!progress_token.has_value()) return;
-                    try {
-                        ctx.Server().SendProgress(
-                            *progress_token, progress,
-                            static_cast<double>(progress_total), message);
-                    } catch (...) {
-                    }
-                };
-            send_progress(0.0, "batch_execute started");
-            bool run_on_transport_thread = tool_name == "call_tool";
-            if (tool_name == "batch_execute") {
-                if (auto* await_async = args.Find("await_async");
-                    await_async && await_async->IsBool() &&
-                    await_async->GetBool()) {
-                    run_on_transport_thread = true;
-                }
-            }
-            godot_autopilot::util::JsonValue res;
-            if (run_on_transport_thread) {
-                dispatch::DepthContext depth_ctx =
-                    dispatch::capture_depth_context();
-                depth_ctx.run_on_calling_thread = true;
-                res = dispatch::call_handler(tool_name, args, depth_ctx);
-            } else {
-                res = dispatch::call_handler(
-                    tool_name, args, dispatch::capture_depth_context());
-            }
-            if (!run_on_transport_thread &&
-                dispatch::has_deferred_marker(res)) {
-                res = dispatch::resolve_deferred_wait(tool_name,
-                                                      std::move(res));
-            }
-            int64_t new_errors = error_watermark::count_response_errors(res);
-            if (new_errors > 0) {
-                error_watermark::record_error(new_errors, gda_request_id);
-            }
-            if (progress_token.has_value()) {
-                send_progress(static_cast<double>(progress_total),
-                              "batch_execute completed");
-            }
-            mcp::CallToolResult mcp_result;
-            if (tool_result_is_error(res)) {
-                mcp_result.is_error = true;
-            }
-            if (res.IsObject()) {
-                res["new_errors_since_last_call"] = godot_autopilot::util::JsonValue(
-                    error_watermark::consume_new_errors(gda_request_id));
-            }
-            std::vector<mcp::ContentVariant> image_content;
-            if (tool_name == "call_tool") {
-                if (auto* target_name = args.Find("name");
-                    target_name && target_name->IsString()) {
-                    const std::string name = target_name->GetString();
-                    bool known = false;
-                    if (auto active = get_active_registry()) {
-                        if (auto target = active->find_any(name)) {
-                            known = true;
-                            if ((target->tool_flags() &
-                                 tool_flags::kCaptureImage) != 0) {
-                                util::try_attach_image_data(res,
-                                                            image_content);
-                            }
-                        }
-                    }
-                    if (!known) {
-                        util::try_attach_image_content(name, res,
-                                                       image_content);
-                    }
-                }
-            } else if ((surface_tool->tool_flags() &
-                        tool_flags::kCaptureImage) != 0) {
-                util::try_attach_image_data(res, image_content);
-            }
-            mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
-            for (auto& block : image_content) {
-                mcp_result.content.push_back(std::move(block));
-            }
-            return mcp_result;
-        });
-}
-
-void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port, ToolSurface surface) {
-
-    if (g_surface_server == &server) {
-        throw godot_autopilot::adapters::SdkError(
-            godot_autopilot::adapters::SdkErrorCode::InvalidParams,
-            "tools already registered on this server");
-    }
-
+std::shared_ptr<ToolRegistry> install_tool_handlers(CommandQueue &queue, ToolCatalog &catalog,
+                                         Bm25Index &index, int port,
+                                         ToolSurface surface) {
     (void)queue;
+    (void)surface;
     g_catalog = &catalog;
     g_index = &index;
     g_port = port;
-    g_surface_server = &server;
-    g_tool_surface = surface;
     auto registry = build_registry(catalog, index, port);
-
-    const std::vector<std::shared_ptr<ToolBase>> surfaced =
-        surface == ToolSurface::Full ? registry->all_any()
-                                     : registry->all_meta();
-    for (const auto& surface_tool : surfaced) {
-        register_surface_tool(server, registry, surface_tool);
-    }
-
     refresh_derived(registry, catalog, index);
-
-    auto count = catalog.size();
+    const auto count = catalog.size();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         std::to_string(count) + " tools registered via registry");
     monitor::lifecycle(
         "tools_registered",
         monitor::build_attrs({{"count", std::to_string(count)}}));
+    return registry;
 }
 
 std::shared_ptr<ToolRegistry> get_active_registry() {
@@ -1077,8 +793,6 @@ void clear_active_registry() {
     g_active_registry = std::make_shared<ToolRegistry>();
     g_catalog = nullptr;
     g_index = nullptr;
-    g_surface_server = nullptr;
-    g_tool_surface = ToolSurface::Meta;
 }
 
 }

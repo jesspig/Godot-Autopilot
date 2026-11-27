@@ -12,7 +12,6 @@
 #include <unordered_map>
 #include <utility>
 #include "util/json_value.hpp"
-#include <mcp/McpTypes.hpp>
 #include <tools/base/tool_invoke.hpp>
 
 namespace godot_autopilot {
@@ -170,8 +169,6 @@ private:
 godot_autopilot::util::JsonValue call_handler(const std::string &name,
                             const godot_autopilot::util::JsonValue &args,
                             const DepthContext &depth_ctx = {});
-
-mcp::CallToolResult export_blocked_result();
 
 godot_autopilot::util::JsonValue export_blocked_json_result();
 

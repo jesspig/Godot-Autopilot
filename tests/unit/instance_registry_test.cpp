@@ -50,6 +50,14 @@ InstanceRecord sample_record() {
   record.endpoints.mcp.path = "/mcp";
   record.endpoints.mcp.protocol = "mcp";
   record.endpoints.mcp.auth = "none";
+  record.endpoints.ipc.present = true;
+  record.endpoints.ipc.kind = "tcp";
+  record.endpoints.ipc.host = "127.0.0.1";
+  record.endpoints.ipc.port = 41001;
+  record.endpoints.ipc.protocol = "gcp-native";
+  record.endpoints.ipc.framing = "length-prefixed-json";
+  record.endpoints.ipc.auth = "token";
+  record.endpoints.ipc.version = 1;
   record.endpoints.api.host = "127.0.0.1";
   record.endpoints.api.port = 9527;
   record.endpoints.api.path = "/api";
@@ -161,12 +169,14 @@ TEST(InstanceRegistryTest, TcpIpcEndpointRoundTrips) {
   EXPECT_EQ(parsed.endpoints.ipc.token, "tcp-token");
 }
 
-TEST(InstanceRegistryTest, MissingIpcEndpointIsBackwardCompatible) {
-  const InstanceRecord original = sample_record();
-  const godot_autopilot::util::JsonValue doc = godot_autopilot::record_to_json(original);
+TEST(InstanceRegistryTest, MissingIpcEndpointIsRejected) {
+  godot_autopilot::util::JsonValue doc =
+      godot_autopilot::record_to_json(sample_record());
+  godot_autopilot::util::JsonValue::Object endpoints;
+  endpoints["mcp"] = doc["endpoints"]["mcp"];
+  doc["endpoints"] = godot_autopilot::util::JsonValue(std::move(endpoints));
   InstanceRecord parsed;
-  ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
-  EXPECT_FALSE(parsed.endpoints.ipc.present);
+  EXPECT_FALSE(godot_autopilot::record_from_json(doc, parsed));
 }
 
 TEST(InstanceRegistryTest, InvalidIpcEndpointFailsValidation) {

@@ -1,6 +1,7 @@
 import { afterEach, afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
@@ -277,8 +278,7 @@ if (!noListen && fakePort > 0 && fakeHome !== "" && fakeProject !== "") {
     project_path: fakeProject,
     api_token: "fake-token",
     endpoints: {
-      mcp: { host: "127.0.0.1", port: fakePort, path: "/mcp", protocol: "mcp", auth: "none" },
-      api: { host: "127.0.0.1", port: fakePort, path: "/api", protocol: "http", auth: "bearer" }
+      ipc: { kind: "tcp", host: "127.0.0.1", port: fakePort, protocol: "native-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 }
     },
     started_at: Date.now(),
     version: "0.3.1",
@@ -290,45 +290,47 @@ if (process.env.GDA_FAKE_GODOT_EXIT === "1") {
 }
 if (!noListen) {
   const port = Number(process.env.GODOT_AUTOPILOT_PORT ?? "0");
-  Bun.serve({
-    port,
-    hostname: "127.0.0.1",
-    fetch: async (req) => {
-      const url = new URL(req.url);
-      if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-      let body = {};
-      try { body = await req.json(); } catch {}
-      const params = body.params ?? {};
-      const isDirect = params.name !== "call_tool";
-      const toolName = isDirect ? (params.name ?? null) : (params.arguments?.name ?? null);
-      report.calls.push({ method: body.method, name: toolName, direct: isDirect });
-      saveReport(report);
-      if (body?.method === "notifications/initialized") return new Response("{}", { status: 200 });
-      if (toolName === "ping" && isDirect && process.env.GDA_FAKE_GODOT_PING_FAIL === "1") {
-        return new Response(JSON.stringify({
-          jsonrpc: "2.0",
-          id: body?.id ?? 1,
-          error: { code: -32602, message: "mock ping failure" },
-        }), { status: 400, headers: { "content-type": "application/json" } });
+  const net = require("node:net");
+  const server = net.createServer((socket) => {
+    let buffer = Buffer.alloc(0);
+    socket.on("data", (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= 4) {
+        const size = buffer.readUInt32BE(0);
+        if (buffer.length < 4 + size) return;
+        const text = buffer.subarray(4, 4 + size).toString("utf8");
+        buffer = buffer.subarray(4 + size);
+        let body = {};
+        try { body = JSON.parse(text); } catch {}
+        const respond = (envelope) => {
+          const payload = Buffer.from(JSON.stringify(envelope), "utf8");
+          const header = Buffer.alloc(4);
+          header.writeUInt32BE(payload.length, 0);
+          socket.write(Buffer.concat([header, payload]));
+        };
+        if (body.method === "initialize") {
+          respond({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "1", capabilities: {}, serverInfo: { name: "fake", version: "0.3.1" } } });
+          continue;
+        }
+        if (body.method === "notifications/initialized") continue;
+        const params = body.params ?? {};
+        const isDirect = params.name !== "call_tool";
+        const toolName = isDirect ? (params.name ?? null) : (params.arguments?.name ?? null);
+        report.calls.push({ method: body.method, name: toolName, direct: isDirect });
+        saveReport(report);
+        if (toolName === "ping" && isDirect && process.env.GDA_FAKE_GODOT_PING_FAIL === "1") {
+          respond({ jsonrpc: "2.0", id: body.id, error: { code: -32602, message: "mock ping failure" } });
+          continue;
+        }
+        if (toolName === "ping" && !isDirect) {
+          respond({ jsonrpc: "2.0", id: body.id, error: { code: -32602, message: "ping must be called directly" } });
+          continue;
+        }
+        respond({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] } });
       }
-      if (toolName === "ping" && !isDirect) {
-        return new Response(JSON.stringify({
-          jsonrpc: "2.0",
-          id: body?.id ?? 1,
-          error: { code: -32602, message: "ping is a meta tool and must be called directly" },
-        }), { status: 400, headers: { "content-type": "application/json" } });
-      }
-      const payload = {
-        jsonrpc: "2.0",
-        id: body?.id ?? 1,
-        result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] },
-      };
-      return new Response("event: message\\ndata: " + JSON.stringify(payload) + "\\n\\n", {
-        status: 200,
-        headers: { "content-type": "text/event-stream" },
-      });
-    },
+    });
   });
+  server.listen(port, "127.0.0.1");
 } else {
   setTimeout(() => {}, 30000);
 }
@@ -633,7 +635,8 @@ describe.skip("start", () => {
   }, TEST_TIMEOUT_MS);
 
   test("端口被占用时自动跳过选择下一个", async () => {
-    const blocker = Bun.serve({ port: 9530, hostname: "127.0.0.1", fetch: () => new Response("x") });
+    const blocker = net.createServer();
+    await new Promise<void>((resolve) => blocker.listen(9530, "127.0.0.1", resolve));
     try {
       const { code } = await startFake({ headless: true });
       expect(code).toBe(ExitCode.Success);
@@ -641,7 +644,7 @@ describe.skip("start", () => {
       expect(instances).toHaveLength(1);
       expect(instances[0].port).not.toBe(9530);
     } finally {
-      blocker.stop();
+      await new Promise<void>((resolve) => blocker.close(() => resolve()));
     }
   }, TEST_TIMEOUT_MS);
 
@@ -957,12 +960,12 @@ describe.serial("T-08 命令树与 alias", () => {
     expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
   });
 
-  test("gda editor status 无实例输出原生状态错误且无 mcp_url", () => {
+  test("gda editor status 无实例输出原生状态错误且无传输专属字段", () => {
     const result = invoke(["editor", "status"]);
     expect(result.status).toBe(ExitCode.Transport);
     const body = JSON.parse(result.stdout);
     expect(body.ok).toBe(false);
-    for (const forbidden of ["mcp_url", "mcp", "port", "port_source"]) {
+    for (const forbidden of ["http_url", "endpoint_url", "protocol_version", "server_info"]) {
       expect(Object.keys(body)).not.toContain(forbidden);
     }
   });

@@ -23,9 +23,6 @@ const LEGACY_TOP_LEVEL = [
   "docs",
   "skills",
   "tools",
-  "resources",
-  "prompts",
-  "tasks",
   "projects",
   "cache",
   "install",
@@ -52,8 +49,6 @@ describe("旧顶层命令 alias", () => {
   test("二级 alias 优先于一级 alias", () => {
     expect(resolveCommand(["install", "plugin"])!.path).toBe("plugin.install");
     expect(resolveCommand(["install"])!.path).toBe("setup.install");
-    expect(resolveCommand(["resources", "read"])!.path).toBe("resource.read");
-    expect(resolveCommand(["resources"])!.path).toBe("resource.list");
   });
 
   test("alias 帮助指向对应新子命令", () => {
@@ -61,14 +56,12 @@ describe("旧顶层命令 alias", () => {
     expect(help).toBeDefined();
     expect(help).toContain("Subcommand: start");
     expect(help).toContain("Invoke: gda editor start");
-    const nested = helpTextForTokens(["tasks", "wait"]);
-    expect(nested).toContain("Invoke: gda job wait");
   });
 
-  test("alias 映射不为命令引入 MCP 专属 flags", () => {
+  test("alias 映射不为命令引入传输专属 flags", () => {
     for (const entry of COMMAND_SPECS) {
       for (const flag of entry.flags) {
-        expect(flag.name).not.toMatch(/mcp/i);
+        expect(flag.name).not.toMatch(/transport|fallback|remote-url/i);
       }
     }
   });

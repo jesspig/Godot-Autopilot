@@ -817,7 +817,7 @@ type AliasMapping = { name: string; canonical: string; action: string };
 function aliasActionOf(text: string): string {
   const helper = text.match(/_with_action\([^,]+,\s*"([^"]+)"\)/);
   if (helper) return helper[1];
-  const assignment = text.match(/\["action"\]\s*=\s*mcp::JsonValue\("([^"]+)"\)/);
+  const assignment = text.match(/\["action"\]\s*=\s*util::JsonValue\("([^"]+)"\)/);
   return assignment ? assignment[1] : "";
 }
 
