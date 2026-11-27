@@ -47,6 +47,14 @@ std::string FormatDouble(double d) {
   if (res.ec == std::errc()) return std::string(buf.data(), res.ptr);
 #endif
   std::array<char, 64> fallback_buf;
+  for (int precision = 1;
+       precision <= std::numeric_limits<double>::max_digits10; ++precision) {
+    int len = std::snprintf(fallback_buf.data(), fallback_buf.size(), "%.*g",
+                            precision, d);
+    if (std::strtod(fallback_buf.data(), nullptr) == d) {
+      return std::string(fallback_buf.data(), static_cast<size_t>(len));
+    }
+  }
   int len = std::snprintf(fallback_buf.data(), fallback_buf.size(), "%.*g",
                           std::numeric_limits<double>::max_digits10, d);
   return std::string(fallback_buf.data(), static_cast<size_t>(len));
