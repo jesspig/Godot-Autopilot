@@ -60,7 +60,9 @@ jobs:
           mkdir -p .gda-cache/godot
           curl -fsSL "$url" -o .gda-cache/godot.zip
           unzip -q .gda-cache/godot.zip -d .gda-cache/godot
-          chmod +x ".gda-cache/godot/${GODOT_EXE_LINUX}"
+          path="$(find .gda-cache/godot -type f -name "$GODOT_EXE_LINUX" -print -quit)"
+          if [ -z "$path" ]; then echo "::error::fixed Godot binary not found after unzip"; exit 1; fi
+          chmod +x "$path"
 
       - name: Resolve Godot path
         id: godot
