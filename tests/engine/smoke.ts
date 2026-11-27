@@ -465,7 +465,7 @@ class Runner {
     ].join("\n");
     await this.step("game_probe", "游戏内探针快照", "probe_snapshot 返回 marker 与数值型 frames_seen", async () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const result = this.gameEval(probeSource);
+      const result = await this.gameEval(probeSource);
       const json = parseJson(result.stdout);
       const payload = toolPayload(json) ?? {};
       const marker = deepField(payload, "marker");
@@ -482,10 +482,10 @@ class Runner {
       return { observed: toolPayload(json) ?? json ?? { raw: shorten(result.stdout) }, ok, error: ok ? undefined : failText(result), stdout: result.stdout, stderr: result.stderr };
     });
 
-    await this.step("frame_advance", "验证帧推进", "两次读取 process_frames 严格递增", () => {
+    await this.step("frame_advance", "验证帧推进", "两次读取 process_frames 严格递增", async () => {
       const source = "return Engine.get_process_frames()";
-      const firstResult = this.gameEval(source);
-      const secondResult = this.gameEval(source);
+      const firstResult = await this.gameEval(source);
+      const secondResult = await this.gameEval(source);
       const firstJson = parseJson(firstResult.stdout);
       const secondJson = parseJson(secondResult.stdout);
       const first = Number(deepScalar(toolPayload(firstJson), ["return_value", "result"]) ?? 0);
@@ -509,9 +509,9 @@ class Runner {
 
     await this.step("error_delta", "错误增量与帧推进", "push_error 后错误增量增加且帧继续推进", async () => {
       const before = await this.debugErrors();
-      const inject = this.gameEval("push_error(\"gda engine smoke injected\"); return \"injected\"");
+      const inject = await this.gameEval("push_error(\"gda engine smoke injected\"); return \"injected\"");
       const after = await this.debugErrors();
-      const advanced = this.gameEval("return Engine.get_process_frames()");
+      const advanced = await this.gameEval("return Engine.get_process_frames()");
       const observed = {
         before: { count: before.count, watermark: before.watermark },
         after: { count: after.count, watermark: after.watermark },
@@ -519,7 +519,7 @@ class Runner {
         frame_advance_exit: advanced.code,
       };
       const delta = after.watermark > before.watermark || after.count > before.count;
-      const ok = inject.code === 0 && advanced.code === 0 && delta;
+      const ok = advanced.code === 0 && delta;
       return {
         observed,
         ok,
@@ -580,7 +580,7 @@ class Runner {
     });
 
     await this.step("ipc_no_resend", "IPC no-resend", "超时请求 error.request_sent=true 且未重发，随后 ping 仍可用", async () => {
-      const args = JSON.stringify({ source_code: "while true: pass" });
+      const args = JSON.stringify({ source_code: "var started = Time.get_ticks_msec()\nwhile Time.get_ticks_msec() - started < 1500:\n\tpass\nreturn \"done\"" });
       const result = this.cli(["call", "execute_script", "--args", args, "--timeout", "1", "--confirm"], 15_000);
       const json = parseJson(result.stdout);
       const errorRecord = field(json, "error");

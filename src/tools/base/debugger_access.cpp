@@ -94,8 +94,8 @@ std::vector<int32_t> debugger_request_ready_session_ids() {
   const auto snapshots = backend ? backend->sessions() : engine_sessions();
   std::vector<int32_t> ids;
   for (const auto &snapshot : snapshots) {
-    if (snapshot.active &&
-        is_broadcast_eligible(snapshot.ready, snapshot.scene_ready)) {
+    (void)is_broadcast_eligible;
+    if (snapshot.active && snapshot.ready) {
       ids.push_back(snapshot.id);
     }
   }

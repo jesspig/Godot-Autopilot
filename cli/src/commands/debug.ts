@@ -53,11 +53,37 @@ function binding(opts: GlobalOptions): NativeBinding {
   };
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function nativePayload(display: unknown): Record<string, unknown> {
+  if (typeof display === "string") {
+    try {
+      return nativePayload(JSON.parse(display));
+    } catch {
+      return {};
+    }
+  }
+  const record = asRecord(display);
+  const content = record.content;
+  if (Array.isArray(content)) {
+    const first = asRecord(content[0]);
+    if (typeof first.text === "string") {
+      try {
+        return asRecord(JSON.parse(first.text));
+      } catch {
+      }
+    }
+  }
+  return asRecord(record.result ?? record.data ?? display);
+}
+
 function stepRecord(name: string, tool: string, outcome: NativeCallOutcome): Step {
   const payload = outcome.payload;
-  const record = payload !== null && typeof payload === "object" && !Array.isArray(payload)
-    ? payload as Record<string, unknown>
-    : {};
+  const record = nativePayload(payload);
   return {
     name,
     tool,
@@ -134,9 +160,8 @@ function emit(
 }
 
 function entriesOf(payload: unknown): unknown[] {
-  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return [];
-  const record = payload as Record<string, unknown>;
-  for (const key of ["entries", "errors", "lines", "output", "items"]) {
+  const record = nativePayload(payload);
+  for (const key of ["entries", "errors", "lines", "output", "items", "result"]) {
     if (Array.isArray(record[key])) return record[key] as unknown[];
   }
   return [];
