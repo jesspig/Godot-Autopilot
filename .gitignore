@@ -54,6 +54,9 @@ node_modules/
 # agent
 .handoff/
 .worktrees/
+
+# Removed protocol SDK submodule (local checkout only)
+/third_party/mcp-cpp-sdk/
 .cursor/
 .claude/
 .trae/
