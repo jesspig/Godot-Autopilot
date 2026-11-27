@@ -56,7 +56,7 @@ node_modules/
 .worktrees/
 
 # Removed protocol SDK submodule (local checkout only)
-/third_party/mcp-cpp-sdk/
+/third_party/*-sdk/
 .cursor/
 .claude/
 .trae/
