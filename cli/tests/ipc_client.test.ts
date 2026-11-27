@@ -1,29 +1,12 @@
-import fs from "node:fs";
 import net from "node:net";
-import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { requestOverIpc } from "../src/ipc/client";
-import { callTool } from "../src/mcp/client";
+import { callTool } from "../src/rpc/client";
 import { run as runCall } from "../src/commands/call";
 import type { GlobalOptions } from "../src/args";
 import { CliError, ExitCode } from "../src/errors";
-
-function captureOutput(): { stderr(): string; restore(): void } {
-  const origErr = process.stderr.write;
-  let errBuf = "";
-  process.stderr.write = ((chunk: unknown) => {
-    errBuf += String(chunk);
-    return true;
-  }) as typeof process.stderr.write;
-  return {
-    stderr: () => errBuf,
-    restore: () => {
-      process.stderr.write = origErr;
-    },
-  };
-}
 
 function encodeFrame(value: unknown): Buffer {
   const payload = Buffer.from(JSON.stringify(value), "utf8");
@@ -51,47 +34,51 @@ function frameServer(handler: (message: any, socket: net.Socket) => void): (sock
   };
 }
 
-const SOCKET_NAME = "i17a.sock";
+const activeSockets = new Set<net.Socket>();
 
-const activeSockets: net.Socket[] = [];
-
-function listenLoopback(socketPath: string, handler: (socket: net.Socket) => void): Promise<net.Server> {
+function listenLoopback(handler: (socket: net.Socket) => void): Promise<{ server: net.Server; port: number }> {
   return new Promise((resolve, reject) => {
-    const server = net.createServer(handler);
-    server.on("connection", (socket) => activeSockets.push(socket));
+    const server = net.createServer((socket) => {
+      activeSockets.add(socket);
+      socket.once("close", () => activeSockets.delete(socket));
+      handler(socket);
+    });
     server.once("error", reject);
-    server.listen(socketPath, () => resolve(server));
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        reject(new Error("no port"));
+        return;
+      }
+      resolve({ server, port: address.port });
+    });
   });
 }
 
 function closeServer(server: net.Server): Promise<void> {
-  for (const socket of activeSockets.splice(0)) {
-    socket.destroy();
-  }
+  for (const socket of Array.from(activeSockets)) socket.destroy();
   return new Promise((resolve) => server.close(() => resolve()));
 }
 
-let socketPath: string;
-
-beforeEach(() => {
-  socketPath = path.join(process.cwd(), SOCKET_NAME);
-  fs.rmSync(socketPath, { force: true });
-});
-
-afterEach(() => {
-  fs.rmSync(socketPath, { force: true });
-});
+function unusedPort(): Promise<number> {
+  return listenLoopback(() => {}).then(async ({ server, port }) => {
+    await closeServer(server);
+    return port;
+  });
+}
 
 describe("ipc client", () => {
   test("长度前缀 JSON-RPC 请求-响应往返", async () => {
-    const server = await listenLoopback(
-      socketPath,
+    const { server, port } = await listenLoopback(
       frameServer((request, socket) => {
         socket.write(encodeFrame({ id: request.id, result: { tools: [] } }));
       }),
     );
     try {
-      const response = await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+      const response = await requestOverIpc(
+        { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 2000 },
+        { jsonrpc: "2.0", id: 1, method: "tools/list" },
+      );
       expect(response.id).toBe(1);
       expect(response.result).toEqual({ tools: [] });
     } finally {
@@ -99,16 +86,20 @@ describe("ipc client", () => {
     }
   });
 
-  test("socket 不存在映射为传输错误并提示", async () => {
+  test("端口不可达映射为传输错误并提示", async () => {
+    const port = await unusedPort();
     let caught: unknown;
     try {
-      await requestOverIpc({ path: socketPath, timeoutMs: 1000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+      await requestOverIpc(
+        { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 1000 },
+        { jsonrpc: "2.0", id: 1, method: "ping" },
+      );
     } catch (error) {
       caught = error;
     }
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
-    expect((caught as CliError).message).toContain("does not exist");
+    expect((caught as CliError).message).toContain("refused the connection");
   });
 
   test("非法 JSON 帧映射为传输错误", async () => {
@@ -116,13 +107,16 @@ describe("ipc client", () => {
     const header = Buffer.alloc(4);
     header.writeUInt32BE(payload.length, 0);
     const invalid = Buffer.concat([header, payload]);
-    const server = await listenLoopback(socketPath, (socket) => {
+    const { server, port } = await listenLoopback((socket) => {
       socket.on("data", () => socket.write(invalid));
     });
     try {
       let caught: unknown;
       try {
-        await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+        await requestOverIpc(
+          { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 2000 },
+          { jsonrpc: "2.0", id: 1, method: "ping" },
+        );
       } catch (error) {
         caught = error;
       }
@@ -135,11 +129,14 @@ describe("ipc client", () => {
   });
 
   test("超时映射为传输错误", async () => {
-    const server = await listenLoopback(socketPath, () => {});
+    const { server, port } = await listenLoopback(() => {});
     try {
       let caught: unknown;
       try {
-        await requestOverIpc({ path: socketPath, timeoutMs: 150 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+        await requestOverIpc(
+          { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 150 },
+          { jsonrpc: "2.0", id: 1, method: "ping" },
+        );
       } catch (error) {
         caught = error;
       }
@@ -153,7 +150,7 @@ describe("ipc client", () => {
 
   test("分块累计缓冲超过 4 MiB 但单帧合法时按完整帧接收", async () => {
     const big = "a".repeat(4_000_000);
-    const server = await listenLoopback(socketPath, (socket) => {
+    const { server, port } = await listenLoopback((socket) => {
       socket.on("data", () => {
         const frame = encodeFrame({ id: 1, result: { data: big } });
         for (let offset = 0; offset < frame.length; offset += 64 * 1024) {
@@ -162,7 +159,10 @@ describe("ipc client", () => {
       });
     });
     try {
-      const response = await requestOverIpc({ path: socketPath, timeoutMs: 5000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+      const response = await requestOverIpc(
+        { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 5000 },
+        { jsonrpc: "2.0", id: 1, method: "ping" },
+      );
       expect(response.error).toBeUndefined();
       expect((response.result as { data: string }).data).toBe(big);
     } finally {
@@ -175,13 +175,16 @@ describe("ipc client", () => {
     const header = Buffer.alloc(4);
     header.writeUInt32BE(4 * 1024 * 1024 + 1, 0);
     const oversized = Buffer.concat([header, payload]);
-    const server = await listenLoopback(socketPath, (socket) => {
+    const { server, port } = await listenLoopback((socket) => {
       socket.on("data", () => socket.write(oversized));
     });
     try {
       let caught: unknown;
       try {
-        await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+        await requestOverIpc(
+          { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 2000 },
+          { jsonrpc: "2.0", id: 1, method: "ping" },
+        );
       } catch (error) {
         caught = error;
       }
@@ -194,13 +197,16 @@ describe("ipc client", () => {
   });
 
   test("连接提前关闭映射为传输错误", async () => {
-    const server = await listenLoopback(socketPath, (socket) => {
+    const { server, port } = await listenLoopback((socket) => {
       socket.on("data", () => socket.destroy());
     });
     try {
       let caught: unknown;
       try {
-        await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "ping" });
+        await requestOverIpc(
+          { kind: "tcp", host: "127.0.0.1", port, timeoutMs: 2000 },
+          { jsonrpc: "2.0", id: 1, method: "ping" },
+        );
       } catch (error) {
         caught = error;
       }
@@ -211,72 +217,23 @@ describe("ipc client", () => {
     }
   });
 });
+
 function respondServer(): (socket: net.Socket) => void {
   return frameServer((message, socket) => {
     if (message.id === undefined) return;
     const result =
       message.method === "initialize"
-        ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
+        ? { protocolVersion: "1", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
         : { content: [{ type: "text", text: "{}" }] };
     socket.write(encodeFrame({ jsonrpc: "2.0", id: message.id, result }));
   });
 }
 
-describe("transport fallback", () => {
-  test("IPC 不可达时 auto 回退 HTTP", async () => {
-    const server = Bun.serve({
-      port: 0,
-      hostname: "127.0.0.1",
-      fetch: async (req) => {
-        const body = (await req.json()) as { id?: number; method?: string };
-        if (body.method === "notifications/initialized") {
-          return new Response("{}", { status: 200 });
-        }
-        const result =
-          body.method === "initialize"
-            ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
-            : { content: [{ type: "text", text: "{}" }] };
-        return Response.json({ jsonrpc: "2.0", id: body.id ?? 1, result });
-      },
-    });
-    const seen: string[] = [];
+describe("native-only transport", () => {
+  test("callTool 以端口为目标时只走原生 IPC 并完成握手", async () => {
+    const { server, port } = await listenLoopback(respondServer());
     try {
-      const response = await callTool("ping", {}, {
-        port: server.port ?? 0,
-        timeoutSec: 5,
-        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: 1, token: "bad" },
-        transport: "auto",
-        transportSink: (transport) => seen.push(transport),
-      });
-      expect(response.error).toBeUndefined();
-      expect(seen).toEqual(["http"]);
-    } finally {
-      server.stop(true);
-    }
-  });
-
-  test("--transport ipc 且 --no-fallback 时直接失败", async () => {
-    let caught: unknown;
-    try {
-      await callTool("ping", {}, {
-        port: 1,
-        timeoutSec: 2,
-        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: 1, token: "bad" },
-        transport: "ipc",
-        noFallback: true,
-      });
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(CliError);
-    expect((caught as CliError).code).toBe(ExitCode.Transport);
-  });
-});
-describe("ipc session and socket channel", () => {
-  test("callTool 经 IPC 完成握手与调用", async () => {
-    const server = await listenLoopback(socketPath, respondServer());
-    try {
-      const response = await callTool("ping", {}, { port: 0, socketPath, timeoutSec: 5 });
+      const response = await callTool("ping", {}, { port, timeoutSec: 5 });
       expect(typeof response.id).toBe("number");
       expect(response.result).toEqual({ content: [{ type: "text", text: "{}" }] });
     } finally {
@@ -284,30 +241,50 @@ describe("ipc session and socket channel", () => {
     }
   });
 
-  test("call --socket 失败时直接报传输错误", async () => {
+  test("原生 IPC 不可达时直接失败且没有其它通道", async () => {
+    const port = await unusedPort();
     let caught: unknown;
     try {
-      await runCall(["ping"], { socketText: socketPath } as unknown as GlobalOptions);
+      await callTool("ping", {}, {
+        port,
+        timeoutSec: 2,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port, token: "bad" },
+      });
     } catch (error) {
       caught = error;
     }
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
+    expect((caught as CliError).message).not.toContain("falling back");
+  });
+});
+
+describe("ipc session and socket channel", () => {
+  test("callTool 经 IPC 完成握手与调用", async () => {
+    const { server, port } = await listenLoopback(respondServer());
+    try {
+      const response = await callTool("ping", {}, {
+        port: 0,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port },
+        timeoutSec: 5,
+      });
+      expect(typeof response.id).toBe("number");
+      expect(response.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+    } finally {
+      await closeServer(server);
+    }
   });
 
-  test("call --socket 失败时直接报传输错误，不再提示端口回退", async () => {
-    const cap = captureOutput();
+  test("call --port 失败时直接报传输错误", async () => {
+    const port = await unusedPort();
     let caught: unknown;
     try {
-      await runCall(["ping"], { socketText: socketPath });
+      await runCall(["ping"], { portText: String(port) } as unknown as GlobalOptions);
     } catch (error) {
       caught = error;
-    } finally {
-      cap.restore();
     }
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
-    // --no-fallback/--transport 已删除：IPC 优先且不再提示回退到端口通道。
-    expect(cap.stderr()).not.toContain("falling back");
+    expect((caught as CliError).message).not.toContain("falling back");
   });
 });

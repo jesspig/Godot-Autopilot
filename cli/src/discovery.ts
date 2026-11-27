@@ -6,8 +6,10 @@ import { CliError, ExitCode, markIpcRequestSent } from "./errors";
 import { fnv1a32 } from "./hash";
 import type { IpcEndpoint } from "./ipc/client";
 import { gdaRoot } from "./platform";
+import { makeTraceparent } from "./trace";
+import { CLI_VERSION } from "./version";
 
-export const MCP_PROTOCOL_TOOLS: ReadonlySet<string> = new Set([
+export const PROTOCOL_TOOLS: ReadonlySet<string> = new Set([
   "ping",
   "search_tools",
   "list_categories",
@@ -16,7 +18,7 @@ export const MCP_PROTOCOL_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 export function isProtocolTool(name: string): boolean {
-  return MCP_PROTOCOL_TOOLS.has(name);
+  return PROTOCOL_TOOLS.has(name);
 }
 
 export function filterProtocolToolNames(names: string[]): string[] {
@@ -96,7 +98,7 @@ export function buildGcpRequest(
     params: Object.keys(params)
       .sort()
       .map((key) => ({ key, value: params[key] })),
-    trace: {},
+    trace: { traceparent: makeTraceparent() },
     deadline_ms: timeoutMs,
   };
 }
@@ -173,6 +175,10 @@ class GcpIpcSession {
   private socket: net.Socket | null = null;
   private buffer = Buffer.alloc(0);
   private readonly pending = new Map<string, PendingNative>();
+  private handshakeId = 1;
+  private handshakeResolve: ((response: Record<string, unknown>) => void) | null = null;
+  private handshakeReject: ((error: Error) => void) | null = null;
+  private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly endpoint: IpcEndpoint,
@@ -186,7 +192,9 @@ class GcpIpcSession {
       let opened = false;
       socket.once("connect", () => {
         opened = true;
-        resolve();
+        this.authenticate().then(() => resolve(), (error: unknown) => {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        });
       });
       socket.once("error", (error: NodeJS.ErrnoException) => {
         const mapped = new CliError(
@@ -202,6 +210,52 @@ class GcpIpcSession {
         this.failAll(error);
       });
       socket.on("data", (chunk: Buffer) => this.onData(chunk));
+    });
+  }
+
+  private authenticate(): Promise<void> {
+    const token = this.endpoint.token;
+    if (token === undefined || token === "" || this.socket === null) {
+      return Promise.resolve();
+    }
+    const id = this.handshakeId;
+    const init = {
+      jsonrpc: "2.0",
+      id,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-11-25",
+        capabilities: { elicitation: {} },
+        clientInfo: { name: "gda-cli", version: CLI_VERSION },
+        _meta: { gda_token: token },
+      },
+    };
+    return new Promise<void>((resolve, reject) => {
+      this.handshakeResolve = (response) => {
+        const error = response.error as { code?: unknown; message?: unknown } | undefined;
+        if (error !== undefined) {
+          const detail = typeof error.message === "string" ? `: ${error.message}` : "";
+          reject(new CliError(
+            ExitCode.Transport,
+            `native IPC initialize failed (code ${String(error.code ?? "unknown")})${detail}.`,
+          ));
+          return;
+        }
+        resolve();
+      };
+      this.handshakeReject = reject;
+      this.handshakeTimer = setTimeout(() => {
+        this.handshakeResolve = null;
+        this.handshakeReject = null;
+        this.handshakeTimer = null;
+        reject(new CliError(
+          ExitCode.Transport,
+          `native IPC initialize timed out after ${this.timeoutMs} ms (${endpointLabel(this.endpoint)}).`,
+        ));
+      }, this.timeoutMs);
+      this.socket?.write(encodeFrame(JSON.stringify(init)));
+    }).then(() => {
+      this.socket?.write(encodeFrame(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })));
     });
   }
 
@@ -223,6 +277,15 @@ class GcpIpcSession {
       }
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) continue;
       const record = parsed as { id?: unknown };
+      if (typeof record.id === "number" && this.handshakeResolve !== null) {
+        if (this.handshakeTimer !== null) clearTimeout(this.handshakeTimer);
+        this.handshakeTimer = null;
+        const resolveHandshake = this.handshakeResolve;
+        this.handshakeResolve = null;
+        this.handshakeReject = null;
+        resolveHandshake(parsed as Record<string, unknown>);
+        continue;
+      }
       if (typeof record.id !== "string") continue;
       const responseId = record.id.startsWith("r-") ? record.id.slice(2) : record.id;
       const entry = this.pending.get(responseId);
@@ -593,6 +656,18 @@ export async function nativeCallGet(
   return callOutcome(response, taskId);
 }
 
+const TERMINAL_TASK_STATES = new Set([
+  "succeeded", "success", "completed", "complete",
+  "failed", "error", "cancelled", "canceled",
+]);
+
+function taskRecord(outcome: NativeCallOutcome): Record<string, unknown> {
+  const value = outcome.payload;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
 export async function nativeToolInvoke(
   endpoint: IpcEndpoint,
   instanceId: string,
@@ -604,7 +679,33 @@ export async function nativeToolInvoke(
   if (started.status === "needs_confirmation" && options.confirm === true) {
     return nativeCallConfirm(endpoint, instanceId, started.request_id, options);
   }
-  return started;
+  if (started.status !== "pending" || started.task_id === "") {
+    return started;
+  }
+  const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_NATIVE_TIMEOUT_MS);
+  let current = started;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    current = await nativeCallGet(endpoint, instanceId, started.task_id, options);
+    const record = taskRecord(current);
+    const state = typeof record.state === "string" ? record.state : "";
+    if (TERMINAL_TASK_STATES.has(state)) {
+      const errorCode = typeof record.error === "number" ? record.error : current.error_code;
+      const errorMessage = typeof record.error_message === "string" ? record.error_message : current.error_message;
+      return {
+        ...current,
+        ok: errorCode === 0 || state === "succeeded" || state === "success" || state === "completed" || state === "complete",
+        payload: record.result !== undefined ? record.result : current.payload,
+        error_code: errorCode,
+        error_message: errorMessage,
+      };
+    }
+  }
+  return {
+    ...current,
+    ok: false,
+    error_message: `native task ${started.task_id} did not reach a terminal state in time.`,
+  };
 }
 
 export interface NativeTaskRecord {

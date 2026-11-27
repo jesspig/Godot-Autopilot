@@ -28,7 +28,7 @@ resource:
 
 ## 端口模型：一个端口，MCP 端点
 
-插件**只监听一个 TCP 端口**，该端口上挂 MCP 路由（`/mcp`，`GDA_MCP_PATH`，Streamable HTTP / JSON-RPC / SSE）。0.3.2 起 REST `/api` 与 API token 已移除，端口只承载 MCP 与插件本机 IPC 通道。
+插件**只监听一个 TCP 端口**，该端口承载本机 HTTP 路由（`GDA_MCP_PATH`，Streamable HTTP / JSON-RPC / SSE）。0.3.2 起 REST `/api` 与 API token 已移除，端口只承载 CLI 连接与插件本机 IPC 通道。
 
 - 端点路径是常量，不可配置；端口是唯一可配项。
 - 所有 HTTP 请求经同一个自建 HTTP 传输层（[`src/core/transport/http_transport.cpp`](../../../src/core/transport/http_transport.cpp)）与同一把 `CommandQueue`。
@@ -98,8 +98,8 @@ resource:
   "pid": 12345,
   "project_path": "C:/path/to/project",
   "endpoints": {
-    "mcp": {"host": "127.0.0.1", "port": 21437, "path": "/mcp", "protocol": "mcp", "auth": "none"},
-    "ipc": {"present": true, "kind": "unix", "path": "/tmp/gda.sock", "token": "<IPC 令牌>", "protocol": "mcp-jsonrpc", "framing": "length-prefixed-json", "auth": "token", "version": 1}
+    "legacyEndpoint": {"host": "127.0.0.1", "port": 21437, "status": "removed"},
+    "ipc": {"present": true, "kind": "unix", "path": "/tmp/gda.sock", "token": "<IPC 令牌>", "protocol": "gcp-native", "framing": "length-prefixed-json", "auth": "token", "version": 1}
   },
   "gda_home": "C:/Users/<user>",
   "started_at": 1760000000000,
@@ -186,7 +186,7 @@ CLI 的目标解析是一条**五级优先链**，每一级都记录来源（`so
 插件在 HTTP 端口之外额外监听一条本机 IPC 通道；令牌生成失败（记 Error）或监听失败（记 Warning）时降级为「仅 HTTP」，不影响端口通道。实现见 [`src/core/transport/ipc_transport.cpp`](../../../src/core/transport/ipc_transport.cpp)、[`ipc_framing.cpp`](../../../src/core/transport/ipc_framing.cpp)、[`ipc_endpoint.cpp`](../../../src/core/transport/ipc_endpoint.cpp)。
 
 - **后端**：Windows 使用 loopback TCP（`127.0.0.1` + 随机端口，`kind=tcp`）；POSIX 使用 AF_UNIX（`<集中根>/run/<工程名清洗>-<路径哈希 8 位>.sock`，`kind=unix`）。命名管道作为后续可选后端，当前未进入生产路径。
-- **实例登记**：`endpoints.ipc = {kind, path|name|host+port, token, protocol:"mcp-jsonrpc", framing:"length-prefixed-json", auth:"token", version:1}`，仅在监听成功时写入；旧记录缺该字段按「无 IPC」处理。
+- **实例登记**：`endpoints.ipc = {kind, path|name|host+port, token, protocol:"gcp-native", framing:"length-prefixed-json", auth:"token", version:1}`，仅在监听成功时写入；旧记录缺该字段按「无 IPC」处理。
 - **帧语义**：4 字节大端长度 + UTF-8 JSON，单帧上限 `kMaxFrameBytes = 4 MiB`；连接读缓冲上限 `max_wire_buffer_bytes() = kMaxFrameBytes + kLengthPrefixBytes`（4 MiB + 4 字节，`src/core/transport/ipc_framing.hpp`），可容纳满额载荷帧，超限关闭连接；`pump()` 每帧有 accept/read/写回预算。
 - **令牌**：每个实例启动时经 `api_token::generate_token()` 生成 32 字节随机值的十六进制令牌，只写实例索引 `endpoints.ipc.token`；空令牌时 `listen_unix()`/`listen_tcp()` 拒绝监听（消息 `IPC token is empty; refusing to listen`）。首帧必须是 `initialize` 且 `params._meta.gda_token` 经 `constant_time_equals()` 恒定时间比较匹配，否则返回 `-32001 IPC token rejected` 并关闭；令牌不可用时返回 `-32003 IPC token unavailable`。令牌不写日志、不写 trace。
 - **边界**：最大连接 8、在途请求 16、请求超时 60 秒、空闲 10 分钟关闭；超限返回 `-32003 too many in-flight IPC requests`。
@@ -224,7 +224,7 @@ CLI 的目标解析是一条**五级优先链**，每一级都记录来源（`so
 - **停止标志**：连接通道的 `closed` 置位后，工作线程不再取新任务，取到任务也直接丢弃退出。
 - **等待预算**：正常停止按 `GDA_RESPONSE_GRACE_MS`（2 秒）有界等待；超时未结束的任务线程被**挂起**（移入堆上容器暂不 join）。
 - **收割时机**：插件退出流程在停服之后做一次短预算收割（同样用 `GDA_RESPONSE_GRACE_MS`），把挂起容器清空——挂起线程在**卸载前**一定已 join，DLL 卸载时不会有本模块的线程在跑。
-- **上界与退出时长**：收割在预算内未结束时改为**阻塞 join**，等待上界为路由处理器剩余时长，MCP 侧分发超时 **30 秒**（`src/core/transport/mcp_http_shim.cpp` 的 `kDispatchTimeout`）；此时退出最坏拖到约 30 秒，表现为进程迟迟不退、CPU 与内存已归零（线程在等超时）。正常退出因「关队列 → 关 MCP 传输 → 停传输」会先唤醒在途处理器，实测在百毫秒量级。
+- **上界与退出时长**：收割在预算内未结束时改为**阻塞 join**，等待上界为路由处理器剩余时长，本机通道分发超时 **30 秒**（`src/core/transport/mcp_http_shim.cpp` 的 `kDispatchTimeout`）；此时退出最坏拖到约 30 秒，表现为进程迟迟不退、CPU 与内存已归零（线程在等超时）。正常退出因「关队列 → 关本机传输 → 停传输」会先唤醒在途处理器，实测在百毫秒量级。
 
 ## 相关页面
 

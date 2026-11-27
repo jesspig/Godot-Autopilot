@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "task": "T-15",
+  "status": "pending",
+  "note": "模板：observed 留空、ok 为 null。由 smoke.ts 实跑回填，最终证据由主代理写入 evidence/T-15/engine-report.json。",
+  "steps": [
+    { "step": "godot_version", "expected": "4.7.2.stable.mono.official.ed1daf0bf", "observed": "", "ok": null },
+    { "step": "editor_start", "expected": "gda start --headless 后插件在 60s 内注册实例", "observed": "", "ok": null },
+    { "step": "gcp_hello", "expected": "editor status 的 hello 返回 instance_id 与 capabilities", "observed": "", "ok": null },
+    { "step": "gcp_ping", "expected": "editor ping 返回 pong=true", "observed": "", "ok": null },
+    { "step": "gcp_status", "expected": "system_status 返回 running 与 tool_count>0", "observed": "", "ok": null },
+    { "step": "scene_create_save", "expected": "建节点/设属性/save_as 返回 ok=true 且 scene_path 可回读", "observed": "", "ok": null },
+    { "step": "gdscript_exec", "expected": "execute_script 编译执行并返回引擎版本字符串", "observed": "", "ok": null },
+    { "step": "game_bridge", "expected": "game start 后 game status 报告游戏进程在线", "observed": "", "ok": null },
+    { "step": "game_probe", "expected": "game eval 调用 probe_snapshot 返回 marker 与 autopilot_singleton=true", "observed": "", "ok": null },
+    { "step": "input_injection", "expected": "game input 入队后 input_events 增加", "observed": "", "ok": null },
+    { "step": "frame_advance", "expected": "两次 snapshot 的 frames_seen/process_frames 递增", "observed": "", "ok": null },
+    { "step": "screenshot", "expected": "GUI 模式下 capture 产出 PNG；headless 模式跳过", "observed": "", "ok": null },
+    { "step": "error_delta", "expected": "push_error 后错误增量游标增加且帧继续推进", "observed": "", "ok": null },
+    { "step": "export_guard", "expected": "导出期工具/资源/提示词入口均返回 editor is exporting 拒绝", "observed": "", "ok": null },
+    { "step": "ipc_auth", "expected": "伪造 IPC 端点在发送前失败（request_sent!=true）", "observed": "", "ok": null },
+    { "step": "ipc_no_resend", "expected": "已发送请求超时后 error.request_sent=true 且未重发，ping 仍可用", "observed": "", "ok": null }
+  ]
+}

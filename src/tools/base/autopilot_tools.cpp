@@ -397,7 +397,7 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
   if (auto registry = get_active_registry()) {
     if (registry->find_any(name) != nullptr) {
       return reject_registration("register_tool: tool '" + name +
-                                 "' collides with a built-in MCP tool");
+                                 "' collides with a built-in tool");
     }
   }
 
@@ -566,7 +566,7 @@ godot::Dictionary AutopilotTools::register_csharp_tool(
     if (registry->find_any(name) != nullptr) {
       godot::Dictionary out = rescan_error(
           "register_csharp_tool: tool '" + name +
-          "' collides with a built-in MCP tool");
+          "' collides with a built-in tool");
       out["tool_name"] = godot::String::utf8(name.c_str());
       out["handle"] = static_cast<int64_t>(-1);
       return out;

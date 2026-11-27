@@ -78,23 +78,20 @@ private:
   bool had_previous_{false};
 };
 
-class ServerCreateRollbackContext : public godot_autopilot::ServerContext {
+class NativeBindFailureContext : public godot_autopilot::ServerContext {
 public:
-  explicit ServerCreateRollbackContext(godot_autopilot::CommandQueue &queue)
+  explicit NativeBindFailureContext(godot_autopilot::CommandQueue &queue)
       : ServerContext(queue) {}
-  int create_calls() const { return create_calls_; }
+  int bind_calls() const { return bind_calls_; }
 
 protected:
-  bool bind_transport() override { return true; }
-  std::unique_ptr<mcp::McpServer> create_server(
-      const std::shared_ptr<godot_autopilot::GodotTransport> &,
-      const mcp::ServerOptions &) override {
-    ++create_calls_;
-    return nullptr;
+  bool bind_transport() override {
+    ++bind_calls_;
+    return false;
   }
 
 private:
-  int create_calls_{0};
+  int bind_calls_{0};
 };
 
 InstanceRecord make_record(const std::string &instance_id, int port, int pid,
@@ -225,7 +222,7 @@ TEST(IpcWaiterSetTest, CancelRejectsNewWaitersAndJoinWaitsForCompletion) {
   EXPECT_EQ(waiters.size(), 0u);
 }
 
-TEST(ServerContextRollbackTest, CreateFailureRollsBackAndAllowsRetry) {
+TEST(ServerContextRollbackTest, NativeBindFailureRollsBackAndAllowsRetry) {
   const std::filesystem::path home =
       std::filesystem::temp_directory_path() /
       ("gda-t05-rollback-" +
@@ -240,16 +237,15 @@ TEST(ServerContextRollbackTest, CreateFailureRollsBackAndAllowsRetry) {
 
   godot_autopilot::http_transport_instance().stop();
   godot_autopilot::ipc_transport::ipc_transport_instance().stop();
-  godot_autopilot::godot_transport_reset();
   godot_autopilot::dispatch::clear_handlers();
   godot_autopilot::clear_active_registry();
 
   godot_autopilot::CommandQueue queue;
-  ServerCreateRollbackContext context(queue);
+  NativeBindFailureContext context(queue);
   EXPECT_FALSE(context.start());
-  EXPECT_EQ(context.create_calls(), 1);
+  EXPECT_EQ(context.bind_calls(), 1);
   EXPECT_FALSE(context.is_running());
-  EXPECT_NE(context.last_error().find("McpServer::Create returned null"),
+  EXPECT_NE(context.last_error().find("native control plane bind failed"),
             std::string::npos);
   EXPECT_FALSE(godot_autopilot::http_transport_is_listening());
   EXPECT_FALSE(
@@ -257,14 +253,13 @@ TEST(ServerContextRollbackTest, CreateFailureRollsBackAndAllowsRetry) {
   EXPECT_TRUE(godot_autopilot::get_active_registry()->all_any().empty());
 
   EXPECT_FALSE(context.start());
-  EXPECT_EQ(context.create_calls(), 2);
+  EXPECT_EQ(context.bind_calls(), 2);
   EXPECT_FALSE(context.is_running());
   EXPECT_FALSE(godot_autopilot::http_transport_is_listening());
   EXPECT_FALSE(
       godot_autopilot::ipc_transport::ipc_transport_instance().is_listening());
   EXPECT_TRUE(godot_autopilot::get_active_registry()->all_any().empty());
   context.stop();
-  godot_autopilot::godot_transport_reset();
   std::filesystem::remove_all(home);
 }
 

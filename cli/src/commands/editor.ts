@@ -15,7 +15,7 @@ function requiresNativeEndpoint(): CliError {
   return new CliError(
     ExitCode.Transport,
     "no native IPC endpoint is available for this instance; pass --socket or --id from 'gda editor list'.",
-    "the native control plane never uses MCP initialize or HTTP /mcp.",
+    "the native control plane is the only supported channel.",
   );
 }
 

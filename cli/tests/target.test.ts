@@ -216,8 +216,7 @@ describe("resolveNativeTarget", () => {
       pid,
       project_path: project,
       endpoints: {
-        mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
-        ipc: { kind: "unix", path: path.join(nativeHome, `${instanceId}.sock`), protocol: "mcp-jsonrpc", framing: "length-prefixed-json", auth: "token", version: 1 },
+        ipc: { kind: "unix", path: path.join(nativeHome, `${instanceId}.sock`), protocol: "gda-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 },
       },
       started_at: Date.now(),
       version: "0.3.5",

@@ -452,7 +452,7 @@ JV wait_os_process(int64_t op_id, int64_t timeout_ms) {
     return util::error_json(
         "execute_os_process cannot wait for the external process on the editor "
         "main thread — the process was terminated; call the tool through the "
-        "MCP channel so the wait runs on the transport thread");
+        "native control plane so the wait runs on a worker thread");
   }
   const int64_t deadline_ms = steady_now_ms() + timeout_ms;
   for (;;) {

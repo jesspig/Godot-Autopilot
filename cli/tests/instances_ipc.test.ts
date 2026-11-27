@@ -13,7 +13,6 @@ function baseRecord(overrides: Record<string, unknown> = {}): Record<string, unk
     project_path: "C:/projects/sample",
     api_token: "token",
     endpoints: {
-      mcp: { host: "127.0.0.1", port: 9601, path: "/mcp", protocol: "mcp", auth: "none" },
       api: { host: "127.0.0.1", port: 9601, path: "/api", protocol: "http", auth: "bearer" },
     },
     gda_home: "C:/home",
@@ -64,7 +63,7 @@ describe("instances ipc endpoint", () => {
       kind: "unix",
       path: "C:/gda/run/sample-1234abcd.sock",
       token: "ipc-token",
-      protocol: "mcp-jsonrpc",
+      protocol: "gda-ipc-v1",
       framing: "length-prefixed-json",
       auth: "token",
       version: 1,
@@ -79,7 +78,7 @@ describe("instances ipc endpoint", () => {
       host: "",
       port: null,
       token: "ipc-token",
-      protocol: "mcp-jsonrpc",
+      protocol: "gda-ipc-v1",
       framing: "length-prefixed-json",
       auth: "token",
       version: 1,
@@ -93,7 +92,7 @@ describe("instances ipc endpoint", () => {
       host: "127.0.0.1",
       port: 21437,
       token: "tcp-token",
-      protocol: "mcp-jsonrpc",
+      protocol: "gda-ipc-v1",
       framing: "length-prefixed-json",
       auth: "token",
       version: 1,
@@ -108,7 +107,7 @@ describe("instances ipc endpoint", () => {
       host: "127.0.0.1",
       port: 21437,
       token: "tcp-token",
-      protocol: "mcp-jsonrpc",
+      protocol: "gda-ipc-v1",
       framing: "length-prefixed-json",
       auth: "token",
       version: 1,
@@ -117,7 +116,7 @@ describe("instances ipc endpoint", () => {
 
   test("ipc 缺 path/tcp 地址时按无 IPC 处理", () => {
     const record = baseRecord();
-    (record.endpoints as Record<string, unknown>).ipc = { protocol: "mcp-jsonrpc" };
+    (record.endpoints as Record<string, unknown>).ipc = { protocol: "gda-ipc-v1" };
     writeIndex([record]);
     const records = readPluginInstanceIndex();
     expect(records).toHaveLength(1);

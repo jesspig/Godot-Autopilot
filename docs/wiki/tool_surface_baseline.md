@@ -85,7 +85,7 @@ resource: devtools/commands/tool-audit.ts
 | Tileset | 1 |
 | **合计** | **247** |
 
-category 口径为 28 类、求和 253（含元与系统）：域与 category 并非一一对应——`Image`/`Mesh` 域工具归 Resources 类，`C#` 域归 Scripts 类，`GridMap`/`Tileset` 归 TileMap 类，`SceneTree` 归 Scene 类，`Log` 域的 `get_game_log_entries` 归 System 类；完整表见 [overview.md](overview.md) 的「MCP 工具面」。
+category 口径为 28 类、求和 253（含元与系统）：域与 category 并非一一对应——`Image`/`Mesh` 域工具归 Resources 类，`C#` 域归 Scripts 类，`GridMap`/`Tileset` 归 TileMap 类，`SceneTree` 归 Scene 类，`Log` 域的 `get_game_log_entries` 归 System 类；完整表见 [overview.md](overview.md) 的「CLI 工具面」。
 
 ## 副作用分布
 

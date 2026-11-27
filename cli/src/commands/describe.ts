@@ -1,6 +1,6 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
-import { callTool } from "../mcp/client";
+import { callTool } from "../rpc/client";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type TargetContext } from "../target";

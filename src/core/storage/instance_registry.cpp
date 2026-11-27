@@ -158,7 +158,7 @@ bool read_registry_ipc_endpoint(const godot_autopilot::util::JsonValue &doc,
   out.token = token != nullptr && token->IsString() ? token->GetString() : "";
   out.protocol = protocol != nullptr && protocol->IsString()
                      ? protocol->GetString()
-                     : "mcp-jsonrpc";
+                     : "gcp-native";
   out.framing = framing != nullptr && framing->IsString()
                     ? framing->GetString()
                     : "length-prefixed-json";
@@ -212,7 +212,9 @@ std::vector<std::string> registry_instance_file_paths(const std::string &root) {
 
 godot_autopilot::util::JsonValue record_to_json(const InstanceRecord &record) {
   godot_autopilot::util::JsonValue::Object endpoints;
-  endpoints["mcp"] = registry_endpoint_to_json(record.endpoints.mcp);
+  if (!record.endpoints.mcp.path.empty()) {
+    endpoints["mcp"] = registry_endpoint_to_json(record.endpoints.mcp);
+  }
   if (!record.endpoints.api.path.empty()) {
     endpoints["api"] = registry_endpoint_to_json(record.endpoints.api);
   }
@@ -272,7 +274,7 @@ bool record_from_json(const godot_autopilot::util::JsonValue &doc, InstanceRecor
   }
   const godot_autopilot::util::JsonValue *mcp_endpoint = endpoints->Find("mcp");
   const godot_autopilot::util::JsonValue *api_endpoint = endpoints->Find("api");
-  if (mcp_endpoint == nullptr || !mcp_endpoint->IsObject()) {
+  if (mcp_endpoint != nullptr && !mcp_endpoint->IsObject()) {
     return false;
   }
   if (api_endpoint != nullptr && !api_endpoint->IsObject()) {
@@ -290,20 +292,19 @@ bool record_from_json(const godot_autopilot::util::JsonValue &doc, InstanceRecor
   if (port_source != nullptr && port_source->IsString()) {
     parsed.port_source = port_source->GetString();
   }
-  if (!read_registry_endpoint(*mcp_endpoint, parsed.endpoints.mcp)) {
+  if (mcp_endpoint != nullptr &&
+      !read_registry_endpoint(*mcp_endpoint, parsed.endpoints.mcp)) {
     return false;
   }
   if (api_endpoint != nullptr && !read_registry_endpoint(*api_endpoint, parsed.endpoints.api)) {
     return false;
   }
-  if (const godot_autopilot::util::JsonValue *ipc_endpoint = endpoints->Find("ipc");
-      ipc_endpoint != nullptr) {
-    if (!ipc_endpoint->IsObject()) {
-      return false;
-    }
-    if (!read_registry_ipc_endpoint(*ipc_endpoint, parsed.endpoints.ipc)) {
-      return false;
-    }
+  const godot_autopilot::util::JsonValue *ipc_endpoint = endpoints->Find("ipc");
+  if (ipc_endpoint == nullptr || !ipc_endpoint->IsObject()) {
+    return false;
+  }
+  if (!read_registry_ipc_endpoint(*ipc_endpoint, parsed.endpoints.ipc)) {
+    return false;
   }
   out = std::move(parsed);
   return true;

@@ -15,49 +15,50 @@ import {
   type NativeCatalogEntry,
 } from "../src/discovery";
 import { CliError, ExitCode } from "../src/errors";
+import { startNativeServer, sendHandshake, type NativeServer } from "./support/native-ipc";
 
-const servers: ReturnType<typeof Bun.serve>[] = [];
+const servers: NativeServer[] = [];
 
-afterEach(() => {
+afterEach(async () => {
   while (servers.length > 0) {
-    servers.pop()!.stop();
+    await servers.pop()!.close();
   }
 });
-
-function serve(handler: (req: Request) => Response | Promise<Response>): number {
-  const server = Bun.serve({ port: 0, fetch: handler });
-  servers.push(server);
-  return server.port!;
-}
-
-function sseResponse(payload: unknown): Response {
-  return new Response(`event: message\ndata: ${JSON.stringify(payload)}\n\n`, {
-    headers: { "content-type": "text/event-stream" },
-  });
-}
 
 interface CapturedRequest {
   method: string;
   params: unknown;
 }
 
-function recordingServer(handler: (req: CapturedRequest) => Response | Promise<Response>) {
+function envelope(value: Record<string, unknown>): Record<string, unknown> {
+  return value;
+}
+
+async function recordingServer(
+  handler: (req: CapturedRequest) => Record<string, unknown>,
+): Promise<{ port: number; requests: CapturedRequest[] }> {
   const requests: CapturedRequest[] = [];
-  const port = serve(async (req) => {
-    const body = (await req.json()) as CapturedRequest;
-    const params = body.params as Record<string, unknown> | undefined;
+  const server = await startNativeServer((message, _socket, send) => {
+    if (message.method === "initialize") {
+      sendHandshake(message, send);
+      return;
+    }
+    if (message.method === "notifications/initialized") return;
+    const params = message.params as Record<string, unknown> | undefined;
     if (params !== undefined && typeof params === "object" && params !== null) {
       const rest: Record<string, unknown> = { ...params };
       delete rest._meta;
-      body.params = rest;
+      requests.push({ method: String(message.method), params: rest });
+    } else {
+      requests.push({ method: String(message.method), params: message.params ?? null });
     }
-    requests.push(body);
-    return handler(body);
+    send({ ...handler(requests[requests.length - 1]), id: message.id });
   });
-  return { port, requests };
+  servers.push(server);
+  return { port: server.port, requests };
 }
 
-function searchEnvelope(names: string[]): unknown {
+function searchEnvelope(names: string[]): Record<string, unknown> {
   const results = names.map((name, index) => ({ name, score: names.length - index }));
   return {
     jsonrpc: "2.0",
@@ -203,8 +204,7 @@ function writePluginIndex(tmp: string, port: number): void {
       pid: process.pid,
       project_path: path.join(tmp, "proj"),
       endpoints: {
-        mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
-        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "mcp-jsonrpc", framing: "length-prefixed-json", auth: "token", version: 1 },
+        ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "gda-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 },
       },
       started_at: Date.now(),
       version: "0.3.5",
@@ -256,7 +256,7 @@ describe("tool 子命令与离线 catalog", () => {
     expect(makeCatalogDocument(stored.tools as NativeCatalogEntry[]).hash).not.toBe(stored.hash);
   });
 
-  test("live catalog.list 不发送 MCP initialize 并写入离线缓存", async () => {
+  test("live catalog.list 不发送 initialize 握手帧并写入离线缓存", async () => {
     const native = await serveNativeCatalog(OFFLINE_TOOLS);
     try {
       writePluginIndex(tmpHome, native.port);
@@ -288,8 +288,8 @@ describe("tool 子命令与离线 catalog", () => {
 
 describe("tools list (live)", () => {
   test("list 请求全量并过滤 5 个协议工具", async () => {
-    const { port, requests } = recordingServer(() =>
-      sseResponse(searchEnvelope(["create_scene_node", "ping", "batch_execute", "call_tool", "code_execute"])),
+    const { port, requests } = await recordingServer(() =>
+      envelope(searchEnvelope(["create_scene_node", "ping", "batch_execute", "call_tool", "code_execute"])),
     );
     const result = await runCaptured(["list"], { portText: String(port) });
     expect(result.code).toBe(ExitCode.Success);
@@ -304,8 +304,8 @@ describe("tools list (live)", () => {
   });
 
   test("list 传 category 与 tags", async () => {
-    const { port, requests } = recordingServer(() =>
-      sseResponse(searchEnvelope(["create_scene_node"])),
+    const { port, requests } = await recordingServer(() =>
+      envelope(searchEnvelope(["create_scene_node"])),
     );
     const result = await runCaptured(["list"], {
       portText: String(port),

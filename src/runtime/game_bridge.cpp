@@ -2016,11 +2016,19 @@ public:
     if (p_message == gda_string(GDA_MSG_HELLO)) {
       godot_autopilot::game_monitor::ensure_connected();
       bool scene_ready = false;
+      godot::SceneTree *tree = nullptr;
       if (auto *engine = godot::Engine::get_singleton()) {
-        if (auto *tree =
-                godot::Object::cast_to<godot::SceneTree>(engine->get_main_loop())) {
+        tree = godot::Object::cast_to<godot::SceneTree>(engine->get_main_loop());
+        if (tree != nullptr) {
           scene_ready = tree->get_current_scene() != nullptr;
         }
+      }
+      if (!scene_ready && tree != nullptr && g_ready_tree == nullptr &&
+          !scene_ready_sent_) {
+        g_ready_tree = tree;
+        tree->connect(
+            "process_frame",
+            godot::Callable(this, godot::StringName("on_process_frame")));
       }
       send_ready_message(scene_ready);
       return true;

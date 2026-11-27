@@ -1,0 +1,232 @@
+name: Engine Smoke
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2.stable.mono.official.ed1daf0bf
+  GODOT_TAG: 4.7.2-stable
+  GODOT_EXE_LINUX: Godot_v4.7.2-stable_mono_linux.x86_64
+  GODOT_EXE_WINDOWS: Godot_v4.7.2-stable_mono_win64.exe
+
+jobs:
+  logic:
+    name: logic (Linux, headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
+      GODOT_AUTOPILOT_CLI_HOME: ${{ github.workspace }}/.gda-home
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Cache Godot (fixed version)
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: .gda-cache/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux
+
+      - name: Install Godot (no version fallback)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_TAG}/Godot_v${GODOT_TAG}_mono_linux_x86_64.zip"
+          mkdir -p .gda-cache/godot
+          curl -fsSL "$url" -o .gda-cache/godot.zip
+          unzip -q .gda-cache/godot.zip -d .gda-cache/godot
+          chmod +x ".gda-cache/godot/${GODOT_EXE_LINUX}"
+
+      - name: Resolve Godot path
+        id: godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="$(find .gda-cache/godot -type f -name "$GODOT_EXE_LINUX" -print -quit)"
+          if [ -z "$path" ]; then echo "::error::fixed Godot binary not found in cache"; exit 1; fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Assert fixed Godot version
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$("${{ steps.godot.outputs.path }}" --version)"
+          if [ "$actual" != "$GODOT_VERSION" ]; then
+            echo "::error::Godot version mismatch: got '$actual', expected '$GODOT_VERSION' (no auto upgrade)"
+            exit 1
+          fi
+          echo "Godot version: $actual"
+
+      - name: Build native extension
+        run: bun run gda-dev-tools build
+
+      - name: Build standalone CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          bun build cli/bin/gda.ts --compile --outfile dist/gda
+          chmod +x dist/gda
+
+      - name: Resolve native library
+        id: lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="$(find build -type f -name 'libgodot-autopilot.so' -print -quit)"
+          if [ -z "$path" ]; then echo "::error::libgodot-autopilot.so not found under build/"; exit 1; fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Run engine smoke (headless logic chain)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun tests/engine/smoke.ts \
+            --godot "${{ steps.godot.outputs.path }}" \
+            --cli dist/gda \
+            --project tests/engine/project \
+            --lib "${{ steps.lib.outputs.path }}" \
+            --mode headless \
+            --report evidence/T-15/engine-report.json
+
+      - name: Upload engine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-smoke-logic-${{ github.run_id }}
+          path: |
+            evidence/T-15/
+            .gda-home/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gui:
+    name: gui (Windows, screenshot only)
+    runs-on: windows-2022
+    timeout-minutes: 40
+
+    env:
+      GODOT_AUTOPILOT_CLI_HOME: ${{ github.workspace }}/.gda-home
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache Godot (fixed version)
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: .gda-cache/godot
+          key: godot-${{ env.GODOT_VERSION }}-windows
+
+      - name: Install Godot (no version fallback)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = "https://github.com/godotengine/godot/releases/download/$env:GODOT_TAG/Godot_v${env:GODOT_TAG}_mono_win64.zip"
+          New-Item -ItemType Directory -Force -Path .gda-cache/godot | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile .gda-cache/godot.zip
+          Expand-Archive -Path .gda-cache/godot.zip -DestinationPath .gda-cache/godot -Force
+
+      - name: Resolve Godot path
+        id: godot
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-ChildItem -Path .gda-cache/godot -Filter $env:GODOT_EXE_WINDOWS -Recurse -File |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $exe) { Write-Error 'fixed Godot binary not found in cache'; exit 1 }
+          "path=$exe" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Assert fixed Godot version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $actual = (& "${{ steps.godot.outputs.path }}" --version | Select-Object -First 1).Trim()
+          if ($actual -ne $env:GODOT_VERSION) {
+            Write-Error "Godot version mismatch: got '$actual', expected '$env:GODOT_VERSION' (no auto upgrade)"
+            exit 1
+          }
+          Write-Host "Godot version: $actual"
+
+      - name: Build native extension
+        run: bun run gda-dev-tools build
+
+      - name: Build standalone CLI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          bun build cli/bin/gda.ts --compile --outfile dist/gda.exe
+
+      - name: Resolve native library
+        id: lib
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lib = Get-ChildItem -Path build -Filter godot-autopilot.dll -Recurse -File |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $lib) { Write-Error 'godot-autopilot.dll not found under build/'; exit 1 }
+          "path=$lib" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      # GUI 作业只承担截图必需项；逻辑链的正确性由 Linux headless 作业负责。
+      - name: Run engine smoke (GUI screenshot)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          bun tests/engine/smoke.ts `
+            --godot "${{ steps.godot.outputs.path }}" `
+            --cli dist/gda.exe `
+            --project tests/engine/project `
+            --lib "${{ steps.lib.outputs.path }}" `
+            --mode gui `
+            --report evidence/T-15/engine-report-gui.json
+
+      - name: Upload engine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-smoke-gui-${{ github.run_id }}
+          path: |
+            evidence/T-15/
+            .gda-home/
+          if-no-files-found: warn
+          retention-days: 14

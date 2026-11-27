@@ -14,6 +14,4 @@ set(GDA_API_CONTRACT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/control/job_service.cpp
     ${CMAKE_SOURCE_DIR}/src/core/control/event_service.cpp
     ${CMAKE_SOURCE_DIR}/src/core/control/trace_service.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp
-    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_json_bridge.cpp
-    ${CMAKE_SOURCE_DIR}/src/adapters/mcp_error_bridge.cpp)
+    ${CMAKE_SOURCE_DIR}/src/util/json_value.cpp)

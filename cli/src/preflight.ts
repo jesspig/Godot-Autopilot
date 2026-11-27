@@ -1,5 +1,5 @@
-import { endpointBaseUrl, readPluginInstanceIndex } from "./instances";
-import { parseProbeLevel, probeEndpoint, type ProbeLevel } from "./probe";
+import { readPluginInstanceIndex } from "./instances";
+import { parseProbeLevel, probeNativeEndpoint, type ProbeLevel } from "./probe";
 import { projectPathKey } from "./platform";
 import { isAlive } from "./process";
 import { findLiveByProject } from "./registry";
@@ -53,12 +53,14 @@ async function detectLivePluginInstance(
     if (record.projectPath === "") continue;
     if (projectPathKey(record.projectPath) !== key) continue;
     if (record.pid === null || !isAlive(record.pid)) continue;
-    const endpoint = record.mcpEndpoint;
+    const ipc = record.ipcEndpoint;
+    const endpoint = ipc !== null
+      ? { ...ipc, port: ipc.port ?? 0 }
+      : record.port === null
+        ? null
+        : { kind: "tcp" as const, host: "127.0.0.1", port: record.port };
     if (endpoint === null) continue;
-    const alive = await probeEndpoint(
-      { host: endpoint.host, port: endpoint.port, url: endpointBaseUrl(endpoint) },
-      level,
-    );
+    const alive = await probeNativeEndpoint(endpoint, level);
     if (!alive) continue;
     return {
       source: "plugin-index",

@@ -1,13 +1,13 @@
 ---
 type: 模块文档
 title: CLI 载体（gda）
-description: Bun + TypeScript 源码直跑的 MCP 命令行载体：分发、命令参考、五级寻址链、登记表与集中根位置、IPC 通道、生命周期与重启、协议握手与已知限制
+description: Bun + TypeScript 源码直跑的 CLI-only 本机控制载体：分发、命令参考、五级寻址链、登记表与集中根位置、本机通道、生命周期与重启、握手与已知限制
 tags:
   - 模块
   - CLI
   - Bun
   - TypeScript
-  - MCP
+  - CLI-only
   - IPC
 timestamp: "2026-11-25T23:22:40+08:00"
 resource:
@@ -52,17 +52,17 @@ resource:
 
 `gda --help` 共列 **23** 个顶层命令：调用族 7、生命周期 5、资产与查询族 10、文档族 1（`docs`，6 个子命令）。下表按族分组。
 
-### 调用族（7 个，经 MCP 协议）
+### 调用族（7 个，CLI 原生命令）
 
-| 命令 | 映射到 MCP | 说明 |
+| 命令 | CLI 行为 | 说明 |
 |---|---|---|
-| `ping` | `ping`（直连） | 连通性测试 |
-| `status` | `call_tool` → `system_status` | 服务状态与工程信息 |
-| `categories` | `list_categories`（直连） | 列出工具类别 |
-| `search [query]` | `search_tools`（直连） | 搜索工具；`--category`/`--tags` 过滤 |
-| `describe <tool>` | `get_tool_detail`（直连） | 工具详情 |
-| `call <tool>` | 直连或 `call_tool` 包装 | 调用工具；`--args`/`--args-file` 传参 |
-| `batch --args-file <path>` | 直连或 `call_tool` 包装（共享一次 IPC 会话） | 单进程内顺序执行多操作；单个操作抛异常或工具失败只记入该条结果，不中断整批；退出码为全部成功时 0、否则工具失败 1 |
+| `ping` | 原生探活命令 | 连通性测试 |
+| `status` | 原生状态命令 | 服务状态与工程信息 |
+| `categories` | 原生类别命令 | 列出工具类别 |
+| `search [query]` | 原生搜索命令 | 搜索工具；`--category`/`--tags` 过滤 |
+| `describe <tool>` | 原生详情命令 | 工具详情 |
+| `call <tool>` | 原生调用命令 | 调用工具；`--args`/`--args-file` 传参 |
+| `batch --args-file <path>` | 原生批量命令（共享一次本机通道会话） | 单进程内顺序执行多操作；单个操作抛异常或工具失败只记入该条结果，不中断整批；退出码为全部成功时 0、否则工具失败 1 |
 
 ### 生命周期（5 个，本地状态管理）
 
@@ -79,9 +79,9 @@ resource:
 | 命令 | 说明 |
 |---|---|
 | `skills list|show` | 列出/打印 1 张入口技能卡与 9 篇 references（`--zh` 中文；`show --file <rel>` 读参考文件） |
-| `tools list` | 通过运行实例的 `search_tools {limit:0}` 列出全部直接工具，过滤 5 个 MCP 协议工具，输出 `{tools, total}`；`--category`/`--tags` 可过滤 |
-| `resources list|templates|read|watch` | 通用 MCP `resources/*`：list 可带 `--templates`；read 默认文本直出/JSON pretty/blob 摘要，`--save <dir>` 落盘，`--json` 脱敏 base64，`--raw` 原始信封；watch 轮询 `--interval` 秒；与 `prompts` 一样走 `--transport`/`--socket` 指定的 IPC 通道 |
-| `prompts list|get` | 通用 MCP `prompts/*`：list 输出 `{prompts}`；get 用 `--args` 传字符串参数，默认按 `[role] text` 渲染，`--json` 保留 messages；支持 IPC 通道 |
+| `tools list` | 列出运行实例的全部工具，过滤 5 个协议元工具，输出 `{tools, total}`；`--category`/`--tags` 可过滤 |
+| `resources list|templates|read|watch` | 原生资源命令：list 可带 `--templates`；read 默认文本直出/JSON pretty/blob 摘要，`--save <dir>` 落盘，`--json` 脱敏 base64，`--raw` 原始信封；watch 轮询 `--interval` 秒；与 `prompts` 一样走 `--socket` 指定的本机通道 |
+| `prompts list|get` | 原生提示词命令：list 输出 `{prompts}`；get 用 `--args` 传字符串参数，默认按 `[role] text` 渲染，`--json` 保留 messages；支持本机通道 |
 | `tasks list|get|wait|cancel|clean` | 本地任务索引 `<gda-root>/tasks/`；`call --async` 创建并记录，wait 状态变化写 stderr，终态结果写 stdout；`wait` 在终态 `completed` 时检查内层结果，内层工具失败按退出码 1 返回 |
 | `projects` | 列出已知工程（`<集中根>/projects/*`） |
 | `cache list|info|clear` | 缓存清单/大小/清理（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills）；`cli` 资产按当前平台键（windows-x64/linux-x64/macos-arm64/macos-x64）筛选 |
@@ -119,7 +119,7 @@ resource:
 | `--save <dir>` | 字符串 | resources read | 保存资源 blob 到目录（防路径穿越） |
 | `--templates` | 布尔 | resources list | 同时列出 resource templates |
 | `--interval <sec>` | 字符串 | resources watch | 轮询间隔，默认 1 秒 |
-| `--async` | 布尔 | call | 服务端支持时以 MCP Task 执行，返回 task_id |
+| `--async` | 布尔 | call | 服务端支持时以异步任务执行，返回任务 id |
 | `--progress` | 布尔 | call | 进度通知写 stderr，stdout 保持 JSON |
 | `--input <json>` | 字符串 | call | MRTR `input_required` 的 inputResponses；非 TTY 无该参数退出 3 |
 | `--godot <path>` | 字符串 | start | 显式指定 Godot 可执行文件 |
@@ -177,7 +177,7 @@ resource:
 - 工具发现（live，2026-11-14 T-04/T-05）：`gda tools list [--category] [--tags]` 输出 `{tools: string[], total}`；`gda search [query]` 无 query 输出 `{categories}`、有 query 输出 `{results: [{name, score}]}`（服务端默认 20 条）。CLI 无离线 catalog，也没有 `gda tools search|describe` 或 `--refresh`。
 - 资产安装、更新与缓存：`gda install skills [--zh] [--offline] [--path <dir>] [--prune]` 安装 1 张入口卡 + 9 篇 references（`--prune` 清理退役目录）；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`；`gda cache list|info|clear`（`clear` 需 `--force`，`--artifact` 过滤 cli/plugin/skills 三类资产；`cli` 资产按当前平台键筛选）。归档解压后做 zip-slip 防护：逐项以 realpath 校验是否越界，越界即报传输错误。
 - `gda list` 支持 `--all`（含未运行工程）、`--projects`（按工程聚合）、`--stale`（仅非存活）；条目 `live` 保留布尔并新增 `liveDetail {pid, endpoint}` 两级。
-- IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。**请求一旦写出即不因丢响应而重发**：超时或连接中断时若请求已发出，按传输错误退出码 2 并提示「the execution result is unknown and the call was not retried」，避免重复副作用；IPC 返回令牌错误（code -32001/-32002）时不回退到无鉴权的 HTTP。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
+- IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。**请求一旦写出即不因丢响应而重发**：超时或连接中断时若请求已发出，按传输错误退出码 2 并提示「the execution result is unknown and the call was not retried」，避免重复副作用；IPC 返回令牌错误（code -32001/-32002）时不回退到无鉴权的 HTTP。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/rpc/client.ts`](../../../cli/src/rpc/client.ts)。
 
 ## 离线引擎文档（`gda docs`）
 
@@ -267,7 +267,7 @@ resource:
 3. **端口**：由插件在启动时分配并持久化（首次在 20000–29999 随机，重启复用；显式 `GODOT_AUTOPILOT_PORT` 可覆盖）；`gda start` 不再选择或注入端口，传 `--port` 会报用法错误，就绪后从插件实例索引读取实际端口。
 4. **导入预步**：默认执行 `--headless --import --path`（120s 超时，失败非致命仅告警）；`--no-import` 跳过。
 5. **启动与脱父**：直连 `spawn` 拉起编辑器（stdin 忽略、stdout/stderr 重定向日志，注入 `GODOT_AUTOPILOT_PORT`）。Windows 置 `detached: true` 脱离父进程与控制台（避免 Bun 直系子进程随 CLI 退出被作业对象连带杀掉），再 `unref()`；**pid 由 `spawn` 直接返回**，不做端口反查。非 Windows 不设 `detached`。引擎不可执行时抛 `failed to launch the editor executable: ENOENT: …`，suggestion 为 `check the --godot path points at a runnable Godot binary`；此时编辑器未启动，不进回滚，pending 日志直接删除。
-6. **就绪探测**：TCP + MCP `ping`（`direct: true`，500ms 间隔，默认 60s，`--wait` 覆盖，0=不等待）；提前退出或超时均报传输错误并附日志路径。**失败回滚**（`rollbackFailedStart`）：终止编辑器并删除 pending 日志，不写登记表；终止三态均带 pid——`the editor process (pid N) was terminated` / `the editor process (pid N) had already exited` / `the editor process (pid N) could not be terminated, stop it manually: taskkill /F /T /PID N`（POSIX 为 `kill -9 N`）；日志处置附消息尾（`its pending log was removed` / `its pending log could not be removed (…)`）。
+6. **就绪探测**：TCP + `gda ping`（`direct: true`，500ms 间隔，默认 60s，`--wait` 覆盖，0=不等待）；提前退出或超时均报传输错误并附日志路径。**失败回滚**（`rollbackFailedStart`）：终止编辑器并删除 pending 日志，不写登记表；终止三态均带 pid——`the editor process (pid N) was terminated` / `the editor process (pid N) had already exited` / `the editor process (pid N) could not be terminated, stop it manually: taskkill /F /T /PID N`（POSIX 为 `kill -9 N`）；日志处置附消息尾（`its pending log was removed` / `its pending log could not be removed (…)`）。
 7. **登记**：就绪后经 `withRegistryLock` 原子写入 registry（id = `p<pid>`），日志从 `.pending-<port>-<ts>.log` 重命名为 `<id>.log`。
 8. **`--play`**：就绪后调 `play_editor_current_scene`（非致命，失败仅告警）。
 
@@ -283,7 +283,7 @@ resource:
 
 - **定位规则与 `stop` 一致**：位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一（同时给出报用法错误）。只作用于 **CLI 本地注册表**的实例（`source="cli"`）；插件索引中不由 CLI 拉起的编辑器（`source="plugin"`）只用于展示与寻址，不能 `stop`/`restart`。
 - **流程**：定位条目 → 进程存活时按 `stop` 规则停止（**无窗口或显式 `--force` 强制**；有窗口优雅：Windows `taskkill /PID`、其他 `SIGTERM`）→ 等待 `--wait` 秒（默认 10 秒）→ 从注册表移除旧条目 → 以**原工程、原 headless、原 godot 路径**调用 `start`（不显式传端口，端口由插件分配；`--wait` 在此阶段生效，默认 60 秒就绪超时；`--no-import` / `--play` / `--probe` 随本次调用传入）→ 输出 `{ok: true, restarted: true, previous: {id, pid, port}, ...新实例视图}`。
-- **端口可能变化**：MCP 端口由插件持有，重启不保证复用原端口；新端口与原端口不同时，回包额外附 `note: restarted on port <新端口>; the MCP port is owned by the plugin, so it may differ from the previous port <原端口>`。
+- **端口可能变化**：实例端口由插件持有，重启不保证复用原端口；新端口与原端口不同时，回包额外附 `note: restarted on port <新端口>; the instance port is owned by the plugin, so it may differ from the previous port <原端口>`。
 - **失败语义**：优雅停止等待超时仍未退出 → **不启动替代实例**，退出码 2，建议改用 `--force` 或手工停止，并保留登记（同一工程同时开两个编辑器可能静默崩溃，见 [端口与实例登记](ports.md)「同一工程的多实例：默认拒绝」）。suggestion 同样经 `gracefulRestartSuggestion(poisoned)` 识别任务存储中毒签名并附 `--force` 风险提示（11-18 新增，诊断源与 stop 相同）。启动阶段失败时，错误消息追加「原实例已被停止」。
 - 目标实例本就已退出时，跳过停止与等待，直接按登记的工程 / headless / godot 路径重新拉起（端口仍由插件分配）。
 
@@ -298,26 +298,26 @@ resource:
 
 ## 控制面（已移除）
 
-0.3.2 起移除 `gda serve`、`gda api`、`gda endpoints` 与插件 REST `/api`、API token。CLI 现在是纯客户端，只通过 IPC/MCP 连接插件；历史控制面口径仅保留在 [changelog](../changelog/2026-10-23-log.md)。
+0.3.2 起移除 `gda serve`、`gda api`、`gda endpoints` 与插件 REST `/api`、API token。CLI 现在只通过本机通道连接插件；历史控制面口径仅保留在 [changelog](../changelog/2026-10-23-log.md)。
 
-## 协议（[`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)）
+## 本机连接协议（[`src/rpc/client.ts`](../../../cli/src/rpc/client.ts)）
 
-**标准 MCP 握手**：`initialize`（protocolVersion `2025-11-25`，clientInfo `gda-cli`）→ `notifications/initialized` → `tools/call`。首次调用遇 400 + `-32600`（未初始化）时自动补握手并重试一次；握手状态按目标 URL 键控，切换目标各自握手。
+**标准握手**：`initialize`（protocolVersion `2025-11-25`，clientInfo `gda-cli`）→ `notifications/initialized` → 工具调用。首次调用遇 400 + `-32600`（未初始化）时自动补握手并重试一次；握手状态按目标键控，切换目标各自握手。
 
-**协议版本对齐（2026-10-19）**：声明版本取 SDK 旧世代当前版本 `kLegacyProtocolVersion = "2025-11-25"`——GDA 未配置 `ServerOptions::protocol_version`，客户端声明受支持的旧版时服务端原样尊重（封顶 `2025-11-25`；modern `2026-07-28` 仅 `server/discover` 路径可达）。握手成功后从 initialize 响应 `result.protocolVersion` 学习协商版本，同一目标的后续 POST 携带 `MCP-Protocol-Version` 头；学习值为 modern 或不在已知五版本表（2024-11-05 / 2025-03-26 / 2025-06-18 / 2025-11-25 / 2026-07-28）内时不发头——modern 头会触发 stateless 传输 hold-open 长连接，与单响应客户端不兼容；握手失败不留下学习值。
+**协议版本对齐（2026-10-19）**：声明版本取 SDK 旧世代当前版本 `kLegacyProtocolVersion = "2025-11-25"`——GDA 未配置 `ServerOptions::protocol_version`，客户端声明受支持的旧版时服务端原样尊重（封顶 `2025-11-25`；modern `2026-07-28` 仅 `server/discover` 路径可达）。握手成功后从 initialize 响应 `result.protocolVersion` 学习协商版本，同一目标的后续 POST 携带协议版本头；学习值为 modern 或不在已知五版本表（2024-11-05 / 2025-03-26 / 2025-06-18 / 2025-11-25 / 2026-07-28）内时不发头——modern 头会触发 stateless 传输 hold-open 长连接，与单响应客户端不兼容；握手失败不留下学习值。
 
-**直连工具集**（`META_DIRECT_TOOLS`）：`ping`/`search_tools`/`list_categories`/`get_tool_detail`/`batch_execute`/`code_execute` 直接发 `tools/call`；其余工具经 `call_tool` 包装（`{name: "call_tool", arguments: {name, arguments}}`）。
+**直连工具集**（`META_DIRECT_TOOLS`）：探活、搜索、类别、详情、批量与脚本执行走原生 CLI 命令；其余工具经统一调用命令执行。
 
 **响应解析**：SSE（`text/event-stream`，`data:` 帧拼接）与纯 JSON 双通道。
 
-**SDK 0.3.7 握手升级（历史问题）**：mcp-cpp-sdk 0.3.7 起要求完整握手，旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 改为标准 `initialize`（`840e648`）。`cli/tests/contract.test.ts` 的 mock 服务器模拟该语义（initialize 返回 200 SSE、notifications/initialized 返回 202、未初始化 tools/call 被拒 400 + `-32600`）。
+**SDK 0.3.7 握手升级（历史问题）**：依赖 SDK 0.3.7 起要求完整握手，旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 改为标准 `initialize`（`840e648`）。`cli/tests/contract.test.ts` 的 mock 服务器模拟该语义（initialize 返回 200 SSE、notifications/initialized 返回 202、未初始化 tools/call 被拒 400 + `-32600`）。
 
 ## 与技能书阶梯的关系
 
 三级调用阶梯（[`godot-autopilot/SKILL.md`](../../../skills/godot-autopilot/SKILL.md)）：
 
-1. **原生 MCP 工具**（客户端 harness 直连）
-2. **GDA CLI**（本载体；`bunx`、全局安装、独立二进制是同一载体的三种分发方式）
+1. **CLI 原生命令**（agent 直接执行）
+2. **工具调用命令**（`gda tool call <tool>`，本载体；`bunx`、全局安装、独立二进制是同一载体的三种分发方式）
 3. **手动兜底**（无 CLI 可用时，按 `gda --help` 与日志手工操作）
 
 技能结构为 1 张入口卡 + 9 篇 references（CLI-first EN/ZH 自包含）；`gda install skills [--zh] [--prune]` 安装到 `~/.agents/skills`，`--path <dir>` 可装到项目级目录（如 `<project>/.agents/skills`），`gda skills list|show` 读取内置副本。
@@ -342,7 +342,7 @@ resource:
 ## 相关页面
 
 - [端口与实例登记](ports.md) — 端口模型、实例登记结构与五级发现链
-- [支撑模块](support.md) — 技能卡与 references（1 + 9，MCP 资源 12）
+- [支撑模块](support.md) — 技能卡与 references（1 + 9，资源与提示词 12）
 - [安全边界与并发契约](../security_contract.md) — CLI 安全包络（§3.4）
 - [测试体系](../tests.md) — ctest 注册点与 TS 单测计数
 - [项目总览](../overview.md) — 目录树中的 `cli/`

@@ -11,26 +11,15 @@ import { run as runDescribe } from "../src/commands/describe";
 import { run as call } from "../src/commands/call";
 import { CliError, ExitCode } from "../src/errors";
 import type { GlobalOptions } from "../src/args";
+import { startNativeServer, sendHandshake, type NativeServer } from "./support/native-ipc";
 
-const servers: ReturnType<typeof Bun.serve>[] = [];
+const servers: NativeServer[] = [];
 
-afterEach(() => {
+afterEach(async () => {
   while (servers.length > 0) {
-    servers.pop()!.stop();
+    await servers.pop()!.close();
   }
 });
-
-function serve(handler: (req: Request) => Response | Promise<Response>): number {
-  const server = Bun.serve({ port: 0, fetch: handler });
-  servers.push(server);
-  return server.port!;
-}
-
-function sseResponse(payload: unknown): Response {
-  return new Response(`event: message\ndata: ${JSON.stringify(payload)}\n\n`, {
-    headers: { "content-type": "text/event-stream" },
-  });
-}
 
 interface CapturedRequest {
   method: string;
@@ -38,23 +27,36 @@ interface CapturedRequest {
   id: number;
 }
 
-function recordingServer(handler: (req: CapturedRequest) => Response | Promise<Response>) {
+function envelope(value: Record<string, unknown>): Record<string, unknown> {
+  return value;
+}
+
+async function recordingServer(
+  handler: (req: CapturedRequest) => Record<string, unknown>,
+): Promise<{ port: number; requests: CapturedRequest[] }> {
   const requests: CapturedRequest[] = [];
-  const port = serve(async (req) => {
-    const body = (await req.json()) as CapturedRequest;
-    const params = body.params as Record<string, unknown> | undefined;
+  const server = await startNativeServer((message, _socket, send) => {
+    if (message.method === "initialize") {
+      sendHandshake(message, send);
+      return;
+    }
+    if (message.method === "notifications/initialized") return;
+    const params = message.params as Record<string, unknown> | undefined;
     if (params !== undefined && typeof params === "object" && params !== null) {
       const rest: Record<string, unknown> = { ...params };
       delete rest._meta;
-      body.params = rest;
+      requests.push({ method: String(message.method), params: rest, id: Number(message.id) });
+    } else {
+      requests.push({ method: String(message.method), params: message.params ?? null, id: Number(message.id) });
     }
-    requests.push(body);
-    return handler(body);
+    const response = handler(requests[requests.length - 1]);
+    send({ ...response, id: message.id });
   });
-  return { port, requests };
+  servers.push(server);
+  return { port: server.port, requests };
 }
 
-function okEnvelope(content: unknown[]): unknown {
+function okEnvelope(content: unknown[]): Record<string, unknown> {
   return { jsonrpc: "2.0", id: 1, result: { content } };
 }
 
@@ -97,7 +99,7 @@ async function catchCliError(p: Promise<number>): Promise<CliError> {
 
 describe("请求形状", () => {
   test("ping 直发 tools/call name=ping，由服务端别名兜底解析", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"ok":true}')])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent('{"ok":true}')])));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
     cap.restore();
@@ -109,7 +111,7 @@ describe("请求形状", () => {
   });
 
   test("status 经 call_tool 包装调 system_status", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"status":"ready"}')])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent('{"status":"ready"}')])));
     const cap = captureOutput();
     const code = await status([], { portText: String(port) });
     cap.restore();
@@ -127,11 +129,10 @@ describe("请求形状", () => {
     expect(statusJson.command).toBe("editor.status");
     expect(statusJson.data.port).toBe(port);
     expect(statusJson.data.server).toEqual({ status: "ready" });
-    // mcp_url / transport 等 MCP 专属字段已随 T-11 删除
   });
 
   test("categories 直达 list_categories", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"categories":["scene"]}')])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent('{"categories":["scene"]}')])));
     const cap = captureOutput();
     const code = await categories([], { portText: String(port) });
     cap.restore();
@@ -140,7 +141,7 @@ describe("请求形状", () => {
   });
 
   test("search 直达 search_tools，args 含 query/category/tags", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"results":[]}')])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent('{"results":[]}')])));
     const cap = captureOutput();
     const code = await search(["spawn"], { portText: String(port), category: "scene", tagsText: "a,,b" });
     cap.restore();
@@ -152,8 +153,8 @@ describe("请求形状", () => {
   });
 
   test("search 无 query 时改用 list_categories", async () => {
-    const { port, requests } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent('{"categories":[{"id":"Scene"}]}')])),
+    const { port, requests } = await recordingServer(() =>
+      envelope(okEnvelope([textContent('{"categories":[{"id":"Scene"}]}')])),
     );
     const cap = captureOutput();
     const code = await search([], { portText: String(port) });
@@ -164,7 +165,7 @@ describe("请求形状", () => {
   });
 
   test("call 忽略已删除的 --direct，仍经 call_tool 包装", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
     const code = await call(["delete_scene_node"], { portText: String(port) });
     cap.restore();
@@ -177,7 +178,7 @@ describe("请求形状", () => {
   });
 
   test("describe 直达 get_tool_detail", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"name":"move_agent"}')])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent('{"name":"move_agent"}')])));
     const cap = captureOutput();
     const code = await runDescribe(["move_agent"], { portText: String(port) });
     cap.restore();
@@ -186,7 +187,7 @@ describe("请求形状", () => {
   });
 
   test("call 元工具直达", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
     const code = await call(["ping"], { portText: String(port) });
     cap.restore();
@@ -196,7 +197,7 @@ describe("请求形状", () => {
   });
 
   test("call 领域工具经 call_tool 包装", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
     const code = await call(["move_agent"], { portText: String(port), argsJson: '{"x":1}' });
     cap.restore();
@@ -206,7 +207,7 @@ describe("请求形状", () => {
   });
 
   test("call --confirm 将 confirm 写入工具参数", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
     const code = await call(["delete_scene_node"], { portText: String(port), confirm: true });
     cap.restore();
@@ -219,7 +220,7 @@ describe("请求形状", () => {
   });
 
   test("call 默认 args 为 {}", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
     const code = await call(["move_agent"], { portText: String(port) });
     cap.restore();
@@ -231,7 +232,7 @@ describe("请求形状", () => {
   test("call --args-file 读取文件作为参数", async () => {
     const file = path.join(os.tmpdir(), `gda-args-${process.pid}-${Date.now()}.json`);
     fs.writeFileSync(file, JSON.stringify({ x: 2 }));
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const { port, requests } = await recordingServer(() => envelope(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
     const code = await call(["move_agent"], { portText: String(port), argsFile: file });
     cap.restore();
@@ -244,7 +245,7 @@ describe("请求形状", () => {
 
 describe("载荷提取", () => {
   test("多 text 载荷输出数组", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent('{"a":1}'), textContent('{"b":2}')])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([textContent('{"a":1}'), textContent('{"b":2}')])));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
     cap.restore();
@@ -254,8 +255,8 @@ describe("载荷提取", () => {
 
   test("仅 image 载荷输出空对象并合并图片报告", async () => {
     const png = Buffer.from("89504e470d0a1a0a", "hex");
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([{ type: "image", mimeType: "image/png", data: png.toString("base64") }])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([{ type: "image", mimeType: "image/png", data: png.toString("base64") }])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -267,8 +268,8 @@ describe("载荷提取", () => {
 
   test("text 与 image 合并到同一对象", async () => {
     const png = Buffer.from("89504e470d0a1a0a", "hex");
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent('{"ok":true}'), { type: "image", mimeType: "image/png", data: png.toString("base64") }])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([textContent('{"ok":true}'), { type: "image", mimeType: "image/png", data: png.toString("base64") }])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -282,8 +283,8 @@ describe("载荷提取", () => {
   test("--save-images 落盘 tempfile 目录", async () => {
     const png = Buffer.from("89504e470d0a1a0a", "hex");
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-test-"));
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([{ type: "image", mimeType: "image/png", data: png.toString("base64") }])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([{ type: "image", mimeType: "image/png", data: png.toString("base64") }])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port), saveImages: dir } as GlobalOptions);
@@ -298,7 +299,7 @@ describe("载荷提取", () => {
   });
 
   test("--pretty 缩进 2 空格", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent('{"a":1}')])));
+    const { port } = await recordingServer(() => okEnvelope([textContent('{"a":1}')]));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port), pretty: true });
     cap.restore();
@@ -310,8 +311,8 @@ describe("载荷提取", () => {
 
   test("--raw 输出脱敏信封", async () => {
     const png = Buffer.from("89504e470d0a1a0a", "hex");
-    const { port } = recordingServer(() =>
-      sseResponse({
+    const { port } = await recordingServer(() =>
+      envelope({
         jsonrpc: "2.0",
         id: 42,
         result: { content: [textContent('{"ok":true}'), { type: "image", mimeType: "image/png", data: png.toString("base64") }] },
@@ -322,20 +323,20 @@ describe("载荷提取", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     const display = JSON.parse(cap.stdout()).data;
-    expect(display.id).toBe(42);
+    expect(typeof display.id).toBe("number");
     expect(display.result.content[1].data).toBe("<redacted 8 bytes>");
     expect(cap.stdout()).not.toContain(png.toString("base64"));
   });
 
   test("text 非 JSON 报传输错误", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent("not-json")])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([textContent("not-json")])));
     const e = await catchCliError(ping([], { portText: String(port) }));
     expect(e.code).toBe(ExitCode.Transport);
     expect(e.message).toContain("not valid JSON");
   });
 
   test("content 为空报传输错误", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([])));
     const e = await catchCliError(ping([], { portText: String(port) }));
     expect(e.code).toBe(ExitCode.Transport);
     expect(e.message).toContain("no result.content");
@@ -344,8 +345,8 @@ describe("载荷提取", () => {
 
 describe("search 投影", () => {
   test("query 输出 results 并只保留 name/score", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(
+    const { port } = await recordingServer(() =>
+      envelope(
         okEnvelope([
           textContent(
             JSON.stringify({
@@ -368,8 +369,8 @@ describe("search 投影", () => {
 
 describe("toolFailed", () => {
   test("result.isError 导致 exit 1", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse({ jsonrpc: "2.0", id: 1, result: { isError: true, content: [textContent('{"error":"boom"}')] } }),
+    const { port } = await recordingServer(() =>
+      envelope({ jsonrpc: "2.0", id: 1, result: { isError: true, content: [textContent('{"error":"boom"}')] } }),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -379,7 +380,7 @@ describe("toolFailed", () => {
   });
 
   test("载荷顶层含 error 键导致 exit 1", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent('{"error":"boom"}')])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([textContent('{"error":"boom"}')])));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
     cap.restore();
@@ -388,7 +389,7 @@ describe("toolFailed", () => {
   });
 
   test("载荷内层 result 含 error 键导致 exit 1", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent('{"result":{"error":"x"}}')])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([textContent('{"result":{"error":"x"}}')])));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
     cap.restore();
@@ -396,7 +397,7 @@ describe("toolFailed", () => {
   });
 
   test("results 数组项 status=error 导致 exit 1", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent('{"results":[{"status":"error"}]}')])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([textContent('{"results":[{"status":"error"}]}')])));
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
     cap.restore();
@@ -404,8 +405,8 @@ describe("toolFailed", () => {
   });
 
   test("载荷 runtime_error=true 导致 exit 1", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(
+    const { port } = await recordingServer(() =>
+      envelope(
         okEnvelope([textContent('{"result":{"value":null},"runtime_error":true,"error_details":"boom"}')]),
       ),
     );
@@ -417,8 +418,8 @@ describe("toolFailed", () => {
   });
 
   test("载荷 structured_error.code 导致 exit 1", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent('{"structured_error":{"code":"when_timeout","timeout_ms":4000}}')])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([textContent('{"structured_error":{"code":"when_timeout","timeout_ms":4000}}')])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -427,8 +428,8 @@ describe("toolFailed", () => {
   });
 
   test("载荷 structured_error 无 code 不判失败", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent('{"structured_error":{"action":"retry"},"result":{"value":1}}')])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([textContent('{"structured_error":{"action":"retry"},"result":{"value":1}}')])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -437,8 +438,8 @@ describe("toolFailed", () => {
   });
 
   test("runtime_error 非布尔 true 不判失败", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent('{"runtime_error":"true","result":{"value":1}}')])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([textContent('{"runtime_error":"true","result":{"value":1}}')])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -447,8 +448,8 @@ describe("toolFailed", () => {
   });
 
   test("正常载荷不判失败并 exit 0", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent('{"result":{"value":1}}')])),
+    const { port } = await recordingServer(() =>
+      envelope(okEnvelope([textContent('{"result":{"value":1}}')])),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -457,8 +458,8 @@ describe("toolFailed", () => {
   });
 
   test("JSON-RPC 顶层 error 信封导致 exit 1 并透出服务端消息", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse({ jsonrpc: "2.0", id: 1, error: { code: -32602, message: "mock top-level error" } }),
+    const { port } = await recordingServer(() =>
+      envelope({ jsonrpc: "2.0", id: 1, error: { code: -32602, message: "mock top-level error" } }),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port) });
@@ -466,33 +467,33 @@ describe("toolFailed", () => {
     expect(code).toBe(ExitCode.ToolFailure);
     expect(cap.stderr()).toContain("mock top-level error");
     expect(cap.stderr()).toContain("-32602");
-    const envelope = JSON.parse(cap.stdout()) as {
+    const parsed = JSON.parse(cap.stdout()) as {
       ok: boolean;
       data: unknown;
       error: { code: string; message: string; request_sent: boolean };
     };
-    expect(envelope.ok).toBe(false);
-    expect(envelope.data).toBeNull();
-    expect(envelope.error.code).toBe("TOOL_FAILURE");
-    expect(envelope.error.request_sent).toBe(false);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.data).toBeNull();
+    expect(parsed.error.code).toBe("TOOL_FAILURE");
+    expect(parsed.error.request_sent).toBe(false);
   });
 
   test("JSON-RPC 顶层 error 信封在 --raw 下 exit 1，服务端消息保留在 stderr（失败时 data 为空）", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse({ jsonrpc: "2.0", id: 7, error: { code: -32602, message: "mock top-level error" } }),
+    const { port } = await recordingServer(() =>
+      envelope({ jsonrpc: "2.0", id: 7, error: { code: -32602, message: "mock top-level error" } }),
     );
     const cap = captureOutput();
     const code = await ping([], { portText: String(port), raw: true });
     cap.restore();
     expect(code).toBe(ExitCode.ToolFailure);
-    const envelope = JSON.parse(cap.stdout()) as {
+    const parsed = JSON.parse(cap.stdout()) as {
       ok: boolean;
       data: unknown;
       error: { code: string };
     };
-    expect(envelope.ok).toBe(false);
-    expect(envelope.data).toBeNull();
-    expect(envelope.error.code).toBe("TOOL_FAILURE");
+    expect(parsed.ok).toBe(false);
+    expect(parsed.data).toBeNull();
+    expect(parsed.error.code).toBe("TOOL_FAILURE");
     expect(cap.stderr()).toContain("mock top-level error");
     expect(cap.stderr()).toContain("-32602");
   });
@@ -577,17 +578,17 @@ describe("用法错误", () => {
 
 describe("连接与端口", () => {
   test("连接失败 exit 2 且 stderr 含 suggestion", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("x") });
+    const server = await startNativeServer(() => {});
     const port = server.port;
-    server.stop();
+    await server.close();
     const e = await catchCliError(ping([], { portText: String(port) }));
     expect(e.code).toBe(ExitCode.Transport);
     expect(e.suggestion).toBeDefined();
-    expect(e.suggestion).toContain("GODOT_AUTOPILOT_PORT");
+    expect(e.suggestion).toContain("--port");
   });
 
   test("GODOT_AUTOPILOT_PORT 指向 stub", async () => {
-    const { port } = recordingServer(() => sseResponse(okEnvelope([textContent('{"ok":true}')])));
+    const { port } = await recordingServer(() => envelope(okEnvelope([textContent('{"ok":true}')])));
     const old = process.env.GODOT_AUTOPILOT_PORT;
     process.env.GODOT_AUTOPILOT_PORT = String(port);
     try {

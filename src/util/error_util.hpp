@@ -3,8 +3,6 @@
 
 #include <godot_cpp/variant/string.hpp>
 #include "util/json_value.hpp"
-#include "adapters/mcp_error_bridge.hpp"
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -12,15 +10,6 @@ namespace godot_autopilot {
 namespace util {
 
 godot_autopilot::util::JsonValue error_json(const std::string &msg);
-
-using SdkErrorCode = godot_autopilot::adapters::SdkErrorCode;
-
-[[noreturn]] inline void throw_mcp_error(
-    SdkErrorCode code, std::string message,
-    std::optional<godot_autopilot::util::JsonValue> data = std::nullopt) {
-  godot_autopilot::adapters::ThrowSdkError(code, std::move(message),
-                                           std::move(data));
-}
 
 godot_autopilot::util::JsonValue ok_result(godot_autopilot::util::JsonValue value);
 

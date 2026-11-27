@@ -8,7 +8,6 @@
 #include <chrono>
 #include <memory>
 #include "util/json_value.hpp"
-#include <mcp/server/McpServer.hpp>
 #include <string>
 
 namespace godot_autopilot {
@@ -17,9 +16,9 @@ enum class ToolSurface { Meta, Full };
 
 ToolSurface resolve_tool_surface();
 
-void register_all_tools(mcp::McpServer &server, CommandQueue &queue,
-                        ToolCatalog &catalog, Bm25Index &index, int port,
-                        ToolSurface surface = ToolSurface::Meta);
+std::shared_ptr<ToolRegistry> install_tool_handlers(
+    CommandQueue &queue, ToolCatalog &catalog, Bm25Index &index, int port,
+    ToolSurface surface = ToolSurface::Meta);
 
 bool tool_result_is_error(const godot_autopilot::util::JsonValue &result);
 

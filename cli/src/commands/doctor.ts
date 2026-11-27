@@ -81,7 +81,7 @@ function instanceChecks(instances: Array<{ id: string; pid: number; project: str
 function nativeCheck(instances: Array<{ id: string; pid: number; ipcEndpoint?: { kind?: string; path?: string; name?: string; host?: string; port?: number } | null }>): DoctorCheck {
   const candidate = instances.find((entry) => entry.ipcEndpoint != null && isAlive(entry.pid));
   if (candidate === undefined) {
-    return check("native", "GDA_IPC_ENDPOINT_MISSING", "warn", "no live instance advertises a native IPC endpoint", "Restart the editor so the plugin binds its native IPC channel; the doctor never uses MCP initialize or HTTP /mcp.");
+    return check("native", "GDA_IPC_ENDPOINT_MISSING", "warn", "no live instance advertises a native IPC endpoint", "Restart the editor so the plugin binds its native IPC channel; the doctor only uses the native control plane.");
   }
   return check("native", "GDA_IPC_ENDPOINT_OK", "ok", `${candidate.id} exposes ${candidate.ipcEndpoint?.kind ?? "unknown"}`, "none");
 }
@@ -141,7 +141,7 @@ export async function diagnose(positional: string[], opts: GlobalOptions): Promi
         const hello = await nativeHello(target.ipcEndpoint, identity);
         report.checks.push(check("hello", "GDA_NATIVE_OK", "ok", `instance ${hello.instance_id}`, "none"));
       } catch (error) {
-        report.checks.push(check("hello", "GDA_NATIVE_FAILED", "error", (error as Error).message, "Check that the plugin's native dispatcher is enabled; do not fall back to MCP initialize."));
+        report.checks.push(check("hello", "GDA_NATIVE_FAILED", "error", (error as Error).message, "Check that the plugin's native dispatcher is enabled; there is no alternate control-plane channel."));
       }
     }
   } catch (error) {

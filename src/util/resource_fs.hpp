@@ -6,7 +6,7 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include "adapters/mcp_sha256.hpp"
+#include "util/sha256.hpp"
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -678,7 +678,7 @@ inline uint64_t next_file_transaction_serial() {
 }
 
 inline std::string sha256_hex(std::string_view content) {
-  return godot_autopilot::adapters::Sha256Hex(content);
+  return godot_autopilot::util::sha256_hex(content);
 }
 
 inline std::string file_transaction_temp_path(const std::string &destination,

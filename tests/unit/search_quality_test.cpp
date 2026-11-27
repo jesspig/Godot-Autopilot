@@ -1,10 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/Capabilities.hpp>
 #include "util/json_value.hpp"
-#include <mcp/client/McpClient.hpp>
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -13,11 +9,9 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -328,38 +322,16 @@ void compare_with_baseline(
 }
 
 struct SearchQualityTest : ::testing::Test {
-  std::unique_ptr<mcp::McpServer> server;
-  std::unique_ptr<mcp::McpClient> client;
-  std::thread server_thread;
   godot_autopilot::CommandQueue queue;
   godot_autopilot::ToolCatalog catalog;
   godot_autopilot::Bm25Index index;
 
   void SetUp() override {
-    auto pair = mcp::InMemoryTransport::CreatePair();
-    server = mcp::McpServer::Create(pair.server);
-    godot_autopilot::register_all_tools(*server, queue, catalog, index, 9540);
-    server_thread = std::thread([this] { server->Run(); });
-
-    mcp::ClientOptions options;
-    options.client_info =
-        mcp::Implementation{"GdaSearchQualityClient", "1.0.0"};
-    options.connect_mode = mcp::ConnectMode::Auto;
-    client = mcp::McpClient::Create(pair.client, options);
-
+    godot_autopilot::install_tool_handlers(queue, catalog, index, 9540);
     queue.drain();
   }
 
   void TearDown() override {
-    if (client) {
-      client->Close();
-    }
-    if (server) {
-      server->Close();
-    }
-    if (server_thread.joinable()) {
-      server_thread.join();
-    }
     godot_autopilot::dispatch::clear_handlers();
     godot_autopilot::clear_active_registry();
   }

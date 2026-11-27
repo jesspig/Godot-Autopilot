@@ -13,7 +13,7 @@
 
 ## 0. 输入与范围
 - 报告路径 / 轮目录 / GDA 版本 / Godot 版本 / 本项目 commit
-- MCP SDK 路径与 commit / 绑定层路径与 commit
+- 依赖 SDK 路径与 commit / 绑定层路径与 commit
 - digest 路径 / schema / 来源轮次（digest.round）
 - GOAL 终态：active | paused | budgetLimited | usageLimited | complete | unmet（取自对应工程 GOAL.md 末态，与报告头部对照）
 - 冻结快照：本轮读到的运行时数据 `.handoff/library/HARNESS_LIBRARY.md` 条目 id 与状态清单（规则见 `HARNESS_LIBRARY.md` 模板）；digest.json / coverage.json / trace-snapshot.jsonl 版本
@@ -34,7 +34,7 @@
 - 触发条件与复现步骤
 - 调用链
 - 本项目证据（文件:行号）
-- MCP SDK 证据（传输/分发/工具注册，文件:行号）
+- 依赖 SDK 证据（传输/分发/工具注册，文件:行号）
 - 绑定层证据（GDExtension C++ 绑定，文件:行号）
 - 根因结论与反证
 - 因果三元组：动作=<...>；条件=<...>；后果=<...>
@@ -72,7 +72,7 @@
 - coverage_invalid_touches 剔除情况：列工具名、原因与缺失要素
 - 未覆盖工具逐项列原因；禁止为补缺口做无开发意图的调用
 
-## 9. MCP 同类工具调研（按需）
+## 9. 同类工具调研（按需）
 - 工具/项目 / 生态 / 相似功能 / 架构 / 性能 / 安全 / 问题处理 / 来源 URL + 检索日期
 
 ## 10. 交叉验证与优化候选

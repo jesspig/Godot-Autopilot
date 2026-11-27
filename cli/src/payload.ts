@@ -4,7 +4,7 @@ import path from "node:path";
 
 import type { GlobalOptions } from "./args";
 import { CliError, ExitCode } from "./errors";
-import type { JsonRpcResponse } from "./mcp/client";
+import type { JsonRpcResponse } from "./rpc/client";
 import { activeCommandName, err, writeJson } from "./output";
 
 const DEFAULT_TIMEOUT_SEC = 60;

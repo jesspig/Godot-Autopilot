@@ -1,6 +1,6 @@
 #include "tools/base/tool_pipeline.hpp"
 #include "tools/base/tool_spec.hpp"
-#include "util/mcp_image_content.hpp"
+#include "util/tool_image_content.hpp"
 
 #include <gtest/gtest.h>
 
@@ -9,13 +9,6 @@
 #include <vector>
 
 namespace {
-
-const mcp::ImageContent *image_at(
-    const std::vector<mcp::ContentVariant> &content, size_t index) {
-  if (index >= content.size())
-    return nullptr;
-  return std::get_if<mcp::ImageContent>(&content[index]);
-}
 
 godot_autopilot::ToolSpec make_plain_spec() {
   godot_autopilot::ToolSpec spec;
@@ -30,20 +23,27 @@ godot_autopilot::ToolSpec make_plain_spec() {
   return spec;
 }
 
+void expect_native_image(const godot_autopilot::util::JsonValue &image,
+                         const std::string &data) {
+  ASSERT_TRUE(image.IsObject());
+  ASSERT_NE(image.Find("type"), nullptr);
+  EXPECT_EQ(image.Find("type")->GetString(), "image");
+  ASSERT_NE(image.Find("data"), nullptr);
+  EXPECT_EQ(image.Find("data")->GetString(), data);
+  ASSERT_NE(image.Find("mimeType"), nullptr);
+  EXPECT_EQ(image.Find("mimeType")->GetString(), "image/png");
+}
+
 } // namespace
 
 TEST(ToolPipelineTraitsTest, AttachImageDataTopLevel) {
-  godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
-      R"({"data":"QUJD","format":"png","width":640,"height":480})");
-  std::vector<mcp::ContentVariant> content;
-  ASSERT_TRUE(
-      godot_autopilot::util::try_attach_image_data(result, content));
+  godot_autopilot::util::JsonValue result =
+      godot_autopilot::util::JsonValue::Parse(
+          R"({"data":"QUJD","format":"png","width":640,"height":480})");
+  std::vector<godot_autopilot::util::JsonValue> content;
+  ASSERT_TRUE(godot_autopilot::util::try_attach_image_data(result, content));
   ASSERT_EQ(content.size(), 1u);
-  const mcp::ImageContent *image = image_at(content, 0);
-  ASSERT_NE(image, nullptr);
-  EXPECT_EQ(image->type, "image");
-  EXPECT_EQ(image->data, "QUJD");
-  EXPECT_EQ(image->mime_type, "image/png");
+  expect_native_image(content[0], "QUJD");
   EXPECT_EQ(result["data"].GetString(), "<attached-as-image-content>");
   ASSERT_TRUE(result["image_attached"].IsBool());
   EXPECT_TRUE(result["image_attached"].GetBool());
@@ -52,7 +52,7 @@ TEST(ToolPipelineTraitsTest, AttachImageDataTopLevel) {
 TEST(ToolPipelineTraitsTest, RejectNonPngFormat) {
   godot_autopilot::util::JsonValue result =
       godot_autopilot::util::JsonValue::Parse(R"({"data":"QUJD","format":"jpg"})");
-  std::vector<mcp::ContentVariant> content;
+  std::vector<godot_autopilot::util::JsonValue> content;
   std::string reason;
   EXPECT_FALSE(
       godot_autopilot::util::try_attach_image_data(result, content, &reason));
@@ -64,10 +64,10 @@ TEST(ToolPipelineTraitsTest, RejectNonPngFormat) {
 
 TEST(ToolPipelineTraitsTest, RejectMissingData) {
   godot_autopilot::util::JsonValue result =
-      godot_autopilot::util::JsonValue::Parse(R"({"result":{"width":100,"height":50}})");
-  std::vector<mcp::ContentVariant> content;
-  EXPECT_FALSE(
-      godot_autopilot::util::try_attach_image_data(result, content));
+      godot_autopilot::util::JsonValue::Parse(
+          R"({"result":{"width":100,"height":50}})");
+  std::vector<godot_autopilot::util::JsonValue> content;
+  EXPECT_FALSE(godot_autopilot::util::try_attach_image_data(result, content));
   EXPECT_TRUE(content.empty());
   EXPECT_FALSE(result["result"].Contains("image_attached"));
 }
@@ -76,8 +76,9 @@ TEST(ToolPipelineTraitsTest, RunPostWithoutFlagsPassesThrough) {
   godot_autopilot::ToolSpec spec = make_plain_spec();
   godot_autopilot::util::JsonValue args =
       godot_autopilot::util::JsonValue::Parse(R"({"observe":true})");
-  godot_autopilot::util::JsonValue result = godot_autopilot::util::JsonValue::Parse(
-      R"({"result":{"ok":true,"width":100}})");
+  godot_autopilot::util::JsonValue result =
+      godot_autopilot::util::JsonValue::Parse(
+          R"({"result":{"ok":true,"width":100}})");
   const std::string before = result.Dump();
   godot_autopilot::util::JsonValue out =
       godot_autopilot::pipeline::run_post(spec, args, std::move(result));

@@ -9,7 +9,7 @@ import {
   closeBatchIpcSession,
   createBatchIpcSession,
   META_DIRECT_TOOLS,
-} from "../mcp/client";
+} from "../rpc/client";
 import { normalizeEnvelope, recordConfirmation, writeEnvelope, batchStatus } from "../output";
 import type { ConfirmationSummary } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, extractPayload } from "../payload";
@@ -114,10 +114,28 @@ function readBatchFile(filePath: string): BatchOperation[] {
 
 function resolveIpcEndpoint(opts: GlobalOptions): IpcEndpoint {
   if (opts.socketText !== undefined) {
-    return {
-      path: opts.socketText,
-      token: process.env.GODOT_AUTOPILOT_IPC_TOKEN ?? "",
-    };
+    const token = process.env.GODOT_AUTOPILOT_IPC_TOKEN ?? "";
+    if (opts.socketText.startsWith("tcp:")) {
+      const address = opts.socketText.slice(4);
+      const separator = address.lastIndexOf(":");
+      if (separator > 0) {
+        const port = Number(address.slice(separator + 1));
+        if (Number.isInteger(port) && port > 0 && port <= 65535) {
+          return {
+            kind: "tcp",
+            host: address.slice(0, separator),
+            port,
+            token,
+          };
+        }
+      }
+      throw new CliError(
+        ExitCode.Usage,
+        `invalid tcp IPC endpoint: ${opts.socketText}.`,
+        "Use tcp:<host>:<port>.",
+      );
+    }
+    return { path: opts.socketText, token };
   }
   const target = resolveTarget(opts, TARGET_CONTEXT);
   if (target.ipcEndpoint === undefined) {
@@ -185,8 +203,6 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
           timeoutSec,
           direct: META_DIRECT_TOOLS.has(operation.tool),
           ipcEndpoint: endpoint,
-          transport: "ipc",
-          noFallback: true,
           ipcSession: session,
         });
         const extracted = extractPayload(envelope, { raw: opts.raw });

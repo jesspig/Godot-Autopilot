@@ -37,12 +37,19 @@ function frameServer(handler: (message: any, socket: net.Socket) => void): (sock
 const activeSockets: net.Socket[] = [];
 const servers: net.Server[] = [];
 
-function listenLoopback(socketPath: string, handler: (socket: net.Socket) => void): Promise<net.Server> {
+function listenLoopback(handler: (socket: net.Socket) => void): Promise<{ server: net.Server; port: number }> {
   return new Promise((resolve, reject) => {
     const server = net.createServer(handler);
     server.on("connection", (socket) => activeSockets.push(socket));
     server.once("error", reject);
-    server.listen(socketPath, () => resolve(server));
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        reject(new Error("mock IPC server has no TCP port"));
+        return;
+      }
+      resolve({ server, port: address.port });
+    });
   });
 }
 
@@ -130,18 +137,15 @@ function batchServer(state: ServerState, options: BatchServerOptions = {}): (soc
 }
 
 let dir: string;
-let socketPath: string;
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "gb-"));
-  socketPath = path.join(dir, "gbatch.sock");
 });
 
 afterEach(async () => {
   while (servers.length > 0) {
     await closeServer(servers.pop()!);
   }
-  fs.rmSync(socketPath, { force: true });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -154,13 +158,13 @@ function writeBatchFile(value: unknown, raw?: string): string {
 describe("gda batch", () => {
   test("两个操作全成功：exit 0、results 两项 ok、握手只做一次", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state));
+    const { server, port } = await listenLoopback(batchServer(state));
     servers.push(server);
     const file = writeBatchFile([{ tool: "alpha", args: { a: 1 } }, { tool: "beta" }]);
     const cap = captureOutput();
     let code: number;
     try {
-      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "5" });
+      code = await batch([], { argsFile: file, socketText: `tcp:127.0.0.1:${port}`, timeoutText: "5" });
     } finally {
       cap.restore();
     }
@@ -175,7 +179,7 @@ describe("gda batch", () => {
 
   test("一个 toolFailed：exit 1 且对应项 ok=false，confirm 写入参数", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state, { failTool: "fail_tool" }));
+    const { server, port } = await listenLoopback(batchServer(state, { failTool: "fail_tool" }));
     servers.push(server);
     const file = writeBatchFile({
       operations: [{ tool: "alpha" }, { tool: "fail_tool", args: {}, confirm: true }],
@@ -183,7 +187,7 @@ describe("gda batch", () => {
     const cap = captureOutput();
     let code: number;
     try {
-      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "5" });
+      code = await batch([], { argsFile: file, socketText: `tcp:127.0.0.1:${port}`, timeoutText: "5" });
     } finally {
       cap.restore();
     }
@@ -198,13 +202,13 @@ describe("gda batch", () => {
 
   test("IPC timeout 立即停止 batch、关闭 session 并返回 Transport", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state, { hangTool: "alpha" }));
+    const { server, port } = await listenLoopback(batchServer(state, { hangTool: "alpha" }));
     servers.push(server);
     const file = writeBatchFile([{ tool: "alpha" }, { tool: "beta" }]);
     const cap = captureOutput();
     let code: number;
     try {
-      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "0.2" });
+      code = await batch([], { argsFile: file, socketText: `tcp:127.0.0.1:${port}`, timeoutText: "0.2" });
     } finally {
       cap.restore();
     }
@@ -221,13 +225,13 @@ describe("gda batch", () => {
 
   test("IPC 收到工具调用后断开立即停止 batch 并返回 Transport", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state, { disconnectTool: "alpha" }));
+    const { server, port } = await listenLoopback(batchServer(state, { disconnectTool: "alpha" }));
     servers.push(server);
     const file = writeBatchFile([{ tool: "alpha" }, { tool: "beta" }]);
     const cap = captureOutput();
     let code: number;
     try {
-      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "2" });
+      code = await batch([], { argsFile: file, socketText: `tcp:127.0.0.1:${port}`, timeoutText: "2" });
     } finally {
       cap.restore();
     }
@@ -242,13 +246,13 @@ describe("gda batch", () => {
 
   test("batch 遇到 Transport 错误立即停止并保留退出码", async () => {
     const state: ServerState = { initializeCount: 0, calls: [] };
-    const server = await listenLoopback(socketPath, batchServer(state, { invalidResponseTool: "alpha" }));
+    const { server, port } = await listenLoopback(batchServer(state, { invalidResponseTool: "alpha" }));
     servers.push(server);
     const file = writeBatchFile([{ tool: "alpha" }, { tool: "beta" }]);
     const cap = captureOutput();
     let code: number;
     try {
-      code = await batch([], { argsFile: file, socketText: socketPath, timeoutText: "2" });
+      code = await batch([], { argsFile: file, socketText: `tcp:127.0.0.1:${port}`, timeoutText: "2" });
     } finally {
       cap.restore();
     }
@@ -266,7 +270,7 @@ describe("gda batch", () => {
     const file = writeBatchFile(null, '{"operations":');
     let caught: unknown;
     try {
-      await batch([], { argsFile: file, socketText: socketPath });
+      await batch([], { argsFile: file, portText: "1" });
     } catch (error) {
       caught = error;
     }

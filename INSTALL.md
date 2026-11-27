@@ -6,8 +6,8 @@
 
 Godot Autopilot (GDA) has two installable parts:
 
-- **Editor plugin** — a GDExtension that runs inside the Godot editor and exposes the MCP server. It is installed per Godot project.
-- **`gda` CLI** — discovers the plugin's random port, speaks MCP, installs the plugin and skill books, and starts or stops editors. It is installed once per machine.
+- **Editor plugin** — a GDExtension that runs inside the Godot editor and makes the project reachable from the CLI. It is installed per Godot project.
+- **`gda` CLI** — discovers the plugin's local instance, runs every operation as a command that prints a JSON envelope, installs the plugin and skill books, and starts or stops editors. It is installed once per machine.
 - **Skill books** — optional Agent Skills that teach an AI client the GDA calling protocol. They can be installed globally or per project.
 
 GDA does **not** install Godot itself. A Godot 4.7+ editor must already be available.
@@ -21,9 +21,9 @@ GDA does **not** install Godot itself. A Godot 4.7+ editor must already be avail
 - 项目级技能目录：`<project>/.agents/skills`。
 - Agent 在安装前必须问你：技能书装全局、装项目内，还是跳过。
 - 一键脚本未识别到 Godot 工程时只安装 CLI，不安装插件；此时传入 `--project <工程目录>`。
-- 安装后用 `gda status --json` 读取 `mcp_url`，再用 `gda ping` 验证。
+- 安装后用 `gda ping` 探活、用 `gda status --format json` 读取连接记录（实例与本机端点）；无需配置客户端。
 - 不要用 `--headless` 验证：无窗口编辑器模式下插件会禁用 UI 与服务器。
-- 详细的手动安装、源码构建、客户端配置与排错见下文英文正文。
+- 详细的手动安装、源码构建、CLI 连接与排错见下文英文正文。
 
 ---
 
@@ -92,9 +92,9 @@ Run the verification commands in [Verify the installation](#verify-the-installat
 - Never use `sudo`, an elevated PowerShell, or administrator rights.
 - Never expose the GDA port beyond loopback; never proxy or forward it.
 - Do not pass `--confirm` to high-risk tools during installation (`destructive`, `process`, `code_execute`, `game_runtime`).
-- Do not hand-write HTTP requests to the MCP port.
+- Do not hand-write HTTP requests; use the CLI commands instead.
 - Do not use `--headless` for installation verification. The plugin disables the server when the editor has no drawable window.
-- Modify only `addons/godot-autopilot`, the selected skill directory, and the MCP client configuration. Do not rewrite project files.
+- Modify only `addons/godot-autopilot` and the selected skill directory. Do not rewrite project files.
 - If a step fails, report the command, exit code, and the relevant output. Do not silently skip a failed check.
 - If the user asked for a specific release, pin `--version <version>`; otherwise use the latest release.
 
@@ -106,7 +106,7 @@ Include:
 - Installed CLI version and path.
 - Project path and plugin path.
 - Skill scope and skill directory, or “skipped”.
-- `mcp_url` from `gda status --json`.
+- The connection record from `gda status --format json`.
 - Every command that failed, with its exit code.
 - Any remaining risk (for example, the release predates 0.3.3 and cannot install the plugin).
 
@@ -388,42 +388,33 @@ A source build contains only the host platform library. Use the release pipeline
 
 ---
 
-## Connect your MCP client
+## Connect through the CLI
 
 1. Start a **graphical** Godot editor session:
    ```bash
-   gda start --project "<project>"
+   gda editor start --project "<project>"
    ```
    Or open the project in the Godot editor yourself.
-2. Read the connection record:
+2. Probe the instance and read the connection record:
    ```bash
-   gda status --json
+   gda ping
+   gda status --format json
+   gda commands --json
    ```
-   The only URL a client needs is `mcp_url`, for example `http://127.0.0.1:21437/mcp`.
-3. Add that URL to the client configuration. Examples:
-   - Claude Code (`.mcp.json`):
-     ```json
-     {"mcpServers":{"godot-autopilot":{"type":"http","url":"http://127.0.0.1:21437/mcp"}}}
-     ```
-   - Cursor (`.cursor/mcp.json`):
-     ```json
-     {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:21437/mcp"}}}
-     ```
-   - OpenCode (`opencode.json`):
-     ```json
-     {"mcp":{"godot-autopilot":{"type":"remote","url":"http://127.0.0.1:21437/mcp","enabled":true}}}
-     ```
-   - Codex (`.codex/config.toml`):
-     ```toml
-     [mcp_servers.godot-autopilot]
-     url = "http://127.0.0.1:21437/mcp"
-     ```
-   - Other clients: use the same `mcp_url`.
-4. Restart or reconnect the client and confirm that the GDA tools appear.
+   The JSON record confirms the live instance, its per-project loopback port and IPC channel. There is no URL to copy into a client: every operation is a `gda` command that prints a JSON envelope.
+3. Discover and call tools directly:
+   ```bash
+   gda tool list
+   gda tool search "scene"
+   gda tool describe <tool>
+   gda tool call <tool> --args '<json>'
+   ```
+   `gda commands --json` is the authoritative list of commands and flags. High-risk calls return a confirmation summary; re-run the same command with `--confirm` after reviewing it.
+4. Confirm with `gda tool list` that the tools appear, and with `gda ping` that the instance is reachable.
 
-The port is chosen and persisted by the plugin, not by the CLI. Never reuse a port from documentation or from another project; read `mcp_url` again after every editor restart.
+The port is chosen and persisted by the plugin, not by the CLI. Never hardcode a port from documentation or from another project; re-read the connection record after every editor restart.
 
-Do not use `--headless` for this check. The plugin disables the UI and server when the editor has no drawable window.
+Do not use `--headless` for this check. The plugin disables the UI and instance registration when the editor has no drawable window.
 
 ---
 
@@ -434,22 +425,22 @@ Run these in order:
 ```bash
 gda --version
 gda list
-gda status --json
+gda status --format json
 gda ping
 gda search "scene"
-gda call ping
+gda tool call ping
 ```
 
 Expected:
 
 - `gda --version` prints the installed version.
 - `gda list` shows a live entry for the project, or tells you no instance is running.
-- `gda status --json` contains `"ok": true` and a non-empty `mcp_url`.
+- `gda status --format json` contains `"ok": true` and a live instance record with a loopback port.
 - `gda ping` succeeds.
 - `gda search "scene"` returns candidates from the live instance.
-- `gda call ping` returns a successful MCP response.
+- `gda tool call ping` returns a successful JSON envelope.
 
-If `gda status --json` fails, start the graphical editor first and retry. If it still fails, check that the plugin directory exists and that the editor loaded the plugin.
+If `gda status --format json` fails, start the graphical editor first and retry. If it still fails, check that the plugin directory exists and that the editor loaded the plugin.
 
 ---
 
@@ -465,7 +456,7 @@ curl -fsSL https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scri
 - The CLI binary is replaced in `~/.godot-autopilot/bin`.
 - The plugin is replaced in `<project>/addons/godot-autopilot`; the installer keeps a timestamped backup.
 - Skill books are overwritten because the script passes `--force`.
-- Re-read `mcp_url` after the upgrade. The plugin persists a port per project, but the value is authoritative only after the editor restarts.
+- Re-read the connection record after the upgrade. The plugin persists a port per project, but the value is authoritative only after the editor restarts.
 
 For manual upgrades, replace the CLI binary and re-run `gda install plugin --project "<project>"`.
 
@@ -487,7 +478,7 @@ For manual upgrades, replace the CLI binary and re-run `gda install plugin --pro
    ~/.agents/skills/godot-autopilot*
    <project>/.agents/skills/godot-autopilot*
    ```
-5. Remove the MCP client entry that points at the old `mcp_url`.
+5. Remove any scripts or notes that hardcode the old loopback port.
 6. Remove `~/.godot-autopilot/bin` from the user `PATH` if you added it.
 
 ---
@@ -506,7 +497,7 @@ For manual upgrades, replace the CLI binary and re-run `gda install plugin --pro
 | `godot: command not found` | `godot --version` | Pass the editor path with `gda start --godot <path> --project "<project>"`. |
 | macOS refuses to run `gda` | Quarantine attribute | Verify the checksum first, then `xattr -d com.apple.quarantine ~/.godot-autopilot/bin/gda`. |
 | Windows SmartScreen warning | Zone identifier on the ZIP | Unblock the ZIP before extracting. |
-| Port conflict or stale URL | `gda status --json` | Re-read `mcp_url`; do not hardcode a port. |
+| Port conflict or stale endpoint | `gda status --format json` | Re-read the connection record; do not hardcode a port. |
 | Skills install fails because files exist | Existing skill books | Re-run with `--force`, or choose a different `--path`. |
 | Headless editor has no server | Editor has no drawable window | Use a graphical editor session; `GDA_FORCE_HEADLESS` and headless mode disable the plugin UI and server. |
 
@@ -514,7 +505,7 @@ For manual upgrades, replace the CLI binary and re-run `gda install plugin --pro
 
 ## Security
 
-- The MCP server binds loopback only. Never expose, proxy, or forward the port.
+- The CLI reaches a loopback-only instance. Never expose, proxy, or forward the port.
 - High-risk tools (`destructive`, `process`, `code_execute`, `game_runtime`) require `confirm=true`; there is no global allow list.
 - Do not pass `--confirm` during installation. Review the tool description and target before confirming a high-risk call.
 - Verify downloaded archives against `sha256sums.txt` before installing.

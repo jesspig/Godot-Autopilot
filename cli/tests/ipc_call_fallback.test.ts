@@ -1,121 +1,11 @@
-import fs from "node:fs";
 import net from "node:net";
-import os from "node:os";
-import path from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
 import { run as runCall } from "../src/commands/call";
 import { CliError, ExitCode, isIpcRequestSent } from "../src/errors";
-import { callTool } from "../src/mcp/client";
-
-function encodeFrame(value: unknown): Buffer {
-  const payload = Buffer.from(JSON.stringify(value), "utf8");
-  const header = Buffer.alloc(4);
-  header.writeUInt32BE(payload.length, 0);
-  return Buffer.concat([header, payload]);
-}
-
-function frameHandler(onCall: (socket: net.Socket, id: number) => void): (socket: net.Socket) => void {
-  return (socket) => {
-    let buffer = Buffer.alloc(0);
-    socket.on("data", (chunk: Buffer) => {
-      buffer = Buffer.concat([buffer, chunk]);
-      while (buffer.length >= 4) {
-        const size = buffer.readUInt32BE(0);
-        if (buffer.length < 4 + size) return;
-        const text = buffer.subarray(4, 4 + size).toString("utf8");
-        buffer = buffer.subarray(4 + size);
-        let message: { id?: number; method?: string };
-        try {
-          message = JSON.parse(text) as { id?: number; method?: string };
-        } catch {
-          return;
-        }
-        if (message.id === undefined) continue;
-        if (message.method === "tools/call") {
-          onCall(socket, message.id);
-        } else {
-          socket.write(encodeFrame({ jsonrpc: "2.0", id: message.id, result: {} }));
-        }
-      }
-    });
-  };
-}
-
-async function listenUnix(
-  onCall: (socket: net.Socket, id: number) => void,
-): Promise<{ socketPath: string; close: () => Promise<void> }> {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-ipc-call-"));
-  const socketPath = path.join(dir, "ipc.sock");
-  const sockets = new Set<net.Socket>();
-  const handler = frameHandler(onCall);
-  const server = net.createServer((socket) => {
-    sockets.add(socket);
-    socket.once("close", () => sockets.delete(socket));
-    handler(socket);
-  });
-  try {
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(socketPath, resolve);
-    });
-  } catch (error) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    throw error;
-  }
-  return {
-    socketPath,
-    close: async () => {
-      for (const socket of sockets) {
-        socket.destroy();
-      }
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-      fs.rmSync(dir, { recursive: true, force: true });
-    },
-  };
-}
-
-function unusedSocketPath(): { socketPath: string; cleanup: () => void } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-ipc-call-"));
-  return {
-    socketPath: path.join(dir, "missing.sock"),
-    cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
-  };
-}
-
-function serveHttp(onToolCall: () => void): ReturnType<typeof Bun.serve> {
-  return Bun.serve({
-    port: 0,
-    hostname: "127.0.0.1",
-    fetch: async (req) => {
-      const body = await req.json() as { id?: number; method?: string };
-      if (body.method === "initialize") {
-        return Response.json({
-          jsonrpc: "2.0",
-          id: body.id ?? 1,
-          result: {
-            protocolVersion: "2025-11-25",
-            capabilities: {},
-            serverInfo: { name: "mock", version: "1" },
-          },
-        });
-      }
-      if (body.method === "notifications/initialized") {
-        return new Response(null, { status: 202 });
-      }
-      if (body.method === "tools/call") {
-        onToolCall();
-        return Response.json({
-          jsonrpc: "2.0",
-          id: body.id ?? 1,
-          result: { content: [{ type: "text", text: '{"ok":true}' }] },
-        });
-      }
-      return Response.json({ jsonrpc: "2.0", id: body.id ?? 1, error: { code: -32600, message: "unexpected method" } }, { status: 400 });
-    },
-  });
-}
+import { callTool } from "../src/rpc/client";
+import { startNativeServer, sendHandshake } from "./support/native-ipc";
 
 function captureOutput(): { stdout(): string; stderr(): string; restore(): void } {
   const originalOut = process.stdout.write;
@@ -125,7 +15,7 @@ function captureOutput(): { stdout(): string; stderr(): string; restore(): void 
   process.stdout.write = ((chunk: unknown) => {
     stdout += String(chunk);
     return true;
-  }) as typeof process.stdout.write;
+  }) as typeof process.stderr.write;
   process.stderr.write = ((chunk: unknown) => {
     stderr += String(chunk);
     return true;
@@ -140,111 +30,93 @@ function captureOutput(): { stdout(): string; stderr(): string; restore(): void 
   };
 }
 
-async function catchCliError(promise: Promise<number>): Promise<CliError> {
-  try {
-    await promise;
-  } catch (error) {
-    expect(error).toBeInstanceOf(CliError);
-    return error as CliError;
-  }
-  throw new Error("expected rejection but the promise resolved");
-}
-
-describe("call --socket 回退安全", () => {
-  test("IPC timeout 后不回退 HTTP，工具调用仅一次", async () => {
+describe("call 原生通道安全语义", () => {
+  test("IPC 超时后不重发，工具调用仅一次", async () => {
     let ipcCalls = 0;
-    const ipc = await listenUnix(() => {
-      ipcCalls += 1;
-    });
-    let httpCalls = 0;
-    const http = serveHttp(() => {
-      httpCalls += 1;
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      if (message.method === "tools/call") ipcCalls += 1;
     });
     const output = captureOutput();
     let caught: unknown;
     try {
-      try {
-        await callTool("mutating_tool", {}, {
-          ipcEndpoint: { path: ipc.socketPath },
-          port: http.port ?? 0,
-          timeoutSec: 0.2,
-        });
-      } catch (error) {
-        caught = error;
-      }
+      caught = await callTool("mutating_tool", {}, {
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: server.port },
+        port: 0,
+        timeoutSec: 0.2,
+      }).catch((error: unknown) => error);
     } finally {
       output.restore();
-      http.stop(true);
-      await ipc.close();
+      await server.close();
     }
+    expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
     expect(isIpcRequestSent(caught)).toBe(true);
     expect((caught as CliError).message).toContain("timed out");
     expect(ipcCalls).toBe(1);
-    expect(httpCalls).toBe(0);
     expect(output.stderr()).not.toContain("falling back");
   });
 
-  test("IPC 收到工具调用后断开不回退 HTTP，工具调用仅一次", async () => {
+  test("IPC 收到工具调用后断开不重发，工具调用仅一次", async () => {
     let ipcCalls = 0;
-    const ipc = await listenUnix((socket) => {
-      ipcCalls += 1;
-      socket.destroy();
-    });
-    let httpCalls = 0;
-    const http = serveHttp(() => {
-      httpCalls += 1;
+    const server = await startNativeServer((message, socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      if (message.method === "tools/call") {
+        ipcCalls += 1;
+        socket.destroy();
+      }
     });
     const output = captureOutput();
     let caught: unknown;
     try {
-      try {
-        await callTool("mutating_tool", {}, {
-          ipcEndpoint: { path: ipc.socketPath },
-          port: http.port ?? 0,
-          timeoutSec: 2,
-        });
-      } catch (error) {
-        caught = error;
-      }
+      caught = await callTool("mutating_tool", {}, {
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: server.port },
+        port: 0,
+        timeoutSec: 2,
+      }).catch((error: unknown) => error);
     } finally {
       output.restore();
-      http.stop(true);
-      await ipc.close();
+      await server.close();
     }
+    expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
     expect(isIpcRequestSent(caught)).toBe(true);
     expect((caught as CliError).message).toContain("execution result is unknown");
     expect(ipcCalls).toBe(1);
-    expect(httpCalls).toBe(0);
     expect(output.stderr()).not.toContain("falling back");
   });
 
-  // 旧场景 "--socket 请求未写入时回退 HTTP" 依赖已删除的 --transport/--no-fallback：
-  // 新语义为 IPC 优先、请求已发出即不再回退，且 runCall 的目标解析已不再接受裸 socket，
-  // 此回退路径没有等价入口。请求已发出后的“不回退”行为由上面两个测试覆盖。
-  test.skip("IPC 请求未写入时仍回退 HTTP，工具调用仅一次", async () => {
-    const endpoint = unusedSocketPath();
-    let httpCalls = 0;
-    const http = serveHttp(() => {
-      httpCalls += 1;
+  test("runCall 的 --port 目标只连接原生 IPC", async () => {
+    const seen: string[] = [];
+    const server = await startNativeServer((message, _socket, send) => {
+      seen.push(String(message.method));
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] },
+      });
     });
     const output = captureOutput();
     let code: number = ExitCode.Success;
     try {
-      code = await runCall(["mutating_tool"], {
-        socketText: endpoint.socketPath,
-        portText: String(http.port),
-        timeoutText: "2",
-      });
+      code = await runCall(["ping"], { portText: String(server.port) });
     } finally {
       output.restore();
-      http.stop(true);
-      endpoint.cleanup();
+      await server.close();
     }
     expect(code).toBe(ExitCode.Success);
-    expect(httpCalls).toBe(1);
-    expect(output.stdout()).toBe('{"ok":true}\n');
-    expect(output.stderr()).toContain("falling back");
+    expect(seen).toEqual(["initialize", "notifications/initialized", "tools/call"]);
+    expect(JSON.parse(output.stdout()).data).toEqual({ ok: true });
+    expect(output.stderr()).not.toContain("falling back");
   });
 });

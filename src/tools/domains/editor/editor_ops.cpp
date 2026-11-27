@@ -1473,7 +1473,7 @@ godot_autopilot::util::JsonValue wait_scene_switch(int64_t watch_id, int64_t tim
     }
     return util::error_json(
         "create_editor_scene cannot wait for the scene switch on the editor "
-        "main thread — call the tool through the MCP channel so the wait "
+        "main thread — call the tool through the native control plane so the wait "
         "runs on the transport thread");
   }
   const int64_t deadline_ms = steady_now_ms() + timeout_ms;

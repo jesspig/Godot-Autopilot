@@ -97,8 +97,8 @@ flowchart TD
 - **Tasks**：`ServerContext` 固定启用 `enable_tasks_extension`，任务存储为 `<gda_home>/.godot-autopilot/tasks/tasks-<stamp>.jsonl` 的 `FileTaskStore`（11-18 修正：此前漏 `.godot-autopilot` 段落到 profile 根 `tasks/`；路径变更仅影响新会话，旧文件保留），装配时发 `tasks_enabled` lifecycle 事件、`path` 属性与存储路径同值；`call_tool` 以 `Task/Optional` 注册，支持 `tasks/get|update|cancel`，不支持任务的客户端同步退化。
 - **Progress**：`batch_execute` 在请求带 progress token 时发送开始/结束两条 `notifications/progress`（当前不逐 operation 上报）。
 - **MRTR**：full 面直接工具在客户端声明 elicitation 且未带 `confirm` 时返回 `input_required`；`accept` 注入 `confirm=true`，`decline/cancel` 不执行。2026-11-23 起 `call_tool` 也纳入同一 elicitation 判定（`call_tool_elicitation.hpp`）：代理时按 `args.name` 查目标工具（含别名解析）取其 `side_effect` 作为有效副作用，`should_elicit = required_for(effect) && !confirm_provided && client_supports_elicitation`；目标为高风险且未带 confirm 时同样返回 `input_required`，不再由 `call_tool` 自身的 `None` 副作用绕过。注入 confirm 后仍走目标工具的 `confirmation_required`。
-- **Skills**：`enable_skills_extension=true`，1 张入口卡 + 9 篇 references 以 `godot://skills/<name>/SKILL.md` 注册为 `mcp::Skill`（resources=dynamic）；旧 `godot://skills/...` 资源保留。Skills 是 2026 协议能力：客户端必须先发 `server/discover`（不要用 `initialize`）再把 `MCP-Protocol-Version: 2026-07-28` 与 `params._meta` 带到 `skills/list|get`；`initialize` 仍按 2025-11-25 协商，供旧客户端使用。
-- `gda status --json` 的 `mcp` 块暴露协议版本、capabilities 与 serverInfo，脚本可先判断扩展再选命令。
+- **Skills**：`enable_skills_extension=true`，1 张入口卡 + 9 篇 references 以 `godot://skills/<name>/SKILL.md` 注册为技能资源（resources=dynamic）；旧 `godot://skills/...` 资源保留。技能由 `gda skill list|show` 发现，无需客户端协议扩展。
+- `gda status --format json` 的连接记录暴露实例与本机端点信息，脚本据此选择命令。
 
 ## Schema 统计口径
 

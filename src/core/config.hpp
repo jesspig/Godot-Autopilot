@@ -10,7 +10,6 @@ constexpr int GDA_DEFAULT_PORT = 9527;
 constexpr int GDA_PORT_CANDIDATE_BASE = 20000;
 constexpr int GDA_PORT_CANDIDATE_LIMIT = 29999;
 constexpr int GDA_PORT_PROBE_LIMIT = 256;
-constexpr const char *GDA_MCP_PATH = "/mcp";
 constexpr const char *GDA_HOME_DIR_NAME = ".godot-autopilot";
 constexpr int GDA_PROJECT_HASH_LENGTH = 8;
 static_assert(GDA_PORT_CANDIDATE_BASE <= GDA_PORT_CANDIDATE_LIMIT,
