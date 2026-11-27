@@ -17,6 +17,7 @@ const TEST_TIMEOUT_MS = 60_000;
 const FAKE_GODOT_SOURCE = `
 import fs from "node:fs";
 import path from "node:path";
+import net from "node:net";
 const port = Number(process.env.GODOT_AUTOPILOT_PORT ?? "0");
 if (process.argv.includes("--import")) process.exit(0);
 if (process.env.GDA_FAKE_GODOT_MODE === "exit") process.exit(3);
@@ -26,18 +27,32 @@ const home = process.env.GODOT_AUTOPILOT_HOME ?? "";
 let server;
 for (let attempt = 0; attempt < 100; attempt += 1) {
   try {
-    server = Bun.serve({
-      port,
-      hostname: "127.0.0.1",
-      fetch: async (req) => {
-        const url = new URL(req.url);
-        if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-        let body = {};
-        try { body = await req.json(); } catch {}
-        if (body?.method === "notifications/initialized") return new Response("{}", { status: 200 });
-        const payload = { jsonrpc: "2.0", id: body?.id ?? 1, result: { content: [{ type: "text", text: "{\\"ok\\":true}" }] } };
-        return new Response("event: message\\ndata: " + JSON.stringify(payload) + "\\n\\n", { status: 200, headers: { "content-type": "text/event-stream" } });
-      },
+    server = net.createServer((socket) => {
+      let buffer = Buffer.alloc(0);
+      socket.on("data", (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        while (buffer.length >= 4) {
+          const size = buffer.readUInt32BE(0);
+          if (buffer.length < 4 + size) return;
+          const text = buffer.subarray(4, 4 + size).toString("utf8");
+          buffer = buffer.subarray(4 + size);
+          let body = {};
+          try { body = JSON.parse(text); } catch {}
+          if (body.method === "notifications/initialized") continue;
+          const payload = Buffer.from(JSON.stringify({
+            jsonrpc: "2.0",
+            id: body.id ?? 1,
+            result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] },
+          }), "utf8");
+          const header = Buffer.alloc(4);
+          header.writeUInt32BE(payload.length, 0);
+          socket.write(Buffer.concat([header, payload]));
+        }
+      });
+    });
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", resolve);
     });
     break;
   } catch (error) {
@@ -56,8 +71,7 @@ if (home !== "" && project !== "" && port > 0) {
     project_path: project,
     api_token: "fake-token",
     endpoints: {
-      mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
-      api: { host: "127.0.0.1", port, path: "/api", protocol: "http", auth: "bearer" }
+      ipc: { kind: "tcp", host: "127.0.0.1", port, protocol: "native-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 }
     },
     started_at: Date.now(),
     version: "0.3.1",

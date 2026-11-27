@@ -1,0 +1,140 @@
+# T-09 CLI 核心领域命令 —— 实现证据（静态记录，未运行测试）
+
+本文件只记录静态实现事实。按任务约束，子代理未运行 `bun test` / `tsc` / 任何构建命令，
+不声称任何测试通过；全部测试均由主代理统一执行后判定。
+
+## 一、改动文件
+
+新增（CLI 命令层）：
+- `cli/src/commands/scene.ts` —— 领域命令共享基础设施（native GCP 调用编排、args-file/stdin 读取、
+  高危确认前置检查、统一输出 envelope）+ scene 二级动作。
+- `cli/src/commands/script.ts` —— script 二级动作。
+- `cli/src/commands/resource.ts` —— resource 二级动作。
+- `cli/src/commands/game.ts` —— game 二级动作。
+
+修改（CLI 核心与入口）：
+- `cli/src/discovery.ts` —— 仅为原生 `call.start` / `call.confirm` / `call.get` 增加封装：
+  `nativeCallStart`、`nativeCallConfirm`、`nativeCallGet`、`nativeToolInvoke`；
+  `GcpEnvelopeLike` 增补 `confirmation` 字段；`nativeRequest` 增加可选 `id` 参数
+  （confirm 需复用 call.start 的 request_id）；参数扁平化为 GCP 字符串 map。
+- `cli/src/command-spec.ts` —— 为 scene/script/resource/game 补二级动作 spec；
+  将 T-08 遗留的占位工具名（scene_list/scene_open/scene_node_add、script_list/script_read/
+  script_create/script_delete、resource_list/resource_templates/resource_read/resource_watch/
+  resource_prompts、game_start/game_stop/game_status）替换为真实 canonical 工具名。
+- `cli/bin/gda.ts` —— 注册四个一级领域路由与默认子命令；`tool.call` 改为原生 `call.start`
+  实现（其他 tool 子命令仍委托 T-08 处理器）；`--args` / `--args-file` 映射到 GlobalOptions。
+
+新增（测试）：
+- `cli/tests/domain.test.ts` —— 命令到工具的映射、参数适配、统一 envelope、高危确认矩阵、
+  `--args-file` 文件与 stdin `-`、CLI 端到端路由。
+- `cli/tests/tool-coverage.test.ts` —— canonical 工具覆盖、未提升工具通用可达、二级动作数量。
+- `cli/tests/readback.test.ts` —— 写后读回调用序列、确认不绕过。
+
+新增（证据）：
+- `evidence/T-09/domain-tests.txt`（本文件）
+- `evidence/T-09/tool-coverage.json`
+- `evidence/T-09/readback-tests.txt`
+
+未触碰：主工作树、其他工作树、`.handoff`、`src/` C++、`tests/` C++、CMake、Skills、
+`VERSION`、`third_party`；未实现 T-10/T-11（debug/logs/test/job/trace/monitor、Envelope 全局参数）；
+未修改旧 parser 的 MCP parity 行为（顶层 `COMMANDS` 仍为 24 项，legacy `gda call` 仍走 MCP client）。
+
+## 二、命令映射（wrapper 只做参数/输出适配，不复制 C++ handler 业务逻辑）
+
+### scene
+| 命令 | canonical 工具 | 动作/参数适配 |
+| --- | --- | --- |
+| scene tree | get_scene_tree | --max-depth/--pattern/--type/--group/--include-* |
+| scene node | create_scene_node | --type/--name/--parent/--props 或 --args-file |
+| scene property | property_set | --path/--property/--value/--type-hint 或 --args-file |
+| scene signal | signal_connect / signal_disconnect | --from/--signal/--to/--method/--disconnect/--no-persist |
+| scene save | save_editor_scene | action=save；--path 时 action=save_as |
+| scene verify | get_scene_tree | verify=true |
+| scene diff | get_scene_tree | verify=true, include_hash=true |
+| scene list/open/add（T-08 遗留） | get_editor_state / editor_scene_control / create_scene_node | 保留入口，改接真实工具 |
+
+### script
+| 命令 | canonical 工具 | 动作/参数适配 |
+| --- | --- | --- |
+| script create | create_script | path、--extends、--source |
+| script patch | patch_script | --path、--dry-run、--args-file |
+| script compile | patch_script | 强制 dry_run=true（编译检查不写盘） |
+| script attach | attach_script_to_node | --node/--script |
+| script exec | execute_script | --source/--args-file，高危需 --confirm |
+| script reload | reload_script | --path/--keep-state |
+| script test | run_gdscript_tests | --directory/--pattern/--timeout，或 --args-file |
+
+### resource
+| 命令 | canonical 工具 | 动作/参数适配 |
+| --- | --- | --- |
+| resource inspect | resource_query | action=type，--path/--uid |
+| resource get | resource_property | action=get，--path/--name/--property |
+| resource set | resource_property | action=set，--value 或 --args-file |
+| resource save | resource_save | action=save，--name/--object-id/--dest |
+| resource import | resource_import | action=reimport，--path 或 --args-file paths |
+| resource rename | resource_file | action=rename，--path/--to，高危需 --confirm |
+| resource move | resource_file | action=move，--path/--to，高危需 --confirm |
+| resource references | resource_query | action=references，--path/--uid/--class |
+
+### game
+| 命令 | canonical 工具 | 动作/参数适配 |
+| --- | --- | --- |
+| game play/start | editor_scene_control | action=play，高危需 --confirm |
+| game stop | editor_scene_control | action=stop，高危需 --confirm |
+| game status | get_game_state | action=status，--timeout 转 timeout_ms |
+| game input | game_input | action=queue，--type/--mode/--event/--duration 或 --args-file |
+| game capture | capture_editor_viewport | --target/--save/--dir/--after-frames/--when/--scale |
+| game eval | game_script | action=execute, script_action=script，高危需 --confirm |
+| game scenario | game_input | action=sequence，--args-file timeline，高危需 --confirm |
+
+### 通用通路
+`gda tool call <tool> --args '<json>' | --args-file <path|-> [--confirm] [--port|--id|--socket|--project]`
+经 `gda.ts` 的原生路由调用 `runGenericToolCall`，复用同一 `call.start/confirm/get` 编排与 envelope；
+未提升为专用命令的 canonical 工具（例如 `physics_query`）仍可通过此路径调用。
+
+## 三、确认矩阵（统一 --confirm，非交互缺确认不执行）
+
+| 类别 | 命令 | 行为 |
+| --- | --- | --- |
+| 高危（code_execute / destructive / process / game_runtime） | script exec、script delete、resource rename、resource move、game play/start/stop/input/eval/scenario | 前置检查：缺 `--confirm` 直接抛 Usage 错误，**不发送任何原生调用**；带 `--confirm` 时在 call.start 参数中写入 `confirm=true` |
+| 低危写（writes_scene/writes_file，按 GDA 安全姿态无需确认） | scene node/property/signal/save/add/open、script create/patch/attach/reload、resource set/save/import、game capture | 直接调用，不要求 `--confirm` |
+| 只读 | scene tree/verify/diff/list、script list/read/compile/test、resource inspect/get/references/list/read/watch/templates/prompts、game status | 直接调用；不携带 `confirm` |
+
+补充：`nativeToolInvoke` 仍保留服务端二次 challenge 处理 —— 若服务器返回
+`needs_confirmation` 且调用方已带 `--confirm`，自动发 `call.confirm`；否则抛出
+`confirmation_required` 工具失败，不切换到别名或其他工具绕过。wrapper 不复制业务逻辑。
+
+## 四、参数与输出适配
+
+- 简单参数用 flags；复杂 JSON 用 `--args` 或 `--args-file`（含 `--args-file -` 从 stdin 读取）。
+- `--args-file` 内容必须是 JSON 对象；与 `--args` 同时出现报用法错误；
+  `--value` 与 `--args-file`、`--source` 与 `--args-file` 互斥。
+- 所有领域命令输出统一 envelope：`schema_version, ok, command, tool, action,
+  scene_path, revision, receipt{request_id,digest,artifact_id}, result,
+  task_id, error, new_errors_since_last_call`。写命令的 `scene_path/revision` 优先取工具结果，
+  缺失时回退到参数的 `path/parent_path`；`receipt` 来自 GCP 请求 id 与 artifact 摘要。
+- GCP params 为扁平字符串 map；对象/数组 JSON.stringify 后传入，与 C++ `GcpInvocationSink`
+  把每个 param 作为字符串写入工具 arguments 的契约一致。
+
+## 五、未运行验证原因
+
+按任务约束，子代理不运行 `bun test` / `tsc` / `cmake` / 任何构建，也不提交。
+上述全部用例为「已编写、未执行」；是否通过由主代理统一构建后判定。
+
+## 六、风险与待主代理核对
+
+1. 四个领域文件由 `gda.ts` 直接分发，不进入顶层 `COMMANDS` 快照；需确认
+   `command-manifest/surface.test.ts` 的 24 项断言不受影响（本任务未改 `commands/index.ts`）。
+2. 新增 spec 会改变 `buildManifest()` 的 `command_count`；现有 manifest 测试只比对
+   `COMMAND_SPECS` 本身，理论无硬编码计数，但需实跑确认。
+3. T-08 的 `tool.ts` 对 `call`/`batch` 仍拒绝；本任务在 `gda.ts` 层为 `tool.call` 加原生路由，
+   `gda tool batch` 仍按 T-08 行为指向 legacy `gda batch`（不在授权文件内，未改 `tool.ts`）。
+4. `nativeToolInvoke` 自行实现 GCP 帧解析与 request_id 复用，未复用 `ipc/client.ts`；
+   需主代理统一 typecheck 与 fake-server 用例验证 needs_confirmation 与 call.confirm 顺序。
+5. 工具参数从 flags 扁平化为字符串 map，依赖 C++ handler 接受字符串形式的 JSON（与
+   `GcpInvocationSink` 现有实现一致）；真实引擎下复杂值（Vector/Array/Dictionary）需
+   主代理用最小场景确认一次。
+6. `scene compile` 没有独立 canonical 工具，采用 `patch_script` + `dry_run=true` 做编译检查；
+   若真实 handler 要求 anchor/content 才能 dry-run，需主代理确认参数完整性。
+7. T-08 遗留的 script/resource 占位工具名已改为真实 canonical 工具；其参数 schema
+   未按 `gda describe` 逐项核对（本任务未连接真实编辑器），需主代理对高频命令做一次真实 smoke。

@@ -1,16 +1,15 @@
 import { parseArgv, usageText } from "./args";
 import { COMMANDS } from "./commands/index";
-import { CliError, ExitCode } from "./errors";
-import { err } from "./output";
+import { CliError, ExitCode, errorMessage } from "./errors";
+import { err, setActiveCommand, writeFailure, writeJson } from "./output";
 import { applyUpdate } from "./update";
 import { CLI_VERSION } from "./version";
 
-function reportCliError(error: CliError): number {
-  err(error.message);
-  if (error.suggestion !== undefined) {
-    process.stderr.write(`[gda] suggestion: ${error.suggestion}\n`);
-  }
-  return error.code;
+function reportUsage(message: string, command = ""): number {
+  const error = new CliError(ExitCode.Usage, message);
+  writeFailure(command, error, {});
+  process.stderr.write(`${usageText()}\n`);
+  return ExitCode.Usage;
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -22,9 +21,7 @@ export async function main(argv: string[]): Promise<number> {
     parsed = parseArgv(argv);
   } catch (error) {
     if (error instanceof CliError) {
-      const code = reportCliError(error);
-      process.stderr.write(`${usageText()}\n`);
-      return code;
+      return reportUsage(error.message);
     }
     throw error;
   }
@@ -36,30 +33,28 @@ export async function main(argv: string[]): Promise<number> {
     return ExitCode.Success;
   }
   if (opts.version === true) {
-    process.stdout.write(`gda ${CLI_VERSION}\n`);
+    writeJson({ version: CLI_VERSION }, opts, "--version");
     return ExitCode.Success;
   }
 
   const commandName = positionals[0];
   if (commandName === undefined) {
-    err("missing command");
-    process.stderr.write(`${usageText()}\n`);
-    return ExitCode.Usage;
+    return reportUsage("missing command");
   }
 
   const command = COMMANDS[commandName];
   if (command === undefined) {
-    err(`unknown command: ${commandName}`);
-    process.stderr.write(`${usageText()}\n`);
-    return ExitCode.Usage;
+    return reportUsage(`unknown command: ${commandName}`);
   }
 
+  setActiveCommand(commandName);
   try {
     return await command.run(positionals.slice(1), opts);
   } catch (error) {
     if (error instanceof CliError) {
-      return reportCliError(error);
+      return writeFailure(commandName, error, opts);
     }
-    throw error;
+    err(errorMessage(error));
+    return writeFailure(commandName, new CliError(ExitCode.ToolFailure, errorMessage(error)), opts);
   }
 }

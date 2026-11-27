@@ -94,17 +94,17 @@ int64_t reject_registration(const std::string &message) {
   return -1;
 }
 
-mcp::JsonValue dynamic_error(const std::string &name, const std::string &message,
+godot_autopilot::util::JsonValue dynamic_error(const std::string &name, const std::string &message,
                              const std::string &code) {
-  mcp::JsonValue result = util::error_json(message);
-  result["code"] = mcp::JsonValue(code);
-  result["tool"] = mcp::JsonValue(name);
-  result["retryable"] = mcp::JsonValue(false);
+  godot_autopilot::util::JsonValue result = util::error_json(message);
+  result["code"] = godot_autopilot::util::JsonValue(code);
+  result["tool"] = godot_autopilot::util::JsonValue(name);
+  result["retryable"] = godot_autopilot::util::JsonValue(false);
   return result;
 }
 
-mcp::JsonValue invoke_dynamic_target(
-    const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue invoke_dynamic_target(
+    const std::shared_ptr<DynamicTarget> &target, const godot_autopilot::util::JsonValue &args) {
   if (!target->active.load()) {
     return dynamic_error(target->name,
                          "user tool '" + target->name +
@@ -153,18 +153,18 @@ mcp::JsonValue invoke_dynamic_target(
     return util::error_json("user tool returned null");
   }
 
-  mcp::JsonValue serialized = VariantJson::serialize(returned);
+  godot_autopilot::util::JsonValue serialized = VariantJson::serialize(returned);
   if (returned.get_type() == godot::Variant::DICTIONARY && serialized.IsObject() &&
       serialized.Find("error") != nullptr) {
     return serialized;
   }
-  mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue wrapped(godot_autopilot::util::JsonValue::object_tag);
   wrapped["result"] = std::move(serialized);
   return wrapped;
 }
 
-mcp::JsonValue run_dynamic_handler(
-    const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue run_dynamic_handler(
+    const std::shared_ptr<DynamicTarget> &target, const godot_autopilot::util::JsonValue &args) {
   if (ExportGuard::is_exporting()) {
     return dispatch::export_blocked_json_result();
   }
@@ -176,11 +176,11 @@ mcp::JsonValue run_dynamic_handler(
   }
   if (!get_editor_queue().is_main_thread()) {
     const dispatch::DepthContext ctx = dispatch::capture_depth_context();
-    auto state = std::make_shared<mcp::JsonValue>();
+    auto state = std::make_shared<godot_autopilot::util::JsonValue>();
     dispatch::BoundedWaitOutcome outcome =
         dispatch::run_bounded_on_main_thread(
             get_editor_queue(), "user tool dispatch", state,
-            [target, args, ctx](mcp::JsonValue &result) {
+            [target, args, ctx](godot_autopilot::util::JsonValue &result) {
               dispatch::ScopedDepthContext restore(ctx);
               if (ExportGuard::is_exporting()) {
                 result = dispatch::export_blocked_json_result();
@@ -397,7 +397,7 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
   if (auto registry = get_active_registry()) {
     if (registry->find_any(name) != nullptr) {
       return reject_registration("register_tool: tool '" + name +
-                                 "' collides with a built-in MCP tool");
+                                 "' collides with a built-in tool");
     }
   }
 
@@ -486,7 +486,7 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
       node_owners_.retain(target->node_owner_id);
     }
   }
-  spec.handler = [target](const mcp::JsonValue &args) {
+  spec.handler = [target](const godot_autopilot::util::JsonValue &args) {
     return run_dynamic_handler(target, args);
   };
 
@@ -566,7 +566,7 @@ godot::Dictionary AutopilotTools::register_csharp_tool(
     if (registry->find_any(name) != nullptr) {
       godot::Dictionary out = rescan_error(
           "register_csharp_tool: tool '" + name +
-          "' collides with a built-in MCP tool");
+          "' collides with a built-in tool");
       out["tool_name"] = godot::String::utf8(name.c_str());
       out["handle"] = static_cast<int64_t>(-1);
       return out;
@@ -705,9 +705,9 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
     disabled["code"] = godot::String::utf8("tools_disabled");
     return disabled;
   }
-  mcp::JsonValue result;
+  godot_autopilot::util::JsonValue result;
   try {
-    mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
+    godot_autopilot::util::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
     result = dispatch::call_handler(
         tool_name, json_args, dispatch::capture_depth_context());
   } catch (const std::exception &e) {

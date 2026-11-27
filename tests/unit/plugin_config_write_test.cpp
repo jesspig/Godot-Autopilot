@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -16,43 +16,43 @@ using godot_autopilot::ConfigReadStatus;
 using godot_autopilot::PluginConfig;
 
 TEST(PluginConfigWriteTest, ParseFailureRefusesToMerge) {
-  mcp::JsonValue::Object doc;
-  doc["port"] = mcp::JsonValue(static_cast<int64_t>(9527));
-  doc["desensitize"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue::Object doc;
+  doc["port"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(9527));
+  doc["desensitize"] = godot_autopilot::util::JsonValue(true);
   std::string text = "SENTINEL";
 
   EXPECT_FALSE(PluginConfig::merge_value(ConfigReadStatus::kParseFailed, doc,
-                                         "show_time", mcp::JsonValue(false),
+                                         "show_time", godot_autopilot::util::JsonValue(false),
                                          text));
   EXPECT_EQ(text, "SENTINEL");
 }
 
 TEST(PluginConfigWriteTest, MissingConfigMergesIntoEmptyDocument) {
-  mcp::JsonValue::Object doc;
+  godot_autopilot::util::JsonValue::Object doc;
   std::string text;
 
   ASSERT_TRUE(PluginConfig::merge_value(ConfigReadStatus::kMissing, doc,
                                         "port",
-                                        mcp::JsonValue(static_cast<int64_t>(1)),
+                                        godot_autopilot::util::JsonValue(static_cast<int64_t>(1)),
                                         text));
-  mcp::JsonValue parsed = mcp::JsonValue::Parse(text);
+  godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(text);
   ASSERT_TRUE(parsed.IsObject());
   ASSERT_TRUE(parsed.GetObject().find("port") != parsed.GetObject().end());
   EXPECT_EQ(parsed.GetObject().at("port").GetInt(), 1);
 }
 
 TEST(PluginConfigWriteTest, SuccessfulReadPreservesOtherKeys) {
-  mcp::JsonValue::Object doc;
-  doc["show_time"] = mcp::JsonValue(true);
-  doc["desensitize"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue::Object doc;
+  doc["show_time"] = godot_autopilot::util::JsonValue(true);
+  doc["desensitize"] = godot_autopilot::util::JsonValue(true);
   std::string text;
 
   ASSERT_TRUE(PluginConfig::merge_value(ConfigReadStatus::kOk, doc, "port",
-                                        mcp::JsonValue(static_cast<int64_t>(2)),
+                                        godot_autopilot::util::JsonValue(static_cast<int64_t>(2)),
                                         text));
-  mcp::JsonValue parsed = mcp::JsonValue::Parse(text);
+  godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(text);
   ASSERT_TRUE(parsed.IsObject());
-  const mcp::JsonValue::Object &out = parsed.GetObject();
+  const godot_autopilot::util::JsonValue::Object &out = parsed.GetObject();
   ASSERT_TRUE(out.find("port") != out.end());
   ASSERT_TRUE(out.find("show_time") != out.end());
   ASSERT_TRUE(out.find("desensitize") != out.end());
@@ -62,15 +62,15 @@ TEST(PluginConfigWriteTest, SuccessfulReadPreservesOtherKeys) {
 }
 
 TEST(PluginConfigWriteTest, ExistingKeyValueIsReplaced) {
-  mcp::JsonValue::Object doc;
-  doc["port"] = mcp::JsonValue(static_cast<int64_t>(1));
-  doc["show_time"] = mcp::JsonValue(false);
+  godot_autopilot::util::JsonValue::Object doc;
+  doc["port"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(1));
+  doc["show_time"] = godot_autopilot::util::JsonValue(false);
   std::string text;
 
   ASSERT_TRUE(PluginConfig::merge_value(ConfigReadStatus::kOk, doc, "port",
-                                        mcp::JsonValue(static_cast<int64_t>(9)),
+                                        godot_autopilot::util::JsonValue(static_cast<int64_t>(9)),
                                         text));
-  mcp::JsonValue parsed = mcp::JsonValue::Parse(text);
+  godot_autopilot::util::JsonValue parsed = godot_autopilot::util::JsonValue::Parse(text);
   ASSERT_TRUE(parsed.IsObject());
   EXPECT_EQ(parsed.GetObject().at("port").GetInt(), 9);
   EXPECT_FALSE(parsed.GetObject().at("show_time").GetBool());

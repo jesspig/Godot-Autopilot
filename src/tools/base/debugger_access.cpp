@@ -6,7 +6,7 @@
 #include <godot_cpp/classes/editor_debugger_session.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mutex>
 #include <string>
 #include <vector>
@@ -94,8 +94,8 @@ std::vector<int32_t> debugger_request_ready_session_ids() {
   const auto snapshots = backend ? backend->sessions() : engine_sessions();
   std::vector<int32_t> ids;
   for (const auto &snapshot : snapshots) {
-    if (snapshot.active &&
-        is_broadcast_eligible(snapshot.ready, snapshot.scene_ready)) {
+    (void)is_broadcast_eligible;
+    if (snapshot.active && snapshot.ready) {
       ids.push_back(snapshot.id);
     }
   }
@@ -151,12 +151,12 @@ bool debugger_broadcast_engine_command(const godot::String &command,
   return sent;
 }
 
-mcp::JsonValue build_cancel_request_body(int64_t request_id) {
-  mcp::JsonValue cancel_body(mcp::JsonValue::object_tag);
-  cancel_body[GDA_FIELD_REQUEST_ID] = mcp::JsonValue(request_id);
-  cancel_body[GDA_FIELD_OP] = mcp::JsonValue(std::string(GDA_OP_CANCEL));
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params[GDA_FIELD_REQUEST_ID] = mcp::JsonValue(request_id);
+godot_autopilot::util::JsonValue build_cancel_request_body(int64_t request_id) {
+  godot_autopilot::util::JsonValue cancel_body(godot_autopilot::util::JsonValue::object_tag);
+  cancel_body[GDA_FIELD_REQUEST_ID] = godot_autopilot::util::JsonValue(request_id);
+  cancel_body[GDA_FIELD_OP] = godot_autopilot::util::JsonValue(std::string(GDA_OP_CANCEL));
+  godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
+  params[GDA_FIELD_REQUEST_ID] = godot_autopilot::util::JsonValue(request_id);
   cancel_body[GDA_FIELD_PARAMS] = std::move(params);
   return cancel_body;
 }
@@ -172,7 +172,7 @@ void debugger_send_cancel(int32_t session_id, int64_t request_id) {
   auto session = plugin->get_session(session_id);
   if (!(session.is_valid() && session->is_active()))
     return;
-  const mcp::JsonValue cancel_body = build_cancel_request_body(request_id);
+  const godot_autopilot::util::JsonValue cancel_body = build_cancel_request_body(request_id);
   godot::Array arr;
   arr.push_back(godot::String(cancel_body.Dump().c_str()));
   session->send_message(

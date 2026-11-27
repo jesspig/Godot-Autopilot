@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveTarget, type InstanceEntry, type TargetContext } from "../src/target";
+import { AmbiguousTargetError, resolveNativeTarget, resolveTarget, type InstanceEntry, type TargetContext } from "../src/target";
 import { CliError, ExitCode } from "../src/errors";
 
 let work: string;
@@ -184,5 +184,99 @@ describe("resolveTarget", () => {
 
   test("无显式 flag 且全部缺失时报错而非 9527", () => {
     expect(() => resolveTarget({}, mockCtx([]))).toThrow(/no running Godot Autopilot instance/);
+  });
+});
+
+describe("resolveNativeTarget", () => {
+  let prevHome: string | undefined;
+  let nativeHome: string;
+
+  beforeEach(() => {
+    prevHome = process.env.GODOT_AUTOPILOT_HOME;
+    nativeHome = path.join(work, "native-home");
+    fs.mkdirSync(nativeHome, { recursive: true });
+    process.env.GODOT_AUTOPILOT_HOME = nativeHome;
+  });
+
+  afterEach(() => {
+    if (prevHome === undefined) delete process.env.GODOT_AUTOPILOT_HOME;
+    else process.env.GODOT_AUTOPILOT_HOME = prevHome;
+  });
+
+  function writeIndex(records: unknown[]): void {
+    const dir = path.join(nativeHome, ".godot-autopilot");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "instances.json"), JSON.stringify({ instances: records }));
+  }
+
+  function pluginRecord(instanceId: string, project: string, port: number, pid: number): unknown {
+    return {
+      instance_id: instanceId,
+      port,
+      pid,
+      project_path: project,
+      endpoints: {
+        ipc: { kind: "unix", path: path.join(nativeHome, `${instanceId}.sock`), protocol: "gda-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 },
+      },
+      started_at: Date.now(),
+      version: "0.3.5",
+      port_source: "persisted",
+    };
+  }
+
+  test("显式 selector 优先级 --id > --socket > --port > --project", () => {
+    const err = catchUsage(() => resolveNativeTarget({ id: "a", socketText: "/tmp/s.sock" }, mockCtx([makeEntry({ id: "a" })])));
+    expect(err.code).toBe(ExitCode.Usage);
+    expect(err.message).toBe("use only one of --id/--socket/--port/--project");
+  });
+
+  test("--socket 返回 socket 链并附带 IPC endpoint", () => {
+    const socket = path.join(nativeHome, "native-1.sock");
+    writeIndex([pluginRecord("native-1", path.join(nativeHome, "proj"), 6101, process.pid)]);
+    const target = resolveNativeTarget({ socketText: socket }, mockCtx([]));
+    expect(target.chain).toBe("socket");
+    expect(target.source).toBe("socket");
+    expect(target.pinned).toBe(true);
+    expect(target.ipcEndpoint?.path).toBe(socket);
+  });
+
+  test("--port 返回 port 链并保留原生 endpoint", () => {
+    writeIndex([pluginRecord("native-1", path.join(nativeHome, "proj"), 6102, process.pid)]);
+    const target = resolveNativeTarget({ portText: "6102" }, mockCtx([]));
+    expect(target.chain).toBe("port");
+    expect(target.port).toBe(6102);
+    expect(target.instanceId).toBe("native-1");
+  });
+
+  test("--project 多实例产生 candidates 歧义错误", () => {
+    const project = path.join(nativeHome, "proj");
+    writeIndex([
+      pluginRecord("native-1", project, 6103, process.pid),
+      pluginRecord("native-2", project, 6104, process.pid),
+    ]);
+    let caught: unknown;
+    try {
+      resolveNativeTarget({ project }, mockCtx([makeEntry({ id: "native-1", project, port: 6103 })]));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(AmbiguousTargetError);
+    expect((caught as AmbiguousTargetError).candidates).toHaveLength(2);
+    expect((caught as AmbiguousTargetError).message).toContain("select one with --id");
+  });
+
+  test("--id 指向陈旧实例时拒绝固定", () => {
+    const entry = makeEntry({ id: "dead", pid: 999999 });
+    const err = catchUsage(() => resolveNativeTarget({ id: "dead" }, mockCtx([entry])));
+    expect(err.code).toBe(ExitCode.Transport);
+    expect(err.message).toContain("stale instance");
+  });
+
+  test("--id 命中活实例时固定实例 id", () => {
+    const entry = makeEntry({ id: "pinned", pid: process.pid, port: 6105, startedAt: "" });
+    const target = resolveNativeTarget({ id: "pinned" }, mockCtx([entry]));
+    expect(target.pinned).toBe(true);
+    expect(target.instanceId).toBe("pinned");
+    expect(target.chain).toBe("id");
   });
 });

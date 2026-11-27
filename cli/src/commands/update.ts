@@ -2,7 +2,7 @@ import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { run as runInstall } from "./install";
 import { selectLatest } from "../cache";
-import { updateCheck, updateCli, writeUpdateResult, type UpdateItemResult } from "../update";
+import { assertSkillsAssetIntegrity, skillsUpdateItem, updateCheck, updateCli, writeUpdateResult, type UpdateItemResult } from "../update";
 import { CLI_VERSION } from "../version";
 import { writeJson } from "./json-output";
 
@@ -38,6 +38,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const results: UpdateItemResult[] = [];
   const runOne = async (itemTarget: Exclude<Target, "all">): Promise<boolean> => {
     try {
+      if (itemTarget === "skills") assertSkillsAssetIntegrity();
       const code =
         itemTarget === "cli"
           ? await updateCli()
@@ -45,10 +46,14 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
               [itemTarget],
               { ...opts, sourceText: opts.sourceText ?? "online" },
             );
-      results.push(buildUpdateItem(itemTarget, code === ExitCode.Success, ""));
+      results.push(itemTarget === "skills"
+        ? skillsUpdateItem(code === ExitCode.Success, "")
+        : buildUpdateItem(itemTarget, code === ExitCode.Success, ""));
       return code === ExitCode.Success;
     } catch (error) {
-      results.push(buildUpdateItem(itemTarget, false, String(error)));
+      results.push(itemTarget === "skills"
+        ? skillsUpdateItem(false, String(error))
+        : buildUpdateItem(itemTarget, false, String(error)));
       return false;
     }
   };

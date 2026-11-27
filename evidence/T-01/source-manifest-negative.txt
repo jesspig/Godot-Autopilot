@@ -1,0 +1,2 @@
+negative fixture rejected: production manifests miss: src/tools/domains/unlisted/unlisted_ops.cpp
+source-manifest-guard self-test OK

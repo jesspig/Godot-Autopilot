@@ -12,7 +12,7 @@ resource:
   - src/runtime/
 ---
 
-> **0.3.2**：编辑器级只注册 `McpLogDock`；`McpConfigDock` 已删除。启动不再签发 API token、不再启动 REST `ApiServer`、不再写 `endpoints.api`。
+> **0.3.2**：编辑器级只注册 `GdaLogDock`；`McpConfigDock` 已删除。启动不再签发 API token、不再启动 REST `ApiServer`、不再写 `endpoints.api`。
 
 # 模块：入口与运行时桥接（entry_runtime）
 
@@ -22,7 +22,7 @@ resource:
 
 （**总行数** = 物理行数，`(Get-Content <file>).Count`；**有效代码行** = 去掉空行与纯空白行后的行数，`(Get-Content <file> | Where-Object { $_.Trim() -ne '' }).Count` 或 `Get-Content <file> | Measure-Object -Line`。）
 
-职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 在**游戏运行时进程**内与编辑器进程通信，经 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页覆盖入口生命周期、GDScript 运行时桥接与 C# 运行时桥接（§3.5，`csharp_bridge/`），MCP 工具侧见相关模块页。
+职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 在**游戏运行时进程**内与编辑器进程通信，经 EngineDebugger 消息通道承载 GDA 协议。编辑器内的本机实例（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页覆盖入口生命周期、GDScript 运行时桥接与 C# 运行时桥接（§3.5，`csharp_bridge/`），CLI 工具侧见相关模块页。
 
 **GDA 协议载体（2026-10-20 复核）**：EngineDebugger 消息通道，三类消息固定为 `gda:request`（编辑器侧 → 游戏进程）/ `gda:response`（游戏进程 → 编辑器侧）/ `gda:ready`（游戏进程就绪广播），正文为 JSON 字符串。**协议无版本字段、无鉴权**——不做版本协商、不做来源认证，安全性依赖「默认仅绑定 127.0.0.1 + 能力门默认拒绝」这层默认安全姿态（见 [安全边界与并发契约](../security_contract.md)）。
 
@@ -40,7 +40,7 @@ resource:
 按模块级别分派：
 
 - **SCENE 级别**：仅当 `!Engine::is_editor_hint()`（即运行游戏的非编辑器进程）时调用 `runtime::game_bridge::register_listener()`。编辑器进程在此级别不注册桥接监听。并记 `scene_level_initialized` lifecycle 事件。
-- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 **4 个**类：`McpLogDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。并记 `editor_level_initialized` lifecycle 事件。
+- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 **4 个**类：`GdaLogDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。并记 `editor_level_initialized` lifecycle 事件。
 
 ### 1.3 模块终止（register_terminator）
 
@@ -52,14 +52,14 @@ resource:
 `GDCLASS(GodotAutopilotPlugin, godot::EditorPlugin)`，`_bind_methods()` 为空。成员：
 
 - 静态 `CommandQueue s_queue`，经 `queue()` 静态访问器暴露；`_process` 中 `s_queue.drain()` 即 AGENTS.md 所述"主线程排空"的实现点。
-- UI 成员：`McpLogDock *log_dock`（`McpConfigDock *config_dock` 已于 0.3.2 删除）；`Ref<OutputCaptureLogger>`、`Ref<DebugCapturePlugin>`、`Ref<ExportGuard>`。
+- UI 成员：`GdaLogDock *log_dock`（`McpConfigDock *config_dock` 已于 0.3.2 删除）；`Ref<OutputCaptureLogger>`、`Ref<DebugCapturePlugin>`、`Ref<ExportGuard>`。
 - 覆写方法：`_enter_tree` / `_exit_tree` / `_process` / `_get_unsaved_status`。
 
 `_enter_tree()` 顺序（关键 UI/捕获步骤各自独立 try/catch，失败不中断后续；队列/脱敏/持久化初始化、ServerContext 创建与 export_guard 未包裹）：
 
 1. `monitor::lifecycle("plugin_enter_tree")` → `note_editor_startup()` → `set_process_mode(PROCESS_MODE_ALWAYS)` → `s_queue.open()`（`main.cpp:197`）→ `perf_sampler::set_queue(&queue())`（`:198`）→ `sanitize_policy::initialize()`（解析脱敏开关）→ `LogPersist::instance().init_session()`（建 `logs/`/`traces/`、重置日志/轨迹游标、修剪旧文件、写 `session_start` trace 头）→ `monitor::environment_snapshot()`（写 `kind=snapshot`，仅主线程）→ 注册两个路径 provider：`HomeResolver::set_data_dir_provider`（取 `OS::get_data_dir()`，`:202-208`）与 `util::set_scheme_globalize_provider`（取 `ProjectSettings::globalize_path`，`:209-215`；供 `res://` 路径 globalize 后做符号链接 containment 校验，见 [安全契约](../security_contract.md)）→ 注册 `AutopilotTools` 单例 → 日志 "plugin starting"，`runtime_ops::set_editor_queue(&queue())` 注入队列（`main.cpp:239-240`），`ModeDetector` 判定 Editor/Runtime 模式写日志。
 2. `gda_cmdline_mode()` 为真则直接 return——不建 UI、不启服务器（队列已在步骤 1 注入）。
-3. 创建 `McpLogDock`（标题 "GDA Log"）`add_dock`。
+3. 创建 `GdaLogDock`（标题 "GDA Log"）`add_dock`。
 4. `debugger_ops::create_output_logger()` 经 `OS::add_logger` 注册；`debugger_ops::create_debug_plugin()` 经 `add_debugger_plugin` 注册。
 5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功发 `server_ready` lifecycle（记 Transport 日志含端口，并追加 `{"type":"server_ready","host","port"}` trace），失败发 `error_event` 并记 `last_error()`。
 6. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"（并记 `plugin_ready` lifecycle）。
@@ -79,7 +79,7 @@ resource:
 
 ### 1.6 主线程等待预算（09-29 起，dispatch.cpp）
 
-非主线程的领域工具调用统一经 `dispatch::run_on_main_thread_with_budget` 等待主线程（`call_tool` 代理与直连 meta 工具共用该入口；`call_tool` 编排回调本身仍在 MCP 线程执行）。预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms, long_blocking_ms)` 决策（**2026-10-20 起 4 参**，新增 `long_blocking_ms`）：`kLongBlocking`（`code_execute`/`batch_execute`）用 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 29000ms`（= `GDA_DISPATCH_WAIT_MAX_MS`；env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 经 `env_int_clamped` 钳制在 `[1000, 29000]`，未设时生效 29000ms、设了只能下调；**不再是无界等待**；参数非正回退默认预算）；`kHealthProbe`（`ping`/`system_status`）用 5000ms（env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）；其余默认 27000ms（env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS=30000`）。超时时先 `cancel(id)` 取消未执行任务，再返回结构化 `main_thread_timeout` 错误（含 `retryable`/`tool`/`waited_ms`/`queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），同时直写一条 trace 与 Transport Warning；队列缺失/关闭/满时返回 `code="queue_unavailable"`（`retryable=true`）。
+非主线程的领域工具调用统一经 `dispatch::run_on_main_thread_with_budget` 等待主线程（`call_tool` 代理与直连 meta 工具共用该入口；调用编排回调本身仍在协议线程执行）。预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms, long_blocking_ms)` 决策（**2026-10-20 起 4 参**，新增 `long_blocking_ms`）：`kLongBlocking`（`code_execute`/`batch_execute`）用 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 29000ms`（= `GDA_DISPATCH_WAIT_MAX_MS`；env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 经 `env_int_clamped` 钳制在 `[1000, 29000]`，未设时生效 29000ms、设了只能下调；**不再是无界等待**；参数非正回退默认预算）；`kHealthProbe`（`ping`/`system_status`）用 5000ms（env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）；其余默认 27000ms（env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS=30000`）。超时时先 `cancel(id)` 取消未执行任务，再返回结构化 `main_thread_timeout` 错误（含 `retryable`/`tool`/`waited_ms`/`queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），同时直写一条 trace 与 Transport Warning；队列缺失/关闭/满时返回 `code="queue_unavailable"`（`retryable=true`）。
 
 `code_execute` 的 `timeout_ms` 参数上界与长阻塞预算同源：`code_exec_ops::max_timeout_ms()` 取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 本节生效的长阻塞预算)`，默认环境下为 27000ms；该值同时写入 schema 的 `maximum` 与提示词，详见 [工具数据层与执行管线](../tool_base_design.md)。
 
@@ -221,14 +221,14 @@ resource:
 - `ServerContext` 不是入口点启动的：`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中 `new ServerContext` 并 `start()`（main.cpp:196-216）；链条为入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。编辑器侧类在 EDITOR 级别注册；运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程。
 - `_process()` 中 `s_queue.drain()` 之前依次执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）与 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程、不排队列）；跨线程调用另设主线程等待预算（见 §1.6）。
 - 桥接层 `error_result` 与工具侧 `{"error": "..."}` 同构；差异是桥接响应额外带布尔 `ok` 字段。
-- `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）是本页桥接 op 的 MCP 侧封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
+- `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）是本页桥接 op 的 CLI 侧封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
 
 不一致点：`gsd_cmdline_mode` 不存在，实际函数名 `gda_cmdline_mode()`（main.cpp:136，见 §1.5）；`GDA_FORCE_HEADLESS=1` 与变量名相反，是**禁用** cmdline 模式（强制 `false`）而非强制无头（见 §1.5）；terminator 的 SCENE 级别**无条件** `unregister_listener()`，与 initializer 的 `!is_editor_hint()` 条件注册不对称（见 §1.3）；`GDA_MSG_REQUEST` 不被桥接侧使用（由工具侧 `debugger_access.cpp` 发出）；请求消息虽从 `GDA_PREFIX` 取名，但桥接捕获只按 `"gda"` 前缀匹配，`GDA_MSG_*` 常量仅用于发送方向。
 
 ## 出站链接
 
 - 详见 [../modules/core.md](../modules/core.md)（命令队列与线程模型）
-- 详见 [../modules/tools_ops_b.md](../modules/tools_ops_b.md)（运行时/调试器工具的 MCP 封装）
+- 详见 [../modules/tools_ops_b.md](../modules/tools_ops_b.md)（运行时/调试器工具的 CLI 封装）
 
 ## 源码注释归档（2026-09-19）
 

@@ -30,7 +30,7 @@ using godot_autopilot::util::error_json;
 
 namespace {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 int64_t extract_timeout(const JV &args) {
   int64_t timeout = GDA_DEFAULT_TIMEOUT_MS;
@@ -213,13 +213,13 @@ bool is_valid_game_locale(const std::string &locale) {
 
 } // namespace
 
-void append_runtime_degradation_hint(mcp::JsonValue &result) {
+void append_runtime_degradation_hint(godot_autopilot::util::JsonValue &result) {
   if (!result.IsObject() || !result.Contains("error"))
     return;
-  result["hint"] = mcp::JsonValue(RUNTIME_DEGRADATION_HINT);
+  result["hint"] = godot_autopilot::util::JsonValue(RUNTIME_DEGRADATION_HINT);
 }
 
-mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_status(const godot_autopilot::util::JsonValue &args) {
   if (!args.IsObject())
     return error_json("get_game_status parameters must be an object");
   for (const auto &entry : args.GetObject()) {
@@ -239,7 +239,7 @@ mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
                          wait_ready, session_id);
 }
 
-mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_eval(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "execute_game_script called");
   if (!args.IsObject())
@@ -319,7 +319,7 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
                          wait_ready, session_id);
 }
 
-mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_input(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "queue_game_input called");
   if (!args.IsObject())
@@ -397,7 +397,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_input_wait(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "wait_game_input called");
   static constexpr const char *allowed[] = {"action", "state", "inject",
@@ -436,7 +436,7 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_input_status(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_input_status called");
   if (!args.IsObject())
@@ -470,7 +470,7 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_sequence_game_inputs(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sequence_game_inputs called");
   static constexpr const char *allowed[] = {"inputs", "timeout_ms",
@@ -547,7 +547,7 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_ui_elements(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_ui_elements called");
   static constexpr const char *allowed[] = {
@@ -595,7 +595,7 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_click_game_ui_element(const godot_autopilot::util::JsonValue &args) {
   if (!args.IsObject())
     return error_json("click_game_ui_element parameters must be an object");
   static constexpr const char *allowed[] = {"path", "text", "text_index", "button_index",
@@ -694,7 +694,7 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_capture(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_game_viewport called");
   if (!args.IsObject())
@@ -758,7 +758,7 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
       scale && (!scale->IsInt() || scale->GetInt() < 1 || scale->GetInt() > 8))
     return error_json("scale must be an integer between 1 and 8");
   capture_ops::CaptureSaveOptions save_options;
-  mcp::JsonValue save_error;
+  godot_autopilot::util::JsonValue save_error;
   if (!capture_ops::read_capture_save_options(args, &save_options,
                                               &save_error))
     return save_error;
@@ -786,7 +786,7 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_reload_scripts(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_game_scripts called");
   static constexpr const char *allowed[] = {"paths", "session_id"};
@@ -846,7 +846,7 @@ mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_job_start(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "start_game_job called");
   if (!args.IsObject())
@@ -958,7 +958,7 @@ mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
   return util::ok_result(std::move(job));
 }
 
-mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_job_get(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_job called");
   if (!args.IsObject())
@@ -1076,11 +1076,11 @@ mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args) {
   return marker;
 }
 
-mcp::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms) {
+godot_autopilot::util::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms) {
   if (on_editor_main_thread()) {
     return util::error_json(
         "get_game_job cannot wait for the game response on the editor main "
-        "thread — call the tool through the MCP channel so the wait runs on "
+        "thread — call the tool through the native control plane so the wait runs on "
         "the transport thread");
   }
   int64_t request_id = 0;
@@ -1147,7 +1147,7 @@ double sample_json_number(const JV &value) {
 
 } // namespace
 
-mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_sample_property(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sample_game_property called");
   if (!args.IsObject())
@@ -1210,7 +1210,7 @@ mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_collect_evidence(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "collect_game_evidence called");
   if (!args.IsObject())
@@ -1270,7 +1270,7 @@ mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_validate_ui_layout(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "validate_game_ui_layout called");
   if (!args.IsObject())
@@ -1340,7 +1340,7 @@ mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
   return result;
 }
 
-mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_game_locale(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_locale called");
   if (!args.IsObject())
@@ -1358,7 +1358,7 @@ mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_game_locale(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_game_locale called");
   if (!args.IsObject())
@@ -1388,7 +1388,7 @@ mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_translation_list(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_translation_list called");
   if (!args.IsObject())
@@ -1409,7 +1409,7 @@ mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_translate_text(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_translate_text(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "translate_text called");
   if (!args.IsObject())
@@ -1470,20 +1470,20 @@ void bundle_rename_action(JV &forwarded, const JV &args, const char *from,
   }
 }
 
-mcp::JsonValue bundle_action_missing(const std::string &choices) {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue bundle_action_missing(const std::string &choices) {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
   error["error"] =
-      mcp::JsonValue("missing required parameter: action (" + choices + ")");
+      godot_autopilot::util::JsonValue("missing required parameter: action (" + choices + ")");
   return error;
 }
 
-mcp::JsonValue bundle_action_invalid(const std::string &choices) {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue("invalid action: expected " + choices);
+godot_autopilot::util::JsonValue bundle_action_invalid(const std::string &choices) {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue("invalid action: expected " + choices);
   return error;
 }
 
-mcp::JsonValue game_session_result(const JV &forwarded) {
+godot_autopilot::util::JsonValue game_session_result(const JV &forwarded) {
   if (!forwarded.IsObject() || !forwarded.GetObject().empty()) {
     return error_json("session action accepts no parameters");
   }
@@ -1519,7 +1519,7 @@ mcp::JsonValue game_session_result(const JV &forwarded) {
 
 } // namespace
 
-mcp::JsonValue handle_game_state_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_state_bundle(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_state called");
   const std::string action = bundle_action_text(args);
@@ -1543,7 +1543,7 @@ mcp::JsonValue handle_game_state_bundle(const mcp::JsonValue &args) {
   return bundle_action_invalid("status|session|input|job");
 }
 
-mcp::JsonValue handle_game_ui_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_ui_bundle(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_ui called");
   const std::string action = bundle_action_text(args);
@@ -1557,7 +1557,7 @@ mcp::JsonValue handle_game_ui_bundle(const mcp::JsonValue &args) {
   return bundle_action_invalid("elements");
 }
 
-mcp::JsonValue handle_game_evidence_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_evidence_bundle(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_evidence called");
   const std::string action = bundle_action_text(args);
@@ -1577,7 +1577,7 @@ mcp::JsonValue handle_game_evidence_bundle(const mcp::JsonValue &args) {
   return bundle_action_invalid("sample|collect|validate");
 }
 
-mcp::JsonValue handle_game_localization_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_localization_bundle(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_localization called");
   const std::string action = bundle_action_text(args);
@@ -1597,7 +1597,7 @@ mcp::JsonValue handle_game_localization_bundle(const mcp::JsonValue &args) {
   return bundle_action_invalid("locale|list|translate");
 }
 
-mcp::JsonValue handle_game_script_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_script_bundle(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "game_script called");
   const std::string action = bundle_action_text(args);
@@ -1618,7 +1618,7 @@ mcp::JsonValue handle_game_script_bundle(const mcp::JsonValue &args) {
   return bundle_action_invalid("execute|start_job");
 }
 
-mcp::JsonValue handle_game_input_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_game_input_bundle(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "game_input called");
   const std::string action = bundle_action_text(args);

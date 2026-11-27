@@ -1,31 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { callTool } from "../src/mcp/client";
+import { describe, expect, test } from "bun:test";
+
+import { callTool, getHandshakeInfo } from "../src/rpc/client";
 import { CliError, ExitCode } from "../src/errors";
 import { CLI_VERSION } from "../src/version";
-
-const servers: ReturnType<typeof Bun.serve>[] = [];
-
-afterEach(() => {
-  while (servers.length > 0) {
-    servers.pop()!.stop();
-  }
-});
-
-function serve(handler: (req: Request) => Response | Promise<Response>): number {
-  const server = Bun.serve({ port: 0, fetch: handler });
-  servers.push(server);
-  return server.port!;
-}
-
-function sseResponse(payload: unknown): Response {
-  return new Response(`event: message\ndata: ${JSON.stringify(payload)}\n\n`, {
-    headers: { "content-type": "text/event-stream" },
-  });
-}
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-}
+import { rpcError, rpcResult, startNativeServer } from "./support/native-ipc";
 
 async function catchError(p: Promise<unknown>): Promise<CliError> {
   try {
@@ -37,197 +15,143 @@ async function catchError(p: Promise<unknown>): Promise<CliError> {
   throw new Error("expected rejection but the promise resolved");
 }
 
-interface Recorded {
-  method?: string;
-  version: string | null;
-}
-
-function serveLazyHandshakeServer(
-  initResult: Record<string, unknown> | null,
-): { port: number; calls: Recorded[] } {
-  const calls: Recorded[] = [];
-  let initialized = false;
-  const port = serve(async (req) => {
-    const body = (await req.json()) as { method?: string; id?: number };
-    calls.push({ method: body.method, version: req.headers.get("mcp-protocol-version") });
-    if (body.method === "initialize") {
-      initialized = true;
-      return sseResponse({
-        jsonrpc: "2.0",
-        id: body.id,
-        result: initResult ?? { capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
-      });
-    }
-    if (body.method === "notifications/initialized") {
-      return new Response("", { status: 202 });
-    }
-    if (!initialized) {
-      return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
-    }
-    return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
-  });
-  return { port, calls };
-}
-
 const SERVER_INFO = { name: "gda-testbed", version: "1.0.0" };
 
-describe("callTool 协议版本协商", () => {
-  test("initialize 声明 2025-11-25，握手后按响应学习值携带 MCP-Protocol-Version 头", async () => {
-    const seen: { params?: unknown }[] = [];
-    let initialized = false;
-    const port = serve(async (req) => {
-      const body = (await req.json()) as { method?: string; params?: unknown; id?: number };
-      if (body.method === "initialize") {
-        seen.push({ params: body.params });
-        initialized = true;
-        return sseResponse({
-          jsonrpc: "2.0",
-          id: body.id,
-          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: SERVER_INFO },
-        });
+describe("callTool 原生握手", () => {
+  test("initialize 声明原生协议版本，握手后只发一次 tools/call", async () => {
+    const initParams: unknown[] = [];
+    const methods: string[] = [];
+    const server = await startNativeServer((message, _socket, send) => {
+      methods.push(String(message.method));
+      if (message.method === "initialize") {
+        initParams.push(message.params);
+        send(rpcResult(message.id, {
+          protocolVersion: "1",
+          capabilities: { tools: {} },
+          serverInfo: SERVER_INFO,
+        }));
+        return;
       }
-      if (body.method === "notifications/initialized") {
-        return new Response("", { status: 202 });
+      if (message.method === "notifications/initialized") return;
+      send(rpcResult(message.id, { content: [{ type: "text", text: "{}" }] }));
+    });
+    try {
+      const res = await callTool("system_status", {}, { port: server.port });
+      expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+      expect(methods).toEqual(["initialize", "notifications/initialized", "tools/call"]);
+      expect(initParams[0]).toEqual({
+        protocolVersion: "1",
+        capabilities: { elicitation: {} },
+        clientInfo: { name: "gda-cli", version: CLI_VERSION },
+      });
+      expect(getHandshakeInfo(server.port)?.protocol_version).toBe("1");
+      expect(getHandshakeInfo(server.port)?.server_info).toEqual(SERVER_INFO);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test("initialize 携带注册表中的 IPC token，且不使用任何 HTTP 头", async () => {
+    let presented: unknown;
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        const params = message.params as Record<string, unknown> | undefined;
+        presented = (params?._meta as Record<string, unknown> | undefined)?.gda_token;
+        send(rpcResult(message.id, { protocolVersion: "1", capabilities: {}, serverInfo: SERVER_INFO }));
+        return;
       }
-      if (!initialized) {
-        return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
+      if (message.method === "notifications/initialized") return;
+      send(rpcResult(message.id, { content: [] }));
+    });
+    try {
+      await callTool("system_status", {}, {
+        port: 0,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: server.port, token: "registry-token" },
+      });
+      expect(presented).toBe("registry-token");
+    } finally {
+      await server.close();
+    }
+  });
+
+  test("initialize 返回 token 错误时不重发工具调用", async () => {
+    let calls = 0;
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        send(rpcError(message.id, -32001, "IPC token rejected"));
+        return;
       }
-      return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
+      calls += 1;
+      send(rpcResult(message.id, { content: [] }));
     });
-    const res = await callTool("system_status", {}, { port });
-    expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-    expect(seen[0].params).toEqual({
-      protocolVersion: "2025-11-25",
-      capabilities: { elicitation: {} },
-      clientInfo: { name: "gda-cli", version: CLI_VERSION },
-    });
+    try {
+      const err = await catchError(callTool("x", {}, { port: server.port }));
+      expect(err.code).toBe(ExitCode.Transport);
+      expect(err.message).toContain("IPC authentication failed");
+      expect(calls).toBe(0);
+    } finally {
+      await server.close();
+    }
   });
 
-  test("握手后从 initialize 响应学习协商版本，后续请求携带 MCP-Protocol-Version 头", async () => {
-    const { port, calls } = serveLazyHandshakeServer({
-      protocolVersion: "2025-11-25",
-      capabilities: {},
-      serverInfo: SERVER_INFO,
+  test("initialize 业务错误作为结果透传，不重试", async () => {
+    let calls = 0;
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        send(rpcError(message.id, -32600, "initialize refused"));
+        return;
+      }
+      calls += 1;
+      send(rpcResult(message.id, { content: [] }));
     });
-    const res = await callTool("system_status", {}, { port });
-    expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-    expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call"]);
-    expect(calls[0].version).toBeNull();
-    expect(calls[1].version).toBeNull();
-    expect(calls[2].version).toBe("2025-11-25");
-    expect(calls[3].version).toBe("2025-11-25");
+    try {
+      const res = await callTool("x", {}, { port: server.port });
+      expect(res.error?.code).toBe(-32600);
+      expect(res.error?.message).toBe("initialize refused");
+      expect(calls).toBe(0);
+    } finally {
+      await server.close();
+    }
   });
 
-  test("initialize 响应缺 protocolVersion 时不发送版本头", async () => {
-    const { port, calls } = serveLazyHandshakeServer(null);
-    await callTool("system_status", {}, { port });
-    expect(calls.every((c) => c.version === null)).toBe(true);
+  test("服务端重启后下一次调用重新握手，不复用失效会话", async () => {
+    const methods: string[] = [];
+    let valid = true;
+    const server = await startNativeServer((message, _socket, send) => {
+      methods.push(String(message.method));
+      if (message.method === "initialize") {
+        valid = true;
+        send(rpcResult(message.id, { protocolVersion: "1", capabilities: {}, serverInfo: SERVER_INFO }));
+        return;
+      }
+      if (message.method === "notifications/initialized") return;
+      if (!valid) {
+        send(rpcError(message.id, -32000, "stale session"));
+        return;
+      }
+      send(rpcResult(message.id, { content: [{ type: "text", text: "{}" }] }));
+    });
+    try {
+      const first = await callTool("system_status", {}, { port: server.port });
+      expect(first.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+      valid = false;
+      const second = await callTool("system_status", {}, { port: server.port });
+      expect(second.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+      expect(methods).toEqual([
+        "initialize", "notifications/initialized", "tools/call",
+        "initialize", "notifications/initialized", "tools/call",
+      ]);
+    } finally {
+      await server.close();
+    }
   });
 
-  test("modern 协商版本（2026-07-28）不发送 MCP-Protocol-Version 头", async () => {
-    const { port, calls } = serveLazyHandshakeServer({
-      protocolVersion: "2026-07-28",
-      capabilities: {},
-      serverInfo: SERVER_INFO,
-    });
-    await callTool("system_status", {}, { port });
-    expect(calls.every((c) => c.version === null)).toBe(true);
-  });
-
-  test("协商版本不在已知五版本表内时不发送版本头", async () => {
-    const { port, calls } = serveLazyHandshakeServer({
-      protocolVersion: "2099-01-01",
-      capabilities: {},
-      serverInfo: SERVER_INFO,
-    });
-    await callTool("system_status", {}, { port });
-    expect(calls.every((c) => c.version === null)).toBe(true);
-  });
-
-  test("initialize 失败不学习版本，保持无头行为", async () => {
-    let n = 0;
-    const port = serve(async () => {
-      n += 1;
-      if (n === 1) return jsonResponse({ error: { code: -32600, message: "x" } }, 400);
-      return new Response("{}", { status: 500 });
-    });
+  test("IPC 不可达时报传输错误且不尝试任何其它通道", async () => {
+    const probe = await startNativeServer(() => {});
+    const port = probe.port;
+    await probe.close();
     const err = await catchError(callTool("x", {}, { port }));
     expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toBe("initialize failed with HTTP 500.");
-  });
-});
-
-interface RestartableServer {
-  port: number;
-  calls: Recorded[];
-  restart(): void;
-}
-
-function serveRestartableServer(): RestartableServer {
-  const calls: Recorded[] = [];
-  let sessionValid = false;
-  const port = serve(async (req) => {
-    const body = (await req.json()) as { method?: string; id?: number };
-    calls.push({ method: body.method, version: req.headers.get("mcp-protocol-version") });
-    if (body.method === "initialize") {
-      sessionValid = true;
-      return sseResponse({
-        jsonrpc: "2.0",
-        id: body.id,
-        result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: SERVER_INFO },
-      });
-    }
-    if (body.method === "notifications/initialized") {
-      return new Response("", { status: 202 });
-    }
-    if (!sessionValid) {
-      return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
-    }
-    return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
-  });
-  return {
-    port,
-    calls,
-    restart: () => {
-      sessionValid = false;
-    },
-  };
-}
-
-describe("callTool 握手状态失效", () => {
-  test("服务端重启后同一进程重新握手并调用成功", async () => {
-    const server = serveRestartableServer();
-    const first = await callTool("system_status", {}, { port: server.port });
-    expect(first.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-
-    server.restart();
-    const second = await callTool("system_status", {}, { port: server.port });
-    expect(second.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-    expect(server.calls.map((c) => c.method)).toEqual([
-      "tools/call",
-      "initialize",
-      "notifications/initialized",
-      "tools/call",
-      "tools/call",
-      "initialize",
-      "notifications/initialized",
-      "tools/call",
-    ]);
-  });
-
-  test("重握手次数达上限后直接报传输错误，不无限重试", async () => {
-    const server = serveRestartableServer();
-    await callTool("system_status", {}, { port: server.port });
-
-    server.restart();
-    const recovered = await callTool("system_status", {}, { port: server.port });
-    expect(recovered.result).toBeDefined();
-
-    server.restart();
-    const err = await catchError(callTool("system_status", {}, { port: server.port }));
-    expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toContain("HTTP 400");
-    const methods = server.calls.map((c) => c.method);
-    expect(methods.filter((m) => m === "initialize")).toHaveLength(2);
+    expect(err.message).toContain("refused the connection");
   });
 });

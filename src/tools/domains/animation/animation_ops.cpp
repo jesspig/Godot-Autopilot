@@ -43,7 +43,7 @@ constexpr int64_t MAX_TRACKS_LIMIT = 4096;
 constexpr int64_t MAX_KEYS_LIMIT = 4096;
 constexpr std::size_t CANDIDATE_LIMIT = 8;
 
-bool read_string_arg(const mcp::JsonValue &args, const char *key,
+bool read_string_arg(const godot_autopilot::util::JsonValue &args, const char *key,
                      std::string &out) {
   auto *v = args.Find(key);
   if (v && v->IsString()) {
@@ -53,12 +53,12 @@ bool read_string_arg(const mcp::JsonValue &args, const char *key,
   return false;
 }
 
-bool require_string_arg(const mcp::JsonValue &args, const char *key,
+bool require_string_arg(const godot_autopilot::util::JsonValue &args, const char *key,
                         std::string &out) {
   return util::require_nonempty_string_arg(args, key, out);
 }
 
-double read_number_arg(const mcp::JsonValue &args, const char *key,
+double read_number_arg(const godot_autopilot::util::JsonValue &args, const char *key,
                        double fallback) {
   auto *v = args.Find(key);
   if (!v || !v->IsNumber())
@@ -148,7 +148,7 @@ ensure_default_library(godot::AnimationMixer *mixer, std::string &msg) {
   return lib;
 }
 
-bool read_int_arg(const mcp::JsonValue &args, const char *key, int64_t &out) {
+bool read_int_arg(const godot_autopilot::util::JsonValue &args, const char *key, int64_t &out) {
   auto *v = args.Find(key);
   if (!v)
     return false;
@@ -175,10 +175,10 @@ std::string join_limited(const std::vector<std::string> &names) {
   return out;
 }
 
-mcp::JsonValue names_json(const std::vector<std::string> &names) {
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+godot_autopilot::util::JsonValue names_json(const std::vector<std::string> &names) {
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (std::size_t i = 0; i < names.size() && i < CANDIDATE_LIMIT; i++)
-    arr.PushBack(mcp::JsonValue(names[i]));
+    arr.PushBack(godot_autopilot::util::JsonValue(names[i]));
   return arr;
 }
 
@@ -221,50 +221,50 @@ std::string track_type_name(godot::Animation::TrackType type) {
   return "unknown";
 }
 
-mcp::JsonValue parameter_value_json(const godot::Variant &value) {
+godot_autopilot::util::JsonValue parameter_value_json(const godot::Variant &value) {
   if (value.get_type() == godot::Variant::OBJECT) {
     godot::Object *object = value.operator godot::Object *();
-    mcp::JsonValue out(mcp::JsonValue::object_tag);
-    out["type"] = mcp::JsonValue("object");
+    godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+    out["type"] = godot_autopilot::util::JsonValue("object");
     if (object) {
-      out["class"] = mcp::JsonValue(util::to_std(object->get_class()));
+      out["class"] = godot_autopilot::util::JsonValue(util::to_std(object->get_class()));
       out["object_id"] =
-          mcp::JsonValue(static_cast<int64_t>(object->get_instance_id()));
+          godot_autopilot::util::JsonValue(static_cast<int64_t>(object->get_instance_id()));
     } else {
-      out["class"] = mcp::JsonValue();
+      out["class"] = godot_autopilot::util::JsonValue();
     }
     return out;
   }
   return VariantJson::serialize(value);
 }
 
-mcp::JsonValue player_state(godot::AnimationPlayer *player) {
-  mcp::JsonValue state(mcp::JsonValue::object_tag);
-  state["current_animation"] = mcp::JsonValue(
+godot_autopilot::util::JsonValue player_state(godot::AnimationPlayer *player) {
+  godot_autopilot::util::JsonValue state(godot_autopilot::util::JsonValue::object_tag);
+  state["current_animation"] = godot_autopilot::util::JsonValue(
       util::to_std(godot::String(player->get_current_animation())));
-  state["position"] = mcp::JsonValue(player->get_current_animation_position());
-  state["length"] = mcp::JsonValue(player->get_current_animation_length());
-  state["playing"] = mcp::JsonValue(player->is_playing());
+  state["position"] = godot_autopilot::util::JsonValue(player->get_current_animation_position());
+  state["length"] = godot_autopilot::util::JsonValue(player->get_current_animation_length());
+  state["playing"] = godot_autopilot::util::JsonValue(player->is_playing());
   state["speed_scale"] =
-      mcp::JsonValue(static_cast<double>(player->get_speed_scale()));
-  mcp::JsonValue queue(mcp::JsonValue::array_tag);
+      godot_autopilot::util::JsonValue(static_cast<double>(player->get_speed_scale()));
+  godot_autopilot::util::JsonValue queue(godot_autopilot::util::JsonValue::array_tag);
   godot::TypedArray<godot::StringName> queued = player->get_queue();
   for (int i = 0; i < queued.size(); i++)
-    queue.PushBack(mcp::JsonValue(util::to_std(godot::String(queued[i]))));
+    queue.PushBack(godot_autopilot::util::JsonValue(util::to_std(godot::String(queued[i]))));
   state["queue"] = std::move(queue);
   return state;
 }
 
-mcp::JsonValue player_result(const std::string &player_path,
+godot_autopilot::util::JsonValue player_result(const std::string &player_path,
                              const std::string &action,
                              godot::AnimationPlayer *player) {
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["player_path"] = mcp::JsonValue(player_path);
-  inner["action"] = mcp::JsonValue(action);
-  mcp::JsonValue state = player_state(player);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+  inner["action"] = godot_autopilot::util::JsonValue(action);
+  godot_autopilot::util::JsonValue state = player_state(player);
   for (const auto &entry : state.GetObject())
     inner[entry.first] = entry.second;
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }
@@ -326,77 +326,77 @@ std::string advance_mode_name(int32_t mode) {
   return "unknown";
 }
 
-mcp::JsonValue transition_json(
+godot_autopilot::util::JsonValue transition_json(
     godot::AnimationNodeStateMachine *state_machine, int32_t index) {
-  mcp::JsonValue item(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
   godot::Ref<godot::AnimationNodeStateMachineTransition> transition =
       state_machine->get_transition(index);
   if (transition.is_null())
     return item;
-  item["index"] = mcp::JsonValue(static_cast<int64_t>(index));
-  item["from"] = mcp::JsonValue(
+  item["index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(index));
+  item["from"] = godot_autopilot::util::JsonValue(
       util::to_std(godot::String(state_machine->get_transition_from(index))));
-  item["to"] = mcp::JsonValue(
+  item["to"] = godot_autopilot::util::JsonValue(
       util::to_std(godot::String(state_machine->get_transition_to(index))));
   item["priority"] =
-      mcp::JsonValue(static_cast<int64_t>(transition->get_priority()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(transition->get_priority()));
   int32_t switch_mode = static_cast<int32_t>(transition->get_switch_mode());
-  item["switch_mode"] = mcp::JsonValue(static_cast<int64_t>(switch_mode));
-  item["switch_mode_name"] = mcp::JsonValue(switch_mode_name(switch_mode));
+  item["switch_mode"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(switch_mode));
+  item["switch_mode_name"] = godot_autopilot::util::JsonValue(switch_mode_name(switch_mode));
   int32_t advance_mode = static_cast<int32_t>(transition->get_advance_mode());
-  item["advance_mode"] = mcp::JsonValue(static_cast<int64_t>(advance_mode));
-  item["advance_mode_name"] = mcp::JsonValue(advance_mode_name(advance_mode));
-  item["advance_condition"] = mcp::JsonValue(util::to_std(godot::String(
+  item["advance_mode"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(advance_mode));
+  item["advance_mode_name"] = godot_autopilot::util::JsonValue(advance_mode_name(advance_mode));
+  item["advance_condition"] = godot_autopilot::util::JsonValue(util::to_std(godot::String(
       transition->get_advance_condition())));
   item["xfade"] =
-      mcp::JsonValue(static_cast<double>(transition->get_xfade_time()));
+      godot_autopilot::util::JsonValue(static_cast<double>(transition->get_xfade_time()));
   return item;
 }
 
-mcp::JsonValue transitions_json(
+godot_autopilot::util::JsonValue transitions_json(
     godot::AnimationNodeStateMachine *state_machine) {
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (int32_t i = 0; i < state_machine->get_transition_count(); i++)
     arr.PushBack(transition_json(state_machine, i));
   return arr;
 }
 
-mcp::JsonValue states_json(godot::AnimationNodeStateMachine *state_machine) {
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+godot_autopilot::util::JsonValue states_json(godot::AnimationNodeStateMachine *state_machine) {
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   for (const std::string &name : state_names(state_machine))
-    arr.PushBack(mcp::JsonValue(name));
+    arr.PushBack(godot_autopilot::util::JsonValue(name));
   return arr;
 }
 
-mcp::JsonValue library_snapshot(godot::AnimationMixer *mixer) {
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+godot_autopilot::util::JsonValue library_snapshot(godot::AnimationMixer *mixer) {
+  godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
   godot::TypedArray<godot::StringName> libs =
       mixer->get_animation_library_list();
   for (int i = 0; i < libs.size(); i++) {
     godot::StringName lib_name = libs[i];
     godot::Ref<godot::AnimationLibrary> lib =
         mixer->get_animation_library(lib_name);
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
     std::string name = util::to_std(godot::String(lib_name));
-    item["name"] = mcp::JsonValue(name);
-    item["default"] = mcp::JsonValue(name.empty());
-    mcp::JsonValue animations(mcp::JsonValue::array_tag);
+    item["name"] = godot_autopilot::util::JsonValue(name);
+    item["default"] = godot_autopilot::util::JsonValue(name.empty());
+    godot_autopilot::util::JsonValue animations(godot_autopilot::util::JsonValue::array_tag);
     int64_t count = 0;
     if (lib.is_valid()) {
       godot::TypedArray<godot::StringName> names = lib->get_animation_list();
       for (int k = 0; k < names.size(); k++) {
         animations.PushBack(
-            mcp::JsonValue(util::to_std(godot::String(names[k]))));
+            godot_autopilot::util::JsonValue(util::to_std(godot::String(names[k]))));
         count++;
       }
     }
-    item["animation_count"] = mcp::JsonValue(count);
+    item["animation_count"] = godot_autopilot::util::JsonValue(count);
     item["animations"] = std::move(animations);
     arr.PushBack(std::move(item));
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   out["library_count"] =
-      mcp::JsonValue(static_cast<int64_t>(libs.size()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(libs.size()));
   out["libraries"] = std::move(arr);
   return out;
 }
@@ -416,11 +416,11 @@ std::vector<std::string> parameter_names(godot::Object *object) {
   return names;
 }
 
-bool resolve_tree_and_machine(const mcp::JsonValue &args,
+bool resolve_tree_and_machine(const godot_autopilot::util::JsonValue &args,
                               std::string &tree_path,
                               godot::AnimationTree *&tree,
                               godot::AnimationNodeStateMachine *&state_machine,
-                              mcp::JsonValue &error) {
+                              godot_autopilot::util::JsonValue &error) {
   if (!require_string_arg(args, "animation_tree_path", tree_path)) {
     error = util::error_json("missing required parameter: animation_tree_path");
     return false;
@@ -442,7 +442,7 @@ bool resolve_tree_and_machine(const mcp::JsonValue &args,
   return true;
 }
 
-bool parse_switch_mode(const mcp::JsonValue &value, int32_t &out) {
+bool parse_switch_mode(const godot_autopilot::util::JsonValue &value, int32_t &out) {
   if (value.IsInt()) {
     int64_t mode = value.GetInt();
     if (mode >= 0 && mode <= 2) {
@@ -469,7 +469,7 @@ bool parse_switch_mode(const mcp::JsonValue &value, int32_t &out) {
   return false;
 }
 
-bool parse_advance_mode(const mcp::JsonValue &value, int32_t &out) {
+bool parse_advance_mode(const godot_autopilot::util::JsonValue &value, int32_t &out) {
   if (value.IsInt()) {
     int64_t mode = value.GetInt();
     if (mode >= 0 && mode <= 2) {
@@ -498,7 +498,7 @@ bool parse_advance_mode(const mcp::JsonValue &value, int32_t &out) {
 
 } // namespace
 
-mcp::JsonValue handle_create_player(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_player(const godot_autopilot::util::JsonValue &args) {
   std::string parent_path;
   if (!require_string_arg(args, "parent_path", parent_path))
     return util::error_json("missing required parameter: parent_path");
@@ -527,18 +527,18 @@ mcp::JsonValue handle_create_player(const mcp::JsonValue &args) {
 
   std::string rel = relative_scene_path(player, scene_root);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["path"] = mcp::JsonValue(rel);
-  inner["type"] = mcp::JsonValue("AnimationPlayer");
-  inner["undo"] = mcp::JsonValue("delete node " + rel +
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["path"] = godot_autopilot::util::JsonValue(rel);
+  inner["type"] = godot_autopilot::util::JsonValue("AnimationPlayer");
+  inner["undo"] = godot_autopilot::util::JsonValue("delete node " + rel +
                                  " (delete_scene_node)");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_create_animation(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_animation(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   std::string name;
   if (!require_string_arg(args, "player_path", player_path))
@@ -584,18 +584,18 @@ mcp::JsonValue handle_create_animation(const mcp::JsonValue &args) {
                       "\" to the default library (Error " +
                       std::to_string(static_cast<int>(err)) + ")");
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["player_path"] = mcp::JsonValue(player_path);
-  inner["name"] = mcp::JsonValue(name);
-  inner["length"] = mcp::JsonValue(length_sec);
-  inner["loop_mode"] = mcp::JsonValue(loop_mode);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+  inner["name"] = godot_autopilot::util::JsonValue(name);
+  inner["length"] = godot_autopilot::util::JsonValue(length_sec);
+  inner["loop_mode"] = godot_autopilot::util::JsonValue(loop_mode);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_remove_animation(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_remove_animation(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   std::string name;
   if (!require_string_arg(args, "player_path", player_path))
@@ -620,10 +620,10 @@ mcp::JsonValue handle_remove_animation(const mcp::JsonValue &args) {
         player->get_animation_library(lib_name);
     if (lib.is_valid() && lib->has_animation(anim_name)) {
       lib->remove_animation(anim_name);
-      mcp::JsonValue inner(mcp::JsonValue::object_tag);
-      inner["removed"] = mcp::JsonValue(name);
-      inner["library"] = mcp::JsonValue(util::to_std(godot::String(lib_name)));
-      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+      inner["removed"] = godot_autopilot::util::JsonValue(name);
+      inner["library"] = godot_autopilot::util::JsonValue(util::to_std(godot::String(lib_name)));
+      godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
       r["result"] = std::move(inner);
       scene_dirty_tracker::mark_scene_modified();
       return r;
@@ -632,7 +632,7 @@ mcp::JsonValue handle_remove_animation(const mcp::JsonValue &args) {
   return util::error_json("animation not found in any library: " + name);
 }
 
-mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_list(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   if (!require_string_arg(args, "player_path", player_path))
     return util::error_json("missing required parameter: player_path");
@@ -652,7 +652,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
   }
 
   if (action == "list") {
-    mcp::JsonValue list(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue list(godot_autopilot::util::JsonValue::array_tag);
     godot::PackedStringArray names = player->get_animation_list();
     for (int i = 0; i < names.size(); i++) {
       godot::String n = names[i];
@@ -660,19 +660,19 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
           player->get_animation(godot::StringName(n));
       if (anim.is_null())
         continue;
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["name"] = mcp::JsonValue(util::to_std(n));
-      item["length"] = mcp::JsonValue(static_cast<double>(anim->get_length()));
-      item["loop_mode"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+      item["name"] = godot_autopilot::util::JsonValue(util::to_std(n));
+      item["length"] = godot_autopilot::util::JsonValue(static_cast<double>(anim->get_length()));
+      item["loop_mode"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(anim->get_loop_mode()));
       list.PushBack(std::move(item));
     }
 
-    mcp::JsonValue inner(mcp::JsonValue::object_tag);
-    inner["player_path"] = mcp::JsonValue(player_path);
-    inner["count"] = mcp::JsonValue(static_cast<int64_t>(names.size()));
+    godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+    inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+    inner["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(names.size()));
     inner["animations"] = std::move(list);
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(inner);
     return r;
   }
@@ -723,31 +723,31 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     int64_t returned_tracks =
         max_tracks < 0 ? track_count : std::min(track_count, max_tracks);
     bool truncated = returned_tracks < track_count;
-    mcp::JsonValue tracks(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue tracks(godot_autopilot::util::JsonValue::array_tag);
     for (int64_t i = 0; i < returned_tracks; i++) {
       int32_t index = static_cast<int32_t>(i);
       godot::Animation::TrackType track_type = anim->track_get_type(index);
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["index"] = mcp::JsonValue(i);
-      item["type"] = mcp::JsonValue(track_type_name(track_type));
-      item["type_id"] = mcp::JsonValue(static_cast<int64_t>(track_type));
-      item["path"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+      item["index"] = godot_autopilot::util::JsonValue(i);
+      item["type"] = godot_autopilot::util::JsonValue(track_type_name(track_type));
+      item["type_id"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(track_type));
+      item["path"] = godot_autopilot::util::JsonValue(
           util::to_std(godot::String(anim->track_get_path(index))));
       int64_t key_count = anim->track_get_key_count(index);
       int64_t returned_keys =
           max_keys < 0 ? key_count : std::min(key_count, max_keys);
-      mcp::JsonValue keys(mcp::JsonValue::array_tag);
+      godot_autopilot::util::JsonValue keys(godot_autopilot::util::JsonValue::array_tag);
       for (int64_t k = 0; k < returned_keys; k++) {
         int32_t key_index = static_cast<int32_t>(k);
-        mcp::JsonValue key(mcp::JsonValue::object_tag);
-        key["time"] = mcp::JsonValue(anim->track_get_key_time(index, key_index));
+        godot_autopilot::util::JsonValue key(godot_autopilot::util::JsonValue::object_tag);
+        key["time"] = godot_autopilot::util::JsonValue(anim->track_get_key_time(index, key_index));
         key["value"] =
             VariantJson::serialize(anim->track_get_key_value(index, key_index));
         keys.PushBack(std::move(key));
       }
-      item["key_count"] = mcp::JsonValue(key_count);
-      item["returned_key_count"] = mcp::JsonValue(returned_keys);
-      item["truncated"] = mcp::JsonValue(returned_keys < key_count);
+      item["key_count"] = godot_autopilot::util::JsonValue(key_count);
+      item["returned_key_count"] = godot_autopilot::util::JsonValue(returned_keys);
+      item["truncated"] = godot_autopilot::util::JsonValue(returned_keys < key_count);
       item["keys"] = std::move(keys);
       if (track_type == godot::Animation::TYPE_VALUE) {
         item["interpolated_value"] = VariantJson::serialize(
@@ -756,18 +756,18 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
       tracks.PushBack(std::move(item));
     }
 
-    mcp::JsonValue inner(mcp::JsonValue::object_tag);
-    inner["player_path"] = mcp::JsonValue(player_path);
-    inner["anim_name"] = mcp::JsonValue(anim_name);
-    inner["length"] = mcp::JsonValue(static_cast<double>(anim->get_length()));
+    godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+    inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+    inner["anim_name"] = godot_autopilot::util::JsonValue(anim_name);
+    inner["length"] = godot_autopilot::util::JsonValue(static_cast<double>(anim->get_length()));
     inner["loop_mode"] =
-        mcp::JsonValue(static_cast<int64_t>(anim->get_loop_mode()));
-    inner["time"] = mcp::JsonValue(time);
-    inner["track_count"] = mcp::JsonValue(track_count);
-    inner["returned_track_count"] = mcp::JsonValue(returned_tracks);
-    inner["truncated"] = mcp::JsonValue(truncated);
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(anim->get_loop_mode()));
+    inner["time"] = godot_autopilot::util::JsonValue(time);
+    inner["track_count"] = godot_autopilot::util::JsonValue(track_count);
+    inner["returned_track_count"] = godot_autopilot::util::JsonValue(returned_tracks);
+    inner["truncated"] = godot_autopilot::util::JsonValue(truncated);
     inner["tracks"] = std::move(tracks);
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(inner);
     return r;
   }
@@ -786,11 +786,11 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
                         "library)");
 
     if (op == "list") {
-      mcp::JsonValue inner = library_snapshot(player);
-      inner["player_path"] = mcp::JsonValue(player_path);
-      inner["action"] = mcp::JsonValue("library");
-      inner["library_action"] = mcp::JsonValue(op);
-      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue inner = library_snapshot(player);
+      inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+      inner["action"] = godot_autopilot::util::JsonValue("library");
+      inner["library_action"] = godot_autopilot::util::JsonValue(op);
+      godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
       r["result"] = std::move(inner);
       return r;
     }
@@ -815,13 +815,13 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
         return util::error_json("failed to add animation library \"" + library +
                           "\" (Error " +
                           std::to_string(static_cast<int>(err)) + ")");
-      mcp::JsonValue inner = library_snapshot(player);
-      inner["player_path"] = mcp::JsonValue(player_path);
-      inner["action"] = mcp::JsonValue("library");
-      inner["library_action"] = mcp::JsonValue(op);
-      inner["library"] = mcp::JsonValue(library);
-      inner["added"] = mcp::JsonValue(true);
-      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue inner = library_snapshot(player);
+      inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+      inner["action"] = godot_autopilot::util::JsonValue("library");
+      inner["library_action"] = godot_autopilot::util::JsonValue(op);
+      inner["library"] = godot_autopilot::util::JsonValue(library);
+      inner["added"] = godot_autopilot::util::JsonValue(true);
+      godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
       r["result"] = std::move(inner);
       scene_dirty_tracker::mark_scene_modified();
       return r;
@@ -846,13 +846,13 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
                           " animations — remove them with remove_animation "
                           "first (that tool requires confirm)");
       player->remove_animation_library(lib_sn);
-      mcp::JsonValue inner = library_snapshot(player);
-      inner["player_path"] = mcp::JsonValue(player_path);
-      inner["action"] = mcp::JsonValue("library");
-      inner["library_action"] = mcp::JsonValue(op);
-      inner["library"] = mcp::JsonValue(library);
-      inner["removed"] = mcp::JsonValue(true);
-      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue inner = library_snapshot(player);
+      inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+      inner["action"] = godot_autopilot::util::JsonValue("library");
+      inner["library_action"] = godot_autopilot::util::JsonValue(op);
+      inner["library"] = godot_autopilot::util::JsonValue(library);
+      inner["removed"] = godot_autopilot::util::JsonValue(true);
+      godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
       r["result"] = std::move(inner);
       scene_dirty_tracker::mark_scene_modified();
       return r;
@@ -867,14 +867,14 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
       return util::error_json("animation library already exists on " + player_path +
                         ": \"" + new_name + "\"");
     player->rename_animation_library(lib_sn, new_sn);
-    mcp::JsonValue inner = library_snapshot(player);
-    inner["player_path"] = mcp::JsonValue(player_path);
-    inner["action"] = mcp::JsonValue("library");
-    inner["library_action"] = mcp::JsonValue(op);
-    inner["old_name"] = mcp::JsonValue(library);
-    inner["new_name"] = mcp::JsonValue(new_name);
-    inner["renamed"] = mcp::JsonValue(true);
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue inner = library_snapshot(player);
+    inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+    inner["action"] = godot_autopilot::util::JsonValue("library");
+    inner["library_action"] = godot_autopilot::util::JsonValue(op);
+    inner["old_name"] = godot_autopilot::util::JsonValue(library);
+    inner["new_name"] = godot_autopilot::util::JsonValue(new_name);
+    inner["renamed"] = godot_autopilot::util::JsonValue(true);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(inner);
     scene_dirty_tracker::mark_scene_modified();
     return r;
@@ -885,7 +885,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
                     "library");
 }
 
-mcp::JsonValue handle_create_track(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_track(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   std::string anim_name;
   std::string track_type;
@@ -942,19 +942,19 @@ mcp::JsonValue handle_create_track(const mcp::JsonValue &args) {
     anim->value_track_set_update_mode(idx,
                                       godot::Animation::UPDATE_CONTINUOUS);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["player_path"] = mcp::JsonValue(player_path);
-  inner["anim_name"] = mcp::JsonValue(anim_name);
-  inner["track_index"] = mcp::JsonValue(static_cast<int64_t>(idx));
-  inner["track_path"] = mcp::JsonValue(track_path);
-  inner["track_type"] = mcp::JsonValue(track_type);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+  inner["anim_name"] = godot_autopilot::util::JsonValue(anim_name);
+  inner["track_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(idx));
+  inner["track_path"] = godot_autopilot::util::JsonValue(track_path);
+  inner["track_type"] = godot_autopilot::util::JsonValue(track_type);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_insert_keyframe(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   std::string anim_name;
   if (!require_string_arg(args, "player_path", player_path))
@@ -1011,8 +1011,8 @@ mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args) {
     godot::Array call_args;
     auto *args_v = value_v->Find("args");
     if (args_v && args_v->IsArray()) {
-      const mcp::JsonValue::Array &arr = args_v->GetArray();
-      for (const mcp::JsonValue &item : arr)
+      const godot_autopilot::util::JsonValue::Array &arr = args_v->GetArray();
+      for (const godot_autopilot::util::JsonValue &item : arr)
         call_args.append(VariantJson::deserialize(item));
     }
     key[godot::StringName("args")] = godot::Variant(call_args);
@@ -1023,20 +1023,20 @@ mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args) {
 
   anim->track_insert_key(static_cast<int32_t>(track_index), time, key_value);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["player_path"] = mcp::JsonValue(player_path);
-  inner["anim_name"] = mcp::JsonValue(anim_name);
-  inner["track_index"] = mcp::JsonValue(track_index);
-  inner["time"] = mcp::JsonValue(time);
-  inner["key_count"] = mcp::JsonValue(static_cast<int64_t>(
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+  inner["anim_name"] = godot_autopilot::util::JsonValue(anim_name);
+  inner["track_index"] = godot_autopilot::util::JsonValue(track_index);
+  inner["time"] = godot_autopilot::util::JsonValue(time);
+  inner["key_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(
       anim->track_get_key_count(static_cast<int32_t>(track_index))));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_track_bundle(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   std::string anim_name;
   std::string track_type;
@@ -1058,7 +1058,7 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
   if (!keys_v || !keys_v->IsArray())
     return util::error_json("missing required parameter: keys (array of 1-256 "
                       "{\"time\": <number >= 0>, \"value\": <json>} objects)");
-  const mcp::JsonValue::Array &keys_arr = keys_v->GetArray();
+  const godot_autopilot::util::JsonValue::Array &keys_arr = keys_v->GetArray();
   if (keys_arr.empty() || keys_arr.size() > 256)
     return util::error_json("keys must contain 1-256 entries (got " +
                       std::to_string(keys_arr.size()) + ")");
@@ -1112,13 +1112,13 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
 
   struct BundleKey {
     double time = 0.0;
-    const mcp::JsonValue *value = nullptr;
+    const godot_autopilot::util::JsonValue *value = nullptr;
     size_t order = 0;
   };
   std::vector<BundleKey> work;
   work.reserve(keys_arr.size());
   for (size_t i = 0; i < keys_arr.size(); i++) {
-    const mcp::JsonValue &entry = keys_arr[i];
+    const godot_autopilot::util::JsonValue &entry = keys_arr[i];
     std::string where = "keys[" + std::to_string(i) + "]";
     if (!entry.IsObject()) {
       anim->remove_track(idx);
@@ -1200,7 +1200,7 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
     work.swap(deduped);
   }
 
-  mcp::JsonValue times(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue times(godot_autopilot::util::JsonValue::array_tag);
   for (const BundleKey &item : work) {
     godot::Variant key_value;
     if (type == godot::Animation::TYPE_METHOD) {
@@ -1211,8 +1211,8 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
       godot::Array call_args;
       auto *args_v = item.value->Find("args");
       if (args_v && args_v->IsArray()) {
-        const mcp::JsonValue::Array &arr = args_v->GetArray();
-        for (const mcp::JsonValue &call_item : arr)
+        const godot_autopilot::util::JsonValue::Array &arr = args_v->GetArray();
+        for (const godot_autopilot::util::JsonValue &call_item : arr)
           call_args.append(VariantJson::deserialize(call_item));
       }
       key[godot::StringName("args")] = godot::Variant(call_args);
@@ -1221,25 +1221,25 @@ mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
       key_value = VariantJson::deserialize(*item.value);
     }
     anim->track_insert_key(idx, item.time, key_value);
-    times.PushBack(mcp::JsonValue(item.time));
+    times.PushBack(godot_autopilot::util::JsonValue(item.time));
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["player_path"] = mcp::JsonValue(player_path);
-  inner["anim_name"] = mcp::JsonValue(anim_name);
-  inner["track_index"] = mcp::JsonValue(static_cast<int64_t>(idx));
-  inner["track_path"] = mcp::JsonValue(track_path);
-  inner["track_type"] = mcp::JsonValue(track_type);
-  inner["key_count"] = mcp::JsonValue(static_cast<int64_t>(
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+  inner["anim_name"] = godot_autopilot::util::JsonValue(anim_name);
+  inner["track_index"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(idx));
+  inner["track_path"] = godot_autopilot::util::JsonValue(track_path);
+  inner["track_type"] = godot_autopilot::util::JsonValue(track_type);
+  inner["key_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(
       anim->track_get_key_count(idx)));
   inner["times"] = std::move(times);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_remove_track(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_remove_track(const godot_autopilot::util::JsonValue &args) {
   std::string player_path;
   std::string anim_name;
   if (!require_string_arg(args, "player_path", player_path))
@@ -1273,19 +1273,19 @@ mcp::JsonValue handle_remove_track(const mcp::JsonValue &args) {
       anim->track_get_path(static_cast<int32_t>(track_index));
   anim->remove_track(static_cast<int32_t>(track_index));
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["player_path"] = mcp::JsonValue(player_path);
-  inner["anim_name"] = mcp::JsonValue(anim_name);
-  inner["removed_track_index"] = mcp::JsonValue(track_index);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["player_path"] = godot_autopilot::util::JsonValue(player_path);
+  inner["anim_name"] = godot_autopilot::util::JsonValue(anim_name);
+  inner["removed_track_index"] = godot_autopilot::util::JsonValue(track_index);
   inner["removed_track_path"] =
-      mcp::JsonValue(util::to_std(godot::String(removed_path)));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue(util::to_std(godot::String(removed_path)));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_create_tree(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_tree(const godot_autopilot::util::JsonValue &args) {
   std::string parent_path;
   if (!require_string_arg(args, "parent_path", parent_path))
     return util::error_json("missing required parameter: parent_path");
@@ -1337,27 +1337,27 @@ mcp::JsonValue handle_create_tree(const mcp::JsonValue &args) {
 
   std::string rel = relative_scene_path(tree, scene_root);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["path"] = mcp::JsonValue(rel);
-  inner["type"] = mcp::JsonValue("AnimationTree");
-  inner["tree_root"] = mcp::JsonValue("AnimationNodeStateMachine");
-  inner["states"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["path"] = godot_autopilot::util::JsonValue(rel);
+  inner["type"] = godot_autopilot::util::JsonValue("AnimationTree");
+  inner["tree_root"] = godot_autopilot::util::JsonValue("AnimationNodeStateMachine");
+  inner["states"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
   if (player_node) {
-    inner["anim_player"] = mcp::JsonValue(relative_scene_path(
+    inner["anim_player"] = godot_autopilot::util::JsonValue(relative_scene_path(
         player_node, scene_root));
   }
-  inner["undo"] = mcp::JsonValue("delete node " + rel +
+  inner["undo"] = godot_autopilot::util::JsonValue("delete node " + rel +
                                  " (delete_scene_node)");
-  inner["next"] = mcp::JsonValue(
+  inner["next"] = godot_autopilot::util::JsonValue(
       "call animation_tree with action=add_node and animation_tree_path=" + rel +
       " to add states, then action=connect to wire transitions");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_add_state(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_add_state(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   std::string state_name;
   if (!require_string_arg(args, "animation_tree_path", tree_path))
@@ -1395,26 +1395,26 @@ mcp::JsonValue handle_add_state(const mcp::JsonValue &args) {
     node->set_animation(godot::StringName(animation.c_str()));
   sm->add_node(state_sn, node);
 
-  mcp::JsonValue states(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue states(godot_autopilot::util::JsonValue::array_tag);
   godot::TypedArray<godot::StringName> node_list = sm->get_node_list();
   for (int i = 0; i < node_list.size(); i++) {
     godot::String state = node_list[i];
-    states.PushBack(mcp::JsonValue(util::to_std(state)));
+    states.PushBack(godot_autopilot::util::JsonValue(util::to_std(state)));
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["state"] = mcp::JsonValue(state_name);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["state"] = godot_autopilot::util::JsonValue(state_name);
   if (has_animation && !animation.empty())
-    inner["animation"] = mcp::JsonValue(animation);
+    inner["animation"] = godot_autopilot::util::JsonValue(animation);
   inner["states"] = std::move(states);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_connect_states(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   std::string from_state;
   std::string to_state;
@@ -1463,24 +1463,24 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
         godot::AnimationNodeStateMachineTransition::ADVANCE_MODE_AUTO);
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["from_state"] = mcp::JsonValue(from_state);
-  inner["to_state"] = mcp::JsonValue(to_state);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["from_state"] = godot_autopilot::util::JsonValue(from_state);
+  inner["to_state"] = godot_autopilot::util::JsonValue(to_state);
   if (has_condition && !condition.empty()) {
-    inner["advance_condition"] = mcp::JsonValue(condition);
-    inner["note"] = mcp::JsonValue(
+    inner["advance_condition"] = godot_autopilot::util::JsonValue(condition);
+    inner["note"] = godot_autopilot::util::JsonValue(
         "transition advance_mode was set to AUTO because a condition was "
         "given; the condition must be a bool parameter on the AnimationTree "
         "(set via animation_runtime action=set_parameter)");
   }
-  if (const mcp::JsonValue *priority_v = args.Find("priority")) {
+  if (const godot_autopilot::util::JsonValue *priority_v = args.Find("priority")) {
     if (!priority_v->IsInt())
       return util::error_json("priority must be an integer");
     transition->set_priority(static_cast<int32_t>(priority_v->GetInt()));
     inner["priority"] = *priority_v;
   }
-  if (const mcp::JsonValue *xfade_v = args.Find("xfade")) {
+  if (const godot_autopilot::util::JsonValue *xfade_v = args.Find("xfade")) {
     if (!xfade_v->IsNumber())
       return util::error_json("xfade must be a number >= 0");
     double xfade = xfade_v->IsInt() ? static_cast<double>(xfade_v->GetInt())
@@ -1489,9 +1489,9 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
       return util::error_json("xfade must be >= 0 (got " + std::to_string(xfade) +
                         ")");
     transition->set_xfade_time(static_cast<float>(xfade));
-    inner["xfade"] = mcp::JsonValue(xfade);
+    inner["xfade"] = godot_autopilot::util::JsonValue(xfade);
   }
-  if (const mcp::JsonValue *switch_v = args.Find("switch_mode")) {
+  if (const godot_autopilot::util::JsonValue *switch_v = args.Find("switch_mode")) {
     int32_t mode = 0;
     if (!parse_switch_mode(*switch_v, mode))
       return util::error_json("switch_mode must be immediate, sync or at_end "
@@ -1499,9 +1499,9 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
     transition->set_switch_mode(
         static_cast<godot::AnimationNodeStateMachineTransition::SwitchMode>(
             mode));
-    inner["switch_mode"] = mcp::JsonValue(switch_mode_name(mode));
+    inner["switch_mode"] = godot_autopilot::util::JsonValue(switch_mode_name(mode));
   }
-  if (const mcp::JsonValue *advance_v = args.Find("advance_mode")) {
+  if (const godot_autopilot::util::JsonValue *advance_v = args.Find("advance_mode")) {
     int32_t mode = 0;
     if (!parse_advance_mode(*advance_v, mode))
       return util::error_json("advance_mode must be disabled, enabled or auto "
@@ -1509,11 +1509,11 @@ mcp::JsonValue handle_connect_states(const mcp::JsonValue &args) {
     transition->set_advance_mode(
         static_cast<godot::AnimationNodeStateMachineTransition::AdvanceMode>(
             mode));
-    inner["advance_mode"] = mcp::JsonValue(advance_mode_name(mode));
+    inner["advance_mode"] = godot_autopilot::util::JsonValue(advance_mode_name(mode));
   }
   sm->add_transition(from_sn, to_sn, transition);
 
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
@@ -1530,54 +1530,54 @@ int32_t find_transition_index(godot::AnimationNodeStateMachine *state_machine,
   return -1;
 }
 
-mcp::JsonValue inspect_tree(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue inspect_tree(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   godot::AnimationTree *tree = nullptr;
   godot::AnimationNodeStateMachine *state_machine = nullptr;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!resolve_tree_and_machine(args, tree_path, tree, state_machine, error))
     return error;
 
-  mcp::JsonValue nodes(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue nodes(godot_autopilot::util::JsonValue::array_tag);
   godot::TypedArray<godot::StringName> node_list = state_machine->get_node_list();
   for (int i = 0; i < node_list.size(); i++) {
     godot::StringName node_name = node_list[i];
     godot::Ref<godot::AnimationNode> node = state_machine->get_node(node_name);
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["name"] = mcp::JsonValue(util::to_std(godot::String(node_name)));
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["name"] = godot_autopilot::util::JsonValue(util::to_std(godot::String(node_name)));
     if (node.is_valid()) {
-      item["type"] = mcp::JsonValue(util::to_std(node->get_class()));
+      item["type"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
       auto *animation_node =
           godot::Object::cast_to<godot::AnimationNodeAnimation>(node.ptr());
       if (animation_node)
-        item["animation"] = mcp::JsonValue(util::to_std(
+        item["animation"] = godot_autopilot::util::JsonValue(util::to_std(
             godot::String(animation_node->get_animation())));
     }
     nodes.PushBack(std::move(item));
   }
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["tree_root"] = mcp::JsonValue(util::to_std(state_machine->get_class()));
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["tree_root"] = godot_autopilot::util::JsonValue(util::to_std(state_machine->get_class()));
   godot::NodePath player_path = tree->get_animation_player();
   if (!player_path.is_empty())
     inner["animation_player"] =
-        mcp::JsonValue(util::to_std(godot::String(player_path)));
-  inner["node_count"] = mcp::JsonValue(static_cast<int64_t>(node_list.size()));
+        godot_autopilot::util::JsonValue(util::to_std(godot::String(player_path)));
+  inner["node_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(node_list.size()));
   inner["nodes"] = std::move(nodes);
-  inner["transition_count"] = mcp::JsonValue(
+  inner["transition_count"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(state_machine->get_transition_count()));
   inner["transitions"] = transitions_json(state_machine);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }
 
-mcp::JsonValue remove_state_node(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue remove_state_node(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   godot::AnimationTree *tree = nullptr;
   godot::AnimationNodeStateMachine *state_machine = nullptr;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!resolve_tree_and_machine(args, tree_path, tree, state_machine, error))
     return error;
 
@@ -1595,25 +1595,25 @@ mcp::JsonValue remove_state_node(const mcp::JsonValue &args) {
                       unknown_state_hint(state_machine));
   state_machine->remove_node(state_sn);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["removed_node"] = mcp::JsonValue(state_name);
-  inner["node_count"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["removed_node"] = godot_autopilot::util::JsonValue(state_name);
+  inner["node_count"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(state_machine->get_node_list().size()));
   inner["nodes"] = states_json(state_machine);
-  inner["transition_count"] = mcp::JsonValue(
+  inner["transition_count"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(state_machine->get_transition_count()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue rename_state_node(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue rename_state_node(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   godot::AnimationTree *tree = nullptr;
   godot::AnimationNodeStateMachine *state_machine = nullptr;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!resolve_tree_and_machine(args, tree_path, tree, state_machine, error))
     return error;
 
@@ -1645,25 +1645,25 @@ mcp::JsonValue rename_state_node(const mcp::JsonValue &args) {
     return util::error_json("state already exists in " + tree_path + ": " + new_name);
   state_machine->rename_node(state_sn, new_sn);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["old_name"] = mcp::JsonValue(state_name);
-  inner["new_name"] = mcp::JsonValue(new_name);
-  inner["node_count"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["old_name"] = godot_autopilot::util::JsonValue(state_name);
+  inner["new_name"] = godot_autopilot::util::JsonValue(new_name);
+  inner["node_count"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(state_machine->get_node_list().size()));
   inner["nodes"] = states_json(state_machine);
   inner["transitions"] = transitions_json(state_machine);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue remove_transition_action(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue remove_transition_action(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   godot::AnimationTree *tree = nullptr;
   godot::AnimationNodeStateMachine *state_machine = nullptr;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!resolve_tree_and_machine(args, tree_path, tree, state_machine, error))
     return error;
 
@@ -1679,7 +1679,7 @@ mcp::JsonValue remove_transition_action(const mcp::JsonValue &args) {
   godot::StringName from_sn(from_state.c_str());
   godot::StringName to_sn(to_state.c_str());
   if (!state_machine->has_transition(from_sn, to_sn)) {
-    mcp::JsonValue e = util::error_json("transition not found: " + from_state +
+    godot_autopilot::util::JsonValue e = util::error_json("transition not found: " + from_state +
                                   " -> " + to_state +
                                   " — available transitions: " +
                                   join_limited(transition_names(state_machine)));
@@ -1688,25 +1688,25 @@ mcp::JsonValue remove_transition_action(const mcp::JsonValue &args) {
   }
   state_machine->remove_transition(from_sn, to_sn);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["removed_transition"] = mcp::JsonValue(from_state + " -> " + to_state);
-  inner["from_state"] = mcp::JsonValue(from_state);
-  inner["to_state"] = mcp::JsonValue(to_state);
-  inner["transition_count"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["removed_transition"] = godot_autopilot::util::JsonValue(from_state + " -> " + to_state);
+  inner["from_state"] = godot_autopilot::util::JsonValue(from_state);
+  inner["to_state"] = godot_autopilot::util::JsonValue(to_state);
+  inner["transition_count"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(state_machine->get_transition_count()));
   inner["transitions"] = transitions_json(state_machine);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue set_transition_params(const godot_autopilot::util::JsonValue &args) {
   std::string tree_path;
   godot::AnimationTree *tree = nullptr;
   godot::AnimationNodeStateMachine *state_machine = nullptr;
-  mcp::JsonValue error;
+  godot_autopilot::util::JsonValue error;
   if (!resolve_tree_and_machine(args, tree_path, tree, state_machine, error))
     return error;
 
@@ -1721,7 +1721,7 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
   godot::StringName from_sn(from_state.c_str());
   godot::StringName to_sn(to_state.c_str());
   if (!state_machine->has_transition(from_sn, to_sn)) {
-    mcp::JsonValue e = util::error_json("transition not found: " + from_state +
+    godot_autopilot::util::JsonValue e = util::error_json("transition not found: " + from_state +
                                   " -> " + to_state +
                                   " — available transitions: " +
                                   join_limited(transition_names(state_machine)));
@@ -1729,11 +1729,11 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
     return e;
   }
 
-  const mcp::JsonValue *priority_v = args.Find("priority");
-  const mcp::JsonValue *switch_v = args.Find("switch_mode");
-  const mcp::JsonValue *advance_v = args.Find("advance_mode");
-  const mcp::JsonValue *condition_v = args.Find("advance_condition");
-  const mcp::JsonValue *xfade_v = args.Find("xfade");
+  const godot_autopilot::util::JsonValue *priority_v = args.Find("priority");
+  const godot_autopilot::util::JsonValue *switch_v = args.Find("switch_mode");
+  const godot_autopilot::util::JsonValue *advance_v = args.Find("advance_mode");
+  const godot_autopilot::util::JsonValue *condition_v = args.Find("advance_condition");
+  const godot_autopilot::util::JsonValue *xfade_v = args.Find("xfade");
   if (!priority_v && !switch_v && !advance_v && !condition_v && !xfade_v)
     return util::error_json(
         "action 'set_transition' requires at least one of priority, "
@@ -1806,18 +1806,18 @@ mcp::JsonValue set_transition_params(const mcp::JsonValue &args) {
   if (xfade_v)
     transition->set_xfade_time(static_cast<float>(xfade));
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["from_state"] = mcp::JsonValue(from_state);
-  inner["to_state"] = mcp::JsonValue(to_state);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["from_state"] = godot_autopilot::util::JsonValue(from_state);
+  inner["to_state"] = godot_autopilot::util::JsonValue(to_state);
   inner["transition"] = transition_json(state_machine, index);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
-mcp::JsonValue handle_tree(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_tree(const godot_autopilot::util::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty())
     return util::error_json(
@@ -1847,7 +1847,7 @@ mcp::JsonValue handle_tree(const mcp::JsonValue &args) {
                     "remove_transition or set_transition");
 }
 
-mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
+godot_autopilot::util::JsonValue tree_parameter(const godot_autopilot::util::JsonValue &args, bool write) {
   std::string tree_path;
   std::string path;
   if (!require_string_arg(args, "animation_tree_path", tree_path))
@@ -1866,14 +1866,14 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
 
   std::vector<std::string> names = parameter_names(tree);
   if (std::find(names.begin(), names.end(), path) == names.end()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     if (names.empty()) {
-      e["error"] = mcp::JsonValue(
+      e["error"] = godot_autopilot::util::JsonValue(
           "the AnimationTree at " + tree_path +
           " exposes no parameters/... properties — assign a tree_root and an "
           "animation_player first");
     } else {
-      e["error"] = mcp::JsonValue(
+      e["error"] = godot_autopilot::util::JsonValue(
           "unknown animation tree parameter: " + path + " — available: " +
           join_limited(names));
     }
@@ -1883,11 +1883,11 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
 
   godot::StringName name(path.c_str());
   if (!write) {
-    mcp::JsonValue inner(mcp::JsonValue::object_tag);
-    inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-    inner["path"] = mcp::JsonValue(path);
+    godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+    inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+    inner["path"] = godot_autopilot::util::JsonValue(path);
     inner["value"] = parameter_value_json(tree->get(name));
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
     r["result"] = std::move(inner);
     return r;
   }
@@ -1897,30 +1897,30 @@ mcp::JsonValue tree_parameter(const mcp::JsonValue &args, bool write) {
     return util::error_json("missing required parameter for action 'set_parameter': "
                       "value");
   godot::Variant desired = VariantJson::deserialize(*value_v);
-  mcp::JsonValue old_value = parameter_value_json(tree->get(name));
+  godot_autopilot::util::JsonValue old_value = parameter_value_json(tree->get(name));
   tree->set(name, desired);
-  mcp::JsonValue new_value = parameter_value_json(tree->get(name));
+  godot_autopilot::util::JsonValue new_value = parameter_value_json(tree->get(name));
   if (new_value.Dump() == old_value.Dump() &&
       parameter_value_json(desired).Dump() != old_value.Dump())
     return util::error_json("animation tree parameter is read-only or rejected the "
                       "value: " + path);
 
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["animation_tree_path"] = mcp::JsonValue(tree_path);
-  inner["path"] = mcp::JsonValue(path);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["animation_tree_path"] = godot_autopilot::util::JsonValue(tree_path);
+  inner["path"] = godot_autopilot::util::JsonValue(path);
   inner["old"] = std::move(old_value);
   inner["new"] = std::move(new_value);
-  inner["changed"] = mcp::JsonValue(
+  inner["changed"] = godot_autopilot::util::JsonValue(
       inner["old"].Dump() != inner["new"].Dump());
-  inner["note"] = mcp::JsonValue(
+  inner["note"] = godot_autopilot::util::JsonValue(
       "parameter writes are runtime state only; the scene file is not "
       "modified");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }
 
-mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_runtime(const godot_autopilot::util::JsonValue &args) {
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString() || action_p->GetString().empty())
     return util::error_json(
@@ -1962,10 +1962,10 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
     } else {
       player->play_backwards();
     }
-    mcp::JsonValue out = player_result(player_path, action, player);
-    mcp::JsonValue *inner = out.Find("result");
+    godot_autopilot::util::JsonValue out = player_result(player_path, action, player);
+    godot_autopilot::util::JsonValue *inner = out.Find("result");
     if (inner != nullptr && inner->IsObject() && has_animation)
-      (*inner)["animation"] = mcp::JsonValue(animation);
+      (*inner)["animation"] = godot_autopilot::util::JsonValue(animation);
     return out;
   }
 
@@ -1976,7 +1976,7 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
 
   if (action == "stop") {
     bool keep_state = false;
-    if (const mcp::JsonValue *keep_v = args.Find("keep_state")) {
+    if (const godot_autopilot::util::JsonValue *keep_v = args.Find("keep_state")) {
       if (!keep_v->IsBool())
         return util::error_json("keep_state must be a boolean");
       keep_state = keep_v->GetBool();
@@ -1998,7 +1998,7 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
       return util::error_json("position must be >= 0 (got " +
                         std::to_string(position) + ")");
     bool update = false;
-    if (const mcp::JsonValue *update_v = args.Find("update")) {
+    if (const godot_autopilot::util::JsonValue *update_v = args.Find("update")) {
       if (!update_v->IsBool())
         return util::error_json("update must be a boolean");
       update = update_v->GetBool();
@@ -2019,10 +2019,10 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
       return util::error_json("speed_scale must be a finite number");
     float old_speed = player->get_speed_scale();
     player->set_speed_scale(static_cast<float>(speed));
-    mcp::JsonValue out = player_result(player_path, action, player);
-    mcp::JsonValue *inner = out.Find("result");
+    godot_autopilot::util::JsonValue out = player_result(player_path, action, player);
+    godot_autopilot::util::JsonValue *inner = out.Find("result");
     if (inner != nullptr && inner->IsObject())
-      (*inner)["old_speed_scale"] = mcp::JsonValue(
+      (*inner)["old_speed_scale"] = godot_autopilot::util::JsonValue(
           static_cast<double>(old_speed));
     return out;
   }
@@ -2036,10 +2036,10 @@ mcp::JsonValue handle_runtime(const mcp::JsonValue &args) {
                           unknown_animation_hint(player));
       player->queue(anim_sn);
     }
-    mcp::JsonValue out = player_result(player_path, action, player);
-    mcp::JsonValue *inner = out.Find("result");
+    godot_autopilot::util::JsonValue out = player_result(player_path, action, player);
+    godot_autopilot::util::JsonValue *inner = out.Find("result");
     if (inner != nullptr && inner->IsObject() && has_animation)
-      (*inner)["queued"] = mcp::JsonValue(animation);
+      (*inner)["queued"] = godot_autopilot::util::JsonValue(animation);
     return out;
   }
 

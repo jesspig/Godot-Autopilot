@@ -33,7 +33,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector4.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -44,7 +44,7 @@ namespace game_bridge {
 
 namespace {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 class GameBridgeEvalAwaiter : public godot::Node {
   GDCLASS(GameBridgeEvalAwaiter, godot::Node)
@@ -119,7 +119,7 @@ public:
     if (done_)
       return;
     done_ = true;
-    JV body = ok_result(VariantJson::serialize(p_result));
+    JV body = bridge_ok_result(VariantJson::serialize(p_result));
     if (persist_ && !persist_path_.empty()) {
       if (body["result"].IsObject() && body["data"].IsObject()) {
         body["result"]["node_path"] = JV(persist_path_);
@@ -128,7 +128,7 @@ public:
         JV inner(JV::object_tag);
         inner["value"] = std::move(body["result"]);
         inner["node_path"] = JV(persist_path_);
-        body = ok_result(std::move(inner));
+        body = bridge_ok_result(std::move(inner));
       }
     }
     if (wrapped_)
@@ -575,7 +575,7 @@ JV op_eval_script(const JV &params, int64_t request_id) {
     memdelete(temp_node);
   }
 
-  JV body = ok_result(VariantJson::serialize(result));
+  JV body = bridge_ok_result(VariantJson::serialize(result));
   append_eval_runtime_errors(body, run_seq_before);
   if (persist) {
     if (body["result"].IsObject() && body["data"].IsObject()) {
@@ -585,7 +585,7 @@ JV op_eval_script(const JV &params, int64_t request_id) {
       JV inner(JV::object_tag);
       inner["value"] = std::move(body["result"]);
       inner["node_path"] = JV("/root/__gda_runtime/" + persist_name);
-      body = ok_result(std::move(inner));
+      body = bridge_ok_result(std::move(inner));
     }
   }
   if (wrapped_attempt)
@@ -608,7 +608,7 @@ JV op_eval_get_property(const JV &params) {
   if (prop_name.find('.') == std::string::npos) {
     godot::Variant value =
         node->get(godot::StringName(prop_name.c_str()));
-    JV body = ok_result(VariantJson::serialize(value));
+    JV body = bridge_ok_result(VariantJson::serialize(value));
     append_eval_runtime_errors(body, get_seq_before);
     return body;
   }
@@ -618,7 +618,7 @@ JV op_eval_get_property(const JV &params) {
     return target.error;
   godot::Variant dotted_value =
       target.owner->get(godot::StringName(target.leaf.c_str()));
-  JV dotted_body = ok_result(VariantJson::serialize(dotted_value));
+  JV dotted_body = bridge_ok_result(VariantJson::serialize(dotted_value));
   append_eval_runtime_errors(dotted_body, get_seq_before);
   return dotted_body;
 }
@@ -1231,7 +1231,7 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     return JV();
   }
 
-  JV body = ok_result(VariantJson::serialize(result));
+  JV body = bridge_ok_result(VariantJson::serialize(result));
   append_eval_runtime_errors(body, call_seq_before);
   return body;
 }

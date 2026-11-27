@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_DEBUG_TOOLS_HPP
 #define GODOT_AUTOPILOT_DEBUG_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -45,64 +45,64 @@ const std::vector<std::string> kGetDebugInfoActions = {
 const std::vector<std::string> kSetDebugVisualsActions = {
     "collision", "navigation", "performance"};
 
-inline mcp::JsonValue debug_monitors_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *catalog = args.Find("catalog");
+inline godot_autopilot::util::JsonValue debug_monitors_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *catalog = args.Find("catalog");
   if (catalog != nullptr && catalog->IsBool() && catalog->GetBool()) {
-    out["action"] = mcp::JsonValue("catalog");
+    out["action"] = godot_autopilot::util::JsonValue("catalog");
     return out;
   }
-  const mcp::JsonValue *ids = args.Find("ids");
+  const godot_autopilot::util::JsonValue *ids = args.Find("ids");
   if (ids != nullptr) {
-    out["action"] = mcp::JsonValue("monitors");
+    out["action"] = godot_autopilot::util::JsonValue("monitors");
     out["ids"] = *ids;
     return out;
   }
-  const mcp::JsonValue *include_custom = args.Find("include_custom");
+  const godot_autopilot::util::JsonValue *include_custom = args.Find("include_custom");
   if (include_custom != nullptr && include_custom->IsBool() &&
       include_custom->GetBool()) {
-    out["action"] = mcp::JsonValue("custom");
+    out["action"] = godot_autopilot::util::JsonValue("custom");
     return out;
   }
-  out["action"] = mcp::JsonValue("monitors");
+  out["action"] = godot_autopilot::util::JsonValue("monitors");
   return out;
 }
 
-inline mcp::JsonValue project_monitor_value(const mcp::JsonValue &result) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *inner = result.Find("result");
+inline godot_autopilot::util::JsonValue project_monitor_value(const godot_autopilot::util::JsonValue &result) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
   if (inner != nullptr && inner->IsArray() && inner->Size() > 0) {
-    const mcp::JsonValue *value = (*inner)[0].Find("value");
+    const godot_autopilot::util::JsonValue *value = (*inner)[0].Find("value");
     if (value != nullptr) {
       out["result"] = *value;
     }
   }
   if (!out.Contains("result")) {
-    out["error"] = mcp::JsonValue("monitor value not available");
+    out["error"] = godot_autopilot::util::JsonValue("monitor value not available");
   }
   return out;
 }
 
-inline mcp::JsonValue project_custom_monitor_names(
-    const mcp::JsonValue &result) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *inner = result.Find("result");
-  const mcp::JsonValue *names =
+inline godot_autopilot::util::JsonValue project_custom_monitor_names(
+    const godot_autopilot::util::JsonValue &result) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *names =
       inner != nullptr && inner->IsObject() ? inner->Find("custom_names")
                                             : nullptr;
   if (names != nullptr) {
     out["result"] = *names;
   } else {
-    out["error"] = mcp::JsonValue("custom monitor names not available");
+    out["error"] = godot_autopilot::util::JsonValue("custom monitor names not available");
   }
   return out;
 }
 
-inline mcp::JsonValue visual_args(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue visual_args(const godot_autopilot::util::JsonValue &args,
                                   const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
-  const mcp::JsonValue *enabled = args.Find("enabled");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
+  const godot_autopilot::util::JsonValue *enabled = args.Find("enabled");
   if (enabled != nullptr) {
     out["enabled"] = *enabled;
   }
@@ -144,19 +144,19 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {
           ToolAlias{
               "set_debug_collision_visual", "set_debug_visuals",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return visual_args(args, "collision");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_debug_navigation_visual", "set_debug_visuals",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return visual_args(args, "navigation");
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "set_debug_performance_visual", "set_debug_visuals",
-              [](const mcp::JsonValue &args) {
+              [](const godot_autopilot::util::JsonValue &args) {
                 return visual_args(args, "performance");
               },
               {}, "0.4.0", "0.6.0"},
@@ -180,11 +180,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               debug_monitors_args, {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debug_monitor", "get_debug_info",
-              [](const mcp::JsonValue &args) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("monitors");
-                mcp::JsonValue ids(mcp::JsonValue::array_tag);
-                const mcp::JsonValue *monitor = args.Find("monitor");
+              [](const godot_autopilot::util::JsonValue &args) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("monitors");
+                godot_autopilot::util::JsonValue ids(godot_autopilot::util::JsonValue::array_tag);
+                const godot_autopilot::util::JsonValue *monitor = args.Find("monitor");
                 if (monitor != nullptr) {
                   ids.PushBack(*monitor);
                 }
@@ -192,77 +192,77 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                 return out;
               },
               project_monitor_value, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
-                const mcp::JsonValue *monitor = args.Find("monitor");
+              [](const godot_autopilot::util::JsonValue &args) {
+                const godot_autopilot::util::JsonValue *monitor = args.Find("monitor");
                 if (monitor == nullptr || !monitor->IsNumber()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
-                  error["error"] = mcp::JsonValue(
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+                  error["error"] = godot_autopilot::util::JsonValue(
                       "missing required parameter: monitor (integer 0-58)");
                   return error;
                 }
-                return mcp::JsonValue();
+                return godot_autopilot::util::JsonValue();
               }},
           ToolAlias{
               "get_debug_monitor_catalog", "get_debug_info",
-              [](const mcp::JsonValue &) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("catalog");
+              [](const godot_autopilot::util::JsonValue &) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("catalog");
                 return out;
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debug_object_count", "get_debug_info",
-              [](const mcp::JsonValue &) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("object");
+              [](const godot_autopilot::util::JsonValue &) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("object");
                 return out;
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debug_memory_usage", "get_debug_info",
-              [](const mcp::JsonValue &) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("memory");
+              [](const godot_autopilot::util::JsonValue &) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("memory");
                 return out;
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debug_node_count", "get_debug_info",
-              [](const mcp::JsonValue &) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("node");
+              [](const godot_autopilot::util::JsonValue &) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("node");
                 return out;
               },
               {}, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debug_custom_monitor_names", "get_debug_info",
-              [](const mcp::JsonValue &) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("custom");
+              [](const godot_autopilot::util::JsonValue &) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("custom");
                 return out;
               },
               project_custom_monitor_names, "0.4.0", "0.6.0"},
           ToolAlias{
               "get_debug_custom_monitor", "get_debug_info",
-              [](const mcp::JsonValue &args) {
-                mcp::JsonValue out(mcp::JsonValue::object_tag);
-                out["action"] = mcp::JsonValue("custom");
-                const mcp::JsonValue *id = args.Find("id");
+              [](const godot_autopilot::util::JsonValue &args) {
+                godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+                out["action"] = godot_autopilot::util::JsonValue("custom");
+                const godot_autopilot::util::JsonValue *id = args.Find("id");
                 if (id != nullptr) {
                   out["id"] = *id;
                 }
                 return out;
               },
               {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
-                const mcp::JsonValue *id = args.Find("id");
+              [](const godot_autopilot::util::JsonValue &args) {
+                const godot_autopilot::util::JsonValue *id = args.Find("id");
                 if (id == nullptr || !id->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: id");
+                      godot_autopilot::util::JsonValue("missing required parameter: id");
                   return error;
                 }
-                return mcp::JsonValue();
+                return godot_autopilot::util::JsonValue();
               }},
       })));
   v.push_back(make_spec_tool(ToolSpec{

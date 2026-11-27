@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_LEGACY_STORE_HPP
 #define GODOT_AUTOPILOT_LEGACY_STORE_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <string>
 #include <vector>
@@ -59,7 +59,7 @@ public:
 
   static bool select_config_value(const std::string &primary_json,
                                   const std::string &legacy_json,
-                                  const char *key, mcp::JsonValue &out,
+                                  const char *key, godot_autopilot::util::JsonValue &out,
                                   bool &from_legacy, std::string &error);
 
   static LegacyTarget classify_relative_path(const std::string &relative_path);

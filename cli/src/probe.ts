@@ -1,15 +1,15 @@
 import net from "node:net";
 
 import { CliError, ExitCode } from "./errors";
+import { IpcSession, type IpcEndpoint } from "./ipc/client";
 
 export type ProbeLevel = "light" | "strict";
 
 export const PROBE_TIMEOUT_MS = 800;
 
-export interface ProbeTarget {
+export interface NativeProbeTarget {
   host: string;
   port: number;
-  url: string;
 }
 
 export function parseProbeLevel(text: string | undefined): ProbeLevel {
@@ -37,23 +37,68 @@ export function probeTcp(host: string, port: number, timeoutMs: number = PROBE_T
   });
 }
 
-export async function probeHttp(url: string, method: string, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<boolean> {
+function probeLocalPath(endpoint: IpcEndpoint, timeoutMs: number): Promise<boolean> {
+  const target = endpoint.kind === "pipe"
+    ? `\\\\.\\pipe\\${endpoint.name ?? ""}`
+    : endpoint.path ?? "";
+  if (target === "") return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (alive: boolean): void => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(alive);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    socket.connect(target);
+  });
+}
+
+function probeTransport(endpoint: IpcEndpoint, timeoutMs: number): Promise<boolean> {
+  if (endpoint.kind === "tcp") return probeTcp(endpoint.host ?? "127.0.0.1", endpoint.port ?? 0, timeoutMs);
+  const empty = endpoint.kind === "pipe" ? endpoint.name === undefined || endpoint.name === "" : endpoint.path === undefined || endpoint.path === "";
+  return empty ? Promise.resolve(false) : probeLocalPath(endpoint, timeoutMs);
+}
+
+export async function probeNativeEndpoint(
+  endpoint: IpcEndpoint,
+  level: ProbeLevel,
+  timeoutMs: number = PROBE_TIMEOUT_MS,
+): Promise<boolean> {
+  if (!(await probeTransport(endpoint, timeoutMs))) return false;
+  if (level === "light") return true;
+  const session = new IpcSession(endpoint, timeoutMs);
   try {
-    await fetch(url, { method, signal: AbortSignal.timeout(timeoutMs) });
+    await session.open();
+    await session.request({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "1", capabilities: {}, clientInfo: { name: "gda-probe", version: "1" } },
+    });
     return true;
   } catch {
     return false;
+  } finally {
+    session.close();
   }
 }
 
 export async function probeEndpoint(
-  target: ProbeTarget,
+  target: NativeProbeTarget,
   level: ProbeLevel,
   timeoutMs: number = PROBE_TIMEOUT_MS,
 ): Promise<boolean> {
-  if (!(await probeTcp(target.host, target.port, timeoutMs))) return false;
-  if (level === "light") return true;
-  return await probeHttp(target.url, "GET", timeoutMs);
+  return await probeNativeEndpoint(
+    { kind: "tcp", host: target.host, port: target.port },
+    level,
+    timeoutMs,
+  );
 }
 
 export const ENDPOINT_ALIVE_TTL_MS = 5000;

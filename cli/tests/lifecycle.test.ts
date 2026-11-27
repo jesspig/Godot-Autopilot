@@ -1,6 +1,7 @@
 import { afterEach, afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
@@ -277,8 +278,7 @@ if (!noListen && fakePort > 0 && fakeHome !== "" && fakeProject !== "") {
     project_path: fakeProject,
     api_token: "fake-token",
     endpoints: {
-      mcp: { host: "127.0.0.1", port: fakePort, path: "/mcp", protocol: "mcp", auth: "none" },
-      api: { host: "127.0.0.1", port: fakePort, path: "/api", protocol: "http", auth: "bearer" }
+      ipc: { kind: "tcp", host: "127.0.0.1", port: fakePort, protocol: "native-ipc-v1", framing: "length-prefixed-json", auth: "token", version: 1 }
     },
     started_at: Date.now(),
     version: "0.3.1",
@@ -290,45 +290,47 @@ if (process.env.GDA_FAKE_GODOT_EXIT === "1") {
 }
 if (!noListen) {
   const port = Number(process.env.GODOT_AUTOPILOT_PORT ?? "0");
-  Bun.serve({
-    port,
-    hostname: "127.0.0.1",
-    fetch: async (req) => {
-      const url = new URL(req.url);
-      if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-      let body = {};
-      try { body = await req.json(); } catch {}
-      const params = body.params ?? {};
-      const isDirect = params.name !== "call_tool";
-      const toolName = isDirect ? (params.name ?? null) : (params.arguments?.name ?? null);
-      report.calls.push({ method: body.method, name: toolName, direct: isDirect });
-      saveReport(report);
-      if (body?.method === "notifications/initialized") return new Response("{}", { status: 200 });
-      if (toolName === "ping" && isDirect && process.env.GDA_FAKE_GODOT_PING_FAIL === "1") {
-        return new Response(JSON.stringify({
-          jsonrpc: "2.0",
-          id: body?.id ?? 1,
-          error: { code: -32602, message: "mock ping failure" },
-        }), { status: 400, headers: { "content-type": "application/json" } });
+  const net = require("node:net");
+  const server = net.createServer((socket) => {
+    let buffer = Buffer.alloc(0);
+    socket.on("data", (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= 4) {
+        const size = buffer.readUInt32BE(0);
+        if (buffer.length < 4 + size) return;
+        const text = buffer.subarray(4, 4 + size).toString("utf8");
+        buffer = buffer.subarray(4 + size);
+        let body = {};
+        try { body = JSON.parse(text); } catch {}
+        const respond = (envelope) => {
+          const payload = Buffer.from(JSON.stringify(envelope), "utf8");
+          const header = Buffer.alloc(4);
+          header.writeUInt32BE(payload.length, 0);
+          socket.write(Buffer.concat([header, payload]));
+        };
+        if (body.method === "initialize") {
+          respond({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "1", capabilities: {}, serverInfo: { name: "fake", version: "0.3.1" } } });
+          continue;
+        }
+        if (body.method === "notifications/initialized") continue;
+        const params = body.params ?? {};
+        const isDirect = params.name !== "call_tool";
+        const toolName = isDirect ? (params.name ?? null) : (params.arguments?.name ?? null);
+        report.calls.push({ method: body.method, name: toolName, direct: isDirect });
+        saveReport(report);
+        if (toolName === "ping" && isDirect && process.env.GDA_FAKE_GODOT_PING_FAIL === "1") {
+          respond({ jsonrpc: "2.0", id: body.id, error: { code: -32602, message: "mock ping failure" } });
+          continue;
+        }
+        if (toolName === "ping" && !isDirect) {
+          respond({ jsonrpc: "2.0", id: body.id, error: { code: -32602, message: "ping must be called directly" } });
+          continue;
+        }
+        respond({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] } });
       }
-      if (toolName === "ping" && !isDirect) {
-        return new Response(JSON.stringify({
-          jsonrpc: "2.0",
-          id: body?.id ?? 1,
-          error: { code: -32602, message: "ping is a meta tool and must be called directly" },
-        }), { status: 400, headers: { "content-type": "application/json" } });
-      }
-      const payload = {
-        jsonrpc: "2.0",
-        id: body?.id ?? 1,
-        result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] },
-      };
-      return new Response("event: message\\ndata: " + JSON.stringify(payload) + "\\n\\n", {
-        status: 200,
-        headers: { "content-type": "text/event-stream" },
-      });
-    },
+    });
   });
+  server.listen(port, "127.0.0.1");
 } else {
   setTimeout(() => {}, 30000);
 }
@@ -473,7 +475,7 @@ describe.serial("list", () => {
   test("空登记输出 [] 且 exit 0", async () => {
     const { code, stdout } = await captureStdout(() => runList([], {}));
     expect(code).toBe(ExitCode.Success);
-    expect(stdout.trim()).toBe("[]");
+    expect((JSON.parse(stdout) as { data: unknown }).data).toEqual([]);
   });
 
   test("只输出存活实例并标注 live", async () => {
@@ -485,7 +487,7 @@ describe.serial("list", () => {
       writeEntry(makeEntry({ id: "pdead", pid: dead, project: path.join(tmp, "b") }));
       const { code, stdout } = await captureStdout(() => runList([], {}));
       expect(code).toBe(ExitCode.Success);
-      const parsed = JSON.parse(stdout);
+      const parsed = (JSON.parse(stdout) as { data: Array<Record<string, unknown>> }).data;
       expect(parsed).toHaveLength(1);
       expect(parsed[0].id).toBe(`p${runner.pid}`);
       expect(parsed[0].live).toBe(true);
@@ -633,7 +635,8 @@ describe.skip("start", () => {
   }, TEST_TIMEOUT_MS);
 
   test("端口被占用时自动跳过选择下一个", async () => {
-    const blocker = Bun.serve({ port: 9530, hostname: "127.0.0.1", fetch: () => new Response("x") });
+    const blocker = net.createServer();
+    await new Promise<void>((resolve) => blocker.listen(9530, "127.0.0.1", resolve));
     try {
       const { code } = await startFake({ headless: true });
       expect(code).toBe(ExitCode.Success);
@@ -641,7 +644,7 @@ describe.skip("start", () => {
       expect(instances).toHaveLength(1);
       expect(instances[0].port).not.toBe(9530);
     } finally {
-      blocker.stop();
+      await new Promise<void>((resolve) => blocker.close(() => resolve()));
     }
   }, TEST_TIMEOUT_MS);
 
@@ -774,7 +777,7 @@ describe.serial("stop", () => {
       const { code, stderr, stdout } = await captureStdout(() => runStop([`p${runner.pid}`], { waitText: "1" }));
       expect(code).toBe(ExitCode.Transport);
       expect(stderr).toContain("--force");
-      expect(JSON.parse(stdout).ok).toBe(false);
+      expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(false);
       expect(isAlive(runner.pid)).toBe(true);
       expect(registeredInstances()).toHaveLength(1);
     } finally {
@@ -789,7 +792,7 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${pid}`, pid, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([`p${pid}`], { force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(stdout).ok).toBe(true);
+    expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
@@ -821,7 +824,7 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9601, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([], { id: `p${pid}`, force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(stdout).ok).toBe(true);
+    expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
@@ -832,7 +835,7 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9602, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([], { portText: "9602", force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(JSON.parse(stdout).ok).toBe(true);
+    expect((JSON.parse(stdout) as { data: { ok: boolean } }).data.ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
@@ -924,7 +927,7 @@ describe.serial("CLI 端到端", () => {
       encoding: "utf8",
     });
     expect(result.status).toBe(ExitCode.Success);
-    expect(result.stdout.trim()).toBe("[]");
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
   });
 
   test("gda stop nope 未命中 exit 2", () => {
@@ -935,5 +938,81 @@ describe.serial("CLI 端到端", () => {
     });
     expect(result.status).toBe(ExitCode.Transport);
     expect(result.stderr).toContain("gda list");
+  });
+});
+
+describe.serial("T-08 命令树与 alias", () => {
+  function cliRoot(): string {
+    return path.resolve(import.meta.dir, "..", "..");
+  }
+
+  function invoke(args: string[]) {
+    return spawnSync(process.execPath, ["cli/bin/gda.ts", ...args], {
+      cwd: cliRoot(),
+      env: { ...process.env, GODOT_AUTOPILOT_CLI_HOME: tmp, GODOT_AUTOPILOT_HOME: tmp },
+      encoding: "utf8",
+    });
+  }
+
+  test("gda editor list 空登记输出 []", () => {
+    const result = invoke(["editor", "list"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
+  });
+
+  test("gda editor status 无实例输出原生状态错误且无传输专属字段", () => {
+    const result = invoke(["editor", "status"]);
+    expect(result.status).toBe(ExitCode.Transport);
+    const body = JSON.parse(result.stdout);
+    expect(body.ok).toBe(false);
+    for (const forbidden of ["http_url", "endpoint_url", "protocol_version", "server_info"]) {
+      expect(Object.keys(body)).not.toContain(forbidden);
+    }
+  });
+
+  test("gda editor stop 未命中 exit 2", () => {
+    const result = invoke(["editor", "stop", "nope"]);
+    expect(result.status).toBe(ExitCode.Transport);
+  });
+
+  test("projects 旧顶层 alias 仍可用", () => {
+    const result = invoke(["projects"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect((JSON.parse(result.stdout) as { data: unknown }).data).toEqual([]);
+  });
+
+  test("ping 旧顶层 alias 帮助指向 editor ping", () => {
+    const result = invoke(["ping", "--help"]);
+    expect(result.status).toBe(ExitCode.Success);
+    expect(result.stdout).toContain("Invoke: gda editor ping");
+    expect(result.stdout).toContain("Subcommand: ping");
+  });
+
+  test("gda tool categories --offline 无缓存报传输错误", () => {
+    const result = invoke(["tool", "categories", "--offline"]);
+    expect(result.status).toBe(ExitCode.Transport);
+    expect(result.stderr).toContain("offline catalog");
+  });
+
+  test("gda shell 缺少 --protocol ndjson 报用法错误", () => {
+    const result = invoke(["shell", "run", "echo hi", "--protocol", "text"]);
+    expect(result.status).toBe(ExitCode.Usage);
+    expect(result.stderr).toContain("--protocol ndjson");
+  });
+
+  test("gda doctor --ci 输出稳定字段", () => {
+    const result = invoke(["doctor", "--ci"]);
+    expect(result.status).toBe(ExitCode.Success);
+    const body = JSON.parse(result.stdout) as {
+      schema_version: number;
+      data: { mode: string; checks: Array<{ code: string; remediation: string }> };
+    };
+    expect(body.schema_version).toBe(1);
+    expect(body.data.mode).toBe("ci");
+    expect(Array.isArray(body.data.checks)).toBe(true);
+    for (const check of body.data.checks) {
+      expect(typeof check.code).toBe("string");
+      expect(typeof check.remediation).toBe("string");
+    }
   });
 });

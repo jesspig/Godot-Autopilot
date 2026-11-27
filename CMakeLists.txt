@@ -95,7 +95,10 @@ target_include_directories(godot-autopilot PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}/generated)
 
-target_link_libraries(godot-autopilot PRIVATE godot-cpp mcp-server mcp-http)
+target_link_libraries(godot-autopilot PRIVATE godot-cpp)
+if(WIN32)
+    target_link_libraries(godot-autopilot PRIVATE ws2_32)
+endif()
 if(MSVC)
     target_link_options(godot-autopilot PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()

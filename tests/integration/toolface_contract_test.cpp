@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstddef>
 #include <set>
@@ -30,26 +30,26 @@ struct ToolFacts {
   bool complete = false;
 };
 
-mcp::JsonValue empty_object() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue empty_object() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-mcp::JsonValue call_search_all(IntegrationHarness &harness) {
-  mcp::JsonValue args = empty_object();
-  args["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
+godot_autopilot::util::JsonValue call_search_all(IntegrationHarness &harness) {
+  godot_autopilot::util::JsonValue args = empty_object();
+  args["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
   return harness.call("search_tools", args);
 }
 
-mcp::JsonValue call_tool_detail(IntegrationHarness &harness,
+godot_autopilot::util::JsonValue call_tool_detail(IntegrationHarness &harness,
                                 const std::string &name) {
-  mcp::JsonValue args = empty_object();
-  args["name"] = mcp::JsonValue(name);
+  godot_autopilot::util::JsonValue args = empty_object();
+  args["name"] = godot_autopilot::util::JsonValue(name);
   return harness.call("get_tool_detail", args);
 }
 
 std::vector<std::string> enumerate_tool_names(IntegrationHarness &harness) {
   std::vector<std::string> names;
-  const mcp::JsonValue result = call_search_all(harness);
+  const godot_autopilot::util::JsonValue result = call_search_all(harness);
   const auto *results = result.Find("results");
   if (!results || !results->IsArray()) {
     return names;
@@ -71,7 +71,7 @@ ToolFacts read_tool_facts(IntegrationHarness &harness,
                           const std::string &name) {
   ToolFacts facts;
   facts.name = name;
-  const mcp::JsonValue detail = call_tool_detail(harness, name);
+  const godot_autopilot::util::JsonValue detail = call_tool_detail(harness, name);
   const auto *tool = detail.Find("tool");
   if (!tool || !tool->IsObject()) {
     return facts;
@@ -127,7 +127,7 @@ std::string call_group_of(const ToolFacts &facts) {
   return kGroupCandidate;
 }
 
-std::string error_text_of(const mcp::JsonValue &response) {
+std::string error_text_of(const godot_autopilot::util::JsonValue &response) {
   const auto *error = response.Find("error");
   if (error && error->IsString()) {
     return error->GetString();
@@ -135,16 +135,16 @@ std::string error_text_of(const mcp::JsonValue &response) {
   return std::string();
 }
 
-bool is_authorization_denied(const mcp::JsonValue &response) {
+bool is_authorization_denied(const godot_autopilot::util::JsonValue &response) {
   (void)response;
   return false;
 }
 
 void expect_missing_parameter_error(IntegrationHarness &harness,
                                     const ToolFacts &facts) {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
-  args["confirm"] = mcp::JsonValue(true);
-  const mcp::JsonValue response = harness.call(facts.name, args);
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
+  const godot_autopilot::util::JsonValue response = harness.call(facts.name, args);
   EXPECT_TRUE(response.IsObject()) << facts.name << " -> " << response.Dump();
   if (!response.IsObject()) {
     return;
@@ -158,7 +158,7 @@ void expect_missing_parameter_error(IntegrationHarness &harness,
 
 void expect_authorization_error(IntegrationHarness &harness,
                                 const ToolFacts &facts) {
-  const mcp::JsonValue response = harness.call(facts.name, empty_object());
+  const godot_autopilot::util::JsonValue response = harness.call(facts.name, empty_object());
   EXPECT_TRUE(response.IsObject()) << facts.name << " -> " << response.Dump();
   if (!response.IsObject()) {
     return;
@@ -197,7 +197,7 @@ void run_empty_arg_group(IntegrationHarness &harness, const char *group,
 }
 
 TEST_F(IntegrationHarness, SearchToolsEmptyQueryEnumeratesAllTools) {
-  const mcp::JsonValue result = call_search_all(*this);
+  const godot_autopilot::util::JsonValue result = call_search_all(*this);
   ASSERT_TRUE(result.IsObject()) << result.Dump();
   const auto *results = result.Find("results");
   ASSERT_NE(results, nullptr) << result.Dump();
@@ -226,7 +226,7 @@ TEST_F(IntegrationHarness, MetaToolsDistinguishableByCategoryField) {
   std::set<std::string> categories;
   std::vector<std::string> meta_names;
   for (const auto &name : names) {
-    const mcp::JsonValue detail = call_tool_detail(*this, name);
+    const godot_autopilot::util::JsonValue detail = call_tool_detail(*this, name);
     const auto *tool = detail.Find("tool");
     EXPECT_NE(tool, nullptr) << name << " -> " << detail.Dump();
     if (!tool) {
@@ -261,7 +261,7 @@ TEST_F(IntegrationHarness, DetailContractForEveryEnumeratedTool) {
   ASSERT_FALSE(names.empty());
   std::size_t checked = 0;
   for (const auto &name : names) {
-    const mcp::JsonValue detail = call_tool_detail(*this, name);
+    const godot_autopilot::util::JsonValue detail = call_tool_detail(*this, name);
     EXPECT_TRUE(detail.IsObject()) << name << " -> " << detail.Dump();
     const auto *tool = detail.Find("tool");
     EXPECT_NE(tool, nullptr) << name << " -> " << detail.Dump();
@@ -291,7 +291,7 @@ TEST_F(IntegrationHarness, DetailContractForEveryEnumeratedTool) {
 }
 
 TEST_F(IntegrationHarness, DetailContractUnknownNameReportsToolNotFound) {
-  const mcp::JsonValue detail =
+  const godot_autopilot::util::JsonValue detail =
       call_tool_detail(*this, "gda_contract_no_such_tool_probe");
   const auto *error = detail.Find("error");
   ASSERT_NE(error, nullptr) << detail.Dump();

@@ -1,0 +1,15 @@
+command: cmake --preset debug
+exit_code: 0
+result: configure done; build files generated
+
+command: cmake --build --preset debug
+first_attempt_exit_code: 143
+first_attempt_reason: 120 second harness timeout after 759/1621 steps; no compiler error observed
+resume_exit_code: 0
+resume_result: incremental build completed; godot-autopilot.dll and unit/boundary/integration test executables linked
+final_progress: 862/863
+artifacts:
+  - build/debug/godot-autopilot.dll
+  - build/debug/tests/gda_unit_tests.exe
+  - build/debug/tests/gda_boundary_tests.exe
+  - build/debug/tests/gda_integration_tests.exe

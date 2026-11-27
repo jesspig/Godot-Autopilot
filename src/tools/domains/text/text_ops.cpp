@@ -35,7 +35,7 @@
 namespace godot_autopilot {
 namespace text_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -585,11 +585,11 @@ std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
   return infos;
 }
 
-mcp::JsonValue script_load_diagnostics(bool loaded, bool instantiable) {
-  mcp::JsonValue diag(mcp::JsonValue::object_tag);
-  diag["ok"] = mcp::JsonValue(loaded);
+godot_autopilot::util::JsonValue script_load_diagnostics(bool loaded, bool instantiable) {
+  godot_autopilot::util::JsonValue diag(godot_autopilot::util::JsonValue::object_tag);
+  diag["ok"] = godot_autopilot::util::JsonValue(loaded);
   if (loaded)
-    diag["instantiable"] = mcp::JsonValue(instantiable);
+    diag["instantiable"] = godot_autopilot::util::JsonValue(instantiable);
   return diag;
 }
 
@@ -791,25 +791,25 @@ JV build_script_diagnostics(const godot::String &gs_path,
 
 } // namespace
 
-mcp::JsonValue file_write_failure_json(
+godot_autopilot::util::JsonValue file_write_failure_json(
     const std::string &path, const std::string &mode,
     const resource_fs::TextWriteResult &result) {
-  mcp::JsonValue error = util::error_json(
+  godot_autopilot::util::JsonValue error = util::error_json(
       "file write failed for " + path + ": " + result.message);
-  mcp::JsonValue details(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue details(godot_autopilot::util::JsonValue::object_tag);
   details["code"] =
-      mcp::JsonValue(resource_fs::text_write_failure_code(result.failure));
-  details["path"] = mcp::JsonValue(path);
-  details["mode"] = mcp::JsonValue(mode);
+      godot_autopilot::util::JsonValue(resource_fs::text_write_failure_code(result.failure));
+  details["path"] = godot_autopilot::util::JsonValue(path);
+  details["mode"] = godot_autopilot::util::JsonValue(mode);
   details["io_error"] =
-      mcp::JsonValue(static_cast<int64_t>(result.io_error));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(result.io_error));
   details["expected_bytes"] =
-      mcp::JsonValue(static_cast<int64_t>(result.expected_bytes));
-  details["created"] = mcp::JsonValue(result.created);
-  details["append_created"] = mcp::JsonValue(result.append_created);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(result.expected_bytes));
+  details["created"] = godot_autopilot::util::JsonValue(result.created);
+  details["append_created"] = godot_autopilot::util::JsonValue(result.append_created);
   if (result.actual_bytes >= 0) {
     details["actual_bytes"] =
-        mcp::JsonValue(static_cast<int64_t>(result.actual_bytes));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(result.actual_bytes));
   }
   error["structured_error"] = std::move(details);
   return error;

@@ -1,0 +1,21 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-json/build/debug
+    Start 547: McpWireTest.RejectsMalformedBody
+1/1 Test #547: McpWireTest.RejectsMalformedBody ...***Failed    0.35 sec
+Running main() from C:\Users\jesspig\Documents\Projects\VibeCoding\Godot-Autopilot\.worktrees\cli-native-control-plane-json\third_party\googletest\googletest\src\gtest_main.cc
+Note: Google Test filter = McpWireTest.RejectsMalformedBody
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpWireTest
+[ RUN      ] McpWireTest.RejectsMalformedBody
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+unit    =   0.35 sec*proc (1 test)
+
+Total Test time (real) =   0.39 sec
+
+The following tests FAILED:
+	547 - McpWireTest.RejectsMalformedBody (Failed)         unit
+Errors while running CTest

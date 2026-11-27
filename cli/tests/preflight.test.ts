@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import net from "node:net";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -63,7 +64,6 @@ function pluginRecord(port: number, pid: number): Record<string, unknown> {
     project_path: projectDir,
     api_token: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     endpoints: {
-      mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
       api: { host: "127.0.0.1", port, path: "/api", protocol: "http", auth: "bearer" },
     },
     started_at: 1760000000000,
@@ -91,9 +91,10 @@ describe("detectActiveInstance", () => {
   });
 
   test("插件实例索引的存活且端口可达记录被命中", async () => {
-    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
+    const server = net.createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
-      const port = server.port!;
+      const port = (server.address() as net.AddressInfo).port;
       writePluginIndex([pluginRecord(port, process.pid)]);
       const active = await detectActiveInstance(projectDir);
       expect(active).not.toBeUndefined();
@@ -101,7 +102,7 @@ describe("detectActiveInstance", () => {
       expect(active!.port).toBe(port);
       expect(active!.pid).toBe(process.pid);
     } finally {
-      server.stop(true);
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 
@@ -111,24 +112,26 @@ describe("detectActiveInstance", () => {
   });
 
   test("插件实例索引记录进程已死时忽略", async () => {
-    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
+    const server = net.createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
-      writePluginIndex([pluginRecord(server.port!, 999999)]);
+      writePluginIndex([pluginRecord((server.address() as net.AddressInfo).port, 999999)]);
       expect(await detectActiveInstance(projectDir)).toBeUndefined();
     } finally {
-      server.stop(true);
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 
   test("其它工程的插件实例索引记录不被计入", async () => {
-    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
+    const server = net.createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
-      const record = pluginRecord(server.port!, process.pid);
+      const record = pluginRecord((server.address() as net.AddressInfo).port, process.pid);
       record["project_path"] = path.join(tmp, "other-proj");
       writePluginIndex([record]);
       expect(await detectActiveInstance(projectDir)).toBeUndefined();
     } finally {
-      server.stop(true);
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 });

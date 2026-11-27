@@ -24,7 +24,7 @@
 | 3 | `gda call --project <project-dir> system_status`（连续两次） | 两次均退出码 0 |
 
 - 退出码语义：0 成功 / 1 工具失败 / 2 传输环境失败 / 3 用法错误。
-- 失败时记录命令、退出码与 `gda status` / `gda list` 的实例、端口、`mcp_url`、`live`。按「先记录上下文再自重启」重试环境准备一次再复测；`status.project` 不匹配则自重启到目标工程后重跑；CLI 成功而 MCP 调用失败记为客户端路径问题；端口无监听则查 `%LOCALAPPDATA%\CrashDumps` 后自重启一次，仍失败转报告记阻断。
+- 失败时记录命令、退出码与 `gda status --format json` / `gda list` 的实例、端口、`live`。按「先记录上下文再自重启」重试环境准备一次再复测；`status.project` 不匹配则自重启到目标工程后重跑；连接记录正常而 CLI 调用失败记为 CLI 路径问题；端口无监听则查 `%LOCALAPPDATA%\CrashDumps` 后自重启一次，仍失败转报告记阻断。
 - `system_status` 要求 `running=true`；不可达按上条重试一次，仍不可达转报告记阻断。
 - 用 `execute_script`（confirm=true）读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`；被拒时记录原因，不推测。
 - 以 `search_tools` / `gda describe` 确认工具名与参数，不凭记忆调用。

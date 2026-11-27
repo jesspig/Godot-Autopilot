@@ -1,8 +1,8 @@
-import { parseTransport, type GlobalOptions } from "../args";
+import type { GlobalOptions } from "../args";
 import { fnv1a32 } from "../hash";
 import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
-import { callTool, ensureConnection, getHandshakeInfo } from "../mcp/client";
+import { callTool } from "../rpc/client";
 import { assertCallFamilyUsage, callTimeoutSec, extractPayload } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type ResolvedTarget, type TargetContext } from "../target";
@@ -17,11 +17,7 @@ function asRecord(value: unknown): Record<string, unknown> {
   return {};
 }
 
-function buildStatus(
-  target: ResolvedTarget,
-  payload: Record<string, unknown>,
-  transport: "ipc" | "http",
-): Record<string, unknown> {
+function buildStatus(target: ResolvedTarget, payload: Record<string, unknown>): Record<string, unknown> {
   const pluginVersion =
     typeof payload.version === "string" ? payload.version : target.pluginVersion;
   const toolCount =
@@ -29,6 +25,7 @@ function buildStatus(
   return {
     schema_version: 1,
     ok: true,
+    command: "editor.status",
     project:
       target.pluginRecord?.projectPath ??
       target.instance?.project ??
@@ -39,11 +36,8 @@ function buildStatus(
     plugin_version: pluginVersion,
     cli_version: CLI_VERSION,
     protocol_version: "1",
-    mcp: getHandshakeInfo(target.port),
     port: target.port,
     port_source: target.portSource,
-    mcp_url: target.mcpUrl,
-    transport,
     ipc_kind: target.ipcEndpoint?.kind ?? "",
     toolset_hash: fnv1a32(`${pluginVersion}:${toolCount}`),
     server: payload,
@@ -52,27 +46,18 @@ function buildStatus(
 
 export async function run(_positional: string[], opts: GlobalOptions): Promise<number> {
   assertCallFamilyUsage("status", opts);
-  const transportMode = parseTransport(opts.transportText);
   try {
     const target = resolveTarget(opts, TARGET_CONTEXT);
-    let actualTransport: "ipc" | "http" = target.transport;
-    if (transportMode !== "ipc") {
-      await ensureConnection(target.port, callTimeoutSec(opts));
-    }
     const envelope = await callTool("system_status", {}, {
       port: target.port,
       timeoutSec: callTimeoutSec(opts),
       ipcEndpoint: target.ipcEndpoint,
-      transport: transportMode,
-      noFallback: opts.noFallback,
-      transportSink: (transport) => {
-        actualTransport = transport;
-      },
+      traceparent: undefined,
     });
     const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
     const payload = asRecord(extracted.display);
-    const status = buildStatus(target, payload, actualTransport);
-    writeJson(status, opts);
+    const status = buildStatus(target, payload);
+    writeJson(status, opts, "editor.status", !extracted.toolFailed);
     return extracted.toolFailed ? ExitCode.ToolFailure : ExitCode.Success;
   } catch (error) {
     if (error instanceof CliError) {
@@ -80,16 +65,17 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
         {
           schema_version: 1,
           ok: false,
+          command: "editor.status",
           cli_version: CLI_VERSION,
           error: error.message,
           port: null,
           port_source: "",
-          mcp_url: null,
-          transport: null,
           ipc_kind: "",
           toolset_hash: "",
         },
         opts,
+        "editor.status",
+        false,
       );
       return error.code;
     }

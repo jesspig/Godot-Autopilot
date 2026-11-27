@@ -1,0 +1,16 @@
+Test project C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane/build/debug
+    Start 1266: source_manifest_guard
+1/4 Test #1266: source_manifest_guard .............   Passed    0.07 sec
+    Start 1267: source_manifest_guard_self_test
+2/4 Test #1267: source_manifest_guard_self_test ...   Passed    0.08 sec
+    Start 1268: no_mcp_guard
+3/4 Test #1268: no_mcp_guard ......................   Passed    0.19 sec
+    Start 1269: no_mcp_json_guard
+4/4 Test #1269: no_mcp_json_guard .................   Passed    0.09 sec
+
+100% tests passed out of 4
+
+Label Time Summary:
+guard    =   0.42 sec*proc (4 tests)
+
+Total Test time (real) =   0.48 sec

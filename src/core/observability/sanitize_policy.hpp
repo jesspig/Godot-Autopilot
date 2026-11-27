@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot_autopilot {
 namespace sanitize_policy {
@@ -161,23 +161,23 @@ inline bool metadata_marks_sensitive(std::string_view metadata_key,
 }
 
 struct RedactionResult {
-  mcp::JsonValue value;
+  godot_autopilot::util::JsonValue value;
   bool redacted = false;
 };
 
 namespace detail {
 
 inline RedactionResult redact_json_impl(
-    const mcp::JsonValue &value, const std::vector<std::string> &allowed_keys) {
+    const godot_autopilot::util::JsonValue &value, const std::vector<std::string> &allowed_keys) {
   if (value.IsObject()) {
-    RedactionResult result{mcp::JsonValue(mcp::JsonValue::object_tag), false};
+    RedactionResult result{godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag), false};
     for (const auto &entry : value.GetObject()) {
       if (sensitive_key_is_allowed(entry.first, allowed_keys)) {
         result.value[entry.first] = entry.second;
         continue;
       }
       if (is_sensitive_key(entry.first)) {
-        result.value[entry.first] = mcp::JsonValue(kRedactedValue);
+        result.value[entry.first] = godot_autopilot::util::JsonValue(kRedactedValue);
         result.redacted = true;
         continue;
       }
@@ -188,8 +188,8 @@ inline RedactionResult redact_json_impl(
     return result;
   }
   if (value.IsArray()) {
-    RedactionResult result{mcp::JsonValue(mcp::JsonValue::array_tag), false};
-    for (const mcp::JsonValue &item : value.GetArray()) {
+    RedactionResult result{godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag), false};
+    for (const godot_autopilot::util::JsonValue &item : value.GetArray()) {
       RedactionResult child = redact_json_impl(item, allowed_keys);
       result.value.PushBack(std::move(child.value));
       result.redacted = result.redacted || child.redacted;
@@ -202,7 +202,7 @@ inline RedactionResult redact_json_impl(
 } // namespace detail
 
 inline RedactionResult redact_sensitive_values(
-    const mcp::JsonValue &value,
+    const godot_autopilot::util::JsonValue &value,
     const std::vector<std::string> &allowed_keys = {}) {
   return detail::redact_json_impl(value, allowed_keys);
 }

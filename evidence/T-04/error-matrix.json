@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "protocol": "gda-gcp/1",
+  "codes": [
+    { "id": "E-06", "numeric": 6, "symbol": "unsupported_version" },
+    { "id": "E-07", "numeric": 7, "symbol": "auth_failed" },
+    { "id": "E-08", "numeric": 8, "symbol": "instance_mismatch" },
+    { "id": "E-09", "numeric": 9, "symbol": "result_unknown" },
+    { "id": "E-10", "numeric": 10, "symbol": "cursor_expired" },
+    { "id": "E-11", "numeric": 11, "symbol": "export_in_progress" },
+    { "id": "E-12", "numeric": 12, "symbol": "main_thread_timeout" },
+    { "id": "E-13", "numeric": 13, "symbol": "confirmation_required" },
+    { "id": "E-14", "numeric": 14, "symbol": "task_not_found" },
+    { "id": "E-15", "numeric": 15, "symbol": "backpressure_exceeded" }
+  ],
+  "methods": [
+    "hello",
+    "capabilities.get",
+    "catalog.list",
+    "catalog.search",
+    "catalog.describe",
+    "call.start",
+    "call.get",
+    "call.confirm",
+    "task.list",
+    "task.get",
+    "task.cancel",
+    "events.subscribe",
+    "events.resume",
+    "trace.get"
+  ],
+  "statuses": ["ok", "error", "pending", "needs_confirmation"]
+}

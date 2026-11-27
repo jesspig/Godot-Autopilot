@@ -1,0 +1,35 @@
+T-07 新增测试用例清单（未运行 bun test / tsc / 构建；不宣称通过）
+
+cli/tests/command-spec.test.ts
+  - 一级领域恰好 24 项，与 D-03 一致
+  - search/filter/categories 不作为一级领域，search/categories 为 tool 二级动作
+  - docs/debug/logs 为一级领域
+  - 每个 spec 完整表达 group/subcommand/tools/action/positional/flags/output/risk/long_running/examples
+  - manifest 输出 name/path/positional/flags/output.schema/risk/invoke
+  - 全局 flags + 位置参数解析
+  - 命令专属 flag 越界被拒绝（--extends 用于 tool.search）
+  - MCP 专属 flag（--mcp-url）被拒绝
+  - 互斥 flags（--json/--raw）被拒绝
+  - 数字 flag（--tail/--slow）校验
+  - 必需位置参数缺失、多余位置参数均退出 3
+  - 可选位置参数可省略
+  - alias 解析、重复 alias 拒绝、未知目标拒绝
+  - 补全候选来自同一 spec
+
+cli/tests/help-snapshots.test.ts
+  - editor.stop 帮助关键行快照
+  - 全部 85 个子命令帮助首行/Subcommand/Group/Output/Risk
+  - 每个领域帮助列出全部二级动作；search/filter 无领域帮助
+  - gda commands --help 列出全部一级领域
+
+cli/tests/command-alias.test.ts
+  - 24 个旧顶层命令均有 alias
+  - 所有 alias 目标解析到已注册 spec
+  - 二级 alias 优先于一级 alias（install plugin / install，resources read / resources）
+  - alias 帮助指向新子命令（start -> editor.start，tasks wait -> job.wait）
+  - alias/spec 不引入 MCP 专属 flags
+
+运行时自检（非测试）：
+  - bun cli/scripts/generate-command-manifest.ts 执行成功，写出 85 commands / 24 groups
+  - bun -e 导入 command-spec 后解析 editor.stop 的 --wait/--force 互斥、alias 帮助、
+    补全候选与 manifest 计数均返回预期值

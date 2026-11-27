@@ -3,27 +3,27 @@
 namespace godot_autopilot {
 namespace util {
 
-mcp::JsonValue error_json(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
+godot_autopilot::util::JsonValue error_json(const std::string &msg) {
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue(msg);
   return e;
 }
 
-mcp::JsonValue ok_result(mcp::JsonValue value) {
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue ok_result(godot_autopilot::util::JsonValue value) {
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(value);
   return r;
 }
 
-const mcp::JsonValue *find_result_or_data(const mcp::JsonValue &body) {
-  if (const mcp::JsonValue *v = body.Find("result")) {
+const godot_autopilot::util::JsonValue *find_result_or_data(const godot_autopilot::util::JsonValue &body) {
+  if (const godot_autopilot::util::JsonValue *v = body.Find("result")) {
     return v;
   }
   return body.Find("data");
 }
 
-mcp::JsonValue *find_result_or_data(mcp::JsonValue &body) {
-  if (mcp::JsonValue *v = body.Find("result")) {
+godot_autopilot::util::JsonValue *find_result_or_data(godot_autopilot::util::JsonValue &body) {
+  if (godot_autopilot::util::JsonValue *v = body.Find("result")) {
     return v;
   }
   return body.Find("data");
@@ -34,7 +34,7 @@ std::string to_std(const godot::String &s) {
   return std::string(utf8.ptr());
 }
 
-mcp::JsonValue error_detail(const std::string &fact,
+godot_autopilot::util::JsonValue error_detail(const std::string &fact,
                             const std::string &position,
                             const std::string &expected,
                             const std::string &action) {

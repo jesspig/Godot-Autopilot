@@ -1,0 +1,51 @@
+T-15 真实 Godot 引擎 smoke 根因调查与止损报告
+================================================
+
+执行环境
+- Godot：4.7.2.stable.mono.official.ed1daf0bf（本机 C:\Users\jesspig\Documents\Godot\default\Godot.exe）
+- GDExtension：cmake --preset debug 构建，build/debug/godot-autopilot.dll 部署到测试工程 addon
+- CLI：bun 解释执行 cli/bin/gda.ts（注：bun build --compile 独立二进制在 Windows 上 fs.openSync(lock,"wx") 报 EPERM，与本次问题无关；已加 --cli-runner 支持）
+- 隔离 GDA_HOME：临时目录，避免与用户既有编辑器实例冲突
+
+最终状态：fail — 21 步中 6 pass / 13 fail / 1 skip(headless 截图) / 1 pending(导出期拒绝需人工)
+
+已确认并修复的 CLI↔C++ 契约问题（3 处，均在 engine-gate 分支 cli/src/discovery.ts）
+--------------------------------------------------------------------------
+1. native IPC 首帧握手冲突
+   - 症状：editor status/ping 全部 "native IPC connection closed"
+   - 根因：CLI GCP 帧 {v,kind,method} 无 token；C++ ipc_transport.cpp 强制每个连接首帧为 JSON-RPC initialize + gda_token（authenticate()）。server_context 已分流 GCP 但 transport 前置握手让 GCP 帧收不到。
+   - 修复：GcpIpcSession 在 endpoint.token 存在时先发 initialize(params._meta.gda_token) + notifications/initialized 再发 GCP 帧；无 token 的测试 fake server 不受影响（柔性）。保持 token 认证不降级。
+   - 用户裁决：选"CLI 先握手，保持认证"方案。
+
+2. traceparent malformed (code 9)
+   - 症状：握手后 gcp_hello/gcp_status 报 "trace.traceparent is malformed"
+   - 根因：CLI buildGcpRequest 的 trace 为空对象 {}；C++ gcp_envelope.cpp valid_traceparent 要求 55 字符 W3C 格式，validate() 在 response fallback 之前执行。
+   - 修复：buildGcpRequest 生成 makeTraceparent()（00-<32hex>-<16hex>-01）。
+   - 验证：gcp_hello 转绿，真实引擎返回 instance.id/pid/ready=true/ipc_kind=tcp。
+
+3. 异步 tool 任务未等待
+   - 症状：scene open / system_status 返回 task_id + result:null + ok=false "tool failure"
+   - 根因：C++ gcp_dispatcher.cpp call.start 对 editor_scene_control 等返回 status=pending + task_id（操作排主线程队列）；CLI nativeToolInvoke 拿到 pending 后未轮询 call.get 取终态。fake server 测试从不返回 pending，故此路径从未被测。
+   - 修复：nativeToolInvoke 在 pending 时轮询 nativeCallGet 直到终态（succeeded/failed/cancelled），取 task record 的 result/error。
+
+止损点（第 4 个新问题，架构级，停止修补并上报）
+--------------------------------------------------
+4. headless 下 editor_scene_control open 导致编辑器进程死亡
+   - 最小复现：隔离 HOME 启动 headless 编辑器（pid=40288）→ 仅执行 `gda scene open res://main.tscn` → 握手超时 30s → 进程消失（Get-Process 无输出），Godot 日志无崩溃堆栈（仅到 loading_editor_layout DONE）。
+   - 影响：scene_* / gdscript_exec / game_* / error_delta / cleanup 全部因此失败；export_guard 本就需人工导出期验证保持 pending。
+   - 判定：这是引擎侧真实缺陷（headless 场景打开触发退出/abort），需 C++ 主线程/场景逻辑排查，超出 T-15 允许修改范围（tests/engine + workflows）。
+   - 按失败恢复准则：连续 3 次修复均在别处暴露新问题，属架构错误，停止修补、上报重新评估。
+
+已排除的方向（避免重复）
+--------------------------------------------------
+- 夹具配置：GDExtension 正常加载（日志有 Plugin ready）、无 plugin.cfg 需求（C++ EditorPlugins::add_by_type 自注册）、headless 无阻断限制（帧推进正常 587 帧/5s）。
+- 端口 22985 vs 58624：同一实例的 HTTP/MCP 与 IPC 双端点，设计如此，非陈旧记录。
+- bun 编译二进制 EPERM：仅影响直接 spawn 独立二进制，与 token/握手无关，已用 --cli-runner 规避。
+
+注意：上述 3 处 CLI 修复均保留在 engine-gate 分支，typecheck pass、CLI 全量 563 pass/26 skip/0 fail（无回归）。但它们依赖的 C++ 侧 GCP 实现仍是 T-06 未经真实引擎联调的版本。
+
+证据
+--------------------------------------------------
+- evidence/T-15/engine-report.json：21 步完整观测（status=fail）
+- evidence/T-15/godot-version.txt：固定版本 4.7.2.stable.mono
+- 本文件：根因链与止损判定

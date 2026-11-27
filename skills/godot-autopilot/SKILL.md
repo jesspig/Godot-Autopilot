@@ -1,177 +1,123 @@
 ---
 name: godot-autopilot
-description: "Single entry skill for Godot Autopilot (GDA): connect through gda status --json and mcp_url, look up engine APIs with gda docs, discover live tools with gda search/describe, call them with gda call, respect confirmation and the error watermark, and follow the change-observe-verify loop. Read the matching reference for setup, tools, scenes, scripting, resources, runtime, content, C#, or servers."
+description: "CLI-only entry skill for Godot Autopilot (GDA): probe with gda ping, discover commands with gda commands, find tools with gda tool list/search/describe, call them with gda tool call --confirm, and follow change-observe-verify. Read only the reference matching the task."
 ---
 
 # Godot Autopilot
 
-Godot Autopilot (GDA) is an in-process GDExtension that exposes a running Godot
-editor through a local `gda` CLI and an MCP endpoint. This card is the only entry
-point. Read the reference that matches the task; do not load all of them.
+Godot Autopilot (GDA) exposes a running Godot editor through one local `gda`
+CLI. There is no second protocol and no endpoint to configure: every operation
+is a CLI command that prints a JSON envelope. Read only the one reference that
+matches the task; do not load them all.
 
-## Connection model
+## Start here
 
-- The `gda` CLI is the first-class interface. It discovers the plugin's random
-  port, prefers IPC when available, falls back to HTTP, and prints JSON.
-- The plugin owns the port and persists it. Never choose a listen port, assume a
-  default, or reuse a port across editor restarts.
-- `gda status --json` is the connection record. `mcp_url` is the only
-  authoritative endpoint for an MCP client; `transport` and `ipc_kind` describe
-  the local channel the CLI used.
-- The server is loopback-only. Never forward, proxy, or publish its port.
-- If no instance is visible, `gda list --all` shows known projects and
-  `gda start --project <dir>` launches the editor. Re-read `mcp_url` after every
-  restart.
-- The MCP face is the compatibility channel for clients that already list native
-  tools: `search_tools`, `get_tool_detail`, `call_tool`, `batch_execute`, and
-  `code_execute`. The same rules apply; the CLI is the default when the client
-  has no native tools.
+```bash
+gda ping
+gda status --format json
+gda commands --json
+```
+
+`gda ping` is a health probe, not a handshake; it only proves the control plane
+is reachable. `gda status --format json` is the connection record.
+`gda commands --json` is the authoritative list of implemented commands and
+flags; never invent a command that is not in it.
+
+## Discover tools, never guess
+
+The tool catalog changes with the CLI; names and counts are not fixed. Use the
+CLI to discover, then read the schema before the first call.
+
+```bash
+gda tool list
+gda tool search <query>
+gda tool describe <tool>
+gda tool call <tool> --args '<json>'
+```
+
+1. `gda tool list` lists the current canonical catalog; filter with `--category`
+   or `--tags`. `gda tool categories` lists categories.
+2. `gda tool search <query>` finds tools by object first ("tile cell", "audio
+   track"), adding a verb only when results are too broad; try synonyms before
+   concluding a tool is missing.
+3. `gda tool describe <tool>` shows the schema, required `action` values and
+   side effects. Read it before the first call; never infer parameter names.
+4. `gda tool call <tool>` runs one tool. Use `--args '<json>'` for short input
+   and `--args-file <path>` (or `-` for stdin) for long JSON.
+5. A remembered tool name may be a legacy alias. Resolve it with
+   `gda tool describe` or `gda tool search` and prefer the canonical name and
+   action; do not rely on a remembered migration list.
 
 ## Engine documentation
 
-Never write an unfamiliar engine API from memory. Property names, method
-signatures, enum values, and defaults change between Godot versions, and a
-recalled signature is a common source of silent failures.
-
-- Before writing or patching a script that touches an unfamiliar API, setting a
-  property whose exact name or accepted values are unclear, or chasing an
-  "unknown property" or parse error, run `gda docs search <query>`.
-- Then narrow with `gda docs class <name> --member <text>` or
-  `gda docs member <class> <name>`.
-- Docs come from the local engine binary and are cached by engine minor under
-  the GDA home. The first query may export the cache; later queries are fast.
-- If the project pin and the available binary disagree, the command fails and
-  suggests `--godot`. Pass a matching Godot binary instead of guessing.
-- `gda docs status` shows the project pin, resolved engine, and cache state.
-  `gda docs sync` forces an export; `--docs-file <path>` reads an external dump.
-
-## Discover tools, never guess names
-
-Tool names are snake_case and usually verb-first, but segment counts vary and
-names change as the toolset grows. Discovery is mandatory.
-
-The live catalog carries 253 canonical tools. Another 325 deprecated aliases
-still resolve through `call_tool` and `batch_execute`, but they stay out of
-`search_tools` and `gda tools list`. The aliases are deprecated from the 0.4.x
-line and are removed in the 0.6.x line: always call the canonical tool with its
-action. The alias notes in `references/tools.md` map common old names.
+Never write an unfamiliar engine API from memory. Look it up first:
 
 ```bash
-gda search "tilemap cell"
-gda describe set_tilemap_cells
-gda call set_tilemap_cells --args '{"node_path": "Level", "cells": [{"x": 0, "y": 0, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}]}'
+gda docs search <query>
+gda docs class <name> --member <text>
 ```
 
-1. `gda search <query>` searches the live server by name, description, category,
-   and tags. It returns at most 20 results by default.
-2. `gda describe <name>` prints the schema and the `side_effect` marker. Read it
-   before the first call; never infer parameter names.
-3. `gda call <name> --args '<json>'` or `--args-file <path>` executes one tool
-   against the live editor.
-4. `gda tools list` prints every directly callable tool when you need the full
-   inventory. Deprecated aliases are not listed.
-
-Discovery is live-only; there is no offline catalog. Start an editor with
-`gda start --project <dir>` when no instance is running. Search by the object
-first ("tilemap cell", "animation track", "import sidecar"), then add a verb only
-when the result is too broad. Retry with synonyms before concluding a tool is
-missing: tile/cell, sprite/texture, log/output, delete/remove/erase,
-create/add/new.
-
-Many tools group related operations under a required `action` (or `mode` for
-`create_scene_node` and `physics_query`). Read the enum in `gda describe` instead
-of remembering separate one-operation names.
-
-## Task routing
-
-Reduce the task to its object and intent, then read the matching reference.
-Confirm names and schemas with `gda search` and `gda describe` before the first
-call.
-
-| Task | Reference | First move |
-|---|---|---|
-| Install, start, connect, install skills | `references/setup.md` | `gda status --json`; if missing, install the plugin |
-| Calling protocol, confirmation, errors, docs CLI | `references/tools.md` | `gda describe <tool>` before the first call |
-| Scenes, nodes, properties, signals, undo | `references/scene-system.md` | `get_scene_tree` and `property_get` |
-| GDScript lifecycle, execution channels, reload | `references/scripting.md` | Check `@tool` and pick the channel |
-| Resources, imports, rename/move, UID | `references/resources.md` | Inspect dependencies before moving |
-| Run the game, inject input, debug, logs | `references/runtime.md` | `get_game_state` action=status and the error watermark |
-| TileMap, animation, audio, UI theming | `references/content.md` | Inspect the existing resource before editing |
-| C#, csproj, build loop, reflection bridge | `references/csharp.md` | Probe `dotnet_environment`, then build |
-| Servers, RIDs, physics, navigation | `references/servers.md` | Verify the RID lifecycle and thread |
-
-## Symptom routing
-
-| Symptom | Reference | First move |
-|---|---|---|
-| A property write has no effect | `references/scene-system.md` | Read it back; check owner and value shape |
-| A saved scene is missing a node | `references/scene-system.md` | Check parent, owner, and save target |
-| The game ignores injected input | `references/runtime.md` | `get_game_state` action=status; align input to frames |
-| A script does not run in the editor | `references/scripting.md` | Add `@tool` or use an editor channel |
-| A C# change is not applied | `references/csharp.md` | Rebuild and read `diagnostics.instantiable` |
-| A resource path breaks after a rename | `references/resources.md` | Check UID, dependencies, and references |
-| Tiles or animations look wrong | `references/content.md` | Inspect TileSet, tracks, and SpriteFrames |
-| A server call fails silently | `references/servers.md` | Verify RID validity and main-thread execution |
+`gda docs status` shows the resolved engine and cache; `gda docs sync` refreshes
+the cache. Pass `--godot` when the project pin and the available binary differ.
 
 ## Confirmation and safety
 
-High-risk side effects return a structured `confirmation_required` error instead
-of executing. The classes are `destructive`, `process`, `code_execute`, and
-`game_runtime`. Review the tool description and the exact target, then retry:
+High-risk effects are not executed. They return `confirmation_required` with a
+summary of tool, target, risk and arguments; re-run the same command with
+`--confirm` after reviewing that summary. In a non-interactive session a missing
+`--confirm` stops the command and sends nothing.
 
 ```bash
-gda call code_execute --args '{"source_code": "return 1"}' --confirm
+gda tool call <tool> --args '<json>' --confirm
 ```
 
-With native MCP tools, pass `confirm: true` in the arguments object. File and
-scene writes (`writes_file`, `writes_config`, `writes_scene`) do not require
-confirmation, but they still change project content: read the target back after
-every write. Never work around a confirmation error by switching to a different
-tool with the same effect, including a deprecated alias. Treat `destructive` and
-`game_runtime` annotations as a stop-and-review signal, not a formality.
+- `destructive`, `process`, `code_execute` and `game_runtime` annotations are
+  stop-and-review signals, not formalities.
+- If a result is unknown, do not resend a side-effecting call; read the state
+  back first.
+- Read back every file or scene write; confirm each high-risk item separately
+  in a batch. Overwrites need explicit confirmation.
+- Details in `references/safety.md`.
 
-## Watch the engine state
+## Watch the engine and recover
 
-Never chain writes blind. Every change lands in a live editor with an import
-queue, a debugger, and an engine log; state you did not observe is state you do
-not know.
+```bash
+gda doctor
+gda job
+```
 
-- Read `new_errors_since_last_call` after every call. A non-zero value means new
-  errors were recorded; pull the real log lines, fix or explain them, then
-  continue. The counter is one-shot and resets when read.
-- While a game runs, `get_debugger_stream` with action=errors and action=output
-  carries its errors and prints. Without a running game, action=log reads the
-  editor output and engine log, and `get_game_log_entries` reads the on-disk log
-  after the session ends.
-- When the problem is inside the plugin itself (confirmation denials, timeouts,
-  dropped responses), read `get_plugin_log` or `get_debugger_stream` action=log
-  with source=plugin.
-- Prefer observed output - a log line, a screenshot, a read-back - over assuming
-  a call did what its name suggests. `ok` only means the call went through.
+`gda doctor` diagnoses the environment; `gda doctor run --offline --ci` gives a
+stable machine-readable report. Long-running calls return a job id: track them
+with `gda job list`, `gda job wait <id>` and `gda job status <id>`; stop one with
+`gda job cancel <id> --confirm`. Read logs with `gda logs editor`,
+`gda logs game`, `gda logs plugin` or `gda logs cli`.
 
-## The change/observe/verify loop
+## Change / observe / verify
 
-1. Change the project through tools, or orchestrate a deterministic sequence
-   with `batch_execute` or `code_execute`.
-2. Observe with a screenshot (`capture_editor_viewport`, and with target=game for
-   the running game), a read-back (`property_get`, `get_scene_tree`,
-   `resource_property` action=get), or output (`get_debugger_stream` action=log,
-   and while a game runs action=errors or action=output).
+1. Change the project with a CLI command or tool call.
+2. Observe with a read-back (`gda scene tree`, `gda resource get`), a capture
+   (`gda game capture`) or logs (`gda logs editor`).
 3. Diagnose from the observation, fix, and observe again until the result
-   matches the intent.
-4. Confirm the fix with the error watermark at zero, then run the relevant
-   validation tool (`analyze_project` action=validate_scene, inline GDScript
-   tests, or a game probe) before declaring success.
+   matches intent.
+4. Validate with `gda test run`, `gda debug errors` or `gda scene verify` before
+   declaring success.
 
-## References
+## Task routing
 
-- `references/setup.md` - install, start, connect, skills, `--prune`.
-- `references/tools.md` - CLI protocol, confirmation, errors, limits, docs CLI,
-  alias window.
-- `references/scene-system.md` - scenes, nodes, properties, signals, undo.
-- `references/scripting.md` - GDScript lifecycle and execution channels.
-- `references/resources.md` - resources, imports, rename/move, UID.
-- `references/runtime.md` - running the game, input, logs, debugging.
-- `references/content.md` - tilemap, animation, audio, UI theming.
-- `references/csharp.md` - C# build loop and reflection bridge.
-- `references/servers.md` - RIDs, physics, navigation, rendering.
+| Task | Reference | First move |
+|---|---|---|
+| Install, connect, skills, plugin | `references/setup.md` | `gda setup status` |
+| CLI syntax, envelope, args-file, jobs | `references/cli.md` | `gda commands --json` |
+| Confirmation and error recovery | `references/safety.md` | `gda tool describe <tool>` |
+| Offline and air-gapped use | `references/offline.md` | `gda doctor run --offline` |
+| Tool discovery and aliases | `references/tools.md` | `gda tool search <query>` |
+| Scenes, nodes, properties, signals | `references/scene.md` | `gda scene tree` |
+| GDScript create, patch, run, reload | `references/scripting.md` | `gda script list` |
+| Resources, import, rename, UID | `references/resources.md` | `gda resource inspect --path <path>` |
+| Run game, input, capture, logs | `references/runtime.md` | `gda game status` |
+| Debug, trace, report | `references/debugging.md` | `gda debug status` |
+| Tests and runs | `references/testing.md` | `gda test list` |
+| Workflows and long jobs | `references/workflows.md` | `gda workflow list` |
+| TileMap, animation, audio, UI | `references/content.md` | `gda tool search <query>` |
+| C# build loop | `references/csharp.md` | `gda doctor run --ci` |
+| Servers, RIDs, physics, navigation | `references/servers.md` | `gda tool search <query>` |

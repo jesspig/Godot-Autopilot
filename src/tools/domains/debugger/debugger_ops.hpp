@@ -12,7 +12,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <algorithm>
 #include <atomic>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -137,14 +137,14 @@ std::string capture_new_output_text(size_t since_count);
 ::godot::Ref<OutputCaptureLogger> create_output_logger();
 ::godot::Ref<DebugCapturePlugin> create_debug_plugin();
 
-mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args);
-mcp::JsonValue handle_plugin_log_get(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_stream(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_breakpoints(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_output_get_log(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_plugin_log_get(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_debugger_get_errors(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_debugger_get_output(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_debugger_get_scene_tree(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_debugger_get_session_info(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_debugger_stream(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_debugger_breakpoints(const godot_autopilot::util::JsonValue &args);
 
 void register_classes();
 

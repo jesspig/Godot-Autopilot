@@ -1,0 +1,598 @@
+{
+  "schema_version": 1,
+  "task": "T-15",
+  "generated_at": "2026-11-26T12:26:35.115Z",
+  "status": "fail",
+  "environment": {
+    "godot": "C:\\Users\\jesspig\\Documents\\Godot\\default\\Godot.exe",
+    "godot_version_expected": "4.7.2.stable.mono.official.ed1daf0bf",
+    "cli": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\cli\\bin\\gda.ts",
+    "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+    "mode": "headless",
+    "platform": "win32",
+    "arch": "x64",
+    "timeout_sec": 90
+  },
+  "summary": {
+    "total": 21,
+    "passed": 6,
+    "failed": 13,
+    "skipped": 1,
+    "pending": 1
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "name": "前置检查",
+      "command": "",
+      "expected": "godot/cli/project 路径存在且断言模板可解析",
+      "observed": {
+        "godot": "C:\\Users\\jesspig\\Documents\\Godot\\default\\Godot.exe",
+        "cli": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\cli\\bin\\gda.ts",
+        "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+        "missing": [],
+        "assertions_ok": true
+      },
+      "ok": true,
+      "status": "pass",
+      "error": "",
+      "duration_ms": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "godot_version",
+      "name": "固定引擎版本",
+      "command": "C:\\Users\\jesspig\\Documents\\Godot\\default\\Godot.exe --version",
+      "expected": "godot --version 包含 4.7.2.stable.mono.official.ed1daf0bf",
+      "observed": {
+        "version": "4.7.2.stable.mono.official.ed1daf0bf",
+        "exit": 0
+      },
+      "ok": true,
+      "status": "pass",
+      "error": "version mismatch: 4.7.2.stable.mono.official.ed1daf0bf",
+      "duration_ms": 81,
+      "stdout": "4.7.2.stable.mono.official.ed1daf0bf",
+      "stderr": ""
+    },
+    {
+      "id": "prepare_addon",
+      "name": "部署 GDExtension 产物",
+      "command": "",
+      "expected": "addon 目录含 .gdextension 与当前平台动态库",
+      "observed": {
+        "os": "win32",
+        "descriptor": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project\\addons\\godot-autopilot\\godot-autopilot.gdextension",
+        "descriptor_ok": true,
+        "library": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project\\addons\\godot-autopilot\\godot-autopilot.dll",
+        "library_ok": true,
+        "library_bytes": 28676096
+      },
+      "ok": true,
+      "status": "pass",
+      "error": "",
+      "duration_ms": 15,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "editor_start",
+      "name": "启动编辑器",
+      "command": "gda start --godot <path> --wait 60 --project <dir> (--headless when mode=headless)",
+      "expected": "gda start 在 60s 内注册插件实例并返回 id/pid/port",
+      "observed": {
+        "schema_version": 1,
+        "ok": true,
+        "command": "start",
+        "data": {
+          "id": "p24952",
+          "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+          "port": 22985,
+          "pid": 24952,
+          "headless": true,
+          "startedAt": "2026-11-26T12:26:47.111Z",
+          "live": true
+        },
+        "error": null,
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": true,
+      "status": "pass",
+      "error": "",
+      "duration_ms": 12188,
+      "stdout": "{\"schema_version\":1,\"ok\":true,\"command\":\"start\",\"data\":{\"id\":\"p24952\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"port\":22985,\"pid\":24952,\"headless\":true,\"startedAt\":\"2026-11-26T12:26:47.111Z\",\"live\":true},\"error\":null,\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": ""
+    },
+    {
+      "id": "gcp_hello",
+      "name": "GCP hello",
+      "command": "",
+      "expected": "editor status 返回 instance.id 与 capabilities，ok=true",
+      "observed": {
+        "schema_version": 1,
+        "ok": true,
+        "command": "editor.status",
+        "data": {
+          "instance": {
+            "id": "gda-8e8b0942-24952-1795696007074",
+            "pid": 24952
+          },
+          "project": "C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-engine-gate/tests/engine/project",
+          "version": "0.3.5",
+          "ipc_kind": "tcp",
+          "ready": true,
+          "tool_count": 0,
+          "capabilities": {
+            "features": [],
+            "methods": [],
+            "protocol_version": 1
+          }
+        },
+        "error": null,
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": true,
+      "status": "pass",
+      "error": "",
+      "duration_ms": 1714,
+      "stdout": "{\"schema_version\":1,\"ok\":true,\"command\":\"editor.status\",\"data\":{\"instance\":{\"id\":\"gda-8e8b0942-24952-1795696007074\",\"pid\":24952},\"project\":\"C:/Users/jesspig/Documents/Projects/VibeCoding/Godot-Autopilot/.worktrees/cli-native-control-plane-engine-gate/tests/engine/project\",\"version\":\"0.3.5\",\"ipc_kind\":\"tcp\",\"ready\":true,\"tool_count\":0,\"capabilities\":{\"features\":[],\"methods\":[],\"protocol_version\":1}},\"error\":null,\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": ""
+    },
+    {
+      "id": "gcp_ping",
+      "name": "GCP ping",
+      "command": "",
+      "expected": "editor ping 返回 pong=true",
+      "observed": {
+        "schema_version": 1,
+        "ok": true,
+        "command": "editor.ping",
+        "data": {
+          "pong": true,
+          "instance": "gda-8e8b0942-24952-1795696007074",
+          "ipc_kind": "tcp"
+        },
+        "error": null,
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=0",
+      "duration_ms": 335,
+      "stdout": "{\"schema_version\":1,\"ok\":true,\"command\":\"editor.ping\",\"data\":{\"pong\":true,\"instance\":\"gda-8e8b0942-24952-1795696007074\",\"ipc_kind\":\"tcp\"},\"error\":null,\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": ""
+    },
+    {
+      "id": "gcp_status",
+      "name": "GCP system_status",
+      "command": "",
+      "expected": "system_status 返回 ok=true 且 tool_count>0",
+      "observed": {
+        "schema_version": 1,
+        "ok": false,
+        "command": "tool.system_status",
+        "data": {
+          "tool": "system_status",
+          "scene_path": "",
+          "revision": "",
+          "receipt": {
+            "request_id": "gda-call-31292-1",
+            "digest": "",
+            "artifact_id": ""
+          },
+          "result": null,
+          "task_id": "task-1",
+          "new_errors_since_last_call": 0
+        },
+        "error": {
+          "code": "TOOL_FAILURE",
+          "message": "tool failure",
+          "retryable": false,
+          "request_sent": false
+        },
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=1",
+      "duration_ms": 311,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"tool.system_status\",\"data\":{\"tool\":\"system_status\",\"scene_path\":\"\",\"revision\":\"\",\"receipt\":{\"request_id\":\"gda-call-31292-1\",\"digest\":\"\",\"artifact_id\":\"\"},\"result\":null,\"task_id\":\"task-1\",\"new_errors_since_last_call\":0},\"error\":{\"code\":\"TOOL_FAILURE\",\"message\":\"tool failure\",\"retryable\":false,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": ""
+    },
+    {
+      "id": "scene_open",
+      "name": "打开主场景",
+      "command": "",
+      "expected": "editor_scene_control open 返回 ok=true",
+      "observed": {
+        "schema_version": 1,
+        "ok": false,
+        "command": "scene.open",
+        "data": null,
+        "error": {
+          "code": "TRANSPORT_FAILURE",
+          "message": "native IPC initialize timed out after 30000 ms (tcp 127.0.0.1:62705).",
+          "retryable": true,
+          "request_sent": false
+        },
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=2 | [gda] native IPC initialize timed out after 30000 ms (tcp 127.0.0.1:62705).\ngda scene.open — Open a scene in the editor\n\nUsage:\n  gda scene open [path] [flags]\n\nSubcommand: open\nGroup: scene\nInvoke: gda scene open\nTools: editor_scene_control\nAction: gcp.scene.open\n\nArguments:\n  <path>  Scene path (optional)\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for scene.open:\n  --path <text>  Scene path\n\nOutput: gda.result.v1 (envelope)\nRisk: low\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda scene open  Example invocation",
+      "duration_ms": 30321,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"scene.open\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC initialize timed out after 30000 ms (tcp 127.0.0.1:62705).\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] native IPC initialize timed out after 30000 ms (tcp 127.0.0.1:62705).\ngda scene.open — Open a scene in the editor\n\nUsage:\n  gda scene open [path] [flags]\n\nSubcommand: open\nGroup: scene\nInvoke: gda scene open\nTools: editor_scene_control\nAction: gcp.scene.open\n\nArguments:\n  <path>  Scene path (optional)\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for scene.open:\n  --path <text>  Scene path\n\nOutput: gda.result.v1 (envelope)\nRisk: low\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda scene open  Example invocation"
+    },
+    {
+      "id": "scene_create",
+      "name": "创建场景节点",
+      "command": "",
+      "expected": "create_scene_node 返回 ok=true 且节点名回显",
+      "observed": {
+        "schema_version": 1,
+        "ok": false,
+        "command": "tool.call",
+        "data": null,
+        "error": {
+          "code": "TRANSPORT_FAILURE",
+          "message": "native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705",
+          "retryable": true,
+          "request_sent": false
+        },
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=2 | [gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation",
+      "duration_ms": 309,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"tool.call\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation"
+    },
+    {
+      "id": "scene_save",
+      "name": "保存场景",
+      "command": "",
+      "expected": "save_editor_scene 落盘 res://smoke_scene.tscn 且 ok=true",
+      "observed": {
+        "envelope": {
+          "schema_version": 1,
+          "ok": false,
+          "command": "tool.call",
+          "data": null,
+          "error": {
+            "code": "TRANSPORT_FAILURE",
+            "message": "native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705",
+            "retryable": true,
+            "request_sent": false
+          },
+          "meta": {
+            "request_id": "",
+            "instance_id": "",
+            "project": "",
+            "duration_ms": 0
+          },
+          "warnings": []
+        },
+        "disk_exists": false
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=2 | [gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation",
+      "duration_ms": 298,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"tool.call\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation"
+    },
+    {
+      "id": "gdscript_exec",
+      "name": "编译执行 GDScript",
+      "command": "",
+      "expected": "execute_script 返回引擎版本且 AutopilotTools 单例已注册",
+      "observed": {
+        "schema_version": 1,
+        "ok": false,
+        "command": "tool.call",
+        "data": null,
+        "error": {
+          "code": "TRANSPORT_FAILURE",
+          "message": "native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705",
+          "retryable": true,
+          "request_sent": false
+        },
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "version=undefined singleton=undefined | exit=2 | [gda] confirm tool.execute_script: tool=execute_script target=instance:gda-8e8b0942-24952-1795696007074 risk=none args={\"source_code\":\"return {\\\"version\\\": Engine.get_version_info().get(\\\"string\\\", \\\"\\\"), \\\"autopilot_singleton\\\": Engine.has_singleton(\\\"AutopilotTools\\\")}\",\"confirm\":true}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation",
+      "duration_ms": 295,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"tool.call\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] confirm tool.execute_script: tool=execute_script target=instance:gda-8e8b0942-24952-1795696007074 risk=none args={\"source_code\":\"return {\\\"version\\\": Engine.get_version_info().get(\\\"string\\\", \\\"\\\"), \\\"autopilot_singleton\\\": Engine.has_singleton(\\\"AutopilotTools\\\")}\",\"confirm\":true}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation"
+    },
+    {
+      "id": "game_bridge",
+      "name": "启动游戏并验证 bridge",
+      "command": "",
+      "expected": "game start 与 game status 均返回 ok=true",
+      "observed": {
+        "play": {
+          "schema_version": 1,
+          "ok": false,
+          "command": "game.start",
+          "data": null,
+          "error": {
+            "code": "TRANSPORT_FAILURE",
+            "message": "native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705",
+            "retryable": true,
+            "request_sent": false
+          },
+          "meta": {
+            "request_id": "",
+            "instance_id": "",
+            "project": "",
+            "duration_ms": 0
+          },
+          "warnings": []
+        },
+        "status": {
+          "schema_version": 1,
+          "ok": false,
+          "command": "game.status",
+          "data": null,
+          "error": {
+            "code": "TRANSPORT_FAILURE",
+            "message": "native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705",
+            "retryable": true,
+            "request_sent": false
+          },
+          "meta": {
+            "request_id": "",
+            "instance_id": "",
+            "project": "",
+            "duration_ms": 0
+          },
+          "warnings": []
+        }
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "play: exit=2 | [gda] confirm game.start: tool=editor_scene_control target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"action\":\"play\"}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.start — Run the game\n\nUsage:\n  gda game start [flags]\n\nSubcommand: start\nGroup: game\nInvoke: gda game start\nTools: editor_scene_control\nAction: gcp.game.start\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for game.start:\n  --headless  Run headless\n  --play  Play the current scene\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game start  Example invocation | status: exit=2 | [gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.status — Show game run status\n\nUsage:\n  gda game status [flags]\n\nSubcommand: status\nGroup: game\nInvoke: gda game status\nTools: get_game_state\nAction: gcp.game.status\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game status  Example invocation",
+      "duration_ms": 595,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"game.start\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] confirm game.start: tool=editor_scene_control target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"action\":\"play\"}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.start — Run the game\n\nUsage:\n  gda game start [flags]\n\nSubcommand: start\nGroup: game\nInvoke: gda game start\nTools: editor_scene_control\nAction: gcp.game.start\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for game.start:\n  --headless  Run headless\n  --play  Play the current scene\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game start  Example invocation\n\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.status — Show game run status\n\nUsage:\n  gda game status [flags]\n\nSubcommand: status\nGroup: game\nInvoke: gda game status\nTools: get_game_state\nAction: gcp.game.status\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game status  Example invocation"
+    },
+    {
+      "id": "game_probe",
+      "name": "游戏内探针快照",
+      "command": "",
+      "expected": "probe_snapshot 返回 marker 与数值型 frames_seen",
+      "observed": {},
+      "ok": false,
+      "status": "fail",
+      "error": "threw: TypeError: undefined is not an object (evaluating 'text.indexOf')",
+      "duration_ms": 816,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "input_injection",
+      "name": "注入游戏输入",
+      "command": "",
+      "expected": "game input 入队返回 ok=true",
+      "observed": {
+        "schema_version": 1,
+        "ok": false,
+        "command": "game.input",
+        "data": null,
+        "error": {
+          "code": "TRANSPORT_FAILURE",
+          "message": "native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705",
+          "retryable": true,
+          "request_sent": false
+        },
+        "meta": {
+          "request_id": "",
+          "instance_id": "",
+          "project": "",
+          "duration_ms": 0
+        },
+        "warnings": []
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=2 | [gda] confirm game.input: tool=game_input target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"action\":\"queue\",\"type\":\"key\",\"mode\":\"event\",\"event\":{\"keycode\":32}}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.input — Queue one input event in the running game\n\nUsage:\n  gda game input [flags]\n\nSubcommand: input\nGroup: game\nInvoke: gda game input\nTools: game_input\nAction: gcp.game.input\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for game.input:\n  --type <text>  Input type: key, mouse_button, wheel, mouse_motion, action\n  --mode <text>  Input mode: event, api, or hold\n  --event <text>  Input event as JSON\n  --duration <n>  Hold duration in milliseconds\n  --args-file <text>  Input arguments from a JSON file (use - for stdin)\n  --confirm  Confirm the game runtime change\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game input  Example invocation",
+      "duration_ms": 291,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"game.input\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] confirm game.input: tool=game_input target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"action\":\"queue\",\"type\":\"key\",\"mode\":\"event\",\"event\":{\"keycode\":32}}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.input — Queue one input event in the running game\n\nUsage:\n  gda game input [flags]\n\nSubcommand: input\nGroup: game\nInvoke: gda game input\nTools: game_input\nAction: gcp.game.input\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for game.input:\n  --type <text>  Input type: key, mouse_button, wheel, mouse_motion, action\n  --mode <text>  Input mode: event, api, or hold\n  --event <text>  Input event as JSON\n  --duration <n>  Hold duration in milliseconds\n  --args-file <text>  Input arguments from a JSON file (use - for stdin)\n  --confirm  Confirm the game runtime change\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game input  Example invocation"
+    },
+    {
+      "id": "frame_advance",
+      "name": "验证帧推进",
+      "command": "",
+      "expected": "两次读取 process_frames 严格递增",
+      "observed": {},
+      "ok": false,
+      "status": "fail",
+      "error": "threw: TypeError: undefined is not an object (evaluating 'text.indexOf')",
+      "duration_ms": 594,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "screenshot",
+      "name": "捕获截图",
+      "command": "",
+      "expected": "GUI 模式产出 PNG；headless 模式跳过",
+      "observed": "skipped: headless 无渲染输出，截图由 GUI 作业承担",
+      "ok": null,
+      "status": "skip",
+      "error": "",
+      "duration_ms": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "error_delta",
+      "name": "错误增量与帧推进",
+      "command": "",
+      "expected": "push_error 后错误增量增加且帧继续推进",
+      "observed": {
+        "before": {
+          "count": 0,
+          "watermark": 0
+        },
+        "after": {
+          "count": 0,
+          "watermark": 0
+        }
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "no error delta: {\"before\":{\"count\":0,\"watermark\":0},\"after\":{\"count\":0,\"watermark\":0}} | inject=exit=null | signal=undefined | ",
+      "duration_ms": 1099,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"debug.errors\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda debug.errors — Read debugger errors and cross-check the on-disk game log\n\nUsage:\n  gda debug errors [flags]\n\nSubcommand: errors\nGroup: debug\nInvoke: gda debug errors\nTools: get_debugger_stream, get_game_log_entries\nAction: gcp.debug.errors\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for debug.errors:\n  --limit <n>  Maximum number of entries\n  --level <text>  Minimum log level\n  --id <text>  Target instance id\n  --socket <text>  Target native IPC socket\n  --port <text>  Target connection port\n  --project <text>  Target project directory\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda debug errors  Example invocation\n\nundefined\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda debug.errors — Read debugger errors and cross-check the on-disk game log\n\nUsage:\n  gda debug errors [flags]\n\nSubcommand: errors\nGroup: debug\nInvoke: gda debug errors\nTools: get_debugger_stream, get_game_log_entries\nAction: gcp.debug.errors\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for debug.errors:\n  --limit <n>  Maximum number of entries\n  --level <text>  Minimum log level\n  --id <text>  Target instance id\n  --socket <text>  Target native IPC socket\n  --port <text>  Target connection port\n  --project <text>  Target project directory\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda debug errors  Example invocation"
+    },
+    {
+      "id": "export_guard",
+      "name": "导出期拒绝入口",
+      "command": "",
+      "expected": "导出期工具/资源/提示词入口均返回 editor is exporting",
+      "observed": {
+        "baseline": {
+          "tool_exit": 2,
+          "resources_list_exit": 2,
+          "resource_uri": "",
+          "resource_exit": null,
+          "prompts_list_exit": 2,
+          "prompt_name": "",
+          "prompt_exit": null
+        },
+        "export_preset": null,
+        "export_blocked_observed": false
+      },
+      "ok": null,
+      "status": "pending",
+      "error": "CLI 无进程内导出入口；导出期拒绝须在真实编辑器导出中验证，见 failure-injection.md。baseline 仅证明三类等价入口可达。",
+      "duration_ms": 443,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"tool.call\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\",\"retryable\":true,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"\",\"duration_ms\":0},\"warnings\":[]}\n\n{\"schema_version\":1,\"ok\":false,\"command\":\"resources\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"cannot reach the server (ECONNREFUSED: Unable to connect. Is the computer able to access the url?).\",\"retryable\":true,\"request_sent\":false,\"suggestion\":\"Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT.\"},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}\n\n{\"schema_version\":1,\"ok\":false,\"command\":\"prompts\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"cannot reach the server (ECONNREFUSED: Unable to connect. Is the computer able to access the url?).\",\"retryable\":true,\"request_sent\":false,\"suggestion\":\"Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT.\"},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation\n\n[gda] cannot reach the server (ECONNREFUSED: Unable to connect. Is the computer able to access the url?).\n[gda] suggestion: Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT.\n\n[gda] cannot reach the server (ECONNREFUSED: Unable to connect. Is the computer able to access the url?).\n[gda] suggestion: Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT."
+    },
+    {
+      "id": "ipc_auth",
+      "name": "IPC 认证/端点校验",
+      "command": "",
+      "expected": "伪造 IPC 端点在发送请求前失败",
+      "observed": {
+        "exit": 3,
+        "request_sent": false,
+        "error": {
+          "code": "TOOL_FAILURE",
+          "message": "use only one of --id/--socket/--port/--project",
+          "retryable": false,
+          "request_sent": false
+        }
+      },
+      "ok": true,
+      "status": "pass",
+      "error": "",
+      "duration_ms": 87,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"editor.ping\",\"data\":{\"pong\":false},\"error\":{\"code\":\"TOOL_FAILURE\",\"message\":\"use only one of --id/--socket/--port/--project\",\"retryable\":false,\"request_sent\":false},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": ""
+    },
+    {
+      "id": "ipc_no_resend",
+      "name": "IPC no-resend",
+      "command": "",
+      "expected": "超时请求 error.request_sent=true 且未重发，随后 ping 仍可用",
+      "observed": {
+        "exit": 2,
+        "request_sent": false,
+        "message": "cannot reach the server (FailedToOpenSocket: Was there a typo in the url or port?).",
+        "recovered_exit": 2
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "timeout=exit=2 | [gda] confirm tool.call: tool=execute_script target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"source_code\":\"while true: pass\",\"confirm\":true}\n[gda] cannot reach the server (FailedToOpenSocket: Was there a typo in the url or port?).\n[gda] suggestion: Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT. recovered=exit=2",
+      "duration_ms": 358,
+      "stdout": "{\"schema_version\":1,\"ok\":false,\"command\":\"call\",\"data\":null,\"error\":{\"code\":\"TRANSPORT_FAILURE\",\"message\":\"cannot reach the server (FailedToOpenSocket: Was there a typo in the url or port?).\",\"retryable\":true,\"request_sent\":false,\"suggestion\":\"Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT.\"},\"meta\":{\"request_id\":\"\",\"instance_id\":\"\",\"project\":\"C:\\\\Users\\\\jesspig\\\\Documents\\\\Projects\\\\VibeCoding\\\\Godot-Autopilot\\\\.worktrees\\\\cli-native-control-plane-engine-gate\\\\tests\\\\engine\\\\project\",\"duration_ms\":0},\"warnings\":[]}",
+      "stderr": "[gda] confirm tool.call: tool=execute_script target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"source_code\":\"while true: pass\",\"confirm\":true}\n[gda] cannot reach the server (FailedToOpenSocket: Was there a typo in the url or port?).\n[gda] suggestion: Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT."
+    },
+    {
+      "id": "cleanup",
+      "name": "停止编辑器",
+      "command": "",
+      "expected": "gda stop 正常退出",
+      "observed": {
+        "exit": 2
+      },
+      "ok": false,
+      "status": "fail",
+      "error": "exit=2 | [gda] no running instance for project: C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project (run \"gda list\" to see running instances)",
+      "duration_ms": 277,
+      "stdout": "",
+      "stderr": "[gda] no running instance for project: C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project (run \"gda list\" to see running instances)"
+    }
+  ],
+  "artifacts": {
+    "report": "C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\evidence\\T-15\\engine-report.json"
+  },
+  "warnings": [
+    "gcp_ping: exit=0",
+    "gcp_status: exit=1",
+    "scene_open: exit=2 | [gda] native IPC initialize timed out after 30000 ms (tcp 127.0.0.1:62705).\ngda scene.open — Open a scene in the editor\n\nUsage:\n  gda scene open [path] [flags]\n\nSubcommand: open\nGroup: scene\nInvoke: gda scene open\nTools: editor_scene_control\nAction: gcp.scene.open\n\nArguments:\n  <path>  Scene path (optional)\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for scene.open:\n  --path <text>  Scene path\n\nOutput: gda.result.v1 (envelope)\nRisk: low\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda scene open  Example invocation",
+    "scene_create: exit=2 | [gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation",
+    "scene_save: exit=2 | [gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation",
+    "gdscript_exec: version=undefined singleton=undefined | exit=2 | [gda] confirm tool.execute_script: tool=execute_script target=instance:gda-8e8b0942-24952-1795696007074 risk=none args={\"source_code\":\"return {\\\"version\\\": Engine.get_version_info().get(\\\"string\\\", \\\"\\\"), \\\"autopilot_singleton\\\": Engine.has_singleton(\\\"AutopilotTools\\\")}\",\"confirm\":true}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda tool.call — Call any canonical tool\n\nUsage:\n  gda tool call <tool> [flags]\n\nSubcommand: call\nGroup: tool\nInvoke: gda tool call\nTools: tool_call\nAction: gcp.tool.call\n\nArguments:\n  <tool>  Tool name\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for tool.call:\n  --args <text>  Arguments as JSON (conflicts: --args-file)\n  --args-file <text>  Arguments from a JSON file (- reads stdin) (conflicts: --args)\n  --progress  Print progress diagnostics to stderr\n  --confirm  Confirm the shown tool/target/risk/argument summary\n  --timeout <text>  Call timeout in seconds\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda tool call  Example invocation",
+    "game_bridge: play: exit=2 | [gda] confirm game.start: tool=editor_scene_control target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"action\":\"play\"}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.start — Run the game\n\nUsage:\n  gda game start [flags]\n\nSubcommand: start\nGroup: game\nInvoke: gda game start\nTools: editor_scene_control\nAction: gcp.game.start\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for game.start:\n  --headless  Run headless\n  --play  Play the current scene\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game start  Example invocation | status: exit=2 | [gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.status — Show game run status\n\nUsage:\n  gda game status [flags]\n\nSubcommand: status\nGroup: game\nInvoke: gda game status\nTools: get_game_state\nAction: gcp.game.status\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nOutput: gda.result.v1 (envelope)\nRisk: none\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game status  Example invocation",
+    "game_probe: threw: TypeError: undefined is not an object (evaluating 'text.indexOf')",
+    "input_injection: exit=2 | [gda] confirm game.input: tool=game_input target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"action\":\"queue\",\"type\":\"key\",\"mode\":\"event\",\"event\":{\"keycode\":32}}\n[gda] native IPC connection failed (tcp 127.0.0.1:62705): connect ECONNREFUSED 127.0.0.1:62705\ngda game.input — Queue one input event in the running game\n\nUsage:\n  gda game input [flags]\n\nSubcommand: input\nGroup: game\nInvoke: gda game input\nTools: game_input\nAction: gcp.game.input\n\nFlags:\n  --args-file <text>  Global option\n  --confirm  Global option\n  --format <text>  Global option\n  --help  Global option\n  --id <text>  Global option\n  --include <text>  Global option (repeatable)\n  --json  Alias for --format json\n  --port <text>  Global option\n  --pretty  Global option\n  --project <text>  Global option\n  --raw  Global option\n  --socket <text>  Global option\n  --tag <text>  Global option (repeatable)\n  --timeout <text>  Global option\n  --version  Global option\n\nFlags for game.input:\n  --type <text>  Input type: key, mouse_button, wheel, mouse_motion, action\n  --mode <text>  Input mode: event, api, or hold\n  --event <text>  Input event as JSON\n  --duration <n>  Hold duration in milliseconds\n  --args-file <text>  Input arguments from a JSON file (use - for stdin)\n  --confirm  Confirm the game runtime change\n\nOutput: gda.result.v1 (envelope)\nRisk: high\nLong running: no\n\nExit codes:\n  0  success\n  1  tool or business failure\n  2  transport or environment failure\n  3  usage error\n  4  confirmation required\n  5  user declined confirmation\n  130  interrupted\n\nExamples:\n  gda game input  Example invocation",
+    "frame_advance: threw: TypeError: undefined is not an object (evaluating 'text.indexOf')",
+    "error_delta: no error delta: {\"before\":{\"count\":0,\"watermark\":0},\"after\":{\"count\":0,\"watermark\":0}} | inject=exit=null | signal=undefined | ",
+    "ipc_no_resend: timeout=exit=2 | [gda] confirm tool.call: tool=execute_script target=instance:gda-8e8b0942-24952-1795696007074 risk=high args={\"source_code\":\"while true: pass\",\"confirm\":true}\n[gda] cannot reach the server (FailedToOpenSocket: Was there a typo in the url or port?).\n[gda] suggestion: Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT. recovered=exit=2",
+    "cleanup: exit=2 | [gda] no running instance for project: C:\\Users\\jesspig\\Documents\\Projects\\VibeCoding\\Godot-Autopilot\\.worktrees\\cli-native-control-plane-engine-gate\\tests\\engine\\project (run \"gda list\" to see running instances)"
+  ],
+  "failure": null
+}

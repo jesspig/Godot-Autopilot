@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { extractZip } from "../src/archive";
+import { applyManagedTree, extractZip } from "../src/archive";
 import { CliError, ExitCode } from "../src/errors";
 
 const tempRoots: string[] = [];
@@ -63,5 +63,61 @@ describe("extractZip zip-slip 纵深防御", () => {
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Transport);
     expect((caught as CliError).message).toContain("unsafe path in archive");
+  });
+});
+
+describe("applyManagedTree 受管文件同步", () => {
+  test("dry-run 只返回计划不写盘", () => {
+    const root = makeTemp();
+    const target = path.join(root, "skills");
+    fs.mkdirSync(path.join(target, "godot-autopilot"), { recursive: true });
+    fs.writeFileSync(path.join(target, "godot-autopilot", "old.md"), "old", "utf8");
+    const result = applyManagedTree(
+      target,
+      {
+        writes: { "godot-autopilot/new.md": "new" },
+        deletes: ["godot-autopilot/old.md"],
+      },
+      { dryRun: true },
+    );
+    expect(result.applied).toBe(false);
+    expect(result.written).toEqual(["godot-autopilot/new.md"]);
+    expect(result.deleted).toEqual(["godot-autopilot/old.md"]);
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "new.md"))).toBe(false);
+    expect(fs.readFileSync(path.join(target, "godot-autopilot", "old.md"), "utf8")).toBe("old");
+  });
+
+  test("越界删除被拒绝", () => {
+    const root = makeTemp();
+    const outside = path.join(root, "outside.md");
+    fs.writeFileSync(outside, "keep", "utf8");
+    let caught: unknown;
+    try {
+      applyManagedTree(root, { writes: {}, deletes: ["../outside.md"] });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).code).toBe(ExitCode.Transport);
+    expect(fs.readFileSync(outside, "utf8")).toBe("keep");
+  });
+
+  test("同内容未加 force 可跳过，异内容未加 force 拒绝且不写盘", () => {
+    const root = makeTemp();
+    const target = path.join(root, "skills");
+    applyManagedTree(target, { writes: { "godot-autopilot/SKILL.md": "v1" }, deletes: [] });
+    applyManagedTree(target, { writes: { "godot-autopilot/SKILL.md": "v1" }, deletes: [] });
+    expect(fs.readFileSync(path.join(target, "godot-autopilot", "SKILL.md"), "utf8")).toBe("v1");
+    let caught: unknown;
+    try {
+      applyManagedTree(target, { writes: { "godot-autopilot/SKILL.md": "v2" }, deletes: [] });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).suggestion).toContain("--force");
+    expect(fs.readFileSync(path.join(target, "godot-autopilot", "SKILL.md"), "utf8")).toBe("v1");
+    applyManagedTree(target, { writes: { "godot-autopilot/SKILL.md": "v2" }, deletes: [] }, { force: true });
+    expect(fs.readFileSync(path.join(target, "godot-autopilot", "SKILL.md"), "utf8")).toBe("v2");
   });
 });

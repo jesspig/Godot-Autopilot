@@ -46,13 +46,13 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 
 namespace godot_autopilot {
 namespace physics_ops {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 JV handle_resolve_object(const JV &args) {
   auto *idp = args.Find("object_id");

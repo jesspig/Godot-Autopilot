@@ -54,7 +54,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -70,7 +70,7 @@ JV error_result(const std::string &message) {
   return r;
 }
 
-JV ok_result(JV result) {
+JV bridge_ok_result(JV result) {
   JV r(JV::object_tag);
   r["result"] = result;
   r["data"] = std::move(result);
@@ -306,7 +306,7 @@ JV op_status() {
       r["scene"] = JV("");
     }
   }
-  return ok_result(std::move(r));
+  return bridge_ok_result(std::move(r));
 }
 
 JV op_ping() {
@@ -1083,7 +1083,7 @@ JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
     r["source_width"] = JV(static_cast<int64_t>(source_width));
     r["source_height"] = JV(static_cast<int64_t>(source_height));
   }
-  return ok_result(std::move(r));
+  return bridge_ok_result(std::move(r));
 }
 
 class GameBridgeCaptureAwaiter : public godot::Node {
@@ -1280,7 +1280,7 @@ JV build_ui_click_result(const std::string &target_path,
   }
   JV inner(JV::object_tag);
   inner["result"] = std::move(clicked);
-  return ok_result(std::move(inner));
+  return bridge_ok_result(std::move(inner));
 }
 
 class GameBridgeUiClickAwaiter : public godot::Node {
@@ -1368,7 +1368,7 @@ JV op_get_output(const JV &params) {
       arr.PushBack(std::move(item));
     }
   }
-  return ok_result(std::move(arr));
+  return bridge_ok_result(std::move(arr));
 }
 
 constexpr int64_t MAX_TREE_NODES = 2000;
@@ -1414,7 +1414,7 @@ JV op_get_tree() {
     state.out +=
         "(tree truncated at " + std::to_string(MAX_TREE_NODES) + " nodes)\n";
   }
-  return ok_result(JV(state.out));
+  return bridge_ok_result(JV(state.out));
 }
 
 JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
@@ -1722,7 +1722,7 @@ JV op_ui_elements_impl(const JV &params, int64_t request_id) {
   r["elements"] = std::move(arr);
   r["count"] = JV(static_cast<int64_t>(elements.size()));
   r["truncated"] = JV(truncated);
-  return ok_result(std::move(r));
+  return bridge_ok_result(std::move(r));
 }
 
 JV op_ui_elements(const JV &params) {
@@ -1924,7 +1924,7 @@ JV op_tween_create(const JV &params) {
   game_tweens()[tween_id] = tween;
   inner["tween_id"] = JV(tween_id);
   inner["running"] = JV(tween->is_running());
-  return ok_result(std::move(inner));
+  return bridge_ok_result(std::move(inner));
 }
 
 JV op_tween_control(const JV &params) {
@@ -1956,7 +1956,7 @@ JV op_tween_control(const JV &params) {
   inner["tween_id"] = *id_p;
   inner["action"] = *action_p;
   inner["running"] = JV(tween.is_valid() && tween->is_running());
-  return ok_result(std::move(inner));
+  return bridge_ok_result(std::move(inner));
 }
 
 JV op_tween_list(const JV &params) {
@@ -1978,7 +1978,7 @@ JV op_tween_list(const JV &params) {
   JV inner(JV::object_tag);
   inner["tweens"] = std::move(items);
   inner["count"] = JV(static_cast<int64_t>(store.size()));
-  return ok_result(std::move(inner));
+  return bridge_ok_result(std::move(inner));
 }
 
 class GameBridgeListener : public godot::RefCounted {
@@ -2016,11 +2016,19 @@ public:
     if (p_message == gda_string(GDA_MSG_HELLO)) {
       godot_autopilot::game_monitor::ensure_connected();
       bool scene_ready = false;
+      godot::SceneTree *tree = nullptr;
       if (auto *engine = godot::Engine::get_singleton()) {
-        if (auto *tree =
-                godot::Object::cast_to<godot::SceneTree>(engine->get_main_loop())) {
+        tree = godot::Object::cast_to<godot::SceneTree>(engine->get_main_loop());
+        if (tree != nullptr) {
           scene_ready = tree->get_current_scene() != nullptr;
         }
+      }
+      if (!scene_ready && tree != nullptr && g_ready_tree == nullptr &&
+          !scene_ready_sent_) {
+        g_ready_tree = tree;
+        tree->connect(
+            "process_frame",
+            godot::Callable(this, godot::StringName("on_process_frame")));
       }
       send_ready_message(scene_ready);
       return true;
@@ -2428,7 +2436,7 @@ JV collect_errors_grouped(int64_t group_limit, int64_t since_seq,
   r["total_errors"] = JV(static_cast<int64_t>(snapshot.size()));
   r["total_groups"] = JV(static_cast<int64_t>(groups.size()));
   r["next_seq"] = JV(error_cursor::next_error_seq(max_returned, current));
-  return ok_result(std::move(r));
+  return bridge_ok_result(std::move(r));
 }
 
 } // namespace
@@ -2486,7 +2494,7 @@ JV op_get_errors(const JV &params) {
       }
     }
   }
-  JV body = ok_result(std::move(arr));
+  JV body = bridge_ok_result(std::move(arr));
   body["next_seq"] = JV(error_cursor::next_error_seq(max_returned, current));
   return body;
 }

@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "tools/base/tool_base.hpp"
 
@@ -29,9 +29,9 @@ inline bool required_for(SideEffect effect) {
   return false;
 }
 
-inline bool provided(const mcp::JsonValue &args) {
+inline bool provided(const godot_autopilot::util::JsonValue &args) {
   if (!args.IsObject()) return false;
-  const mcp::JsonValue *value = args.Find("confirm");
+  const godot_autopilot::util::JsonValue *value = args.Find("confirm");
   return value != nullptr && value->IsBool() && value->GetBool();
 }
 
@@ -49,8 +49,8 @@ struct ConfirmationResolution {
 };
 
 inline ConfirmationResolution resolve_confirmation(
-    const mcp::JsonValue &args, bool is_call_tool,
-    const mcp::JsonValue *input_responses, std::string *error_out) {
+    const godot_autopilot::util::JsonValue &args, bool is_call_tool,
+    const godot_autopilot::util::JsonValue *input_responses, std::string *error_out) {
   ConfirmationResolution out;
   if (error_out != nullptr)
     error_out->clear();
@@ -60,10 +60,10 @@ inline ConfirmationResolution resolve_confirmation(
     out.decision = ConfirmationDecision::kMalformed;
     return out;
   }
-  const mcp::JsonValue *arg_confirm = args.Find("confirm");
-  const mcp::JsonValue *nested_confirm = nullptr;
+  const godot_autopilot::util::JsonValue *arg_confirm = args.Find("confirm");
+  const godot_autopilot::util::JsonValue *nested_confirm = nullptr;
   if (is_call_tool) {
-    const mcp::JsonValue *nested = args.Find("arguments");
+    const godot_autopilot::util::JsonValue *nested = args.Find("arguments");
     if (nested != nullptr && nested->IsObject())
       nested_confirm = nested->Find("confirm");
   }
@@ -94,7 +94,7 @@ inline ConfirmationResolution resolve_confirmation(
     out.decision = ConfirmationDecision::kMalformed;
     return out;
   }
-  const mcp::JsonValue *confirm = input_responses->Find("confirm");
+  const godot_autopilot::util::JsonValue *confirm = input_responses->Find("confirm");
   if (confirm == nullptr)
     return out;
   if (confirm->IsBool()) {
@@ -104,7 +104,7 @@ inline ConfirmationResolution resolve_confirmation(
     return out;
   }
   if (confirm->IsObject()) {
-    const mcp::JsonValue *action = confirm->Find("action");
+    const godot_autopilot::util::JsonValue *action = confirm->Find("action");
     if (action != nullptr && action->IsString()) {
       const std::string value = action->GetString();
       if (value == "accept") {
@@ -125,15 +125,15 @@ inline ConfirmationResolution resolve_confirmation(
   return out;
 }
 
-inline mcp::JsonValue error(const std::string &name, SideEffect effect) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+inline godot_autopilot::util::JsonValue error(const std::string &name, SideEffect effect) {
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   result["error"] =
-      mcp::JsonValue("confirmation required before calling '" + name + "'");
-  result["code"] = mcp::JsonValue("confirmation_required");
-  result["confirm_required"] = mcp::JsonValue(true);
-  result["side_effect"] = mcp::JsonValue(side_effect_name(effect));
+      godot_autopilot::util::JsonValue("confirmation required before calling '" + name + "'");
+  result["code"] = godot_autopilot::util::JsonValue("confirmation_required");
+  result["confirm_required"] = godot_autopilot::util::JsonValue(true);
+  result["side_effect"] = godot_autopilot::util::JsonValue(side_effect_name(effect));
   result["hint"] =
-      mcp::JsonValue("Retry with arguments.confirm=true after reviewing the "
+      godot_autopilot::util::JsonValue("Retry with arguments.confirm=true after reviewing the "
                      "tool description and target.");
   return result;
 }

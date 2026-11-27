@@ -55,7 +55,7 @@ namespace {
 
 constexpr size_t kCurveMaxPoints = 256;
 
-bool read_curve_vec(const mcp::JsonValue &obj, bool need_z, float &ox,
+bool read_curve_vec(const godot_autopilot::util::JsonValue &obj, bool need_z, float &ox,
                     float &oy, float &oz, std::string &error) {
   error.clear();
   if (!obj.IsObject()) {
@@ -109,7 +109,7 @@ struct CurvePoint {
   bool has_out = false;
 };
 
-bool parse_curve_point(const mcp::JsonValue &entry, bool is_3d, CurvePoint &out,
+bool parse_curve_point(const godot_autopilot::util::JsonValue &entry, bool is_3d, CurvePoint &out,
                        std::string &error) {
   error.clear();
   if (!entry.IsObject()) {
@@ -208,7 +208,7 @@ std::string canonical_mesh_ref(const godot::Ref<godot::Resource> &res) {
   return std::to_string(static_cast<int64_t>(res->get_instance_id()));
 }
 
-bool resolve_resource_value_ref(const mcp::JsonValue &v,
+bool resolve_resource_value_ref(const godot_autopilot::util::JsonValue &v,
                                 godot::Ref<godot::Resource> &out,
                                 std::string &error) {
   error.clear();
@@ -297,7 +297,7 @@ bool resolve_resource_value_ref(const mcp::JsonValue &v,
   return false;
 }
 
-bool read_mesh_vertex(const mcp::JsonValue &obj, godot::Vector3 &out,
+bool read_mesh_vertex(const godot_autopilot::util::JsonValue &obj, godot::Vector3 &out,
                       std::string &error) {
   error.clear();
   if (!obj.IsObject()) {
@@ -324,7 +324,7 @@ bool read_mesh_vertex(const mcp::JsonValue &obj, godot::Vector3 &out,
   return true;
 }
 
-bool parse_vec3_list(const mcp::JsonValue *list, const char *field,
+bool parse_vec3_list(const godot_autopilot::util::JsonValue *list, const char *field,
                      godot::PackedVector3Array &out, std::string &error) {
   error.clear();
   const auto &arr = list->GetArray();
@@ -349,7 +349,7 @@ bool parse_vec3_list(const mcp::JsonValue *list, const char *field,
   return true;
 }
 
-bool parse_index_list(const mcp::JsonValue *list, size_t vertex_count,
+bool parse_index_list(const godot_autopilot::util::JsonValue *list, size_t vertex_count,
                       godot::PackedInt32Array &out, std::string &error) {
   error.clear();
   const auto &arr = list->GetArray();
@@ -358,7 +358,7 @@ bool parse_index_list(const mcp::JsonValue *list, size_t vertex_count,
     return false;
   }
   for (size_t i = 0; i < arr.size(); i++) {
-    const mcp::JsonValue &e = arr[i];
+    const godot_autopilot::util::JsonValue &e = arr[i];
     if (!e.IsNumber()) {
       error = "indices[" + std::to_string(i) + "] must be an integer in [0, " +
               std::to_string(vertex_count) + ")";
@@ -378,7 +378,7 @@ bool parse_index_list(const mcp::JsonValue *list, size_t vertex_count,
   return true;
 }
 
-bool read_surface_idx(const mcp::JsonValue *v, int &out, std::string &error) {
+bool read_surface_idx(const godot_autopilot::util::JsonValue *v, int &out, std::string &error) {
   error.clear();
   if (!v || !v->IsNumber()) {
     error = "missing required parameter: surface_idx (non-negative integer)";
@@ -395,7 +395,7 @@ bool read_surface_idx(const mcp::JsonValue *v, int &out, std::string &error) {
 }
 
 bool apply_primitive_params(godot::Object *obj, const std::string &cls,
-                            const mcp::JsonValue &params, std::string &error) {
+                            const godot_autopilot::util::JsonValue &params, std::string &error) {
   error.clear();
   if (!params.IsObject()) {
     error = "params must be an object mapping property names to values";
@@ -446,7 +446,7 @@ bool mesh_surface_has_normals(const godot::Ref<godot::Mesh> &mesh) {
 
 } // namespace
 
-mcp::JsonValue handle_create_curve(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_curve(const godot_autopilot::util::JsonValue &args) {
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
     return util::error_json("missing required parameter: name");
@@ -496,25 +496,25 @@ mcp::JsonValue handle_create_curve(const mcp::JsonValue &args) {
   res->set_name(godot::String(name.c_str()));
   res->set_path(godot::String(("memory://" + name).c_str()));
   resource_registry::register_resource(res, name);
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
-  info["class"] = mcp::JsonValue(cls);
-  info["name"] = mcp::JsonValue(name);
-  info["path"] = mcp::JsonValue("memory://" + name);
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+  info["class"] = godot_autopilot::util::JsonValue(cls);
+  info["name"] = godot_autopilot::util::JsonValue(name);
+  info["path"] = godot_autopilot::util::JsonValue("memory://" + name);
   info["object_id"] =
-      mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-  info["object_id_str"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+  info["object_id_str"] = godot_autopilot::util::JsonValue(
       std::to_string(static_cast<int64_t>(res->get_instance_id())));
-  info["dimension"] = mcp::JsonValue(dimension);
+  info["dimension"] = godot_autopilot::util::JsonValue(dimension);
   if (has_bake)
-    info["bake_interval"] = mcp::JsonValue(static_cast<double>(bake));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+    info["bake_interval"] = godot_autopilot::util::JsonValue(static_cast<double>(bake));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_curve_resource completed: " + name);
   return r;
 }
 
-mcp::JsonValue handle_set_curve_points(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_curve_points(const godot_autopilot::util::JsonValue &args) {
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
     return util::error_json("missing required parameter: name");
@@ -568,17 +568,17 @@ mcp::JsonValue handle_set_curve_points(const mcp::JsonValue &args) {
       c2->add_point(pos, in_v, out_v);
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["name"] = mcp::JsonValue(name);
-  r["class"] = mcp::JsonValue(is_3d ? "Curve3D" : "Curve2D");
-  r["point_count"] = mcp::JsonValue(static_cast<int64_t>(parsed.size()));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["name"] = godot_autopilot::util::JsonValue(name);
+  r["class"] = godot_autopilot::util::JsonValue(is_3d ? "Curve3D" : "Curve2D");
+  r["point_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(parsed.size()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_curve_points completed: " + name);
   return r;
 }
 
-mcp::JsonValue handle_get_curve_baked_points(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_get_curve_baked_points(const godot_autopilot::util::JsonValue &args) {
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
     return util::error_json("missing required parameter: name");
@@ -591,39 +591,39 @@ mcp::JsonValue handle_get_curve_baked_points(const mcp::JsonValue &args) {
   godot::Ref<godot::Curve3D> c3 = res;
   if (c2.is_null() && c3.is_null())
     return util::error_json("memory resource is not a Curve2D/Curve3D: " + name);
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
   if (c3.is_valid()) {
     const godot::PackedVector3Array baked = c3->get_baked_points();
-    mcp::JsonValue pts(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue pts(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < baked.size(); i++) {
       const godot::Vector3 v = baked[i];
       pts.PushBack(util::vec3_to_json(v));
     }
     inner["points"] = std::move(pts);
-    inner["count"] = mcp::JsonValue(static_cast<int64_t>(baked.size()));
+    inner["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(baked.size()));
     inner["baked_length"] =
-        mcp::JsonValue(static_cast<double>(c3->get_baked_length()));
-    inner["class"] = mcp::JsonValue("Curve3D");
+        godot_autopilot::util::JsonValue(static_cast<double>(c3->get_baked_length()));
+    inner["class"] = godot_autopilot::util::JsonValue("Curve3D");
   } else {
     const godot::PackedVector2Array baked = c2->get_baked_points();
-    mcp::JsonValue pts(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue pts(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < baked.size(); i++) {
       const godot::Vector2 v = baked[i];
       pts.PushBack(util::vec2_to_json(v));
     }
     inner["points"] = std::move(pts);
-    inner["count"] = mcp::JsonValue(static_cast<int64_t>(baked.size()));
+    inner["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(baked.size()));
     inner["baked_length"] =
-        mcp::JsonValue(static_cast<double>(c2->get_baked_length()));
-    inner["class"] = mcp::JsonValue("Curve2D");
+        godot_autopilot::util::JsonValue(static_cast<double>(c2->get_baked_length()));
+    inner["class"] = godot_autopilot::util::JsonValue("Curve2D");
   }
-  inner["name"] = mcp::JsonValue(name);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  inner["name"] = godot_autopilot::util::JsonValue(name);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;
 }
 
-mcp::JsonValue handle_create_primitive_mesh(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_primitive_mesh(const godot_autopilot::util::JsonValue &args) {
   auto *t = args.Find("type");
   if (!t || !t->IsString() || t->GetString().empty()) {
     return util::error_json("missing required parameter: type (one of box, "
@@ -668,24 +668,24 @@ mcp::JsonValue handle_create_primitive_mesh(const mcp::JsonValue &args) {
     res->set_path(godot::String(("memory://" + name).c_str()));
   }
   resource_registry::register_resource(res, name);
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
-  info["class"] = mcp::JsonValue(cls);
-  info["name"] = mcp::JsonValue(name);
-  info["path"] = mcp::JsonValue(util::to_std(res->get_path()));
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+  info["class"] = godot_autopilot::util::JsonValue(cls);
+  info["name"] = godot_autopilot::util::JsonValue(name);
+  info["path"] = godot_autopilot::util::JsonValue(util::to_std(res->get_path()));
   info["object_id"] =
-      mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-  info["object_id_str"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+  info["object_id_str"] = godot_autopilot::util::JsonValue(
       std::to_string(static_cast<int64_t>(res->get_instance_id())));
-  info["type"] = mcp::JsonValue(type);
-  info["mesh_ref"] = mcp::JsonValue(canonical_mesh_ref(res));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  info["type"] = godot_autopilot::util::JsonValue(type);
+  info["mesh_ref"] = godot_autopilot::util::JsonValue(canonical_mesh_ref(res));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_primitive_mesh completed: " + type);
   return r;
 }
 
-mcp::JsonValue handle_create_array_mesh(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_create_array_mesh(const godot_autopilot::util::JsonValue &args) {
   auto *v = args.Find("vertices");
   if (!v || !v->IsArray()) {
     return util::error_json(
@@ -761,26 +761,26 @@ mcp::JsonValue handle_create_array_mesh(const mcp::JsonValue &args) {
     res->set_path(godot::String(("memory://" + name).c_str()));
   }
   resource_registry::register_resource(res, name);
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
-  info["class"] = mcp::JsonValue("ArrayMesh");
-  info["name"] = mcp::JsonValue(name);
-  info["path"] = mcp::JsonValue(util::to_std(res->get_path()));
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+  info["class"] = godot_autopilot::util::JsonValue("ArrayMesh");
+  info["name"] = godot_autopilot::util::JsonValue(name);
+  info["path"] = godot_autopilot::util::JsonValue(util::to_std(res->get_path()));
   info["object_id"] =
-      mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-  info["object_id_str"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+  info["object_id_str"] = godot_autopilot::util::JsonValue(
       std::to_string(static_cast<int64_t>(res->get_instance_id())));
-  info["mesh_ref"] = mcp::JsonValue(canonical_mesh_ref(res));
+  info["mesh_ref"] = godot_autopilot::util::JsonValue(canonical_mesh_ref(res));
   info["vertex_count"] =
-      mcp::JsonValue(static_cast<int64_t>(verts.size()));
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(verts.size()));
   info["index_count"] =
-      mcp::JsonValue(static_cast<int64_t>(indices.size()));
-  info["has_normals"] = mcp::JsonValue(has_normals);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(indices.size()));
+  info["has_normals"] = godot_autopilot::util::JsonValue(has_normals);
   info["surface_count"] =
-      mcp::JsonValue(static_cast<int64_t>(mesh->get_surface_count()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(mesh->get_surface_count()));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(info);
   if (!has_normals) {
-    r["warning"] = mcp::JsonValue(
+    r["warning"] = godot_autopilot::util::JsonValue(
         "no normals provided; shaded materials may render flat — recreate the "
         "mesh with normals for correct lighting");
   }
@@ -789,7 +789,7 @@ mcp::JsonValue handle_create_array_mesh(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_set_mesh_surface_material(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_mesh_surface_material(const godot_autopilot::util::JsonValue &args) {
   auto *mr = args.Find("mesh_ref");
   if (!mr) {
     return util::error_json("missing required parameter: mesh_ref");
@@ -830,18 +830,18 @@ mcp::JsonValue handle_set_mesh_surface_material(const mcp::JsonValue &args) {
                             util::to_std(mres->get_class()) + ")");
   }
   mesh->surface_set_material(idx, mat);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["class"] = mcp::JsonValue(util::to_std(mesh->get_class()));
-  r["surface_idx"] = mcp::JsonValue(static_cast<int64_t>(idx));
-  r["surface_count"] = mcp::JsonValue(static_cast<int64_t>(count));
-  r["material"] = mcp::JsonValue(util::to_std(mat->get_class()));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["class"] = godot_autopilot::util::JsonValue(util::to_std(mesh->get_class()));
+  r["surface_idx"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(idx));
+  r["surface_count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(count));
+  r["material"] = godot_autopilot::util::JsonValue(util::to_std(mat->get_class()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_mesh_surface_material completed");
   return r;
 }
 
-mcp::JsonValue handle_assign_mesh_to_instance(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_assign_mesh_to_instance(const godot_autopilot::util::JsonValue &args) {
   auto *np = args.Find("node_path");
   if (!np || !np->IsString() || np->GetString().empty()) {
     return util::error_json("missing required parameter: node_path");
@@ -899,14 +899,14 @@ mcp::JsonValue handle_assign_mesh_to_instance(const mcp::JsonValue &args) {
         "save_resource (pass name or object_id) then assign the saved res:// "
         "path instead");
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["assigned"] = mcp::JsonValue(true);
-  r["node_path"] = mcp::JsonValue(path);
-  r["mesh_ref"] = mcp::JsonValue(canonical_mesh_ref(res));
-  r["class"] = mcp::JsonValue(util::to_std(node->get_class()));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["assigned"] = godot_autopilot::util::JsonValue(true);
+  r["node_path"] = godot_autopilot::util::JsonValue(path);
+  r["mesh_ref"] = godot_autopilot::util::JsonValue(canonical_mesh_ref(res));
+  r["class"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
   if (!mesh_surface_has_normals(mesh)) {
-    r["warning"] = mcp::JsonValue(
+    r["warning"] = godot_autopilot::util::JsonValue(
         "mesh has no normals; shaded materials may render flat — recreate the "
         "mesh with normals for correct lighting");
   }

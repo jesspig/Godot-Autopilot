@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -168,15 +168,15 @@ inline Result inspect(const std::string &res_path, bool fresh_load) {
   return inspect_loaded(res);
 }
 
-inline mcp::JsonValue detail_json(const Result &result,
+inline godot_autopilot::util::JsonValue detail_json(const Result &result,
                                   const std::string &path) {
-  mcp::JsonValue detail(mcp::JsonValue::object_tag);
-  detail["code"] = mcp::JsonValue(code_name(result.code));
-  detail["path"] = mcp::JsonValue(path);
-  detail["resource_class"] = mcp::JsonValue(result.resource_class);
-  detail["base_class"] = mcp::JsonValue(result.base_class);
-  detail["runtime_mountable"] = mcp::JsonValue(result.runtime_mountable);
-  detail["editor_runnable"] = mcp::JsonValue(result.editor_runnable);
+  godot_autopilot::util::JsonValue detail(godot_autopilot::util::JsonValue::object_tag);
+  detail["code"] = godot_autopilot::util::JsonValue(code_name(result.code));
+  detail["path"] = godot_autopilot::util::JsonValue(path);
+  detail["resource_class"] = godot_autopilot::util::JsonValue(result.resource_class);
+  detail["base_class"] = godot_autopilot::util::JsonValue(result.base_class);
+  detail["runtime_mountable"] = godot_autopilot::util::JsonValue(result.runtime_mountable);
+  detail["editor_runnable"] = godot_autopilot::util::JsonValue(result.editor_runnable);
   return detail;
 }
 

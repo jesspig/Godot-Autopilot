@@ -7,68 +7,68 @@ using godot_autopilot::confirmation::resolve_confirmation;
 
 namespace {
 
-mcp::JsonValue object() { return mcp::JsonValue(mcp::JsonValue::object_tag); }
+godot_autopilot::util::JsonValue object() { return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag); }
 
 } // namespace
 
 TEST(ConfirmationResolutionTest, DirectArguments) {
-  mcp::JsonValue args = object();
-  args["confirm"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue args = object();
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
   const auto r = resolve_confirmation(args, false, nullptr, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kAccepted);
   EXPECT_TRUE(r.from_arguments);
 }
 
 TEST(ConfirmationResolutionTest, DeclinedArgument) {
-  mcp::JsonValue args = object();
-  args["confirm"] = mcp::JsonValue(false);
+  godot_autopilot::util::JsonValue args = object();
+  args["confirm"] = godot_autopilot::util::JsonValue(false);
   const auto r = resolve_confirmation(args, false, nullptr, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kDeclined);
 }
 
 TEST(ConfirmationResolutionTest, NestedCallToolArgument) {
-  mcp::JsonValue nested = object();
-  nested["confirm"] = mcp::JsonValue(true);
-  mcp::JsonValue args = object();
+  godot_autopilot::util::JsonValue nested = object();
+  nested["confirm"] = godot_autopilot::util::JsonValue(true);
+  godot_autopilot::util::JsonValue args = object();
   args["arguments"] = std::move(nested);
   const auto r = resolve_confirmation(args, true, nullptr, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kAccepted);
 }
 
 TEST(ConfirmationResolutionTest, WrapperTrueWinsOverNestedFalse) {
-  mcp::JsonValue nested = object();
-  nested["confirm"] = mcp::JsonValue(false);
-  mcp::JsonValue args = object();
-  args["confirm"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue nested = object();
+  nested["confirm"] = godot_autopilot::util::JsonValue(false);
+  godot_autopilot::util::JsonValue args = object();
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
   args["arguments"] = std::move(nested);
   const auto r = resolve_confirmation(args, true, nullptr, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kAccepted);
 }
 
 TEST(ConfirmationResolutionTest, InputResponseBoolShorthand) {
-  mcp::JsonValue args = object();
-  mcp::JsonValue response = object();
-  response["confirm"] = mcp::JsonValue(true);
+  godot_autopilot::util::JsonValue args = object();
+  godot_autopilot::util::JsonValue response = object();
+  response["confirm"] = godot_autopilot::util::JsonValue(true);
   const auto r = resolve_confirmation(args, false, &response, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kAccepted);
   EXPECT_TRUE(r.from_input_responses);
 }
 
 TEST(ConfirmationResolutionTest, InputResponseObjectAction) {
-  mcp::JsonValue args = object();
-  mcp::JsonValue confirm = object();
-  confirm["action"] = mcp::JsonValue(std::string("accept"));
-  mcp::JsonValue response = object();
+  godot_autopilot::util::JsonValue args = object();
+  godot_autopilot::util::JsonValue confirm = object();
+  confirm["action"] = godot_autopilot::util::JsonValue(std::string("accept"));
+  godot_autopilot::util::JsonValue response = object();
   response["confirm"] = std::move(confirm);
   const auto r = resolve_confirmation(args, false, &response, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kAccepted);
 }
 
 TEST(ConfirmationResolutionTest, MalformedInputResponse) {
-  mcp::JsonValue args = object();
-  mcp::JsonValue confirm = object();
-  confirm["action"] = mcp::JsonValue(std::string("maybe"));
-  mcp::JsonValue response = object();
+  godot_autopilot::util::JsonValue args = object();
+  godot_autopilot::util::JsonValue confirm = object();
+  confirm["action"] = godot_autopilot::util::JsonValue(std::string("maybe"));
+  godot_autopilot::util::JsonValue response = object();
   response["confirm"] = std::move(confirm);
   std::string error;
   const auto r = resolve_confirmation(args, false, &response, &error);
@@ -77,7 +77,7 @@ TEST(ConfirmationResolutionTest, MalformedInputResponse) {
 }
 
 TEST(ConfirmationResolutionTest, MissingConfirmation) {
-  mcp::JsonValue args = object();
+  godot_autopilot::util::JsonValue args = object();
   const auto r = resolve_confirmation(args, false, nullptr, nullptr);
   EXPECT_EQ(r.decision, ConfirmationDecision::kMissing);
 }

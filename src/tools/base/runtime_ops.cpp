@@ -40,7 +40,7 @@ namespace runtime_ops {
 
 using godot_autopilot::runtime::response_envelope::carry_transport_fields;
 using godot_autopilot::util::error_json;
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 namespace {
 
@@ -515,8 +515,8 @@ JV dispatch_game_request(int64_t request_id, const std::string &op,
   return state->result;
 }
 
-JV read_capture_file(const mcp::JsonValue &pending_result,
-                     const mcp::JsonValue &options) {
+JV read_capture_file(const godot_autopilot::util::JsonValue &pending_result,
+                     const godot_autopilot::util::JsonValue &options) {
   std::string path = pending_result["path"].GetString();
   godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
       godot::String(path.c_str()), godot::FileAccess::READ);
@@ -611,8 +611,8 @@ void schedule_timeout_recovery(int32_t session_id, int64_t request_id) {
 
 } // namespace
 
-std::string late_result_summary(const mcp::JsonValue &response) {
-  const mcp::JsonValue *source = response.Find(GDA_FIELD_ERROR);
+std::string late_result_summary(const godot_autopilot::util::JsonValue &response) {
+  const godot_autopilot::util::JsonValue *source = response.Find(GDA_FIELD_ERROR);
   if (!source)
     source = response.Find(GDA_FIELD_RESULT);
   if (!source)
@@ -634,7 +634,7 @@ void push_late_result(std::deque<LateResult> &buffer, LateResult entry,
     buffer.pop_front();
 }
 
-mcp::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input) {
+godot_autopilot::util::JsonValue build_game_timeout_receipt(const GameTimeoutReceiptInput &input) {
   const std::string op_name = input.op.empty() ? "?" : input.op;
   std::string response_summary;
   if (input.last_channel_response_age_ms >= 0) {
@@ -853,7 +853,7 @@ void restore_error_breaks() {
       "— error breaks may stay disabled in the game until it restarts");
 }
 
-mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
+godot_autopilot::util::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   std::shared_ptr<PendingRequest> pending;
   {
     std::lock_guard<std::mutex> lock(g_pending_mtx);
@@ -1026,7 +1026,7 @@ bool wait_pending_completion(int64_t request_id, int64_t timeout_ms) {
                               });
 }
 
-bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id) {
+bool payload_is_pending(const godot_autopilot::util::JsonValue &payload, int64_t *out_request_id) {
   if (!payload.IsObject())
     return false;
   auto *pending_id = payload.Find("__gda_pending");
@@ -1037,7 +1037,7 @@ bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id) 
   return true;
 }
 
-bool payload_is_game_job(const mcp::JsonValue &payload, int64_t *out_job_id) {
+bool payload_is_game_job(const godot_autopilot::util::JsonValue &payload, int64_t *out_job_id) {
   if (!payload.IsObject())
     return false;
   auto *job_id = payload.Find("__gda_job");
@@ -1086,8 +1086,8 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
   return true;
 }
 
-mcp::JsonValue start_pending_op(const std::string &op,
-                                const mcp::JsonValue &params,
+godot_autopilot::util::JsonValue start_pending_op(const std::string &op,
+                                const godot_autopilot::util::JsonValue &params,
                                 bool suppress_error_breaks,
                                 int64_t *out_request_id, bool wait_ready,
                                  std::optional<int32_t> session_id) {
@@ -1101,7 +1101,7 @@ mcp::JsonValue start_pending_op(const std::string &op,
   return result;
 }
 
-bool try_collect_response(int64_t request_id, mcp::JsonValue &out_response) {
+bool try_collect_response(int64_t request_id, godot_autopilot::util::JsonValue &out_response) {
   std::shared_ptr<PendingRequest> pending;
   {
     std::lock_guard<std::mutex> lock(g_pending_mtx);
@@ -1192,8 +1192,8 @@ void maybe_recover_break() {
   }
 }
 
-mcp::JsonValue handle_gda_send(const std::string &op,
-                               const mcp::JsonValue &params, int64_t timeout_ms,
+godot_autopilot::util::JsonValue handle_gda_send(const std::string &op,
+                               const godot_autopilot::util::JsonValue &params, int64_t timeout_ms,
                                bool suppress_error_breaks, bool wait_ready,
                                 std::optional<int32_t> session_id) {
   int64_t request_id = g_next_request_id.fetch_add(1);
@@ -1364,8 +1364,8 @@ void on_session_ready(int32_t session_id) {
   }
 }
 
-mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result,
-                                         const mcp::JsonValue &options) {
+godot_autopilot::util::JsonValue finalize_capture_response(const godot_autopilot::util::JsonValue &pending_result,
+                                         const godot_autopilot::util::JsonValue &options) {
   if (pending_result.Contains("error"))
     return pending_result;
   if (!pending_result.IsObject())

@@ -1,7 +1,7 @@
 ---
 type: 模块文档
 title: 支撑模块
-description: 提示词、MCP 资源、编辑器 UI 与通用工具库实现细节
+description: 提示词、资源面、编辑器 UI 与通用工具库实现细节
 tags:
   - 模块
   - 提示词
@@ -16,7 +16,7 @@ resource:
   - src/util/
 ---
 
-> **0.3.2 已移除**：`McpConfigDock`、`client_config_gen`、授权开关、端口 Apply/Pin、Copy API、旧数据导入入口与面板技能生成均已删除；仅保留 `McpLogDock`。MCP 配置由 Agent 根据 `gda status --json` 的 `mcp_url` 生成。
+> **0.3.2 已移除**：`McpConfigDock`、`client_config_gen`、授权开关、端口 Apply/Pin、Copy API、旧数据导入入口与面板技能生成均已删除；仅保留 `GdaLogDock`。连接由 Agent 根据 `gda status --format json` 的连接记录确认，无需客户端配置。
 
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
@@ -25,12 +25,12 @@ resource:
 
 ## 模块简介
 
-这四组文件不直接产生领域工具，而是为 MCP 服务器与编辑器体验提供支撑：
+这四组文件不直接产生领域工具，而是为 CLI 控制面与编辑器体验提供支撑：
 
-- **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），均经 `server.RegisterPrompt` 注册；回调入口统一经 `prompts_detail::reject_if_exporting()` 做导出期拦截。
-- **Resources**：暴露 15 个引擎/调试侧 MCP resource URI（8 引擎侧 + 7 调试捕获侧）+ **12 个 skills 资源**，均为 `godot://` 前缀。skills 组含 `godot://skills` 目录、`godot://skills/<name>` 与 `godot://skills/<name>/<file>`，按 1 张入口卡 + 9 篇 references 动态注册为 1 目录 + 1 技能 + 10 文件 = 12 个资源，经协议层可发现可读；单文件 MIME 按扩展名（`.md` 为 `text/markdown`），目录清单为 `application/json`。
-- **UI**：底部日志面板（`McpLogDock`）；右侧 `McpConfigDock` 已于 0.3.2 移除。
-- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、MCP 图像内容交付、客户端 MCP 配置生成、Agent Skills 文档生成。
+- **Prompts**：提供 12 个 prompt 模板（7 通用 + 5 调试）供 `gda prompts` 调用，均经 `server.RegisterPrompt` 注册；回调入口统一经 `prompts_detail::reject_if_exporting()` 做导出期拦截。
+- **Resources**：提供 15 个引擎/调试侧资源 URI（8 引擎侧 + 7 调试捕获侧）+ **12 个 skills 资源**，均为 `godot://` 前缀。skills 组含 `godot://skills` 目录、`godot://skills/<name>` 与 `godot://skills/<name>/<file>`，按 1 张入口卡 + 9 篇 references 动态注册为 1 目录 + 1 技能 + 10 文件 = 12 个资源，经 CLI 可发现可读；单文件 MIME 按扩展名（`.md` 为 `text/markdown`），目录清单为 `application/json`。
+- **UI**：底部日志面板（`GdaLogDock`）；右侧 `McpConfigDock` 已于 0.3.2 移除。
+- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、截图内容交付、Agent Skills 文档生成。
 
 ## Prompts（12 个，均经 RegisterPrompt 注册）
 
@@ -41,7 +41,7 @@ resource:
 | `register_all_prompts(server, queue)` | `prompt_handlers.cpp` + 7 个 `prompt_*.cpp/hpp` | 7 | 内容函数经 `queue.submit()` 在主线程执行（`prompt_handlers.cpp:28-113`） |
 | `register_debugger_prompts(server)` | `debugger_prompts.cpp/hpp` + `prompt_export_guard.hpp` | 5 | 纯文本模板直接同步构造（不触碰 Godot API，不经 queue）；各回调先经 `reject_if_exporting()` 拦截导出期调用 |
 
-所有 prompt 返回单条 `role=assistant` 的 `TextContent` 消息（两处 `make_result` 实现相同）。通用组经 `run_prompt_task()`、调试组在各回调入口调用 `prompts_detail::reject_if_exporting()`——导出期（`ExportGuard::is_exporting()`）抛 `mcp::McpError(HandlerError, dispatch::export_blocked_error_text())`。注册后各写一条 `Prompts` 类别日志："7 prompt templates registered" / "Registered debugger prompts: 5 templates"。
+所有 prompt 返回单条 `role=assistant` 的 `TextContent` 消息（两处 `make_result` 实现相同）。通用组经 `run_prompt_task()`、调试组在各回调入口调用 `prompts_detail::reject_if_exporting()`——导出期（`ExportGuard::is_exporting()`）抛 `ToolArgError(dispatch::export_blocked_error_text())`。注册后各写一条 `Prompts` 类别日志："7 prompt templates registered" / "Registered debugger prompts: 5 templates"。
 
 ### 通用 prompt 名单（register_all_prompts）
 
@@ -52,7 +52,7 @@ resource:
 | `debug-physics` | Guide to use physics debugging tools including ray casts, shape casts, and performance monitors | `prompt_debug_physics()` | 统一走 `physics_query`（`dimension`=2/3、`mode`=intersect_ray/shape/point）、`set_debug_visuals`（`action`=collision/navigation）、`get_debug_info`（`action`=monitors） |
 | `setup-input-map` | Guide to configure input actions in Project Settings and test them | `prompt_setup_input_map()` | 经 `call_tool` 调 `update_project_settings`（`action`=set/save）、`set_input_map_action`（`action`=set，events 带 `class`）、`get_input_state`、`input_action`、`game_input` |
 | `setup-gui` | Guide to create a simple GUI with CanvasLayer, containers, buttons, and labels | `prompt_setup_gui()` | CanvasLayer → VBoxContainer → 标签/按钮 + 信号连接示例 |
-| `tool-usage` | Usage examples for the 19 most commonly used MCP tools with JSON input/output and gotchas | `prompt_tool_usage()` | 实际含 **19 个**工具章节，注册描述已对齐为 19；示例统一走合并入口（`resource_create`/`resource_save`/`editor_scene_control`/`set_input_map_action`/`node_group`/`set_tilemap_cells` 等） |
+| `tool-usage` | Usage examples for the 19 most commonly used CLI tools with JSON input/output and gotchas | `prompt_tool_usage()` | 实际含 **19 个**工具章节，注册描述已对齐为 19；示例统一走合并入口（`resource_create`/`resource_save`/`editor_scene_control`/`set_input_map_action`/`node_group`/`set_tilemap_cells` 等） |
 | `keycode-reference` | Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations | `prompt_keycode_reference()` | ASCII 键码表、按 Godot 权威 `Key` 枚举重写的特殊键表（`KEY_SPECIAL=4194304` 基值，如 `KEY_ENTER=4194309`、`KEY_SHIFT=4194325`、`KEY_META=4194327`，含小键盘段）、`set_input_map_action`（action=set）的 events JSON、Variant→JSON 映射表 |
 
 ### 调试 prompt 名单（register_debugger_prompts，可带可选参数，均做导出期拦截）
@@ -75,7 +75,7 @@ resource:
 | `register_debugger_resources(server, queue)` | `debugger_resources.cpp/hpp` | 7（全静态） | `godot://` URI，`text/plain` | 每个 handler 经 `dispatch::run_bounded_on_main_thread` 在主线程执行，`debugger-session` 的 Godot debugger 查询也在主线程执行 |
 | `register_skill_resources(server)` | `resource_handlers.cpp` + `skill_resources.hpp`（URI 解析，header-only） | 12（1 目录 + 1 技能 + 10 文件） | `godot://skills…` URI，目录为 `application/json`、单文件按扩展名 | 读构建期内嵌的技能内容（`embedded_skills()`），不触碰 Godot API |
 
-**注意：`resource_handlers` 不是"扩展名注册表"**——它注册的是 MCP Resource（URI 分发），而非 Godot 资源扩展名映射；扩展名/类型相关逻辑在 `tools/resource_ops` 侧。
+**注意：`resource_handlers` 不是"扩展名注册表"**——它注册的是资源面（URI 分发），而非 Godot 资源扩展名映射；扩展名/类型相关逻辑在 `tools/resource_ops` 侧。
 
 **trace 上下文传递**：两组 handler 在提交主线程前调用 `tools::capture_trace_context()`，主线程 lambda 内用 `ScopedTraceContext` 恢复，使资源读取归入发起方 trace；上下文为纯 std 线程局部变量，不触碰 Godot API。资源读取成功发 `monitor::data_flow("resource_read", bytes, {uri, request_id})`、失败发 `monitor::error_event`；调试资源注册发 `monitor::lifecycle`。
 
@@ -92,7 +92,7 @@ resource:
 | `editor-setting`（模板） | `godot://editor/settings/{key}` | 单键编辑器设置值 |
 | `log-recent` | `godot://log/recent` | `LogSystem` 最近 50 条：`level`/`category`/`message`/`timestamp`（ISO8601） |
 
-错误统一为 JSON 对象 `{"error": "消息"}`（本文件内 `set_error`，与 `error_util::error_json` 同构）；3 个模板的 path/key 变量缺失或路径非法则直接抛 `mcp::McpError(InvalidParams, "missing/invalid template variable: path|key")`。
+错误统一为 JSON 对象 `{"error": "消息"}`（本文件内 `set_error`，与 `error_util::error_json` 同构）；3 个模板的 path/key 变量缺失或路径非法则直接抛 `ToolArgError("missing/invalid template variable: path|key")`。
 
 ### debugger_resources 名单（text/plain）
 
@@ -108,7 +108,7 @@ resource:
 
 ## UI
 
-### McpLogDock（`mcp_log_dock.cpp/hpp`）
+### GdaLogDock（`gda_log_dock.cpp/hpp`）
 
 `EditorDock` 子类，标题 "GDA Log"，默认停靠底部槽（`DOCK_SLOT_BOTTOM`），可关闭，最小高度 `DEFAULT_DOCK_HEIGHT = 200`：
 
@@ -134,38 +134,9 @@ resource:
 
 ### client_config_gen（`src/util/client_config_gen.cpp/hpp`，命名空间 `godot_autopilot::client_config_gen`，0.3.2 已移除）
 
-纯函数生成器（**仅依赖 std + `mcp::JsonValue`，无 Godot API**，单元测试 可测）：
+客户端配置生成器已移除。GDA 为 CLI-only：连接由 `gda status --format json` 的连接记录确认，无需任何客户端配置文件。原 20 客户端路径/顶层键矩阵仅为历史口径，见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)。
 
-| 客户端 | 文件路径 | 顶层键 | 条目字段 |
-|---|---|---|---|
-| OpenCode | `opencode.json` | `mcp` | `type=remote`、`url`、`enabled=true` |
-| Claude Code | `.mcp.json` | `mcpServers` | `type=http`、`url` |
-| Codex | `.codex/config.toml` | `[mcp_servers.godot-autopilot]`（TOML） | `url` |
-| Cursor | `.cursor/mcp.json` | `mcpServers` | `url`（无 type） |
-| GitHub Copilot | `.github/mcp.json` | `mcpServers` | `type=http`、`url` |
-| Trae | `.trae/mcp.json` | `mcpServers` | `url`（无 type） |
-| Qoder | `.qoder/settings.json` | `mcpServers` | `type=http`、`url` |
-| WorkBuddy | `.workbuddy/mcp.json` | `mcpServers` | `type=http`、`url` |
-| ZCode | `.zcode/config.json` | `mcp.servers`（双层嵌套） | `type=http`、`url`、`enabled=true`（09-16 新增；type 写 `http` 而非桌面端 legacy `remote`） |
-| pi（pi-mcp-adapter） | `.mcp.json` | `mcpServers` | `url`（无 type；需先安装 pi-mcp-adapter 扩展；与 Command Code/CodeBuddy 共用同一文件同一条目） |
-| Command Code | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code/pi 共用同一文件同一条目） |
-| Kilo Code | `.kilo/mcp.json` | `mcpServers` | `type=streamable-http`、`url`（09-16 新增；取旧格式，新核心自动迁移） |
-| Roo Code | `.roo/mcp.json` | `mcpServers` | `type=streamable-http`、`url`（09-16 新增；该客户端对 URL 型省略 type 会报错） |
-| Grok Build | `.grok/config.toml` | `[mcp_servers.godot-autopilot]`（TOML） | `url`（09-16 新增；与 Codex 同构） |
-| Kimi Code | `.kimi-code/mcp.json` | `mcpServers` | `url`、`enabled=true`（无 type，09-16 新增） |
-| Zed | `.zed/settings.json` | `context_servers` | `url`（无 type；09-16 新增；通用项目设置文件，merge 保留用户其他设置） |
-| CodeBuddy | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code/pi 共用同一文件同一条目） |
-| Crush | `.crush.json` | `mcp` | `type=http`、`url` + 顶层 `$schema`（09-16 新增；legacy JSON 体系，strict schema 不写 enabled） |
-| GitHub Copilot (VS Code) | `.vscode/mcp.json` | `servers`（非 `mcpServers`） | `type=http`、`url`（09-16 新增；覆盖 VS Code 内 Copilot Chat，`.github/mcp.json` 只覆盖 coding agent 与 Copilot CLI） |
-| Reasonix | `reasonix.toml` | `[[plugins]]` 数组（TOML） | `name`、`type=http`、`url`（09-16 新增） |
-
-调研淘汰（09-16）：Cline（项目级 `.cline/mcp.json` 仅官方 CLI 文档化，VS Code 扩展未确认读取）与 Antigravity CLI（支持 `.agents/mcp_config.json`，但 CLI v1.0.0 有项目级 "read but ignored" 已知 bug）按「可能不生效即不支持」原则暂不纳入。
-
-- 服务器名常量 `kServerName = "godot-autopilot"`；URL 统一 `http://127.0.0.1:<port>/mcp`（DNS rebinding 保护要求 127.0.0.1）
-- `render_config(ClientId, port)`——全新文件内容（JSON `Dump(2)` 缩进 / TOML 字符串）；TOML 客户端判定 `uses_toml(id)`（Codex / GrokBuild / Reasonix）
-- `merge_json_config(ClientId, port, existing)`——空串 → 新建；Parse 失败或非对象 → `Unparsable`；否则更新顶层键下同名条目并保留其余内容（ZCode 为 `mcp.servers` 双层，`mcp` 非 object 时重建为 object）
-- `merge_toml_config(ClientId, port, existing)`——Codex/GrokBuild：已含 `[mcp_servers` 段 → `AlreadyConfigured`，否则追加段；Reasonix：marker 为 `name = "godot-autopilot"`，否则追加 `[[plugins]]` 数组元素（均保留原文）
-- `display_name` / `file_path` / `description`——UI label 与报告用
+客户端配置生成相关的历史实现（20 客户端映射、merge 规则与面板入口）已随 0.3.2 整体删除，不再作为活跃口径；详见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)。
 
 ### skill_gen（`src/util/skill_gen.cpp/hpp` + `skill_content_generated.cpp` + `skills/`，命名空间 `godot_autopilot::skill_gen`）
 
@@ -196,7 +167,7 @@ resource:
 
 ### VariantJson（`variant_json.cpp/hpp`）
 
-静态方法 `serialize(Variant) → JsonValue`、`deserialize(JsonValue, type_hint = "") → Variant`、`deserialize_strict(JsonValue, type_hint) → Variant`（09-13 下午新增：命中的类型走严格形状校验，违规抛 `std::runtime_error`；未命中类型退回 `deserialize`）。AGENTS.md 标注的 "`VariantJson::serialize/deserialize` 用于 `godot::Variant ↔ mcp::JsonValue` 互转" 与实现一致。
+静态方法 `serialize(Variant) → JsonValue`、`deserialize(JsonValue, type_hint = "") → Variant`、`deserialize_strict(JsonValue, type_hint) → Variant`（09-13 下午新增：命中的类型走严格形状校验，违规抛 `std::runtime_error`；未命中类型退回 `deserialize`）。AGENTS.md 标注的 "`VariantJson::serialize/deserialize` 用于 `godot::Variant ↔ util::JsonValue` 互转" 与实现一致。
 
 **serialize 类型覆盖**（switch 全量分支，另加特例）：
 
@@ -347,16 +318,16 @@ GDScript 包装流水线共享件（`code_execute`、`execute_script`、游戏�
 
 ### mcp_image_content.hpp（header-only，命名空间 `godot_autopilot::util`，09-13 新增）
 
-MCP 截图交付的纯逻辑件（仅依赖 `mcp::JsonValue`/`mcp::ContentVariant`）：
+截图交付的纯逻辑件（仅依赖 `util::JsonValue`/`ContentVariant`）：
 
 - `is_image_capture_tool(name)`：截图工具白名单 `capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen`。
-- `try_attach_image_content(tool_name, result_json, content_out, reason?)`：命中白名单且响应中顶层或 `result` 下的 `data` 为非空字符串、`format` 缺省或为 `"png"` 时，把 base64 转成 `mcp::ImageContent{"image", base64, "image/png"}` 推入 `content_out`，并把 JSON 中 `data` 改写为 `"<attached-as-image-content>"`、加 `image_attached:true`；不满足条件返回 false（可选回填 `reason`）。
+- `try_attach_image_content(tool_name, result_json, content_out, reason?)`：命中白名单且响应中顶层或 `result` 下的 `data` 为非空字符串、`format` 缺省或为 `"png"` 时，把 base64 转成 `ImageContent{"image", base64, "image/png"}` 推入 `content_out`，并把 JSON 中 `data` 改写为 `"<attached-as-image-content>"`、加 `image_attached:true`；不满足条件返回 false（可选回填 `reason`）。
 
-消费方：`register_all.cpp` 的 `call_tool` 回调——仅元工具 `call_tool` 直调截图工具时附加 image content 块，`batch_execute`/`code_execute` 内不附加（JSON 保留完整 base64）。单元测试 覆盖 `tests/unit/mcp_image_content_test.cpp`。
+消费方：`register_all.cpp` 的调用回调——仅直接调用截图工具时附加 image content 块，`batch_execute`/`code_execute` 内不附加（JSON 保留完整 base64）。单元测试 覆盖 `tests/unit/mcp_image_content_test.cpp`。
 
 ### inline_resource_json.hpp（header-only，命名空间 `godot_autopilot::util::inline_resource`）
 
-内联资源描述的纯形状判定件（仅依赖 `mcp::JsonValue`）：
+内联资源描述的纯形状判定件（仅依赖 `util::JsonValue`）：
 
 - `inspect(value)` → `Description{shape, type, has_properties}`：`shape` 三态——`not_inline`（非对象或无 `type` 字段）、`inline_description`（有 `type` 字符串）、`invalid_properties`（有 `type` 但 `properties` 不是对象）。
 - `nested_depth(value)`：递归求嵌套深度，数组取元素最大深度、对象逐键取最大深度；命中 `inline_description` 时深度 +1（`type` 键自身不计）。嵌套上限常量 `kMaxDepth = 4`。

@@ -1,0 +1,2 @@
+source-manifest-guard production sources 123 == src/ *.cpp 123; L1 manifests reference 60 production sources, all registered
+source-manifest-guard OK

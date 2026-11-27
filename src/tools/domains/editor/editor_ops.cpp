@@ -246,14 +246,14 @@ std::string editor_error_text(const std::string &what, godot::Error err) {
 }
 
 
-void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
+void attach_save_receipt(godot_autopilot::util::JsonValue &r, const godot_autopilot::util::JsonValue &args,
                          godot::Node *root, const std::string &res_path) {
   if (!root || res_path.empty())
     return;
   bool disk_ok = false;
   const std::string text = scene_verify::read_text_file(res_path, disk_ok);
   if (!disk_ok) {
-    r["verify_error"] = mcp::JsonValue(
+    r["verify_error"] = godot_autopilot::util::JsonValue(
         "saved, but the on-disk file could not be re-read for verification: " +
         res_path);
     return;
@@ -262,36 +262,36 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
   const bool want_paths = save_receipt_flag(args, "include_paths");
   const scene_verify::VerifyResult vr =
       scene_verify::compare_tree_with_text(root, text, want_hash);
-  r["memory_nodes"] = mcp::JsonValue(vr.memory_nodes);
-  r["disk_nodes"] = mcp::JsonValue(vr.disk_nodes);
-  r["nodes_match"] = mcp::JsonValue(vr.match);
-  r["memory_connections"] = mcp::JsonValue(vr.memory_connections);
-  r["disk_connections"] = mcp::JsonValue(vr.disk_connections);
+  r["memory_nodes"] = godot_autopilot::util::JsonValue(vr.memory_nodes);
+  r["disk_nodes"] = godot_autopilot::util::JsonValue(vr.disk_nodes);
+  r["nodes_match"] = godot_autopilot::util::JsonValue(vr.match);
+  r["memory_connections"] = godot_autopilot::util::JsonValue(vr.memory_connections);
+  r["disk_connections"] = godot_autopilot::util::JsonValue(vr.disk_connections);
   r["connections_match"] =
-      mcp::JsonValue(vr.memory_connections == vr.disk_connections);
+      godot_autopilot::util::JsonValue(vr.memory_connections == vr.disk_connections);
   if (vr.inherited_nodes > 0)
-    r["inherited_nodes"] = mcp::JsonValue(vr.inherited_nodes);
+    r["inherited_nodes"] = godot_autopilot::util::JsonValue(vr.inherited_nodes);
   if (vr.inherited_connections > 0)
-    r["inherited_connections"] = mcp::JsonValue(vr.inherited_connections);
+    r["inherited_connections"] = godot_autopilot::util::JsonValue(vr.inherited_connections);
   if (!vr.match || want_paths) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &p : vr.missing_paths)
-      arr.PushBack(mcp::JsonValue(p));
+      arr.PushBack(godot_autopilot::util::JsonValue(p));
     r["missing_paths"] = std::move(arr);
     if (vr.missing_truncated)
-      r["missing_truncated"] = mcp::JsonValue(true);
+      r["missing_truncated"] = godot_autopilot::util::JsonValue(true);
   }
   if (!vr.inherited_paths.empty() && (want_paths || !vr.match)) {
-    mcp::JsonValue inherited_arr(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue inherited_arr(godot_autopilot::util::JsonValue::array_tag);
     for (const std::string &p : vr.inherited_paths)
-      inherited_arr.PushBack(mcp::JsonValue(p));
+      inherited_arr.PushBack(godot_autopilot::util::JsonValue(p));
     r["inherited_paths"] = std::move(inherited_arr);
     if (vr.inherited_truncated)
-      r["inherited_truncated"] = mcp::JsonValue(true);
+      r["inherited_truncated"] = godot_autopilot::util::JsonValue(true);
   }
   if (want_hash && vr.hash_computed) {
-    r["memory_hash"] = mcp::JsonValue(hash_hex(vr.memory_hash));
-    r["disk_hash"] = mcp::JsonValue(hash_hex(vr.disk_hash));
+    r["memory_hash"] = godot_autopilot::util::JsonValue(hash_hex(vr.memory_hash));
+    r["disk_hash"] = godot_autopilot::util::JsonValue(hash_hex(vr.disk_hash));
   }
   if (!vr.match) {
     const std::string mismatch_text =
@@ -308,9 +308,9 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
     if (existing_warning != nullptr && existing_warning->IsString() &&
         !existing_warning->GetString().empty()) {
       r["warning"] =
-          mcp::JsonValue(existing_warning->GetString() + "; " + mismatch_text);
+          godot_autopilot::util::JsonValue(existing_warning->GetString() + "; " + mismatch_text);
     } else {
-      r["warning"] = mcp::JsonValue(mismatch_text);
+      r["warning"] = godot_autopilot::util::JsonValue(mismatch_text);
     }
   }
 }
@@ -323,22 +323,22 @@ bool tree_entry_matches(const std::string &name, const std::string &path,
          util::ascii_lowercase(path).find(filter_lower) != std::string::npos;
 }
 
-bool dir_to_json(godot::EditorFileSystemDirectory *dir, mcp::JsonValue &j,
+bool dir_to_json(godot::EditorFileSystemDirectory *dir, godot_autopilot::util::JsonValue &j,
                  int depth, int max_depth, const std::string &filter_lower,
                  bool &out_filtered) {
   if (!dir)
     return false;
-  j["name"] = mcp::JsonValue(util::to_std(dir->get_name()));
-  j["path"] = mcp::JsonValue(util::to_std(dir->get_path()));
-  j["type"] = mcp::JsonValue("directory");
-  mcp::JsonValue children_arr(mcp::JsonValue::array_tag);
+  j["name"] = godot_autopilot::util::JsonValue(util::to_std(dir->get_name()));
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(dir->get_path()));
+  j["type"] = godot_autopilot::util::JsonValue("directory");
+  godot_autopilot::util::JsonValue children_arr(godot_autopilot::util::JsonValue::array_tag);
   bool truncated = false;
   if (depth < max_depth) {
     for (int i = 0; i < dir->get_subdir_count(); i++) {
       auto *sub = dir->get_subdir(i);
       if (!sub)
         continue;
-      mcp::JsonValue child(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue child(godot_autopilot::util::JsonValue::object_tag);
       bool child_filtered = false;
       if (dir_to_json(sub, child, depth + 1, max_depth, filter_lower,
                       child_filtered))
@@ -364,12 +364,12 @@ bool dir_to_json(godot::EditorFileSystemDirectory *dir, mcp::JsonValue &j,
         out_filtered = true;
         continue;
       }
-      mcp::JsonValue file(mcp::JsonValue::object_tag);
-      file["name"] = mcp::JsonValue(fname);
-      file["path"] = mcp::JsonValue(fpath);
+      godot_autopilot::util::JsonValue file(godot_autopilot::util::JsonValue::object_tag);
+      file["name"] = godot_autopilot::util::JsonValue(fname);
+      file["path"] = godot_autopilot::util::JsonValue(fpath);
       godot::StringName sn = dir->get_file_type(i);
-      file["type"] = mcp::JsonValue(util::to_std(godot::String(sn)));
-      file["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+      file["type"] = godot_autopilot::util::JsonValue(util::to_std(godot::String(sn)));
+      file["children"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
       children_arr.PushBack(std::move(file));
     }
   } else if (dir->get_subdir_count() > 0 || dir->get_file_count() > 0) {
@@ -413,32 +413,32 @@ bool release_unclaimed_node(godot::Node *node, godot::EditorInterface *editor) {
   return true;
 }
 
-mcp::JsonValue editor_scene_state_json(godot::EditorInterface *editor) {
-  mcp::JsonValue state(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue editor_scene_state_json(godot::EditorInterface *editor) {
+  godot_autopilot::util::JsonValue state(godot_autopilot::util::JsonValue::object_tag);
   auto *root = editor->get_edited_scene_root();
   if (root) {
-    mcp::JsonValue root_info(mcp::JsonValue::object_tag);
-    root_info["name"] = mcp::JsonValue(util::to_std(root->get_name()));
+    godot_autopilot::util::JsonValue root_info(godot_autopilot::util::JsonValue::object_tag);
+    root_info["name"] = godot_autopilot::util::JsonValue(util::to_std(root->get_name()));
     std::string root_path = util::to_std(root->get_scene_file_path());
     if (!root_path.empty())
-      root_info["scene_file_path"] = mcp::JsonValue(root_path);
+      root_info["scene_file_path"] = godot_autopilot::util::JsonValue(root_path);
     state["edited_root"] = std::move(root_info);
   } else {
-    state["edited_root"] = mcp::JsonValue(nullptr);
+    state["edited_root"] = godot_autopilot::util::JsonValue(nullptr);
   }
   godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
-  mcp::JsonValue unsaved_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue unsaved_arr(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < unsaved.size(); i++)
-    unsaved_arr.PushBack(mcp::JsonValue(util::to_std(unsaved[i])));
+    unsaved_arr.PushBack(godot_autopilot::util::JsonValue(util::to_std(unsaved[i])));
   state["unsaved_scenes"] = std::move(unsaved_arr);
   auto *efs = editor->get_resource_filesystem();
   if (efs) {
-    mcp::JsonValue fs(mcp::JsonValue::object_tag);
-    fs["scanning"] = mcp::JsonValue(efs->is_scanning());
-    fs["progress"] = mcp::JsonValue(efs->get_scanning_progress());
+    godot_autopilot::util::JsonValue fs(godot_autopilot::util::JsonValue::object_tag);
+    fs["scanning"] = godot_autopilot::util::JsonValue(efs->is_scanning());
+    fs["progress"] = godot_autopilot::util::JsonValue(efs->get_scanning_progress());
     state["file_system"] = std::move(fs);
   } else {
-    state["file_system"] = mcp::JsonValue(nullptr);
+    state["file_system"] = godot_autopilot::util::JsonValue(nullptr);
   }
   return state;
 }
@@ -474,24 +474,24 @@ std::mutex g_scene_watch_mutex;
 std::map<int64_t, std::shared_ptr<SceneSwitchWatch>> g_scene_watches;
 std::atomic<int64_t> g_scene_watch_seq{1};
 
-mcp::JsonValue new_scene_success_result(godot::EditorInterface *editor,
+godot_autopilot::util::JsonValue new_scene_success_result(godot::EditorInterface *editor,
                                          const std::string &name,
                                          const std::string &type,
                                          bool closed_previous) {
   scene_dirty_tracker::clear_scene_modified();
   focus_main_screen_for_class(editor, godot::StringName(type.c_str()));
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["path"] = mcp::JsonValue(name);
-  inner["type"] = mcp::JsonValue(type);
-  inner["closed_previous"] = mcp::JsonValue(closed_previous);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["path"] = godot_autopilot::util::JsonValue(name);
+  inner["type"] = godot_autopilot::util::JsonValue(type);
+  inner["closed_previous"] = godot_autopilot::util::JsonValue(closed_previous);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_editor_scene completed");
   return r;
 }
 
-mcp::JsonValue new_scene_timeout_result(godot::EditorInterface *editor,
+godot_autopilot::util::JsonValue new_scene_timeout_result(godot::EditorInterface *editor,
                                          godot::Node *node, int64_t waited_ms,
                                          int64_t timeout_ms) {
   const bool released = release_unclaimed_node(node, editor);
@@ -507,11 +507,11 @@ mcp::JsonValue new_scene_timeout_result(godot::EditorInterface *editor,
     message +=
         "; the node is still attached to the editor and was not released";
   }
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(message);
-  e["waited_ms"] = mcp::JsonValue(waited_ms);
-  e["timeout_ms"] = mcp::JsonValue(timeout_ms);
-  e["node_released"] = mcp::JsonValue(released);
+  godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+  e["error"] = godot_autopilot::util::JsonValue(message);
+  e["waited_ms"] = godot_autopilot::util::JsonValue(waited_ms);
+  e["timeout_ms"] = godot_autopilot::util::JsonValue(timeout_ms);
+  e["node_released"] = godot_autopilot::util::JsonValue(released);
   e["editor_state"] = editor_scene_state_json(editor);
   LogSystem::instance().log(
       LogLevel::Error, LogCategory::Tools,
@@ -522,61 +522,61 @@ mcp::JsonValue new_scene_timeout_result(godot::EditorInterface *editor,
 
 } // namespace
 
-mcp::JsonValue handle_get_selection(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_get_selection(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_selection called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *root = editor->get_edited_scene_root();
   auto *sel = editor->get_selection();
   if (!sel) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorSelection not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorSelection not available");
     return e;
   }
   auto nodes = sel->get_selected_nodes();
-  mcp::JsonValue result_arr(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue result_arr(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < nodes.size(); i++) {
     auto *node = godot::Object::cast_to<godot::Node>(nodes[i]);
     if (!node)
       continue;
-    mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["name"] = mcp::JsonValue(util::to_std(node->get_name()));
-    item["class"] = mcp::JsonValue(util::to_std(node->get_class()));
-    item["path"] = mcp::JsonValue(root ? relative_path(node, root)
+    godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+    item["name"] = godot_autopilot::util::JsonValue(util::to_std(node->get_name()));
+    item["class"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
+    item["path"] = godot_autopilot::util::JsonValue(root ? relative_path(node, root)
                                        : util::to_std(node->get_name()));
     result_arr.PushBack(std::move(item));
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_selection completed");
   return r;
 }
 
-mcp::JsonValue handle_set_selection(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_selection(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_editor_selection called");
   auto *paths_p = args.Find("paths");
   if (!paths_p || !paths_p->IsArray()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: paths (array)");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: paths (array)");
     return e;
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *sel = editor->get_selection();
   if (!sel) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorSelection not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorSelection not available");
     return e;
   }
   sel->clear();
@@ -592,56 +592,56 @@ mcp::JsonValue handle_set_selection(const mcp::JsonValue &args) {
       }
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_editor_selection completed");
   return r;
 }
 
-mcp::JsonValue handle_get_edited_scene_root(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_get_edited_scene_root(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_edited_scene_root called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *root = editor->get_edited_scene_root();
   if (!root) {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(nullptr);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["result"] = godot_autopilot::util::JsonValue(nullptr);
     return r;
   }
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["name"] = mcp::JsonValue(util::to_std(root->get_name()));
-  j["type"] = mcp::JsonValue(util::to_std(root->get_class()));
-  j["path"] = mcp::JsonValue(util::to_std(root->get_name()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["name"] = godot_autopilot::util::JsonValue(util::to_std(root->get_name()));
+  j["type"] = godot_autopilot::util::JsonValue(util::to_std(root->get_class()));
+  j["path"] = godot_autopilot::util::JsonValue(util::to_std(root->get_name()));
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(j);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_edited_scene_root completed");
   return r;
 }
 
-mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_save_scene(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "save_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *root = editor->get_edited_scene_root();
   if (!root) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("no scene open");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("no scene open");
     return e;
   }
   godot::Error err = editor->save_scene();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   if (err != godot::Error::OK) {
     godot::String existing_path = root->get_scene_file_path();
     if (existing_path.is_empty()) {
@@ -657,9 +657,9 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
           editor_ops_detail::file_stamp(generated_path);
       if (editor_ops_detail::decide_write_outcome(before, after) ==
           editor_ops_detail::WriteOutcome::kUnverifiable) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
         e["error"] =
-            mcp::JsonValue("failed to save scene to \"" + generated_path +
+            godot_autopilot::util::JsonValue("failed to save scene to \"" + generated_path +
                            "\": the write could not be confirmed — use "
                            "save_editor_scene_as with an explicit path");
         LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
@@ -667,10 +667,10 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
                                       generated_path);
         return e;
       }
-      r["path"] = mcp::JsonValue(generated_path);
-      r["result"] = mcp::JsonValue("saved");
+      r["path"] = godot_autopilot::util::JsonValue(generated_path);
+      r["result"] = godot_autopilot::util::JsonValue("saved");
       r["note"] =
-          mcp::JsonValue("scene had no file path — saved to " + generated_path +
+          godot_autopilot::util::JsonValue("scene had no file path — saved to " + generated_path +
                          "; use save_editor_scene_as to choose a directory");
       attach_save_receipt(r, args, root, generated_path);
       scene_dirty_tracker::clear_scene_modified();
@@ -680,13 +680,13 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
       return r;
     }
     std::string failed_path = util::to_std(existing_path);
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(editor_error_text("save failed", err) + ": " +
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(editor_error_text("save failed", err) + ": " +
                                 failed_path);
-    e["path"] = mcp::JsonValue(failed_path);
-    e["error_code"] = mcp::JsonValue(static_cast<int64_t>(err));
-    e["error_name"] = mcp::JsonValue(editor_error_name(err));
-    e["hint"] = mcp::JsonValue(editor_error_hint(err));
+    e["path"] = godot_autopilot::util::JsonValue(failed_path);
+    e["error_code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(err));
+    e["error_name"] = godot_autopilot::util::JsonValue(editor_error_name(err));
+    e["hint"] = godot_autopilot::util::JsonValue(editor_error_hint(err));
     LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
                               "save_editor_scene failed " +
                                   editor_error_text("", err) + ": " + failed_path);
@@ -694,9 +694,9 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
   } else {
     godot::String file_path = root->get_scene_file_path();
     const std::string saved_path = util::to_std(file_path);
-    r["path"] = mcp::JsonValue(saved_path);
-    r["result"] = mcp::JsonValue("saved");
-    r["disk_persisted"] = mcp::JsonValue(true);
+    r["path"] = godot_autopilot::util::JsonValue(saved_path);
+    r["result"] = godot_autopilot::util::JsonValue("saved");
+    r["disk_persisted"] = godot_autopilot::util::JsonValue(true);
     attach_save_receipt(r, args, root, saved_path);
     scene_dirty_tracker::clear_scene_modified();
   }
@@ -705,30 +705,30 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_save_all_scenes(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_save_all_scenes(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "save_editor_scenes called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   editor->save_all_scenes();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "save_editor_scenes completed");
   return r;
 }
 
-mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_reload_scene(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *sp = args.Find("scene_path");
@@ -738,15 +738,15 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
   } else {
     auto *root = editor->get_edited_scene_root();
     if (!root) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("no scene open, provide scene_path");
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("no scene open, provide scene_path");
       return e;
     }
     scene_path = util::to_std(root->get_scene_file_path());
     if (scene_path.empty()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
       e["error"] =
-          mcp::JsonValue("current scene has no file path, provide scene_path");
+          godot_autopilot::util::JsonValue("current scene has no file path, provide scene_path");
       return e;
     }
   }
@@ -760,9 +760,9 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
     }
   }
   if (!is_open) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     e["error"] =
-        mcp::JsonValue("scene is not open: " + scene_path + "; reload did not run");
+        godot_autopilot::util::JsonValue("scene is not open: " + scene_path + "; reload did not run");
     LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
                               "reload_editor_scene skipped, scene is not open: " +
                                   scene_path);
@@ -776,24 +776,24 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
       break;
     }
   }
-  const mcp::JsonValue *discard_p = args.Find("discard_unsaved");
+  const godot_autopilot::util::JsonValue *discard_p = args.Find("discard_unsaved");
   const bool discard_unsaved = discard_p != nullptr && discard_p->IsBool() &&
                                discard_p->GetBool();
-  const mcp::JsonValue *confirm_p = args.Find("confirm");
+  const godot_autopilot::util::JsonValue *confirm_p = args.Find("confirm");
   const bool confirm = confirm_p != nullptr && confirm_p->IsBool() &&
                        confirm_p->GetBool();
   if (editor_safety::check_reload_discard(target_unsaved, discard_unsaved,
                                           confirm) !=
       editor_safety::ReloadDiscardFailure::kNone) {
-    mcp::JsonValue e = util::error_json(
+    godot_autopilot::util::JsonValue e = util::error_json(
         "scene has unsaved changes: " + unsaved_list_str(unsaved) +
         " — pass discard_unsaved=true and confirm=true to reload and discard them");
-    e["code"] = mcp::JsonValue("confirmation_required");
-    e["confirm_required"] = mcp::JsonValue(true);
-    e["discard_required"] = mcp::JsonValue(true);
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    e["code"] = godot_autopilot::util::JsonValue("confirmation_required");
+    e["confirm_required"] = godot_autopilot::util::JsonValue(true);
+    e["discard_required"] = godot_autopilot::util::JsonValue(true);
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < unsaved.size(); i++)
-      arr.PushBack(mcp::JsonValue(util::to_std(unsaved[i])));
+      arr.PushBack(godot_autopilot::util::JsonValue(util::to_std(unsaved[i])));
     e["unsaved_scenes"] = std::move(arr);
     return e;
   }
@@ -848,72 +848,72 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
     }
   }
   editor->reload_scene_from_path(target_path);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("reloaded");
-  r["scene_path"] = mcp::JsonValue(scene_path);
-  r["discarded_unsaved"] = mcp::JsonValue(target_unsaved);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("reloaded");
+  r["scene_path"] = godot_autopilot::util::JsonValue(scene_path);
+  r["discarded_unsaved"] = godot_autopilot::util::JsonValue(target_unsaved);
   if (!snapshot_path.empty())
-    r["snapshot_path"] = mcp::JsonValue(snapshot_path);
+    r["snapshot_path"] = godot_autopilot::util::JsonValue(snapshot_path);
   else if (!snapshot_error.empty())
-    r["snapshot_error"] = mcp::JsonValue(snapshot_error);
+    r["snapshot_error"] = godot_autopilot::util::JsonValue(snapshot_error);
   auto *reloaded_root = editor->get_edited_scene_root();
   if (reloaded_root &&
       same_scene_path(reloaded_root->get_scene_file_path(), target_path)) {
-    r["observed"] = mcp::JsonValue(true);
+    r["observed"] = godot_autopilot::util::JsonValue(true);
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_editor_scene completed");
   return r;
 }
 
-mcp::JsonValue handle_undo_redo_start(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_undo_redo_start(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_editor_undo_redo_action called");
   auto *an = args.Find("name");
   if (!an || !an->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: name");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: name");
     return e;
   }
   std::string action_name = an->GetString();
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *undo_redo = editor->get_editor_undo_redo();
   if (!undo_redo) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorUndoRedoManager not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorUndoRedoManager not available");
     return e;
   }
   undo_redo->create_action(godot::String(action_name.c_str()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_editor_undo_redo_action completed");
   return r;
 }
 
-mcp::JsonValue handle_undo_redo_commit(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_undo_redo_commit(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "commit_editor_undo_redo called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *undo_redo = editor->get_editor_undo_redo();
   if (!undo_redo) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorUndoRedoManager not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorUndoRedoManager not available");
     return e;
   }
   undo_redo->commit_action();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "commit_editor_undo_redo completed");
   return r;
@@ -926,7 +926,7 @@ enum class UndoRedoBranch {
   Undo,
 };
 
-mcp::JsonValue handle_undo_redo_add_method(const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue handle_undo_redo_add_method(const godot_autopilot::util::JsonValue &args,
                                            UndoRedoBranch branch) {
   const bool is_do = branch == UndoRedoBranch::Do;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -935,13 +935,13 @@ mcp::JsonValue handle_undo_redo_add_method(const mcp::JsonValue &args,
   auto *np = args.Find("node_path");
   auto *mt = args.Find("method");
   if (!np || !np->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return e;
   }
   if (!mt || !mt->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: method");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: method");
     return e;
   }
   std::string node_path = np->GetString();
@@ -951,19 +951,19 @@ mcp::JsonValue handle_undo_redo_add_method(const mcp::JsonValue &args,
   auto *node = godot_autopilot::util::resolve_scene_node(
       node_path, editor ? editor->get_edited_scene_root() : nullptr, &hint);
   if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path + " — " + hint);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("node not found: " + node_path + " — " + hint);
     return e;
   }
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *undo_redo = editor->get_editor_undo_redo();
   if (!undo_redo) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorUndoRedoManager not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorUndoRedoManager not available");
     return e;
   }
   auto *val = args.Find("value");
@@ -982,8 +982,8 @@ mcp::JsonValue handle_undo_redo_add_method(const mcp::JsonValue &args,
       undo_redo->add_undo_method(node, godot::StringName(method.c_str()));
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             is_do ? "add_editor_undo_redo_do completed"
                                   : "add_editor_undo_redo_undo completed");
@@ -992,27 +992,27 @@ mcp::JsonValue handle_undo_redo_add_method(const mcp::JsonValue &args,
 
 } // namespace
 
-mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_undo_redo_add_do(const godot_autopilot::util::JsonValue &args) {
   return handle_undo_redo_add_method(args, UndoRedoBranch::Do);
 }
 
-mcp::JsonValue handle_undo_redo_add_undo(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_undo_redo_add_undo(const godot_autopilot::util::JsonValue &args) {
   return handle_undo_redo_add_method(args, UndoRedoBranch::Undo);
 }
 
-mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_file_system_get_resources(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_file_system_tree called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *efs = editor->get_resource_filesystem();
   if (!efs) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorFileSystem not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorFileSystem not available");
     return e;
   }
   godot::EditorFileSystemDirectory *dir = nullptr;
@@ -1030,8 +1030,8 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
     dir = efs->get_filesystem();
   }
   if (!dir) {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(nullptr);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["result"] = godot_autopilot::util::JsonValue(nullptr);
     return r;
   }
   int max_depth = MAX_TREE_DEPTH;
@@ -1039,8 +1039,8 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
   if (depth_p && depth_p->IsInt()) {
     const int64_t requested = depth_p->GetInt();
     if (requested < 0) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("invalid parameter: depth must be >= 0");
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue("invalid parameter: depth must be >= 0");
       return e;
     }
     max_depth = requested > MAX_TREE_DEPTH
@@ -1051,95 +1051,95 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
   auto *filter_p = args.Find("filter");
   if (filter_p && filter_p->IsString())
     filter_lower = util::ascii_lowercase(filter_p->GetString());
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   bool filtered = false;
   bool truncated = dir_to_json(dir, result, 0, max_depth, filter_lower, filtered);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(result);
   if (truncated) {
-    r["truncated"] = mcp::JsonValue(true);
-    r["max_depth"] = mcp::JsonValue(static_cast<int64_t>(max_depth));
+    r["truncated"] = godot_autopilot::util::JsonValue(true);
+    r["max_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(max_depth));
   }
   if (filtered) {
-    r["filtered"] = mcp::JsonValue(true);
+    r["filtered"] = godot_autopilot::util::JsonValue(true);
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_file_system_tree completed");
   return r;
 }
 
-mcp::JsonValue handle_file_system_scan(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_file_system_scan(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "scan_editor_file_system called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *efs = editor->get_resource_filesystem();
   if (!efs) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorFileSystem not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorFileSystem not available");
     return e;
   }
   if (efs->is_scanning()) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "scan_editor_file_system skipped: already scanning");
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["skipped"] = mcp::JsonValue(true);
-    r["reason"] = mcp::JsonValue("already scanning");
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["skipped"] = godot_autopilot::util::JsonValue(true);
+    r["reason"] = godot_autopilot::util::JsonValue("already scanning");
     return r;
   }
   efs->scan();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "scan_editor_file_system completed");
   return r;
 }
 
-mcp::JsonValue handle_set_main_scene(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_main_scene(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_editor_main_scene called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   std::string path = pp->GetString();
   auto *ps = godot::ProjectSettings::get_singleton();
   if (!ps) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ProjectSettings not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("ProjectSettings not available");
     return e;
   }
   ps->set_setting("application/run/main_scene",
                   godot::Variant(godot::String(path.c_str())));
   ps->save();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_editor_main_scene completed");
   return r;
 }
 
-mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_play_current_scene(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "play_editor_current_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   if (editor->is_playing_scene()) {
-    mcp::JsonValue a(mcp::JsonValue::object_tag);
-    a["result"] = mcp::JsonValue("already_playing");
-    a["is_playing"] = mcp::JsonValue(true);
-    a["autosaved"] = mcp::JsonValue(false);
-    a["disk_changed"] = mcp::JsonValue(false);
+    godot_autopilot::util::JsonValue a(godot_autopilot::util::JsonValue::object_tag);
+    a["result"] = godot_autopilot::util::JsonValue("already_playing");
+    a["is_playing"] = godot_autopilot::util::JsonValue(true);
+    a["autosaved"] = godot_autopilot::util::JsonValue(false);
+    a["disk_changed"] = godot_autopilot::util::JsonValue(false);
     return a;
   }
   bool autosave_setting = true;
@@ -1153,22 +1153,22 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
   const bool had_unsaved = editor->get_unsaved_scenes().size() > 0;
   editor->play_current_scene();
   if (!editor->is_playing_scene()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "failed to start scene playback: no game process started — ensure the "
         "current scene is saved and runnable");
     return startup_gated_error(editor_in_startup_window(), e);
   }
   const bool autosaved = autosave_setting && had_unsaved;
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["is_playing"] = mcp::JsonValue(true);
-  r["autosaved"] = mcp::JsonValue(autosaved);
-  r["disk_changed"] = mcp::JsonValue(autosaved);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["is_playing"] = godot_autopilot::util::JsonValue(true);
+  r["autosaved"] = godot_autopilot::util::JsonValue(autosaved);
+  r["disk_changed"] = godot_autopilot::util::JsonValue(autosaved);
   r["autosave_setting"] =
-      mcp::JsonValue(std::string("run/auto_save/save_before_running"));
+      godot_autopilot::util::JsonValue(std::string("run/auto_save/save_before_running"));
   if (autosaved) {
-    r["hint"] = mcp::JsonValue(
+    r["hint"] = godot_autopilot::util::JsonValue(
         "Godot saved dirty scenes before running; remove temporary nodes and "
         "call save_editor_scene to restore the disk state");
   }
@@ -1177,80 +1177,80 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
   return r;
 }
 
-mcp::JsonValue handle_stop_playing(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_stop_playing(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_editor_playing called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   editor->stop_playing_scene();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_editor_playing completed");
   return r;
 }
 
-mcp::JsonValue handle_get_resource_filesystem(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_get_resource_filesystem(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_file_system_status called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   auto *efs = editor->get_resource_filesystem();
   if (!efs) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorFileSystem not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorFileSystem not available");
     return e;
   }
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["scanning"] = mcp::JsonValue(efs->is_scanning());
-  j["progress"] = mcp::JsonValue(efs->get_scanning_progress());
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue j(godot_autopilot::util::JsonValue::object_tag);
+  j["scanning"] = godot_autopilot::util::JsonValue(efs->is_scanning());
+  j["progress"] = godot_autopilot::util::JsonValue(efs->get_scanning_progress());
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(j);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_file_system_status completed");
   return r;
 }
 
-mcp::JsonValue handle_set_plugin_enabled(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_set_plugin_enabled(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_editor_plugin_enabled called");
   auto *pp = args.Find("plugin");
   auto *ep = args.Find("enabled");
   if (!pp || !pp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: plugin");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: plugin");
     return e;
   }
   if (!ep || !ep->IsBool()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: enabled (bool)");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: enabled (bool)");
     return e;
   }
   std::string plugin = pp->GetString();
   bool enabled = ep->GetBool();
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   editor->set_plugin_enabled(godot::String(plugin.c_str()), enabled);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_editor_plugin_enabled completed");
   return r;
 }
 
-mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_new_scene(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
@@ -1339,11 +1339,11 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     godot::Error err = editor->close_scene();
     if (err != godot::Error::OK) {
       release_unclaimed_node(node, editor);
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(editor_error_text("failed to close scene", err));
-      e["error_code"] = mcp::JsonValue(static_cast<int64_t>(err));
-      e["error_name"] = mcp::JsonValue(editor_error_name(err));
-      e["hint"] = mcp::JsonValue(editor_error_hint(err));
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(editor_error_text("failed to close scene", err));
+      e["error_code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(err));
+      e["error_name"] = godot_autopilot::util::JsonValue(editor_error_name(err));
+      e["hint"] = godot_autopilot::util::JsonValue(editor_error_hint(err));
       return e;
     }
     closed_previous = true;
@@ -1351,8 +1351,8 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     auto *post_close_root = editor->get_edited_scene_root();
     if (post_close_root) {
       release_unclaimed_node(node, editor);
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+      e["error"] = godot_autopilot::util::JsonValue(
           "close_scene only closed the current tab — another open scene tab "
           "still occupies the editor; repeat close_editor_scene until no "
           "scene is open, then retry create_editor_scene with "
@@ -1382,11 +1382,11 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
     g_scene_watches[watch_id] = watch;
   }
-  mcp::JsonValue wait_obj(mcp::JsonValue::object_tag);
-  wait_obj["kind"] = mcp::JsonValue("editor_scene_switch");
-  wait_obj["id"] = mcp::JsonValue(watch_id);
-  wait_obj["timeout_ms"] = mcp::JsonValue(static_cast<int64_t>(timeout_ms));
-  mcp::JsonValue marker(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue wait_obj(godot_autopilot::util::JsonValue::object_tag);
+  wait_obj["kind"] = godot_autopilot::util::JsonValue("editor_scene_switch");
+  wait_obj["id"] = godot_autopilot::util::JsonValue(watch_id);
+  wait_obj["timeout_ms"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(timeout_ms));
+  godot_autopilot::util::JsonValue marker(godot_autopilot::util::JsonValue::object_tag);
   marker["__gda_wait"] = std::move(wait_obj);
   LogSystem::instance().log_detailed(
       LogLevel::Info, LogCategory::Tools,
@@ -1398,7 +1398,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
 
 namespace {
 
-mcp::JsonValue advance_scene_switch(int64_t watch_id) {
+godot_autopilot::util::JsonValue advance_scene_switch(int64_t watch_id) {
   std::shared_ptr<SceneSwitchWatch> watch;
   {
     std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
@@ -1407,14 +1407,14 @@ mcp::JsonValue advance_scene_switch(int64_t watch_id) {
       watch = it->second;
   }
   if (!watch) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("the scene switch wait state is gone");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("the scene switch wait state is gone");
     return e;
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   const int64_t now_ms = steady_now_ms();
@@ -1423,8 +1423,8 @@ mcp::JsonValue advance_scene_switch(int64_t watch_id) {
       std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
       g_scene_watches.erase(watch_id);
     }
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["done"] = mcp::JsonValue(true);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["done"] = godot_autopilot::util::JsonValue(true);
     r["result"] = new_scene_success_result(editor, watch->name, watch->type,
                                            watch->closed_previous);
     return r;
@@ -1434,22 +1434,22 @@ mcp::JsonValue advance_scene_switch(int64_t watch_id) {
       std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
       g_scene_watches.erase(watch_id);
     }
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["done"] = mcp::JsonValue(true);
+    godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+    r["done"] = godot_autopilot::util::JsonValue(true);
     r["result"] = new_scene_timeout_result(editor, watch->node,
                                            now_ms - watch->started_ms,
                                            watch->deadline_ms -
                                                watch->started_ms);
     return r;
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["done"] = mcp::JsonValue(false);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["done"] = godot_autopilot::util::JsonValue(false);
   return r;
 }
 
 } // namespace
 
-mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
+godot_autopilot::util::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
   if (!runtime_ops::has_editor_queue()) {
     return util::error_json(
         "the editor main thread queue is unavailable — the scene switch "
@@ -1473,7 +1473,7 @@ mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
     }
     return util::error_json(
         "create_editor_scene cannot wait for the scene switch on the editor "
-        "main thread — call the tool through the MCP channel so the wait "
+        "main thread — call the tool through the native control plane so the wait "
         "runs on the transport thread");
   }
   const int64_t deadline_ms = steady_now_ms() + timeout_ms;
@@ -1481,7 +1481,7 @@ mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
     const int64_t remaining_ms = deadline_ms - steady_now_ms();
     if (remaining_ms <= 0)
       break;
-    const mcp::JsonValue slice = dispatch::run_main_thread_slice(
+    const godot_autopilot::util::JsonValue slice = dispatch::run_main_thread_slice(
         queue, "create_editor_scene",
         [watch_id]() { return advance_scene_switch(watch_id); },
         remaining_ms);
@@ -1496,7 +1496,7 @@ mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
           "the scene switch finished without a readable result");
     }
   }
-  const mcp::JsonValue final_slice = dispatch::run_main_thread_slice(
+  const godot_autopilot::util::JsonValue final_slice = dispatch::run_main_thread_slice(
       queue, "create_editor_scene finalize",
       [watch_id]() { return advance_scene_switch(watch_id); }, 2000);
   if (final_slice.Find("error") == nullptr) {
@@ -1511,13 +1511,13 @@ mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
       "the editor main thread did not report the scene switch result in time");
 }
 
-mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_open_scene(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "open_editor_scene called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return e;
   }
   std::string path = pp->GetString();
@@ -1530,14 +1530,14 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return e;
   }
   godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
   if (!unsaved.is_empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "current scene has unsaved changes: " + unsaved_list_str(unsaved) +
         " — save first (save_editor_scene), or discard the changes by calling "
         "reload_editor_scene with the listed path, then retry open_editor_scene");
@@ -1555,16 +1555,16 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
             reloaded_root != nullptr &&
             same_scene_path(reloaded_root->get_scene_file_path(),
                             requested_path);
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = mcp::JsonValue("ok");
-        r["path"] = mcp::JsonValue(path);
-        r["already_open"] = mcp::JsonValue(true);
-        r["reloaded"] = mcp::JsonValue(true);
-        r["reload_observed"] = mcp::JsonValue(observed);
+        godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+        r["result"] = godot_autopilot::util::JsonValue("ok");
+        r["path"] = godot_autopilot::util::JsonValue(path);
+        r["already_open"] = godot_autopilot::util::JsonValue(true);
+        r["reloaded"] = godot_autopilot::util::JsonValue(true);
+        r["reload_observed"] = godot_autopilot::util::JsonValue(observed);
         if (observed) {
-          r["scene_root"] = mcp::JsonValue(
+          r["scene_root"] = godot_autopilot::util::JsonValue(
               util::to_std(godot::String(reloaded_root->get_name())));
-          r["scene_root_type"] = mcp::JsonValue(
+          r["scene_root_type"] = godot_autopilot::util::JsonValue(
               util::to_std(godot::String(reloaded_root->get_class())));
         }
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -1572,15 +1572,15 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
                                       path);
         return r;
       }
-      mcp::JsonValue r(mcp::JsonValue::object_tag);
-      r["result"] = mcp::JsonValue("ok");
-      r["path"] = mcp::JsonValue(path);
-      r["already_open"] = mcp::JsonValue(true);
-      r["hint"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+      r["result"] = godot_autopilot::util::JsonValue("ok");
+      r["path"] = godot_autopilot::util::JsonValue(path);
+      r["already_open"] = godot_autopilot::util::JsonValue(true);
+      r["hint"] = godot_autopilot::util::JsonValue(
           "the requested scene is already the edited scene, so it was not "
           "reopened and edits made by scripts since it was opened are not "
           "refreshed");
-      r["suggested_action"] = mcp::JsonValue(
+      r["suggested_action"] = godot_autopilot::util::JsonValue(
           "call open_editor_scene with reload_if_open=true to reload this "
           "scene from disk (discards unsaved changes), or close_editor_scene "
           "then open_editor_scene");
@@ -1592,8 +1592,8 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   editor->open_scene_from_path(requested_path);
   auto *new_root = editor->get_edited_scene_root();
   if (new_root == old_root) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
         "failed to open scene at " + path +
         " — edited scene did not change (check editor output log)");
     return e;
@@ -1605,16 +1605,16 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   }
 
   scene_dirty_tracker::clear_scene_modified();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  r["path"] = mcp::JsonValue(path);
-  r["already_open"] = mcp::JsonValue(false);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("ok");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["already_open"] = godot_autopilot::util::JsonValue(false);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "open_editor_scene completed");
   return r;
 }
 
-mcp::JsonValue handle_close_scene(const mcp::JsonValue &) {
+godot_autopilot::util::JsonValue handle_close_scene(const godot_autopilot::util::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "close_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
@@ -1629,21 +1629,21 @@ mcp::JsonValue handle_close_scene(const mcp::JsonValue &) {
   }
   godot::Error err = editor->close_scene();
   if (err != godot::Error::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(editor_error_text("failed to close scene", err));
-    e["error_code"] = mcp::JsonValue(static_cast<int64_t>(err));
-    e["error_name"] = mcp::JsonValue(editor_error_name(err));
-    e["hint"] = mcp::JsonValue(editor_error_hint(err));
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(editor_error_text("failed to close scene", err));
+    e["error_code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(err));
+    e["error_name"] = godot_autopilot::util::JsonValue(editor_error_name(err));
+    e["hint"] = godot_autopilot::util::JsonValue(editor_error_hint(err));
     return e;
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("closed");
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("closed");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "close_editor_scene completed");
   return r;
 }
 
-mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_save_scene_as(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "save_editor_scene_as called");
   auto *pp = args.Find("path");
@@ -1659,10 +1659,10 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   path = checked.value;
   if (!scene_safety::is_scene_file(path))
     return util::error_json("parameter 'path' must end with .tscn or .scn");
-  const mcp::JsonValue *overwrite_p = args.Find("overwrite");
+  const godot_autopilot::util::JsonValue *overwrite_p = args.Find("overwrite");
   const bool overwrite = overwrite_p != nullptr && overwrite_p->IsBool() &&
                          overwrite_p->GetBool();
-  const mcp::JsonValue *confirm_p = args.Find("confirm");
+  const godot_autopilot::util::JsonValue *confirm_p = args.Find("confirm");
   const bool confirm = confirm_p != nullptr && confirm_p->IsBool() &&
                        confirm_p->GetBool();
   const bool existed = godot::FileAccess::file_exists(
@@ -1671,20 +1671,20 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
       editor_safety::check_save_as_target(true, true, existed, overwrite,
                                           confirm);
   if (target_failure != editor_safety::SaveAsTargetFailure::kNone) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
     if (target_failure == editor_safety::SaveAsTargetFailure::kTargetExists) {
       e = util::error_json("target scene already exists: " + path +
                            " — pass overwrite=true to replace it");
-      e["code"] = mcp::JsonValue("file_exists");
+      e["code"] = godot_autopilot::util::JsonValue("file_exists");
     } else {
       e = util::error_json(
           "overwriting an existing scene requires overwrite=true and "
           "confirm=true: " +
           path);
-      e["code"] = mcp::JsonValue("confirmation_required");
-      e["confirm_required"] = mcp::JsonValue(true);
+      e["code"] = godot_autopilot::util::JsonValue("confirmation_required");
+      e["confirm_required"] = godot_autopilot::util::JsonValue(true);
     }
-    e["path"] = mcp::JsonValue(path);
+    e["path"] = godot_autopilot::util::JsonValue(path);
     return e;
   }
   auto *editor = godot::EditorInterface::get_singleton();
@@ -1732,14 +1732,14 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
                     same_scene_path(reopened_root->get_scene_file_path(), path_gs);
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("saved");
-  r["path"] = mcp::JsonValue(path);
-  r["tab_path_registered"] = mcp::JsonValue(tab_path_registered);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["result"] = godot_autopilot::util::JsonValue("saved");
+  r["path"] = godot_autopilot::util::JsonValue(path);
+  r["tab_path_registered"] = godot_autopilot::util::JsonValue(tab_path_registered);
   if (!tab_path_registered) {
-    r["tab_rebuilt"] = mcp::JsonValue(tab_rebuilt);
+    r["tab_rebuilt"] = godot_autopilot::util::JsonValue(tab_rebuilt);
     if (!tab_rebuilt) {
-      r["warning"] = mcp::JsonValue(
+      r["warning"] = godot_autopilot::util::JsonValue(
           "saved, but the editor tab path could not be synchronized; "
           "get_open_scenes/reload_editor_scene may not see " + path);
     }
@@ -1755,7 +1755,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
 }
 
 
-bool save_receipt_flag(const mcp::JsonValue &args, const char *name) {
+bool save_receipt_flag(const godot_autopilot::util::JsonValue &args, const char *name) {
   auto *p = args.Find(name);
   return p && p->IsBool() && p->GetBool();
 }
@@ -1769,43 +1769,43 @@ std::string hash_hex(uint64_t value) {
 
 namespace {
 
-std::string editor_action_text(const mcp::JsonValue &args) {
+std::string editor_action_text(const godot_autopilot::util::JsonValue &args) {
   auto *action = args.Find("action");
   return (action && action->IsString()) ? action->GetString() : std::string();
 }
 
-mcp::JsonValue editor_action_missing(const std::string &choices) {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue editor_action_missing(const std::string &choices) {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
   error["error"] =
-      mcp::JsonValue("missing required parameter: action (" + choices + ")");
+      godot_autopilot::util::JsonValue("missing required parameter: action (" + choices + ")");
   return error;
 }
 
-mcp::JsonValue editor_action_invalid(const std::string &choices) {
-  mcp::JsonValue error(mcp::JsonValue::object_tag);
-  error["error"] = mcp::JsonValue("invalid action: expected " + choices);
+godot_autopilot::util::JsonValue editor_action_invalid(const std::string &choices) {
+  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+  error["error"] = godot_autopilot::util::JsonValue("invalid action: expected " + choices);
   return error;
 }
 
-mcp::JsonValue editor_open_scenes_result(godot::EditorInterface *editor) {
+godot_autopilot::util::JsonValue editor_open_scenes_result(godot::EditorInterface *editor) {
   godot::PackedStringArray scenes = editor->get_open_scenes();
-  mcp::JsonValue array(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < scenes.size(); i++) {
-    array.PushBack(mcp::JsonValue(util::to_std(scenes[i])));
+    array.PushBack(godot_autopilot::util::JsonValue(util::to_std(scenes[i])));
   }
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   result["result"] = std::move(array);
   return result;
 }
 
-mcp::JsonValue editor_info_result(godot::EditorInterface *editor) {
-  mcp::JsonValue info(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue editor_info_result(godot::EditorInterface *editor) {
+  godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
   auto *engine = godot::Engine::get_singleton();
   if (engine) {
     godot::Dictionary version = engine->get_version_info();
     if (version.has("string")) {
       godot::String text = version["string"];
-      info["engine_version"] = mcp::JsonValue(util::to_std(text));
+      info["engine_version"] = godot_autopilot::util::JsonValue(util::to_std(text));
     }
   }
   auto *settings = godot::ProjectSettings::get_singleton();
@@ -1814,40 +1814,40 @@ mcp::JsonValue editor_info_result(godot::EditorInterface *editor) {
         settings->get_setting("application/config/name");
     if (project_name.get_type() == godot::Variant::STRING) {
       info["project_name"] =
-          mcp::JsonValue(util::to_std(godot::String(project_name)));
+          godot_autopilot::util::JsonValue(util::to_std(godot::String(project_name)));
     }
     godot::Variant main_scene =
         settings->get_setting("application/run/main_scene");
     if (main_scene.get_type() == godot::Variant::STRING) {
       info["main_scene"] =
-          mcp::JsonValue(util::to_std(godot::String(main_scene)));
+          godot_autopilot::util::JsonValue(util::to_std(godot::String(main_scene)));
     }
   }
   auto *root = editor->get_edited_scene_root();
   if (root) {
-    mcp::JsonValue root_info(mcp::JsonValue::object_tag);
-    root_info["name"] = mcp::JsonValue(util::to_std(root->get_name()));
-    root_info["type"] = mcp::JsonValue(util::to_std(root->get_class()));
+    godot_autopilot::util::JsonValue root_info(godot_autopilot::util::JsonValue::object_tag);
+    root_info["name"] = godot_autopilot::util::JsonValue(util::to_std(root->get_name()));
+    root_info["type"] = godot_autopilot::util::JsonValue(util::to_std(root->get_class()));
     const std::string scene_path = util::to_std(root->get_scene_file_path());
     if (!scene_path.empty()) {
-      root_info["scene_file_path"] = mcp::JsonValue(scene_path);
+      root_info["scene_file_path"] = godot_autopilot::util::JsonValue(scene_path);
     }
     info["edited_root"] = std::move(root_info);
   } else {
-    info["edited_root"] = mcp::JsonValue(nullptr);
+    info["edited_root"] = godot_autopilot::util::JsonValue(nullptr);
   }
   info["open_scene_count"] =
-      mcp::JsonValue(static_cast<int64_t>(editor->get_open_scenes().size()));
-  info["is_playing"] = mcp::JsonValue(editor->is_playing_scene());
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue(static_cast<int64_t>(editor->get_open_scenes().size()));
+  info["is_playing"] = godot_autopilot::util::JsonValue(editor->is_playing_scene());
+  godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
   result["result"] = std::move(info);
   return result;
 }
 
-mcp::JsonValue packed_string_array_json(const godot::PackedStringArray &values) {
-  mcp::JsonValue array(mcp::JsonValue::array_tag);
+godot_autopilot::util::JsonValue packed_string_array_json(const godot::PackedStringArray &values) {
+  godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
   for (int i = 0; i < values.size(); i++) {
-    array.PushBack(mcp::JsonValue(util::to_std(values[i])));
+    array.PushBack(godot_autopilot::util::JsonValue(util::to_std(values[i])));
   }
   return array;
 }
@@ -1863,21 +1863,21 @@ bool path_list_contains(const godot::PackedStringArray &paths,
   return false;
 }
 
-void attach_undo_history(mcp::JsonValue &result,
+void attach_undo_history(godot_autopilot::util::JsonValue &result,
                          godot::EditorUndoRedoManager *manager) {
   godot::UndoRedo *history =
       manager ? manager->get_history_undo_redo(
                     godot::EditorUndoRedoManager::GLOBAL_HISTORY)
               : nullptr;
   result["has_undo"] =
-      mcp::JsonValue(history != nullptr && history->has_undo());
+      godot_autopilot::util::JsonValue(history != nullptr && history->has_undo());
   result["has_redo"] =
-      mcp::JsonValue(history != nullptr && history->has_redo());
+      godot_autopilot::util::JsonValue(history != nullptr && history->has_redo());
   result["current_action_name"] =
-      mcp::JsonValue(history != nullptr
+      godot_autopilot::util::JsonValue(history != nullptr
                          ? util::to_std(history->get_current_action_name())
                          : std::string());
-  result["history_count"] = mcp::JsonValue(
+  result["history_count"] = godot_autopilot::util::JsonValue(
       static_cast<int64_t>(history != nullptr ? history->get_history_count()
                                               : 0));
 }
@@ -1906,47 +1906,47 @@ std::string script_resource_path(const godot::Ref<godot::Script> &script) {
   return script.is_valid() ? util::to_std(script->get_path()) : std::string();
 }
 
-mcp::JsonValue scene_root_summary(godot::Node *root,
+godot_autopilot::util::JsonValue scene_root_summary(godot::Node *root,
                                   const godot::PackedStringArray &unsaved) {
-  mcp::JsonValue summary(mcp::JsonValue::object_tag);
-  summary["name"] = mcp::JsonValue(util::to_std(root->get_name()));
-  summary["type"] = mcp::JsonValue(util::to_std(root->get_class()));
+  godot_autopilot::util::JsonValue summary(godot_autopilot::util::JsonValue::object_tag);
+  summary["name"] = godot_autopilot::util::JsonValue(util::to_std(root->get_name()));
+  summary["type"] = godot_autopilot::util::JsonValue(util::to_std(root->get_class()));
   const godot::String scene_path = root->get_scene_file_path();
-  summary["scene_file_path"] = mcp::JsonValue(util::to_std(scene_path));
-  summary["unsaved"] = mcp::JsonValue(path_list_contains(unsaved, scene_path));
+  summary["scene_file_path"] = godot_autopilot::util::JsonValue(util::to_std(scene_path));
+  summary["unsaved"] = godot_autopilot::util::JsonValue(path_list_contains(unsaved, scene_path));
   return summary;
 }
 
-mcp::JsonValue playing_state_json(godot::EditorInterface *editor) {
-  mcp::JsonValue state(mcp::JsonValue::object_tag);
-  state["is_playing"] = mcp::JsonValue(editor->is_playing_scene());
+godot_autopilot::util::JsonValue playing_state_json(godot::EditorInterface *editor) {
+  godot_autopilot::util::JsonValue state(godot_autopilot::util::JsonValue::object_tag);
+  state["is_playing"] = godot_autopilot::util::JsonValue(editor->is_playing_scene());
   state["playing_scene"] =
-      mcp::JsonValue(util::to_std(editor->get_playing_scene()));
+      godot_autopilot::util::JsonValue(util::to_std(editor->get_playing_scene()));
   return state;
 }
 
-mcp::JsonValue edited_object_summary(godot::Object *object) {
+godot_autopilot::util::JsonValue edited_object_summary(godot::Object *object) {
   if (!object)
-    return mcp::JsonValue(nullptr);
-  mcp::JsonValue summary(mcp::JsonValue::object_tag);
-  summary["class"] = mcp::JsonValue(util::to_std(object->get_class()));
+    return godot_autopilot::util::JsonValue(nullptr);
+  godot_autopilot::util::JsonValue summary(godot_autopilot::util::JsonValue::object_tag);
+  summary["class"] = godot_autopilot::util::JsonValue(util::to_std(object->get_class()));
   if (auto *node = godot::Object::cast_to<godot::Node>(object)) {
-    summary["name"] = mcp::JsonValue(util::to_std(node->get_name()));
+    summary["name"] = godot_autopilot::util::JsonValue(util::to_std(node->get_name()));
     const std::string scene_path = util::to_std(node->get_scene_file_path());
     if (!scene_path.empty())
-      summary["scene_file_path"] = mcp::JsonValue(scene_path);
+      summary["scene_file_path"] = godot_autopilot::util::JsonValue(scene_path);
   } else if (auto *resource =
                  godot::Object::cast_to<godot::Resource>(object)) {
     const std::string resource_path = util::to_std(resource->get_path());
     if (!resource_path.empty())
-      summary["resource_path"] = mcp::JsonValue(resource_path);
+      summary["resource_path"] = godot_autopilot::util::JsonValue(resource_path);
   }
   return summary;
 }
 
 } // namespace
 
-mcp::JsonValue handle_editor_state(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_state(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_state called");
   const std::string action = editor_action_text(args);
@@ -1961,8 +1961,8 @@ mcp::JsonValue handle_editor_state(const mcp::JsonValue &args) {
   }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("EditorInterface not available");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("EditorInterface not available");
     return error;
   }
   if (action == "open") {
@@ -1972,20 +1972,20 @@ mcp::JsonValue handle_editor_state(const mcp::JsonValue &args) {
   }
   if (action == "unsaved") {
     godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
-    mcp::JsonValue array(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < unsaved.size(); i++) {
-      array.PushBack(mcp::JsonValue(util::to_std(unsaved[i])));
+      array.PushBack(godot_autopilot::util::JsonValue(util::to_std(unsaved[i])));
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(array);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "get_editor_state unsaved completed");
     return result;
   }
   if (action == "playing") {
-    mcp::JsonValue inner(mcp::JsonValue::object_tag);
-    inner["is_playing"] = mcp::JsonValue(editor->is_playing_scene());
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+    inner["is_playing"] = godot_autopilot::util::JsonValue(editor->is_playing_scene());
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(inner);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "get_editor_state playing completed");
@@ -1999,7 +1999,7 @@ mcp::JsonValue handle_editor_state(const mcp::JsonValue &args) {
   return editor_action_invalid("selection|root|open|unsaved|playing|info");
 }
 
-mcp::JsonValue handle_editor_files(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_files(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_files called");
   const std::string action = editor_action_text(args);
@@ -2018,7 +2018,7 @@ mcp::JsonValue handle_editor_files(const mcp::JsonValue &args) {
   return editor_action_invalid("tree|status|scan");
 }
 
-mcp::JsonValue handle_editor_scene_control(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_scene_control(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_scene_control called");
   const std::string action = editor_action_text(args);
@@ -2046,7 +2046,7 @@ mcp::JsonValue handle_editor_scene_control(const mcp::JsonValue &args) {
   return editor_action_invalid("create|open|close|reload|play|stop");
 }
 
-mcp::JsonValue handle_editor_save(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_save(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "save_editor_scene called");
   std::string action = editor_action_text(args);
@@ -2065,7 +2065,7 @@ mcp::JsonValue handle_editor_save(const mcp::JsonValue &args) {
   return editor_action_invalid("save|save_as|save_all");
 }
 
-mcp::JsonValue handle_editor_selection_set(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_selection_set(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_selection_set called");
   const std::string action = editor_action_text(args);
@@ -2081,7 +2081,7 @@ mcp::JsonValue handle_editor_selection_set(const mcp::JsonValue &args) {
   return editor_action_invalid("set|select_tree");
 }
 
-mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_undo(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_undo called");
   const std::string action = editor_action_text(args);
@@ -2098,15 +2098,15 @@ mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
   if (action == "add_do" || action == "add_undo") {
     if (auto *side = args.Find("side")) {
       if (!side->IsString()) {
-        mcp::JsonValue error(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
         error["error"] =
-            mcp::JsonValue("invalid parameter: side must be 'do' or 'undo'");
+            godot_autopilot::util::JsonValue("invalid parameter: side must be 'do' or 'undo'");
         return error;
       }
       const std::string expected = action == "add_do" ? "do" : "undo";
       if (side->GetString() != expected) {
-        mcp::JsonValue error(mcp::JsonValue::object_tag);
-        error["error"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+        error["error"] = godot_autopilot::util::JsonValue(
             "side '" + side->GetString() + "' does not match action '" +
             action + "'");
         return error;
@@ -2126,8 +2126,8 @@ mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
     return util::error_json("EditorUndoRedoManager not available");
   }
   if (action == "history") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
     attach_undo_history(result, manager);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_undo history completed");
@@ -2142,11 +2142,11 @@ mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
   if (action == "undo" || action == "redo") {
     const bool is_undo = action == "undo";
     const bool performed = is_undo ? history->undo() : history->redo();
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue(
         performed ? (is_undo ? "undone" : "redone")
                   : (is_undo ? "nothing_to_undo" : "nothing_to_redo"));
-    result["performed"] = mcp::JsonValue(performed);
+    result["performed"] = godot_autopilot::util::JsonValue(performed);
     attach_undo_history(result, manager);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               is_undo ? "editor_undo undo completed"
@@ -2164,9 +2164,9 @@ mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
     }
     manager->clear_history(godot::EditorUndoRedoManager::GLOBAL_HISTORY,
                            increase_version);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("cleared");
-    result["increase_version"] = mcp::JsonValue(increase_version);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("cleared");
+    result["increase_version"] = godot_autopilot::util::JsonValue(increase_version);
     attach_undo_history(result, manager);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_undo clear completed");
@@ -2176,7 +2176,7 @@ mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
       "create|add_do|add_undo|commit|undo|redo|history|clear");
 }
 
-mcp::JsonValue handle_editor_config(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_config(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_config called");
   const std::string action = editor_action_text(args);
@@ -2192,7 +2192,7 @@ mcp::JsonValue handle_editor_config(const mcp::JsonValue &args) {
   return editor_action_invalid("main_scene|plugin_enable");
 }
 
-mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_script_editor(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "script_editor called");
   const std::string action = editor_action_text(args);
@@ -2248,18 +2248,18 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
     }
     editor->edit_script(script, static_cast<int32_t>(line),
                         static_cast<int32_t>(column), grab_focus);
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(path);
-    info["line"] = mcp::JsonValue(line);
-    info["column"] = mcp::JsonValue(column);
-    info["grab_focus"] = mcp::JsonValue(grab_focus);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(path);
+    info["line"] = godot_autopilot::util::JsonValue(line);
+    info["column"] = godot_autopilot::util::JsonValue(column);
+    info["grab_focus"] = godot_autopilot::util::JsonValue(grab_focus);
     if (auto *text_edit = current_script_text_edit(script_editor)) {
-      info["caret_line"] = mcp::JsonValue(
+      info["caret_line"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(text_edit->get_caret_line()) + 1);
-      info["caret_column"] = mcp::JsonValue(
+      info["caret_column"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(text_edit->get_caret_column()) + 1);
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "script_editor open completed: " + path);
@@ -2293,18 +2293,18 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
       }
       script_editor->goto_line(static_cast<int32_t>(line - 1));
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(
         path.empty()
             ? script_resource_path(script_editor->get_current_script())
             : path);
-    info["line"] = mcp::JsonValue(line);
-    info["via"] = mcp::JsonValue(path.empty() ? "goto_line" : "edit_script");
+    info["line"] = godot_autopilot::util::JsonValue(line);
+    info["via"] = godot_autopilot::util::JsonValue(path.empty() ? "goto_line" : "edit_script");
     if (auto *text_edit = current_script_text_edit(script_editor)) {
-      info["caret_line"] = mcp::JsonValue(
+      info["caret_line"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(text_edit->get_caret_line()) + 1);
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "script_editor goto completed");
@@ -2316,51 +2316,51 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
     godot::PackedStringArray unsaved = script_editor->get_unsaved_files();
     const std::string current_path =
         script_resource_path(script_editor->get_current_script());
-    mcp::JsonValue array(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue array(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < scripts.size(); i++) {
       auto *script = godot::Object::cast_to<godot::Script>(scripts[i]);
       if (!script)
         continue;
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
       const std::string path = util::to_std(script->get_path());
-      item["path"] = mcp::JsonValue(path);
-      item["unsaved"] = mcp::JsonValue(
+      item["path"] = godot_autopilot::util::JsonValue(path);
+      item["unsaved"] = godot_autopilot::util::JsonValue(
           path_list_contains(unsaved, script->get_path()));
-      item["current"] = mcp::JsonValue(!path.empty() &&
+      item["current"] = godot_autopilot::util::JsonValue(!path.empty() &&
                                       path == current_path);
       array.PushBack(std::move(item));
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(array);
-    result["count"] = mcp::JsonValue(static_cast<int64_t>(scripts.size()));
+    result["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(scripts.size()));
     return result;
   }
   if (action == "current") {
     godot::Ref<godot::Script> current = script_editor->get_current_script();
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     if (current.is_null()) {
-      result["result"] = mcp::JsonValue(nullptr);
+      result["result"] = godot_autopilot::util::JsonValue(nullptr);
       return result;
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(util::to_std(current->get_path()));
-    info["unsaved"] = mcp::JsonValue(path_list_contains(
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(util::to_std(current->get_path()));
+    info["unsaved"] = godot_autopilot::util::JsonValue(path_list_contains(
         script_editor->get_unsaved_files(), current->get_path()));
-    info["is_tool"] = mcp::JsonValue(current->is_tool());
+    info["is_tool"] = godot_autopilot::util::JsonValue(current->is_tool());
     if (auto *text_edit = current_script_text_edit(script_editor)) {
-      info["caret_line"] = mcp::JsonValue(
+      info["caret_line"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(text_edit->get_caret_line()) + 1);
-      info["caret_column"] = mcp::JsonValue(
+      info["caret_column"] = godot_autopilot::util::JsonValue(
           static_cast<int64_t>(text_edit->get_caret_column()) + 1);
     }
     result["result"] = std::move(info);
     return result;
   }
   if (action == "unsaved") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     godot::PackedStringArray unsaved = script_editor->get_unsaved_files();
     result["result"] = packed_string_array_json(unsaved);
-    result["count"] = mcp::JsonValue(static_cast<int64_t>(unsaved.size()));
+    result["count"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(unsaved.size()));
     return result;
   }
   if (action == "save_all") {
@@ -2369,12 +2369,12 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
     script_editor->save_all_scripts();
     godot::PackedStringArray unsaved_after =
         script_editor->get_unsaved_files();
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
     info["saved_count"] =
-        mcp::JsonValue(static_cast<int64_t>(unsaved_before.size()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(unsaved_before.size()));
     info["saved_paths"] = packed_string_array_json(unsaved_before);
     info["unsaved_after"] = packed_string_array_json(unsaved_after);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "script_editor save_all completed");
@@ -2382,8 +2382,8 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
   }
   if (action == "reload_open") {
     script_editor->reload_open_files();
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "script_editor reload_open completed");
     return result;
@@ -2396,18 +2396,18 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
     const std::string path = pp->GetString();
     godot::Error err = script_editor->close_file(godot::String(path.c_str()));
     if (err != godot::Error::OK) {
-      mcp::JsonValue error(mcp::JsonValue::object_tag);
-      error["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+      error["error"] = godot_autopilot::util::JsonValue(
           editor_error_text("failed to close script", err) + ": " + path);
-      error["error_code"] = mcp::JsonValue(static_cast<int64_t>(err));
-      error["error_name"] = mcp::JsonValue(editor_error_name(err));
-      error["hint"] = mcp::JsonValue(editor_error_hint(err));
+      error["error_code"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(err));
+      error["error_name"] = godot_autopilot::util::JsonValue(editor_error_name(err));
+      error["hint"] = godot_autopilot::util::JsonValue(editor_error_hint(err));
       return error;
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(path);
-    info["closed"] = mcp::JsonValue(true);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(path);
+    info["closed"] = godot_autopilot::util::JsonValue(true);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "script_editor close completed: " + path);
@@ -2416,7 +2416,7 @@ mcp::JsonValue handle_script_editor(const mcp::JsonValue &args) {
   return editor_action_invalid(choices);
 }
 
-mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_session(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_session called");
   const std::string action = editor_action_text(args);
@@ -2431,26 +2431,26 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
   if (action == "get") {
     godot::TypedArray<godot::Node> roots = editor->get_open_scene_roots();
     godot::PackedStringArray unsaved = editor->get_unsaved_scenes();
-    mcp::JsonValue root_array(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue root_array(godot_autopilot::util::JsonValue::array_tag);
     for (int i = 0; i < roots.size(); i++) {
       auto *root = godot::Object::cast_to<godot::Node>(roots[i]);
       if (!root)
         continue;
       root_array.PushBack(scene_root_summary(root, unsaved));
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
     info["open_scene_roots"] = std::move(root_array);
     info["open_scene_count"] =
-        mcp::JsonValue(static_cast<int64_t>(roots.size()));
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(roots.size()));
     info["unsaved_scenes"] = packed_string_array_json(unsaved);
     auto *edited_root = editor->get_edited_scene_root();
     if (edited_root) {
       info["edited_root"] = scene_root_summary(edited_root, unsaved);
     } else {
-      info["edited_root"] = mcp::JsonValue(nullptr);
+      info["edited_root"] = godot_autopilot::util::JsonValue(nullptr);
     }
     info["playing"] = playing_state_json(editor);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_session get completed");
@@ -2458,8 +2458,8 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
   }
   if (action == "mark_unsaved") {
     editor->mark_scene_as_unsaved();
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
     result["unsaved_scenes"] =
         packed_string_array_json(editor->get_unsaved_scenes());
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -2468,8 +2468,8 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
   }
   if (action == "play_main") {
     if (editor->is_playing_scene()) {
-      mcp::JsonValue result(mcp::JsonValue::object_tag);
-      result["result"] = mcp::JsonValue("already_playing");
+      godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+      result["result"] = godot_autopilot::util::JsonValue("already_playing");
       result["playing"] = playing_state_json(editor);
       return result;
     }
@@ -2479,8 +2479,8 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
           "failed to start main scene playback — set "
           "application/run/main_scene and make sure the scene is runnable");
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
     result["playing"] = playing_state_json(editor);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_session play_main completed");
@@ -2493,8 +2493,8 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
     }
     const std::string path = pp->GetString();
     if (editor->is_playing_scene()) {
-      mcp::JsonValue result(mcp::JsonValue::object_tag);
-      result["result"] = mcp::JsonValue("already_playing");
+      godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+      result["result"] = godot_autopilot::util::JsonValue("already_playing");
       result["playing"] = playing_state_json(editor);
       return result;
     }
@@ -2504,9 +2504,9 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
           "failed to start custom scene playback: " + path +
           " — verify the scene exists and is runnable");
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
-    result["path"] = mcp::JsonValue(path);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
+    result["path"] = godot_autopilot::util::JsonValue(path);
     result["playing"] = playing_state_json(editor);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_session play_custom completed");
@@ -2515,7 +2515,7 @@ mcp::JsonValue handle_editor_session(const mcp::JsonValue &args) {
   return editor_action_invalid(choices);
 }
 
-mcp::JsonValue handle_editor_inspect(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_inspect(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_inspect called");
   const std::string action = editor_action_text(args);
@@ -2587,12 +2587,12 @@ mcp::JsonValue handle_editor_inspect(const mcp::JsonValue &args) {
     }
     editor->inspect_object(object, godot::String(for_property.c_str()),
                            inspector_only);
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["kind"] = mcp::JsonValue(kind);
-    info["target"] = mcp::JsonValue(target);
-    info["for_property"] = mcp::JsonValue(for_property);
-    info["inspector_only"] = mcp::JsonValue(inspector_only);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["kind"] = godot_autopilot::util::JsonValue(kind);
+    info["target"] = godot_autopilot::util::JsonValue(target);
+    info["for_property"] = godot_autopilot::util::JsonValue(for_property);
+    info["inspector_only"] = godot_autopilot::util::JsonValue(inspector_only);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     return result;
   }
@@ -2612,11 +2612,11 @@ mcp::JsonValue handle_editor_inspect(const mcp::JsonValue &args) {
       return util::error_json("failed to load resource: " + path);
     }
     editor->edit_resource(resource);
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["resource_path"] = mcp::JsonValue(path);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["resource_path"] = godot_autopilot::util::JsonValue(path);
     info["resource_type"] =
-        mcp::JsonValue(util::to_std(resource->get_class()));
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue(util::to_std(resource->get_class()));
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_inspect edit_resource completed: " + path);
@@ -2635,11 +2635,11 @@ mcp::JsonValue handle_editor_inspect(const mcp::JsonValue &args) {
       return util::error_json("node not found: " + path + " — " + hint);
     }
     editor->edit_node(node);
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["node_path"] = mcp::JsonValue(path);
-    info["name"] = mcp::JsonValue(util::to_std(node->get_name()));
-    info["type"] = mcp::JsonValue(util::to_std(node->get_class()));
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["node_path"] = godot_autopilot::util::JsonValue(path);
+    info["name"] = godot_autopilot::util::JsonValue(util::to_std(node->get_name()));
+    info["type"] = godot_autopilot::util::JsonValue(util::to_std(node->get_class()));
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_inspect edit_node completed: " + path);
@@ -2650,31 +2650,31 @@ mcp::JsonValue handle_editor_inspect(const mcp::JsonValue &args) {
     return util::error_json("EditorInspector not available");
   }
   if (action == "selected_path") {
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
     info["selected_path"] =
-        mcp::JsonValue(util::to_std(inspector->get_selected_path()));
+        godot_autopilot::util::JsonValue(util::to_std(inspector->get_selected_path()));
     info["edited_object"] =
         edited_object_summary(inspector->get_edited_object());
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     return result;
   }
   if (action == "expand_all") {
     inspector->expand_all_folding();
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
     return result;
   }
   if (action == "collapse_all") {
     inspector->collapse_all_folding();
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue("ok");
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue("ok");
     return result;
   }
   return editor_action_invalid(choices);
 }
 
-mcp::JsonValue handle_editor_files_panel(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_files_panel(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_files called");
   const std::string action = editor_action_text(args);
@@ -2694,32 +2694,32 @@ mcp::JsonValue handle_editor_files_panel(const mcp::JsonValue &args) {
     }
     const std::string path = pp->GetString();
     editor->select_file(godot::String(path.c_str()));
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(path);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(path);
     info["selected_paths"] =
         packed_string_array_json(editor->get_selected_paths());
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_files select completed: " + path);
     return result;
   }
   if (action == "selected_paths") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] =
         packed_string_array_json(editor->get_selected_paths());
     return result;
   }
   if (action == "current_path") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] =
-        mcp::JsonValue(util::to_std(editor->get_current_path()));
+        godot_autopilot::util::JsonValue(util::to_std(editor->get_current_path()));
     return result;
   }
   if (action == "current_dir") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] =
-        mcp::JsonValue(util::to_std(editor->get_current_directory()));
+        godot_autopilot::util::JsonValue(util::to_std(editor->get_current_directory()));
     return result;
   }
   if (action == "navigate") {
@@ -2733,13 +2733,13 @@ mcp::JsonValue handle_editor_files_panel(const mcp::JsonValue &args) {
       return util::error_json("FileSystemDock not available");
     }
     dock->navigate_to_path(godot::String(path.c_str()));
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(path);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(path);
     info["current_dir"] =
-        mcp::JsonValue(util::to_std(editor->get_current_directory()));
+        godot_autopilot::util::JsonValue(util::to_std(editor->get_current_directory()));
     info["current_path"] =
-        mcp::JsonValue(util::to_std(editor->get_current_path()));
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue(util::to_std(editor->get_current_path()));
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_files navigate completed: " + path);
@@ -2775,24 +2775,24 @@ mcp::JsonValue handle_editor_files_panel(const mcp::JsonValue &args) {
           " — the file may be new or the scan may be stale; run "
           "get_editor_files action=scan and retry");
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["path"] = mcp::JsonValue(path);
-    info["type"] = mcp::JsonValue(util::to_std(
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["path"] = godot_autopilot::util::JsonValue(path);
+    info["type"] = godot_autopilot::util::JsonValue(util::to_std(
         godot::String(dir->get_file_type(index))));
     info["script_class"] =
-        mcp::JsonValue(util::to_std(dir->get_file_script_class_name(index)));
+        godot_autopilot::util::JsonValue(util::to_std(dir->get_file_script_class_name(index)));
     info["extends"] =
-        mcp::JsonValue(util::to_std(dir->get_file_script_class_extends(index)));
-    info["import_valid"] = mcp::JsonValue(dir->get_file_import_is_valid(index));
-    info["scanning"] = mcp::JsonValue(efs->is_scanning());
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+        godot_autopilot::util::JsonValue(util::to_std(dir->get_file_script_class_extends(index)));
+    info["import_valid"] = godot_autopilot::util::JsonValue(dir->get_file_import_is_valid(index));
+    info["scanning"] = godot_autopilot::util::JsonValue(efs->is_scanning());
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     return result;
   }
   return editor_action_invalid(choices);
 }
 
-mcp::JsonValue handle_editor_info(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_editor_info(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "editor_info called");
   const std::string action = editor_action_text(args);
@@ -2811,29 +2811,29 @@ mcp::JsonValue handle_editor_info(const mcp::JsonValue &args) {
     if (!theme) {
       return util::error_json("editor theme is not available");
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["type"] = mcp::JsonValue(util::to_std(theme->get_class()));
-    info["has_base_scale"] = mcp::JsonValue(theme->has_default_base_scale());
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["type"] = godot_autopilot::util::JsonValue(util::to_std(theme->get_class()));
+    info["has_base_scale"] = godot_autopilot::util::JsonValue(theme->has_default_base_scale());
     if (theme->has_default_base_scale()) {
-      info["base_scale"] = mcp::JsonValue(theme->get_default_base_scale());
+      info["base_scale"] = godot_autopilot::util::JsonValue(theme->get_default_base_scale());
     }
-    info["has_default_font"] = mcp::JsonValue(theme->has_default_font());
+    info["has_default_font"] = godot_autopilot::util::JsonValue(theme->has_default_font());
     info["default_font_size"] =
-        mcp::JsonValue(static_cast<int64_t>(theme->get_default_font_size()));
-    info["type_count"] = mcp::JsonValue(
+        godot_autopilot::util::JsonValue(static_cast<int64_t>(theme->get_default_font_size()));
+    info["type_count"] = godot_autopilot::util::JsonValue(
         static_cast<int64_t>(theme->get_type_list().size()));
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     return result;
   }
   if (action == "scale") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue(editor->get_editor_scale());
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue(editor->get_editor_scale());
     return result;
   }
   if (action == "language") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue(util::to_std(editor->get_editor_language()));
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue(util::to_std(editor->get_editor_language()));
     return result;
   }
   if (action == "paths") {
@@ -2841,30 +2841,30 @@ mcp::JsonValue handle_editor_info(const mcp::JsonValue &args) {
     if (!paths) {
       return util::error_json("EditorPaths not available");
     }
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["data_dir"] = mcp::JsonValue(util::to_std(paths->get_data_dir()));
-    info["config_dir"] = mcp::JsonValue(util::to_std(paths->get_config_dir()));
-    info["cache_dir"] = mcp::JsonValue(util::to_std(paths->get_cache_dir()));
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["data_dir"] = godot_autopilot::util::JsonValue(util::to_std(paths->get_data_dir()));
+    info["config_dir"] = godot_autopilot::util::JsonValue(util::to_std(paths->get_config_dir()));
+    info["cache_dir"] = godot_autopilot::util::JsonValue(util::to_std(paths->get_cache_dir()));
     info["project_settings_dir"] =
-        mcp::JsonValue(util::to_std(paths->get_project_settings_dir()));
-    info["self_contained"] = mcp::JsonValue(paths->is_self_contained());
+        godot_autopilot::util::JsonValue(util::to_std(paths->get_project_settings_dir()));
+    info["self_contained"] = godot_autopilot::util::JsonValue(paths->is_self_contained());
     if (paths->is_self_contained()) {
       info["self_contained_file"] =
-          mcp::JsonValue(util::to_std(paths->get_self_contained_file()));
+          godot_autopilot::util::JsonValue(util::to_std(paths->get_self_contained_file()));
     }
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     return result;
   }
   if (action == "multi_window") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
-    result["result"] = mcp::JsonValue(editor->is_multi_window_enabled());
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
+    result["result"] = godot_autopilot::util::JsonValue(editor->is_multi_window_enabled());
     return result;
   }
   if (action == "distraction_free") {
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] =
-        mcp::JsonValue(editor->is_distraction_free_mode_enabled());
+        godot_autopilot::util::JsonValue(editor->is_distraction_free_mode_enabled());
     return result;
   }
   if (action == "toast") {
@@ -2906,11 +2906,11 @@ mcp::JsonValue handle_editor_info(const mcp::JsonValue &args) {
     }
     toaster->push_toast(godot::String(message.c_str()), severity,
                         godot::String(tooltip.c_str()));
-    mcp::JsonValue info(mcp::JsonValue::object_tag);
-    info["message"] = mcp::JsonValue(message);
-    info["severity"] = mcp::JsonValue(severity_name);
-    info["tooltip"] = mcp::JsonValue(tooltip);
-    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue info(godot_autopilot::util::JsonValue::object_tag);
+    info["message"] = godot_autopilot::util::JsonValue(message);
+    info["severity"] = godot_autopilot::util::JsonValue(severity_name);
+    info["tooltip"] = godot_autopilot::util::JsonValue(tooltip);
+    godot_autopilot::util::JsonValue result(godot_autopilot::util::JsonValue::object_tag);
     result["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "editor_info toast completed");

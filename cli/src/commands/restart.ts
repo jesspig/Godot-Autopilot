@@ -17,7 +17,7 @@ import {
 
 export function restartPortNote(previousPort: number, newPort: number): string | null {
   if (previousPort === newPort) return null;
-  return `restarted on port ${newPort}; the MCP port is owned by the plugin, so it may differ from the previous port ${previousPort}`;
+  return `restarted on port ${newPort}; the control-plane port is owned by the plugin, so it may differ from the previous port ${previousPort}`;
 }
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {

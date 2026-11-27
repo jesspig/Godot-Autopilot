@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -98,17 +98,17 @@ const std::vector<std::string> kEditSceneNodeActions = {
 const std::vector<std::string> kSceneCameraActions = {
     "focus", "set_params", "project", "unproject", "project_ray", "behind"};
 
-inline mcp::JsonValue scene_create_schema() {
-  mcp::JsonValue schema_value = schema::build_schema(kCreateSceneNodeParams);
-  mcp::JsonValue *properties = schema_value.Find("properties");
+inline godot_autopilot::util::JsonValue scene_create_schema() {
+  godot_autopilot::util::JsonValue schema_value = schema::build_schema(kCreateSceneNodeParams);
+  godot_autopilot::util::JsonValue *properties = schema_value.Find("properties");
   if (properties != nullptr && properties->IsObject()) {
-    mcp::JsonValue mode(mcp::JsonValue::object_tag);
-    mode["type"] = mcp::JsonValue("string");
-    mode["description"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue mode(godot_autopilot::util::JsonValue::object_tag);
+    mode["type"] = godot_autopilot::util::JsonValue("string");
+    mode["description"] = godot_autopilot::util::JsonValue(
         "Operation to run: node (default)|scene|spec|bundle|path");
-    mcp::JsonValue values(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::array_tag);
     for (const char *value : {"node", "scene", "spec", "bundle", "path"}) {
-      values.PushBack(mcp::JsonValue(value));
+      values.PushBack(godot_autopilot::util::JsonValue(value));
     }
     mode["enum"] = std::move(values);
     (*properties)["mode"] = std::move(mode);
@@ -116,25 +116,25 @@ inline mcp::JsonValue scene_create_schema() {
   return schema_value;
 }
 
-inline std::function<mcp::JsonValue(const mcp::JsonValue &)> scene_mode_args(
+inline std::function<godot_autopilot::util::JsonValue(const godot_autopilot::util::JsonValue &)> scene_mode_args(
     const char *mode) {
-  return [mode](const mcp::JsonValue &args) {
-    mcp::JsonValue out(mcp::JsonValue::object_tag);
+  return [mode](const godot_autopilot::util::JsonValue &args) {
+    godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
     if (args.IsObject()) {
       out = args;
     }
-    out["mode"] = mcp::JsonValue(mode);
+    out["mode"] = godot_autopilot::util::JsonValue(mode);
     return out;
   };
 }
 
-inline mcp::JsonValue scene_alias_args_with_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue scene_alias_args_with_action(const godot_autopilot::util::JsonValue &args,
                                                    const char *action) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
-  out["action"] = mcp::JsonValue(action);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
@@ -143,7 +143,7 @@ inline ToolAlias scene_action_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return scene_alias_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -151,25 +151,25 @@ inline ToolAlias scene_action_alias(const char *name, const char *canonical,
   return alias;
 }
 
-mcp::JsonValue scene_alias_args_with_verify(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue scene_alias_args_with_verify(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
     out = args;
   }
   if (out.Find("verify") == nullptr) {
-    out["verify"] = mcp::JsonValue(true);
+    out["verify"] = godot_autopilot::util::JsonValue(true);
   }
   return out;
 }
 
-mcp::JsonValue screen_rect_alias_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue screen_rect_alias_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (args.IsObject()) {
-    const mcp::JsonValue *paths = args.Find("paths");
+    const godot_autopilot::util::JsonValue *paths = args.Find("paths");
     if (paths != nullptr) {
       out["paths"] = *paths;
     }
-    const mcp::JsonValue *viewport = args.Find("viewport");
+    const godot_autopilot::util::JsonValue *viewport = args.Find("viewport");
     if (viewport != nullptr) {
       out["viewport"] = *viewport;
     }
@@ -177,70 +177,70 @@ mcp::JsonValue screen_rect_alias_args(const mcp::JsonValue &args) {
   return out;
 }
 
-mcp::JsonValue screen_rect_alias_validate(const mcp::JsonValue &args) {
-  const mcp::JsonValue *paths = args.Find("paths");
+godot_autopilot::util::JsonValue screen_rect_alias_validate(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *paths = args.Find("paths");
   if (paths == nullptr || !paths->IsArray()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
     error["error"] =
-        mcp::JsonValue("missing required parameter: paths (array)");
+        godot_autopilot::util::JsonValue("missing required parameter: paths (array)");
     return error;
   }
   const auto &items = paths->GetArray();
   if (items.empty() || items.size() > 50) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(
         "parameter 'paths' must contain between 1 and 50 entries");
     return error;
   }
   for (const auto &item : items) {
     if (!item.IsString()) {
-      mcp::JsonValue error(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
       error["error"] =
-          mcp::JsonValue("parameter 'paths' must be an array of strings");
+          godot_autopilot::util::JsonValue("parameter 'paths' must be an array of strings");
       return error;
     }
   }
-  if (const mcp::JsonValue *viewport = args.Find("viewport")) {
+  if (const godot_autopilot::util::JsonValue *viewport = args.Find("viewport")) {
     if (!viewport->IsString()) {
-      mcp::JsonValue error(mcp::JsonValue::object_tag);
+      godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
       error["error"] =
-          mcp::JsonValue("parameter 'viewport' must be a string");
+          godot_autopilot::util::JsonValue("parameter 'viewport' must be a string");
       return error;
     }
     const std::string mode = viewport->GetString();
     if (mode != "auto" && mode != "2d" && mode != "3d") {
-      mcp::JsonValue error(mcp::JsonValue::object_tag);
-      error["error"] = mcp::JsonValue(
+      godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+      error["error"] = godot_autopilot::util::JsonValue(
           "parameter 'viewport' must be one of: auto, 2d, 3d");
       return error;
     }
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-void copy_field(const mcp::JsonValue &source, mcp::JsonValue &target,
+void copy_field(const godot_autopilot::util::JsonValue &source, godot_autopilot::util::JsonValue &target,
                 const char *key) {
-  if (const mcp::JsonValue *value = source.Find(key)) {
+  if (const godot_autopilot::util::JsonValue *value = source.Find(key)) {
     target[key] = *value;
   }
 }
 
-mcp::JsonValue screen_rect_alias_project(const mcp::JsonValue &canonical) {
+godot_autopilot::util::JsonValue screen_rect_alias_project(const godot_autopilot::util::JsonValue &canonical) {
   if (canonical.Find("error") != nullptr) {
     return canonical;
   }
-  const mcp::JsonValue *inner = canonical.Find("result");
+  const godot_autopilot::util::JsonValue *inner = canonical.Find("result");
   if (inner == nullptr || !inner->IsObject()) {
     return canonical;
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  if (const mcp::JsonValue *nodes = inner->Find("nodes")) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  if (const godot_autopilot::util::JsonValue *nodes = inner->Find("nodes")) {
     if (nodes->IsObject()) {
       out["result"] = *nodes;
       return out;
     }
   }
-  if (const mcp::JsonValue *nodes_error = inner->Find("nodes_error")) {
+  if (const godot_autopilot::util::JsonValue *nodes_error = inner->Find("nodes_error")) {
     if (nodes_error->IsString()) {
       out["error"] = *nodes_error;
       return out;
@@ -249,33 +249,33 @@ mcp::JsonValue screen_rect_alias_project(const mcp::JsonValue &canonical) {
   return canonical;
 }
 
-mcp::JsonValue verify_alias_project(const mcp::JsonValue &canonical) {
+godot_autopilot::util::JsonValue verify_alias_project(const godot_autopilot::util::JsonValue &canonical) {
   if (canonical.Find("error") != nullptr) {
     return canonical;
   }
-  const mcp::JsonValue *inner = canonical.Find("result");
+  const godot_autopilot::util::JsonValue *inner = canonical.Find("result");
   if (inner == nullptr || !inner->IsObject()) {
     return canonical;
   }
-  const mcp::JsonValue *verify = inner->Find("verify");
+  const godot_autopilot::util::JsonValue *verify = inner->Find("verify");
   if (verify == nullptr || !verify->IsObject()) {
     return canonical;
   }
-  const mcp::JsonValue *available = verify->Find("available");
+  const godot_autopilot::util::JsonValue *available = verify->Find("available");
   if (available != nullptr && available->IsBool() &&
       !available->GetBool()) {
-    mcp::JsonValue out(mcp::JsonValue::object_tag);
-    if (const mcp::JsonValue *error = verify->Find("error")) {
+    godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+    if (const godot_autopilot::util::JsonValue *error = verify->Find("error")) {
       out["error"] = *error;
     } else {
-      out["error"] = mcp::JsonValue("scene file is unavailable");
+      out["error"] = godot_autopilot::util::JsonValue("scene file is unavailable");
     }
     copy_field(*verify, out, "path");
     return out;
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *match = verify->Find("match");
-  out["result"] = mcp::JsonValue(
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *match = verify->Find("match");
+  out["result"] = godot_autopilot::util::JsonValue(
       match != nullptr && match->IsBool() && match->GetBool() ? "match"
                                                              : "mismatch");
   const char *keys[] = {"match",
@@ -299,31 +299,31 @@ mcp::JsonValue verify_alias_project(const mcp::JsonValue &canonical) {
   return out;
 }
 
-mcp::JsonValue has_group_node_args(const mcp::JsonValue &) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["include_groups"] = mcp::JsonValue(true);
-  out["max_depth"] = mcp::JsonValue(static_cast<int64_t>(-1));
+godot_autopilot::util::JsonValue has_group_node_args(const godot_autopilot::util::JsonValue &) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["include_groups"] = godot_autopilot::util::JsonValue(true);
+  out["max_depth"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(-1));
   return out;
 }
 
-mcp::JsonValue has_group_node_validate(const mcp::JsonValue &args) {
-  const mcp::JsonValue *node_path = args.Find("node_path");
+godot_autopilot::util::JsonValue has_group_node_validate(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *node_path = args.Find("node_path");
   if (node_path == nullptr || !node_path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: node_path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: node_path");
     return error;
   }
-  const mcp::JsonValue *group_name = args.Find("group_name");
+  const godot_autopilot::util::JsonValue *group_name = args.Find("group_name");
   if (group_name == nullptr || !group_name->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: group_name");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: group_name");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
 std::string group_query_relative_path(const std::string &raw,
-                                      const mcp::JsonValue &tree) {
+                                      const godot_autopilot::util::JsonValue &tree) {
   std::string clean = raw;
   if (!clean.empty() && clean[0] == '/') {
     clean = clean.substr(1);
@@ -343,27 +343,27 @@ std::string group_query_relative_path(const std::string &raw,
     }
   };
   strip_segment("root");
-  const mcp::JsonValue *root_name = tree.Find("name");
+  const godot_autopilot::util::JsonValue *root_name = tree.Find("name");
   if (root_name != nullptr && root_name->IsString()) {
     strip_segment(root_name->GetString());
   }
   return clean;
 }
 
-const mcp::JsonValue *find_tree_node(const mcp::JsonValue &node,
+const godot_autopilot::util::JsonValue *find_tree_node(const godot_autopilot::util::JsonValue &node,
                                      const std::string &target) {
   if (!node.IsObject()) {
     return nullptr;
   }
-  const mcp::JsonValue *path = node.Find("path");
+  const godot_autopilot::util::JsonValue *path = node.Find("path");
   if (path != nullptr && path->IsString() &&
       path->GetString() == target) {
     return &node;
   }
-  const mcp::JsonValue *children = node.Find("children");
+  const godot_autopilot::util::JsonValue *children = node.Find("children");
   if (children != nullptr && children->IsArray()) {
-    for (const mcp::JsonValue &child : children->GetArray()) {
-      if (const mcp::JsonValue *hit = find_tree_node(child, target)) {
+    for (const godot_autopilot::util::JsonValue &child : children->GetArray()) {
+      if (const godot_autopilot::util::JsonValue *hit = find_tree_node(child, target)) {
         return hit;
       }
     }
@@ -371,14 +371,14 @@ const mcp::JsonValue *find_tree_node(const mcp::JsonValue &node,
   return nullptr;
 }
 
-mcp::JsonValue has_group_node_project(const mcp::JsonValue &canonical,
-                                      const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue has_group_node_project(const godot_autopilot::util::JsonValue &canonical,
+                                      const godot_autopilot::util::JsonValue &args) {
   if (canonical.Find("error") != nullptr) {
     return canonical;
   }
-  const mcp::JsonValue *node_path = args.Find("node_path");
-  const mcp::JsonValue *group_name = args.Find("group_name");
-  const mcp::JsonValue *tree = canonical.Find("result");
+  const godot_autopilot::util::JsonValue *node_path = args.Find("node_path");
+  const godot_autopilot::util::JsonValue *group_name = args.Find("group_name");
+  const godot_autopilot::util::JsonValue *tree = canonical.Find("result");
   if (node_path == nullptr || !node_path->IsString() ||
       group_name == nullptr || !group_name->IsString() || tree == nullptr ||
       !tree->IsObject()) {
@@ -386,18 +386,18 @@ mcp::JsonValue has_group_node_project(const mcp::JsonValue &canonical,
   }
   const std::string target =
       group_query_relative_path(node_path->GetString(), *tree);
-  const mcp::JsonValue *found =
+  const godot_autopilot::util::JsonValue *found =
       target.empty() ? tree : find_tree_node(*tree, target);
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (found == nullptr) {
     out["error"] =
-        mcp::JsonValue("node not found: " + node_path->GetString());
+        godot_autopilot::util::JsonValue("node not found: " + node_path->GetString());
     return out;
   }
   bool in_group = false;
-  if (const mcp::JsonValue *groups = found->Find("groups")) {
+  if (const godot_autopilot::util::JsonValue *groups = found->Find("groups")) {
     if (groups->IsArray()) {
-      for (const mcp::JsonValue &entry : groups->GetArray()) {
+      for (const godot_autopilot::util::JsonValue &entry : groups->GetArray()) {
         if (entry.IsString() && entry.GetString() == group_name->GetString()) {
           in_group = true;
           break;
@@ -405,7 +405,7 @@ mcp::JsonValue has_group_node_project(const mcp::JsonValue &canonical,
       }
     }
   }
-  out["result"] = mcp::JsonValue(in_group);
+  out["result"] = godot_autopilot::util::JsonValue(in_group);
   return out;
 }
 

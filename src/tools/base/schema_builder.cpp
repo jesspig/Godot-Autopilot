@@ -32,11 +32,11 @@ bool validate_param_defs(const std::vector<ParamDef> &params,
   return true;
 }
 
-void add_required_flag(mcp::JsonValue &schema, const std::string &name) {
+void add_required_flag(godot_autopilot::util::JsonValue &schema, const std::string &name) {
   auto *req = schema.Find("required");
   if (!req) {
-    mcp::JsonValue arr(mcp::JsonValue::array_tag);
-    arr.PushBack(mcp::JsonValue(name));
+    godot_autopilot::util::JsonValue arr(godot_autopilot::util::JsonValue::array_tag);
+    arr.PushBack(godot_autopilot::util::JsonValue(name));
     schema["required"] = std::move(arr);
   } else if (req->IsArray()) {
 
@@ -44,27 +44,27 @@ void add_required_flag(mcp::JsonValue &schema, const std::string &name) {
       if (v.IsString() && v.GetString() == name)
         return;
     }
-    req->PushBack(mcp::JsonValue(name));
+    req->PushBack(godot_autopilot::util::JsonValue(name));
   }
 }
 
-mcp::JsonValue build_schema(const std::vector<ParamDef> &params) {
-  mcp::JsonValue s(mcp::JsonValue::object_tag);
-  s["type"] = mcp::JsonValue("object");
-  s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
-  s["required"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+godot_autopilot::util::JsonValue build_schema(const std::vector<ParamDef> &params) {
+  godot_autopilot::util::JsonValue s(godot_autopilot::util::JsonValue::object_tag);
+  s["type"] = godot_autopilot::util::JsonValue("object");
+  s["properties"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  s["required"] = godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::array_tag);
 
   auto *props = s.Find("properties");
   if (!props || !props->IsObject())
     return s;
 
   for (const auto &p : params) {
-    mcp::JsonValue prop(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue prop(godot_autopilot::util::JsonValue::object_tag);
     if (p.type != "json") {
-      prop["type"] = mcp::JsonValue(p.type);
+      prop["type"] = godot_autopilot::util::JsonValue(p.type);
     }
     if (!p.description.empty()) {
-      prop["description"] = mcp::JsonValue(p.description);
+      prop["description"] = godot_autopilot::util::JsonValue(p.description);
     }
     (*props)[p.name] = std::move(prop);
 
@@ -76,22 +76,22 @@ mcp::JsonValue build_schema(const std::vector<ParamDef> &params) {
   return s;
 }
 
-mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
+godot_autopilot::util::JsonValue build_schema(std::initializer_list<ParamDef> params) {
   return build_schema(std::vector<ParamDef>(params));
 }
 
-mcp::JsonValue build_action_schema(const std::vector<std::string> &actions,
+godot_autopilot::util::JsonValue build_action_schema(const std::vector<std::string> &actions,
                                    const std::vector<ParamDef> &params,
                                    const std::string &description) {
-  mcp::JsonValue schema = build_schema(params);
-  mcp::JsonValue action(mcp::JsonValue::object_tag);
-  action["type"] = mcp::JsonValue("string");
+  godot_autopilot::util::JsonValue schema = build_schema(params);
+  godot_autopilot::util::JsonValue action(godot_autopilot::util::JsonValue::object_tag);
+  action["type"] = godot_autopilot::util::JsonValue("string");
   if (!description.empty()) {
-    action["description"] = mcp::JsonValue(description);
+    action["description"] = godot_autopilot::util::JsonValue(description);
   }
-  mcp::JsonValue values(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue values(godot_autopilot::util::JsonValue::array_tag);
   for (const auto &value : actions) {
-    values.PushBack(mcp::JsonValue(value));
+    values.PushBack(godot_autopilot::util::JsonValue(value));
   }
   action["enum"] = std::move(values);
   auto *properties = schema.Find("properties");

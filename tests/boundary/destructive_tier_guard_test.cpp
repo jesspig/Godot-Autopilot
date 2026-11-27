@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
 #include "core/observability/log_system.hpp"
@@ -23,11 +21,6 @@ namespace {
 using godot_autopilot::SideEffect;
 namespace side_effect_policy = godot_autopilot::side_effect_policy;
 
-std::unique_ptr<mcp::McpServer> &server_handle() {
-  static std::unique_ptr<mcp::McpServer> server;
-  return server;
-}
-
 godot_autopilot::CommandQueue &queue_handle() {
   static godot_autopilot::CommandQueue queue;
   return queue;
@@ -44,15 +37,9 @@ godot_autopilot::Bm25Index &index_handle() {
 }
 
 std::shared_ptr<godot_autopilot::ToolRegistry> ensure_registry() {
-  auto registry = godot_autopilot::get_active_registry();
-  if (server_handle() == nullptr) {
-    auto pair = mcp::InMemoryTransport::CreatePair();
-    server_handle() = mcp::McpServer::Create(pair.server);
-    godot_autopilot::register_all_tools(*server_handle(), queue_handle(),
-                                       catalog_handle(), index_handle(), 9527);
-    registry = godot_autopilot::get_active_registry();
-  }
-  return registry;
+  static const auto registry = godot_autopilot::install_tool_handlers(
+      queue_handle(), catalog_handle(), index_handle(), 9527);
+  return registry != nullptr ? registry : godot_autopilot::get_active_registry();
 }
 
 std::vector<side_effect_policy::ToolDeclaration> declarations() {
@@ -254,17 +241,15 @@ TEST(DestructiveTierGuardTest, RegistrationAuditsUndeclaredDestructiveTools) {
     suspect.name = "wipe_all_records";
     suspect.description = "Wipe all records permanently.";
     suspect.category = "Test";
-    suspect.handler = [](const mcp::JsonValue &) {
-      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    suspect.handler = [](const godot_autopilot::util::JsonValue &) {
+      return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
     };
     std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
     godot_autopilot::dynamic_specs::store().push_back(std::move(suspect));
   }
 
-  auto pair = mcp::InMemoryTransport::CreatePair();
-  auto audit_server = mcp::McpServer::Create(pair.server);
-  godot_autopilot::register_all_tools(
-      *audit_server, queue_handle(), catalog_handle(), index_handle(), 9527);
+  godot_autopilot::install_tool_handlers(
+      queue_handle(), catalog_handle(), index_handle(), 9527);
 
   {
     std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
@@ -275,10 +260,8 @@ TEST(DestructiveTierGuardTest, RegistrationAuditsUndeclaredDestructiveTools) {
                                }),
                 specs.end());
   }
-  auto restore_pair = mcp::InMemoryTransport::CreatePair();
-  auto restore_server = mcp::McpServer::Create(restore_pair.server);
-  godot_autopilot::register_all_tools(
-      *restore_server, queue_handle(), catalog_handle(), index_handle(), 9527);
+  godot_autopilot::install_tool_handlers(
+      queue_handle(), catalog_handle(), index_handle(), 9527);
 
   godot_autopilot::LogSystem::Query query;
   query.min_level = godot_autopilot::LogLevel::Warning;

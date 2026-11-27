@@ -68,16 +68,16 @@ constexpr int64_t kMaxDimensionMax = 4096;
 constexpr int64_t kScaleMin = 1;
 constexpr int64_t kScaleMax = 8;
 
-mcp::JsonValue capture_limit_error(const std::string &code,
+godot_autopilot::util::JsonValue capture_limit_error(const std::string &code,
                                    const std::string &message) {
-  mcp::JsonValue error = util::error_json(message);
-  mcp::JsonValue details(mcp::JsonValue::object_tag);
-  details["code"] = mcp::JsonValue(code);
+  godot_autopilot::util::JsonValue error = util::error_json(message);
+  godot_autopilot::util::JsonValue details(godot_autopilot::util::JsonValue::object_tag);
+  details["code"] = godot_autopilot::util::JsonValue(code);
   error["structured_error"] = std::move(details);
   return error;
 }
 
-mcp::JsonValue capture_viewport_unavailable_error(const std::string &code,
+godot_autopilot::util::JsonValue capture_viewport_unavailable_error(const std::string &code,
                                                   godot::SubViewport *viewport) {
   int width = 0;
   int height = 0;
@@ -97,14 +97,14 @@ mcp::JsonValue capture_viewport_unavailable_error(const std::string &code,
             "viewport"
           : "editor viewport is degenerate: rendered size is too small to "
             "capture";
-  mcp::JsonValue error = util::error_json(message);
-  error["code"] = mcp::JsonValue(code);
-  mcp::JsonValue details(mcp::JsonValue::object_tag);
-  details["code"] = mcp::JsonValue(code);
-  details["captured_viewport"] = mcp::JsonValue("2d");
-  mcp::JsonValue size(mcp::JsonValue::object_tag);
-  size["width"] = mcp::JsonValue(width);
-  size["height"] = mcp::JsonValue(height);
+  godot_autopilot::util::JsonValue error = util::error_json(message);
+  error["code"] = godot_autopilot::util::JsonValue(code);
+  godot_autopilot::util::JsonValue details(godot_autopilot::util::JsonValue::object_tag);
+  details["code"] = godot_autopilot::util::JsonValue(code);
+  details["captured_viewport"] = godot_autopilot::util::JsonValue("2d");
+  godot_autopilot::util::JsonValue size(godot_autopilot::util::JsonValue::object_tag);
+  size["width"] = godot_autopilot::util::JsonValue(width);
+  size["height"] = godot_autopilot::util::JsonValue(height);
   details["size"] = std::move(size);
   error["structured_error"] = std::move(details);
   return error;
@@ -118,19 +118,19 @@ struct RegionRequest {
   double height = 0.0;
 };
 
-mcp::JsonValue parse_region_request(const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue parse_region_request(const godot_autopilot::util::JsonValue &args,
                                     RegionRequest *out) {
-  const mcp::JsonValue *region = args.Find("region");
+  const godot_autopilot::util::JsonValue *region = args.Find("region");
   if (!region)
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   const char *message = "invalid parameter: region must be an object with "
                         "numeric x, y, width and height";
   if (!region->IsObject())
     return util::error_json(message);
-  const mcp::JsonValue *x = region->Find("x");
-  const mcp::JsonValue *y = region->Find("y");
-  const mcp::JsonValue *width = region->Find("width");
-  const mcp::JsonValue *height = region->Find("height");
+  const godot_autopilot::util::JsonValue *x = region->Find("x");
+  const godot_autopilot::util::JsonValue *y = region->Find("y");
+  const godot_autopilot::util::JsonValue *width = region->Find("width");
+  const godot_autopilot::util::JsonValue *height = region->Find("height");
   if (!x || !y || !width || !height || !x->IsNumber() || !y->IsNumber() ||
       !width->IsNumber() || !height->IsNumber())
     return util::error_json(message);
@@ -142,14 +142,14 @@ mcp::JsonValue parse_region_request(const mcp::JsonValue &args,
     return util::error_json(
         "invalid parameter: region width and height must be greater than 0");
   out->present = true;
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-mcp::JsonValue parse_max_dimension_request(const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue parse_max_dimension_request(const godot_autopilot::util::JsonValue &args,
                                            int64_t *out) {
-  const mcp::JsonValue *max_dimension = args.Find("max_dimension");
+  const godot_autopilot::util::JsonValue *max_dimension = args.Find("max_dimension");
   if (!max_dimension)
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   if (!max_dimension->IsInt())
     return util::error_json(
         "invalid parameter: max_dimension must be an integer");
@@ -159,7 +159,7 @@ mcp::JsonValue parse_max_dimension_request(const mcp::JsonValue &args,
         "invalid parameter: max_dimension out of range (64-4096): " +
         std::to_string(value));
   *out = value;
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
 godot::Ref<godot::ViewportTexture>
@@ -198,9 +198,9 @@ struct AnnotateNodesRequest {
   int64_t max_limit = 50;
 };
 
-mcp::JsonValue parse_annotate_nodes_request(const mcp::JsonValue &args,
+godot_autopilot::util::JsonValue parse_annotate_nodes_request(const godot_autopilot::util::JsonValue &args,
                                             AnnotateNodesRequest *out) {
-  const mcp::JsonValue *max_p = args.Find("annotate_nodes_max");
+  const godot_autopilot::util::JsonValue *max_p = args.Find("annotate_nodes_max");
   if (max_p) {
     if (!max_p->IsInt())
       return util::error_json(
@@ -212,9 +212,9 @@ mcp::JsonValue parse_annotate_nodes_request(const mcp::JsonValue &args,
           std::to_string(max_value));
     out->max_limit = max_value;
   }
-  const mcp::JsonValue *paths_p = args.Find("annotate_nodes");
+  const godot_autopilot::util::JsonValue *paths_p = args.Find("annotate_nodes");
   if (!paths_p)
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   if (!paths_p->IsArray())
     return util::error_json("invalid parameter: annotate_nodes must be an "
                               "array of node path strings");
@@ -234,7 +234,7 @@ mcp::JsonValue parse_annotate_nodes_request(const mcp::JsonValue &args,
         "invalid parameter: annotate_nodes length exceeds annotate_nodes_max (" +
         std::to_string(out->max_limit) + ")");
   out->present = true;
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
 struct NodeAnnotateItem {
@@ -481,19 +481,19 @@ std::string next_capture_file_path(const std::string &absolute_dir) {
   return std::string();
 }
 
-mcp::JsonValue capture_save_failure(const std::string &path,
+godot_autopilot::util::JsonValue capture_save_failure(const std::string &path,
                                     const std::string &reason) {
   return util::error_json("failed to save capture to " + path + ": " + reason);
 }
 
 }  // namespace
 
-bool read_capture_save_options(const mcp::JsonValue &args,
+bool read_capture_save_options(const godot_autopilot::util::JsonValue &args,
                                CaptureSaveOptions *out,
-                               mcp::JsonValue *error_out) {
+                               godot_autopilot::util::JsonValue *error_out) {
   out->save = false;
   out->save_dir.clear();
-  *error_out = mcp::JsonValue();
+  *error_out = godot_autopilot::util::JsonValue();
   if (auto *save_p = args.Find("save")) {
     if (!save_p->IsBool()) {
       *error_out = util::error_json("invalid parameter: save must be a boolean");
@@ -569,7 +569,7 @@ bool resolve_capture_save_dir(const std::string &requested,
   return true;
 }
 
-mcp::JsonValue save_capture_image(const godot::Ref<godot::Image> &image,
+godot_autopilot::util::JsonValue save_capture_image(const godot::Ref<godot::Image> &image,
                                   const CaptureSaveOptions &options) {
   if (image.is_null())
     return util::error_json("capture image is empty");
@@ -587,12 +587,12 @@ mcp::JsonValue save_capture_image(const godot::Ref<godot::Image> &image,
         path, "PNG write failed (error code " +
                   std::to_string(static_cast<int>(save_err)) + ")");
   prune_capture_files(godot::String::utf8(dir.c_str()), kCaptureKeepFiles);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["saved_path"] = mcp::JsonValue(path);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["saved_path"] = godot_autopilot::util::JsonValue(path);
   return r;
 }
 
-mcp::JsonValue save_capture_bytes(const godot::PackedByteArray &bytes,
+godot_autopilot::util::JsonValue save_capture_bytes(const godot::PackedByteArray &bytes,
                                   const CaptureSaveOptions &options) {
   if (bytes.size() <= 0)
     return util::error_json("capture PNG buffer is empty");
@@ -615,34 +615,34 @@ mcp::JsonValue save_capture_bytes(const godot::PackedByteArray &bytes,
         path, "write failed (error code " +
                   std::to_string(static_cast<int>(write_err)) + ")");
   prune_capture_files(godot::String::utf8(dir.c_str()), kCaptureKeepFiles);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["saved_path"] = mcp::JsonValue(path);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  r["saved_path"] = godot_autopilot::util::JsonValue(path);
   return r;
 }
 
-mcp::JsonValue with_capture_save_options(mcp::JsonValue pending,
+godot_autopilot::util::JsonValue with_capture_save_options(godot_autopilot::util::JsonValue pending,
                                          const CaptureSaveOptions &options) {
   if (!options.save || !pending.IsObject() ||
       pending.Find("__gda_pending") == nullptr)
     return pending;
-  pending["save"] = mcp::JsonValue(true);
+  pending["save"] = godot_autopilot::util::JsonValue(true);
   if (!options.save_dir.empty())
-    pending["save_dir"] = mcp::JsonValue(options.save_dir);
+    pending["save_dir"] = godot_autopilot::util::JsonValue(options.save_dir);
   return pending;
 }
 
-bool is_pending_subcall_response(const mcp::JsonValue &response,
+bool is_pending_subcall_response(const godot_autopilot::util::JsonValue &response,
                                  int64_t *out_request_id,
                                  int64_t *out_timeout_ms) {
   if (!response.IsObject())
     return false;
-  const mcp::JsonValue *pending = response.Find("__gda_pending");
+  const godot_autopilot::util::JsonValue *pending = response.Find("__gda_pending");
   if (pending == nullptr || !pending->IsInt())
     return false;
   if (out_request_id != nullptr)
     *out_request_id = pending->GetInt();
   int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
-  if (const mcp::JsonValue *timeout = response.Find("timeout_ms");
+  if (const godot_autopilot::util::JsonValue *timeout = response.Find("timeout_ms");
       timeout != nullptr && timeout->IsInt() && timeout->GetInt() > 0)
     timeout_ms = timeout->GetInt();
   if (out_timeout_ms != nullptr)
@@ -650,12 +650,12 @@ bool is_pending_subcall_response(const mcp::JsonValue &response,
   return true;
 }
 
-mcp::JsonValue unwrap_subcall_section(const mcp::JsonValue &response,
+godot_autopilot::util::JsonValue unwrap_subcall_section(const godot_autopilot::util::JsonValue &response,
                                       bool await_pending) {
-  mcp::JsonValue section(mcp::JsonValue::object_tag);
-  if (const mcp::JsonValue *r = response.Find("result"))
+  godot_autopilot::util::JsonValue section(godot_autopilot::util::JsonValue::object_tag);
+  if (const godot_autopilot::util::JsonValue *r = response.Find("result"))
     return *r;
-  if (const mcp::JsonValue *e = response.Find("error")) {
+  if (const godot_autopilot::util::JsonValue *e = response.Find("error")) {
     section["error"] = *e;
     return section;
   }
@@ -663,15 +663,15 @@ mcp::JsonValue unwrap_subcall_section(const mcp::JsonValue &response,
   int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
   if (await_pending &&
       is_pending_subcall_response(response, &request_id, &timeout_ms)) {
-    mcp::JsonValue awaited =
+    godot_autopilot::util::JsonValue awaited =
         runtime_ops::wait_pending_response(request_id, timeout_ms);
     if (awaited.IsObject() && !awaited.Contains("error")) {
       awaited = runtime_ops::finalize_capture_response(awaited, response);
     }
     if (awaited.IsObject()) {
-      if (const mcp::JsonValue *r = awaited.Find("result"))
+      if (const godot_autopilot::util::JsonValue *r = awaited.Find("result"))
         return *r;
-      if (const mcp::JsonValue *e = awaited.Find("error")) {
+      if (const godot_autopilot::util::JsonValue *e = awaited.Find("error")) {
         section["error"] = *e;
         return section;
       }
@@ -683,11 +683,11 @@ mcp::JsonValue unwrap_subcall_section(const mcp::JsonValue &response,
   if (diagnostic.size() > kMaxDiagnosticChars)
     diagnostic.resize(kMaxDiagnosticChars);
   section["error"] =
-      mcp::JsonValue("unexpected sub-call response shape: " + diagnostic);
+      godot_autopilot::util::JsonValue("unexpected sub-call response shape: " + diagnostic);
   return section;
 }
 
-mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_capture_viewport(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_editor_viewport called");
 
@@ -702,7 +702,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   CaptureSaveOptions save_options;
-  mcp::JsonValue save_options_error;
+  godot_autopilot::util::JsonValue save_options_error;
   if (!read_capture_save_options(args, &save_options, &save_options_error))
     return save_options_error;
 
@@ -741,7 +741,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   AnnotateNodesRequest annotate_nodes;
-  if (mcp::JsonValue annotate_nodes_error =
+  if (godot_autopilot::util::JsonValue annotate_nodes_error =
           parse_annotate_nodes_request(args, &annotate_nodes);
       !annotate_nodes_error.IsNull())
     return annotate_nodes_error;
@@ -782,46 +782,46 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
 
     RegionRequest region_request;
-    if (mcp::JsonValue region_error =
+    if (godot_autopilot::util::JsonValue region_error =
             parse_region_request(args, &region_request);
         !region_error.IsNull())
       return region_error;
     int64_t max_dimension = 0;
-    if (mcp::JsonValue max_dimension_error =
+    if (godot_autopilot::util::JsonValue max_dimension_error =
             parse_max_dimension_request(args, &max_dimension);
         !max_dimension_error.IsNull())
       return max_dimension_error;
 
-    mcp::JsonValue params(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue params(godot_autopilot::util::JsonValue::object_tag);
     if (region_request.present) {
-      if (const mcp::JsonValue *region = args.Find("region"))
+      if (const godot_autopilot::util::JsonValue *region = args.Find("region"))
         params["region"] = *region;
     }
     if (max_dimension > 0)
-      params["max_dimension"] = mcp::JsonValue(max_dimension);
+      params["max_dimension"] = godot_autopilot::util::JsonValue(max_dimension);
     if (annotate)
-      params["annotate"] = mcp::JsonValue(true);
+      params["annotate"] = godot_autopilot::util::JsonValue(true);
     if (annotate_nodes.present) {
-      if (const mcp::JsonValue *nodes_param = args.Find("annotate_nodes"))
+      if (const godot_autopilot::util::JsonValue *nodes_param = args.Find("annotate_nodes"))
         params["annotate_nodes"] = *nodes_param;
-      if (const mcp::JsonValue *nodes_max_param =
+      if (const godot_autopilot::util::JsonValue *nodes_max_param =
               args.Find("annotate_nodes_max"))
         params["annotate_nodes_max"] = *nodes_max_param;
     }
     if (after_frames > 0)
-      params["after_frames"] = mcp::JsonValue(after_frames);
+      params["after_frames"] = godot_autopilot::util::JsonValue(after_frames);
     if (!when.empty())
-      params["when"] = mcp::JsonValue(when);
+      params["when"] = godot_autopilot::util::JsonValue(when);
     if (scale > 1)
-      params["scale"] = mcp::JsonValue(scale);
-    params["timeout_ms"] = mcp::JsonValue(timeout_ms);
+      params["scale"] = godot_autopilot::util::JsonValue(scale);
+    params["timeout_ms"] = godot_autopilot::util::JsonValue(timeout_ms);
     if (diff_image_requested) {
       return util::error_json(
           "diff_image is only supported for target='editor'");
     }
-    mcp::JsonValue captured = runtime_ops::handle_gda_send(
+    godot_autopilot::util::JsonValue captured = runtime_ops::handle_gda_send(
         "capture", params, timeout_ms, false, wait_ready, session_id);
-    mcp::JsonValue result =
+    godot_autopilot::util::JsonValue result =
         with_capture_save_options(std::move(captured), save_options);
     runtime_ops::append_runtime_degradation_hint(result);
     return result;
@@ -860,7 +860,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   int64_t max_dimension = 0;
-  if (mcp::JsonValue max_dimension_error =
+  if (godot_autopilot::util::JsonValue max_dimension_error =
           parse_max_dimension_request(args, &max_dimension);
       !max_dimension_error.IsNull())
     return max_dimension_error;
@@ -879,7 +879,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   RegionRequest region_request;
-  if (mcp::JsonValue region_error =
+  if (godot_autopilot::util::JsonValue region_error =
           parse_region_request(args, &region_request);
       !region_error.IsNull())
     return region_error;
@@ -1312,32 +1312,32 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   const bool baseline_storable =
       convertible && static_cast<size_t>(pixels.size()) <= kBaselineMaxBytes;
 
-  mcp::JsonValue diff(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue diff(godot_autopilot::util::JsonValue::object_tag);
   bool diff_bbox_available = false;
   double diff_bbox_x = 0.0;
   double diff_bbox_y = 0.0;
   double diff_bbox_w = 0.0;
   double diff_bbox_h = 0.0;
   if (diff_against_last) {
-    diff["comparable"] = mcp::JsonValue(false);
-    diff["changed_ratio"] = mcp::JsonValue(0.0);
+    diff["comparable"] = godot_autopilot::util::JsonValue(false);
+    diff["changed_ratio"] = godot_autopilot::util::JsonValue(0.0);
     if (g_has_baseline) {
-      mcp::JsonValue baseline_size(mcp::JsonValue::object_tag);
-      baseline_size["x"] = mcp::JsonValue(g_last_w);
-      baseline_size["y"] = mcp::JsonValue(g_last_h);
+      godot_autopilot::util::JsonValue baseline_size(godot_autopilot::util::JsonValue::object_tag);
+      baseline_size["x"] = godot_autopilot::util::JsonValue(g_last_w);
+      baseline_size["y"] = godot_autopilot::util::JsonValue(g_last_h);
       diff["baseline_size"] = std::move(baseline_size);
     }
     const auto fill_diff_sample = [&diff, &diff_bbox_available, &diff_bbox_x,
                                    &diff_bbox_y, &diff_bbox_w, &diff_bbox_h](
                                       const coords::DiffResult &sample) {
-      diff["comparable"] = mcp::JsonValue(sample.comparable);
-      diff["changed_ratio"] = mcp::JsonValue(sample.changed_ratio);
+      diff["comparable"] = godot_autopilot::util::JsonValue(sample.comparable);
+      diff["changed_ratio"] = godot_autopilot::util::JsonValue(sample.changed_ratio);
       if (sample.has_bbox) {
-        mcp::JsonValue bbox(mcp::JsonValue::object_tag);
-        bbox["x"] = mcp::JsonValue(sample.bbox.x);
-        bbox["y"] = mcp::JsonValue(sample.bbox.y);
-        bbox["w"] = mcp::JsonValue(sample.bbox.w);
-        bbox["h"] = mcp::JsonValue(sample.bbox.h);
+        godot_autopilot::util::JsonValue bbox(godot_autopilot::util::JsonValue::object_tag);
+        bbox["x"] = godot_autopilot::util::JsonValue(sample.bbox.x);
+        bbox["y"] = godot_autopilot::util::JsonValue(sample.bbox.y);
+        bbox["w"] = godot_autopilot::util::JsonValue(sample.bbox.w);
+        bbox["h"] = godot_autopilot::util::JsonValue(sample.bbox.h);
         diff["changed_bbox"] = std::move(bbox);
         diff_bbox_available = true;
         diff_bbox_x = sample.bbox.x;
@@ -1347,11 +1347,11 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       }
     };
     if (!convertible) {
-      diff["reason"] = mcp::JsonValue("unsupported_format");
+      diff["reason"] = godot_autopilot::util::JsonValue("unsupported_format");
     } else if (!g_has_baseline) {
-      diff["reason"] = mcp::JsonValue("no_baseline");
+      diff["reason"] = godot_autopilot::util::JsonValue("no_baseline");
     } else if (static_cast<size_t>(pixels.size()) > kBaselineMaxBytes) {
-      diff["reason"] = mcp::JsonValue("baseline_too_large");
+      diff["reason"] = godot_autopilot::util::JsonValue("baseline_too_large");
     } else if (final_width != g_last_w || final_height != g_last_h) {
       const int cw = std::min(final_width, g_last_w);
       const int ch = std::min(final_height, g_last_h);
@@ -1372,10 +1372,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       const coords::DiffResult sample = coords::diff_sample(
           tmp_current.data(), tmp_baseline.data(), cw, ch, 4, 4, 16);
       fill_diff_sample(sample);
-      diff["size_mismatch"] = mcp::JsonValue(true);
-      mcp::JsonValue current_size(mcp::JsonValue::object_tag);
-      current_size["x"] = mcp::JsonValue(final_width);
-      current_size["y"] = mcp::JsonValue(final_height);
+      diff["size_mismatch"] = godot_autopilot::util::JsonValue(true);
+      godot_autopilot::util::JsonValue current_size(godot_autopilot::util::JsonValue::object_tag);
+      current_size["x"] = godot_autopilot::util::JsonValue(final_width);
+      current_size["y"] = godot_autopilot::util::JsonValue(final_height);
       diff["current_size"] = std::move(current_size);
     } else {
       const coords::DiffResult sample =
@@ -1444,7 +1444,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   std::string saved_path;
   if (save_options.save) {
-    mcp::JsonValue save_result = save_capture_image(img, save_options);
+    godot_autopilot::util::JsonValue save_result = save_capture_image(img, save_options);
     if (save_result.Contains("error"))
       return save_result;
     if (auto *path_p = save_result.Find("saved_path");
@@ -1454,90 +1454,90 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   std::string b64 =
       base64_encode(png_buffer.ptr(), static_cast<size_t>(png_buffer.size()));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["data"] = mcp::JsonValue(b64);
-  inner["format"] = mcp::JsonValue("png");
-  inner["width"] = mcp::JsonValue(final_width);
-  inner["height"] = mcp::JsonValue(final_height);
-  inner["space"] = mcp::JsonValue(space);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
+  inner["data"] = godot_autopilot::util::JsonValue(b64);
+  inner["format"] = godot_autopilot::util::JsonValue("png");
+  inner["width"] = godot_autopilot::util::JsonValue(final_width);
+  inner["height"] = godot_autopilot::util::JsonValue(final_height);
+  inner["space"] = godot_autopilot::util::JsonValue(space);
   if (region_applied) {
-    mcp::JsonValue applied(mcp::JsonValue::object_tag);
-    applied["x"] = mcp::JsonValue(applied_region_x);
-    applied["y"] = mcp::JsonValue(applied_region_y);
-    applied["width"] = mcp::JsonValue(applied_region_w);
-    applied["height"] = mcp::JsonValue(applied_region_h);
+    godot_autopilot::util::JsonValue applied(godot_autopilot::util::JsonValue::object_tag);
+    applied["x"] = godot_autopilot::util::JsonValue(applied_region_x);
+    applied["y"] = godot_autopilot::util::JsonValue(applied_region_y);
+    applied["width"] = godot_autopilot::util::JsonValue(applied_region_w);
+    applied["height"] = godot_autopilot::util::JsonValue(applied_region_h);
     inner["region"] = std::move(applied);
   }
   const bool cropped =
       region_applied && (applied_region_w != source_width ||
                          applied_region_h != source_height);
   if (cropped || scaled) {
-    inner["source_width"] = mcp::JsonValue(source_width);
-    inner["source_height"] = mcp::JsonValue(source_height);
+    inner["source_width"] = godot_autopilot::util::JsonValue(source_width);
+    inner["source_height"] = godot_autopilot::util::JsonValue(source_height);
   }
   if (diff_against_last) {
     inner["diff"] = std::move(diff);
     if (diff_image_available)
-      inner["diff_image_data"] = mcp::JsonValue(diff_image_b64);
+      inner["diff_image_data"] = godot_autopilot::util::JsonValue(diff_image_b64);
   }
   if (annotate) {
-    mcp::JsonValue elements(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue elements(godot_autopilot::util::JsonValue::array_tag);
     for (const editor_ui_ops::Element &element : annotate_elements) {
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["id"] = mcp::JsonValue(element.id);
-      item["path"] = mcp::JsonValue(element.path);
-      item["type"] = mcp::JsonValue(element.type);
+      godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+      item["id"] = godot_autopilot::util::JsonValue(element.id);
+      item["path"] = godot_autopilot::util::JsonValue(element.path);
+      item["type"] = godot_autopilot::util::JsonValue(element.type);
       if (!element.text.empty())
-        item["text"] = mcp::JsonValue(element.text);
-      mcp::JsonValue position(mcp::JsonValue::object_tag);
-      position["x"] = mcp::JsonValue(element.x);
-      position["y"] = mcp::JsonValue(element.y);
+        item["text"] = godot_autopilot::util::JsonValue(element.text);
+      godot_autopilot::util::JsonValue position(godot_autopilot::util::JsonValue::object_tag);
+      position["x"] = godot_autopilot::util::JsonValue(element.x);
+      position["y"] = godot_autopilot::util::JsonValue(element.y);
       item["position"] = std::move(position);
-      mcp::JsonValue size(mcp::JsonValue::object_tag);
-      size["x"] = mcp::JsonValue(element.w);
-      size["y"] = mcp::JsonValue(element.h);
+      godot_autopilot::util::JsonValue size(godot_autopilot::util::JsonValue::object_tag);
+      size["x"] = godot_autopilot::util::JsonValue(element.w);
+      size["y"] = godot_autopilot::util::JsonValue(element.h);
       item["size"] = std::move(size);
       elements.PushBack(std::move(item));
     }
     inner["elements"] = std::move(elements);
-    inner["annotated"] = mcp::JsonValue(true);
+    inner["annotated"] = godot_autopilot::util::JsonValue(true);
     if (annotate_truncated)
-      inner["elements_truncated"] = mcp::JsonValue(true);
+      inner["elements_truncated"] = godot_autopilot::util::JsonValue(true);
   }
   if (annotate_nodes.present) {
-    mcp::JsonValue node_elements(mcp::JsonValue::array_tag);
+    godot_autopilot::util::JsonValue node_elements(godot_autopilot::util::JsonValue::array_tag);
     for (const NodeAnnotateItem &node_item : node_items) {
-      mcp::JsonValue node_entry(mcp::JsonValue::object_tag);
-      node_entry["id"] = mcp::JsonValue(node_item.id);
-      node_entry["path"] = mcp::JsonValue(node_item.path);
-      node_entry["ok"] = mcp::JsonValue(node_item.ok);
+      godot_autopilot::util::JsonValue node_entry(godot_autopilot::util::JsonValue::object_tag);
+      node_entry["id"] = godot_autopilot::util::JsonValue(node_item.id);
+      node_entry["path"] = godot_autopilot::util::JsonValue(node_item.path);
+      node_entry["ok"] = godot_autopilot::util::JsonValue(node_item.ok);
       if (!node_item.type.empty())
-        node_entry["type"] = mcp::JsonValue(node_item.type);
+        node_entry["type"] = godot_autopilot::util::JsonValue(node_item.type);
       if (node_item.ok) {
-        mcp::JsonValue node_position(mcp::JsonValue::object_tag);
-        node_position["x"] = mcp::JsonValue(node_item.x);
-        node_position["y"] = mcp::JsonValue(node_item.y);
+        godot_autopilot::util::JsonValue node_position(godot_autopilot::util::JsonValue::object_tag);
+        node_position["x"] = godot_autopilot::util::JsonValue(node_item.x);
+        node_position["y"] = godot_autopilot::util::JsonValue(node_item.y);
         node_entry["position"] = std::move(node_position);
-        mcp::JsonValue node_size(mcp::JsonValue::object_tag);
-        node_size["x"] = mcp::JsonValue(node_item.w);
-        node_size["y"] = mcp::JsonValue(node_item.h);
+        godot_autopilot::util::JsonValue node_size(godot_autopilot::util::JsonValue::object_tag);
+        node_size["x"] = godot_autopilot::util::JsonValue(node_item.w);
+        node_size["y"] = godot_autopilot::util::JsonValue(node_item.h);
         node_entry["size"] = std::move(node_size);
-        node_entry["visible"] = mcp::JsonValue(node_item.visible);
+        node_entry["visible"] = godot_autopilot::util::JsonValue(node_item.visible);
         if (node_item.is_3d)
-          node_entry["behind"] = mcp::JsonValue(node_item.behind);
+          node_entry["behind"] = godot_autopilot::util::JsonValue(node_item.behind);
       } else {
-        node_entry["error"] = mcp::JsonValue(node_item.error);
+        node_entry["error"] = godot_autopilot::util::JsonValue(node_item.error);
       }
       node_elements.PushBack(std::move(node_entry));
     }
     inner["node_elements"] = std::move(node_elements);
     if (node_truncated)
-      inner["node_truncated"] = mcp::JsonValue(true);
+      inner["node_truncated"] = godot_autopilot::util::JsonValue(true);
   }
   if (!saved_path.empty()) {
-    inner["path"] = mcp::JsonValue(saved_path);
-    inner["saved_path"] = mcp::JsonValue(saved_path);
+    inner["path"] = godot_autopilot::util::JsonValue(saved_path);
+    inner["saved_path"] = godot_autopilot::util::JsonValue(saved_path);
   }
   r["result"] = std::move(inner);
   if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES)
@@ -1575,7 +1575,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue handle_review_scene(const godot_autopilot::util::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "review_scene_visually called");
   if (!args.IsObject())
@@ -1599,10 +1599,10 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
   if (auto *region = args.Find("region")) {
     if (!region->IsObject())
       return util::error_json("region must be an object with numeric x, y, width and height");
-    const mcp::JsonValue *rx = region->Find("x");
-    const mcp::JsonValue *ry = region->Find("y");
-    const mcp::JsonValue *rw = region->Find("width");
-    const mcp::JsonValue *rh = region->Find("height");
+    const godot_autopilot::util::JsonValue *rx = region->Find("x");
+    const godot_autopilot::util::JsonValue *ry = region->Find("y");
+    const godot_autopilot::util::JsonValue *rw = region->Find("width");
+    const godot_autopilot::util::JsonValue *rh = region->Find("height");
     if (!rx || !ry || !rw || !rh || !rx->IsNumber() || !ry->IsNumber() ||
         !rw->IsNumber() || !rh->IsNumber())
       return util::error_json("region must be an object with numeric x, y, width and height");
@@ -1623,7 +1623,7 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     if (!v->IsBool())
       return util::error_json("annotate must be a boolean");
   }
-  const mcp::JsonValue *nodes_param = args.Find("annotate_nodes");
+  const godot_autopilot::util::JsonValue *nodes_param = args.Find("annotate_nodes");
   if (nodes_param) {
     if (!nodes_param->IsArray() || nodes_param->GetArray().empty() ||
         nodes_param->GetArray().size() > 50)
@@ -1685,19 +1685,19 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     if (node_viewport != "auto" && node_viewport != "2d" && node_viewport != "3d")
       return util::error_json("node_viewport must be one of: auto, 2d, 3d");
   }
-  auto copy_optional = [](const mcp::JsonValue &from, mcp::JsonValue &to, const char *key) {
-    if (const mcp::JsonValue *v = from.Find(key))
+  auto copy_optional = [](const godot_autopilot::util::JsonValue &from, godot_autopilot::util::JsonValue &to, const char *key) {
+    if (const godot_autopilot::util::JsonValue *v = from.Find(key))
       to[key] = *v;
   };
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue inner(godot_autopilot::util::JsonValue::object_tag);
   if (!include_editor) {
-    mcp::JsonValue skipped(mcp::JsonValue::object_tag);
-    skipped["skipped"] = mcp::JsonValue(true);
+    godot_autopilot::util::JsonValue skipped(godot_autopilot::util::JsonValue::object_tag);
+    skipped["skipped"] = godot_autopilot::util::JsonValue(true);
     inner["editor_capture"] = std::move(skipped);
   } else {
-    mcp::JsonValue editor_args(mcp::JsonValue::object_tag);
-    editor_args["target"] = mcp::JsonValue("editor");
-    editor_args["space"] = mcp::JsonValue(space);
+    godot_autopilot::util::JsonValue editor_args(godot_autopilot::util::JsonValue::object_tag);
+    editor_args["target"] = godot_autopilot::util::JsonValue("editor");
+    editor_args["space"] = godot_autopilot::util::JsonValue(space);
     copy_optional(args, editor_args, "region");
     copy_optional(args, editor_args, "max_dimension");
     copy_optional(args, editor_args, "scale");
@@ -1707,11 +1707,11 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     inner["editor_capture"] = unwrap_subcall_section(handle_capture_viewport(editor_args), false);
   }
   if (!include_game) {
-    mcp::JsonValue skipped(mcp::JsonValue::object_tag);
-    skipped["skipped"] = mcp::JsonValue(true);
+    godot_autopilot::util::JsonValue skipped(godot_autopilot::util::JsonValue::object_tag);
+    skipped["skipped"] = godot_autopilot::util::JsonValue(true);
     inner["game_capture"] = std::move(skipped);
   } else {
-    mcp::JsonValue game_args(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue game_args(godot_autopilot::util::JsonValue::object_tag);
     copy_optional(args, game_args, "region");
     copy_optional(args, game_args, "max_dimension");
     copy_optional(args, game_args, "scale");
@@ -1723,23 +1723,23 @@ mcp::JsonValue handle_review_scene(const mcp::JsonValue &args) {
     inner["game_capture"] = unwrap_subcall_section(runtime_ops::handle_game_capture(game_args), true);
   }
   if (!nodes_param) {
-    mcp::JsonValue skipped(mcp::JsonValue::object_tag);
-    skipped["skipped"] = mcp::JsonValue(true);
-    skipped["reason"] = mcp::JsonValue("no annotate_nodes");
+    godot_autopilot::util::JsonValue skipped(godot_autopilot::util::JsonValue::object_tag);
+    skipped["skipped"] = godot_autopilot::util::JsonValue(true);
+    skipped["reason"] = godot_autopilot::util::JsonValue("no annotate_nodes");
     inner["nodes"] = std::move(skipped);
   } else {
-    mcp::JsonValue node_args(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue node_args(godot_autopilot::util::JsonValue::object_tag);
     node_args["paths"] = *nodes_param;
-    node_args["viewport"] = mcp::JsonValue(node_viewport);
+    node_args["viewport"] = godot_autopilot::util::JsonValue(node_viewport);
     inner["nodes"] = unwrap_subcall_section(scene_ops::handle_get_node_screen_rect(node_args), false);
   }
   {
-    mcp::JsonValue geom_args(mcp::JsonValue::object_tag);
-    geom_args["viewport"] = mcp::JsonValue(viewport);
-    geom_args["index"] = mcp::JsonValue(index);
+    godot_autopilot::util::JsonValue geom_args(godot_autopilot::util::JsonValue::object_tag);
+    geom_args["viewport"] = godot_autopilot::util::JsonValue(viewport);
+    geom_args["index"] = godot_autopilot::util::JsonValue(index);
     inner["mapping"] = unwrap_subcall_section(editor_ui_ops::handle_get_editor_viewport_geometry(geom_args), false);
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = std::move(inner);
   if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES)
     return capture_limit_error(

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <string>
 
@@ -15,13 +15,13 @@ class ClickUiCoordsSuite : public IntegrationHarnessWithAllow {
   ClickUiCoordsSuite() : IntegrationHarnessWithAllow("game_runtime") {}
 };
 
-mcp::JsonValue make_args() {
-  mcp::JsonValue args(mcp::JsonValue::object_tag);
-  args["confirm"] = mcp::JsonValue(true);
+godot_autopilot::util::JsonValue make_args() {
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
   return args;
 }
 
-void assert_exact_error(const mcp::JsonValue &result,
+void assert_exact_error(const godot_autopilot::util::JsonValue &result,
                         const std::string &expected) {
   const auto *v = result.Find("error");
   ASSERT_NE(v, nullptr) << result.Dump();
@@ -30,7 +30,7 @@ void assert_exact_error(const mcp::JsonValue &result,
 }
 
 TEST_F(ClickUiCoordsSuite, ClickMissingPathAndText) {
-  mcp::JsonValue result = call("click_game_ui_element", make_args());
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", make_args());
   assert_exact_error(
       result,
       "missing required parameter: path or text (non-empty node path "
@@ -39,9 +39,9 @@ TEST_F(ClickUiCoordsSuite, ClickMissingPathAndText) {
 }
 
 TEST_F(ClickUiCoordsSuite, ClickPathWrongTypeReportsMissingPathOrText) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue(7);
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue(7);
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(
       result,
       "missing required parameter: path or text (non-empty node path "
@@ -50,10 +50,10 @@ TEST_F(ClickUiCoordsSuite, ClickPathWrongTypeReportsMissingPathOrText) {
 }
 
 TEST_F(ClickUiCoordsSuite, ClickButtonIndexOutOfRange) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  args["button_index"] = mcp::JsonValue(0);
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  args["button_index"] = godot_autopilot::util::JsonValue(0);
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(
       result,
       "button_index must be an integer between 1 and 3 (1=left, 2=right, "
@@ -61,38 +61,38 @@ TEST_F(ClickUiCoordsSuite, ClickButtonIndexOutOfRange) {
 }
 
 TEST_F(ClickUiCoordsSuite, ClickDoubleClickWrongType) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  args["double_click"] = mcp::JsonValue("yes");
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  args["double_click"] = godot_autopilot::util::JsonValue("yes");
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(result, "double_click must be a boolean");
 }
 
 TEST_F(ClickUiCoordsSuite, ClickMaxElementsNonPositive) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  args["max_elements"] = mcp::JsonValue(0);
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  args["max_elements"] = godot_autopilot::util::JsonValue(0);
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(result, "max_elements must be a positive integer");
 }
 
 TEST_F(ClickUiCoordsSuite, ClickTimeoutOutOfRange) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  args["timeout_ms"] = mcp::JsonValue(0);
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  args["timeout_ms"] = godot_autopilot::util::JsonValue(0);
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(result,
                      "timeout_ms must be an integer between 1 and 25000");
 }
 
 TEST_F(ClickUiCoordsSuite, ClickUnknownParameterWindowPosition) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  mcp::JsonValue window_position(mcp::JsonValue::object_tag);
-  window_position["x"] = mcp::JsonValue(640);
-  window_position["y"] = mcp::JsonValue(360);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  godot_autopilot::util::JsonValue window_position(godot_autopilot::util::JsonValue::object_tag);
+  window_position["x"] = godot_autopilot::util::JsonValue(640);
+  window_position["y"] = godot_autopilot::util::JsonValue(360);
   args["window_position"] = std::move(window_position);
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(
       result,
       "unknown parameter for click_game_ui_element: window_position — "
@@ -102,10 +102,10 @@ TEST_F(ClickUiCoordsSuite, ClickUnknownParameterWindowPosition) {
 }
 
 TEST_F(ClickUiCoordsSuite, ClickUnknownParameterCoordSpace) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  args["coord_space"] = mcp::JsonValue("viewport");
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  args["coord_space"] = godot_autopilot::util::JsonValue("viewport");
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(
       result,
       "unknown parameter for click_game_ui_element: coord_space — "
@@ -115,19 +115,19 @@ TEST_F(ClickUiCoordsSuite, ClickUnknownParameterCoordSpace) {
 }
 
 TEST_F(ClickUiCoordsSuite, ClickUnknownParameterWindowRect) {
-  mcp::JsonValue args = make_args();
-  args["path"] = mcp::JsonValue("Hud/Start");
-  mcp::JsonValue window_rect(mcp::JsonValue::object_tag);
-  mcp::JsonValue position(mcp::JsonValue::object_tag);
-  position["x"] = mcp::JsonValue(640);
-  position["y"] = mcp::JsonValue(360);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["path"] = godot_autopilot::util::JsonValue("Hud/Start");
+  godot_autopilot::util::JsonValue window_rect(godot_autopilot::util::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue position(godot_autopilot::util::JsonValue::object_tag);
+  position["x"] = godot_autopilot::util::JsonValue(640);
+  position["y"] = godot_autopilot::util::JsonValue(360);
   window_rect["position"] = std::move(position);
-  mcp::JsonValue size(mcp::JsonValue::object_tag);
-  size["x"] = mcp::JsonValue(10);
-  size["y"] = mcp::JsonValue(10);
+  godot_autopilot::util::JsonValue size(godot_autopilot::util::JsonValue::object_tag);
+  size["x"] = godot_autopilot::util::JsonValue(10);
+  size["y"] = godot_autopilot::util::JsonValue(10);
   window_rect["size"] = std::move(size);
   args["window_rect"] = std::move(window_rect);
-  mcp::JsonValue result = call("click_game_ui_element", args);
+  godot_autopilot::util::JsonValue result = call("click_game_ui_element", args);
   assert_exact_error(
       result,
       "unknown parameter for click_game_ui_element: window_rect — "
@@ -137,25 +137,25 @@ TEST_F(ClickUiCoordsSuite, ClickUnknownParameterWindowRect) {
 }
 
 TEST_F(ClickUiCoordsSuite, QueueInputCoordSpaceIllegal) {
-  mcp::JsonValue args = make_args();
-  args["type"] = mcp::JsonValue("key");
-  args["keycode"] = mcp::JsonValue("A");
-  args["coord_space"] = mcp::JsonValue("screen");
-  mcp::JsonValue result = call("queue_game_input", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["type"] = godot_autopilot::util::JsonValue("key");
+  args["keycode"] = godot_autopilot::util::JsonValue("A");
+  args["coord_space"] = godot_autopilot::util::JsonValue("screen");
+  godot_autopilot::util::JsonValue result = call("queue_game_input", args);
   assert_exact_error(result, "coord_space must be window|viewport");
 }
 
 TEST_F(ClickUiCoordsSuite, SequenceInputsCoordSpaceIllegal) {
-  mcp::JsonValue args = make_args();
-  mcp::JsonValue inputs(mcp::JsonValue::array_tag);
-  mcp::JsonValue item(mcp::JsonValue::object_tag);
-  item["kind"] = mcp::JsonValue("key");
-  item["keycode"] = mcp::JsonValue("A");
-  item["at_frame"] = mcp::JsonValue(0);
+  godot_autopilot::util::JsonValue args = make_args();
+  godot_autopilot::util::JsonValue inputs(godot_autopilot::util::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue item(godot_autopilot::util::JsonValue::object_tag);
+  item["kind"] = godot_autopilot::util::JsonValue("key");
+  item["keycode"] = godot_autopilot::util::JsonValue("A");
+  item["at_frame"] = godot_autopilot::util::JsonValue(0);
   inputs.PushBack(std::move(item));
   args["inputs"] = std::move(inputs);
-  args["coord_space"] = mcp::JsonValue("screen");
-  mcp::JsonValue result = call("sequence_game_inputs", args);
+  args["coord_space"] = godot_autopilot::util::JsonValue("screen");
+  godot_autopilot::util::JsonValue result = call("sequence_game_inputs", args);
   assert_exact_error(result, "coord_space must be window|viewport");
 }
 

@@ -26,7 +26,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/vector2.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -48,7 +48,7 @@ void unregister_cancel_handler(int64_t request_id) {
 
 namespace {
 
-using JV = mcp::JsonValue;
+using JV = godot_autopilot::util::JsonValue;
 
 bool allowed_field(const std::string &name,
                   std::initializer_list<const char *> fields) {
@@ -704,7 +704,7 @@ JV inject_duration_sequence(const JV &seq_value) {
   JV inner(JV::object_tag);
   inner["sequence"] = JV("scheduled");
   inner["steps"] = JV(static_cast<int64_t>(items.size()));
-  return ok_result(std::move(inner));
+  return bridge_ok_result(std::move(inner));
 }
 
 constexpr size_t GDA_SEQUENCE_MAX_ITEMS = 256;
@@ -805,7 +805,7 @@ private:
     JV body(JV::object_tag);
     body["completed"] = JV(completed);
     body["executed"] = JV(executed_);
-    send_response(request_id_, ok_result(std::move(body)));
+    send_response(request_id_, bridge_ok_result(std::move(body)));
     queue_free();
   }
 };
@@ -1099,7 +1099,7 @@ JV op_input_status(const JV &params) {
   r["just_released"] = JV(input->is_action_just_released(action));
   r["physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
   r["paused"] = JV(get_scene_tree() ? get_scene_tree()->is_paused() : false);
-  return ok_result(std::move(r));
+  return bridge_ok_result(std::move(r));
 }
 
 void register_input_bridge_classes() {

@@ -23,7 +23,6 @@
 #include <godot_cpp/variant/string.hpp>
 
 #include "core/config.hpp"
-#include "core/transport/godot_transport.hpp"
 #include "core/transport/http_parse.hpp"
 #include "core/transport/http_stream_registry.hpp"
 #include "core/transport/http_transport_ext.hpp"
@@ -774,7 +773,7 @@ void transport_drain_stream(TransportConnection &connection) {
     connection.outbox_cap_warned = false;
   }
   if (connection.sink->closed() && !frames.empty()) {
-    connection.outbox += transport_chunk(mcp_wire::build_close_event_frame());
+    connection.outbox += transport_chunk("event: close\ndata: {}\n\n");
     connection.outbox += transport_final_chunk();
     connection.close_after_write = true;
     connection.last_activity = std::chrono::steady_clock::now();

@@ -1,10 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/Capabilities.hpp>
-#include <mcp/JsonValue.hpp>
-#include <mcp/client/McpClient.hpp>
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
+#include "util/json_value.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -13,11 +9,9 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -50,7 +44,7 @@ struct SearchBaseline {
   std::unordered_map<std::string, BaselineEntry> entries;
 };
 
-mcp::JsonValue load_json(const std::filesystem::path &path) {
+godot_autopilot::util::JsonValue load_json(const std::filesystem::path &path) {
   std::ifstream input(path, std::ios::binary);
   if (!input) {
     throw std::runtime_error("failed to open " + path.generic_string());
@@ -58,35 +52,35 @@ mcp::JsonValue load_json(const std::filesystem::path &path) {
   const std::string text((std::istreambuf_iterator<char>(input)),
                          std::istreambuf_iterator<char>());
   try {
-    return mcp::JsonValue::Parse(text);
+    return godot_autopilot::util::JsonValue::Parse(text);
   } catch (const std::exception &ex) {
     throw std::runtime_error("failed to parse " + path.generic_string() +
                              ": " + ex.what());
   }
 }
 
-const mcp::JsonValue *require_member(const mcp::JsonValue &object,
+const godot_autopilot::util::JsonValue *require_member(const godot_autopilot::util::JsonValue &object,
                                      const char *key,
                                      const std::string &context) {
-  const mcp::JsonValue *value = object.Find(key);
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   if (value == nullptr) {
     throw std::runtime_error(context + " is missing member: " + key);
   }
   return value;
 }
 
-std::string require_string(const mcp::JsonValue &object, const char *key,
+std::string require_string(const godot_autopilot::util::JsonValue &object, const char *key,
                            const std::string &context) {
-  const mcp::JsonValue *value = require_member(object, key, context);
+  const godot_autopilot::util::JsonValue *value = require_member(object, key, context);
   if (!value->IsString()) {
     throw std::runtime_error(context + " member is not a string: " + key);
   }
   return value->GetString();
 }
 
-int64_t require_int(const mcp::JsonValue &object, const char *key,
+int64_t require_int(const godot_autopilot::util::JsonValue &object, const char *key,
                     const std::string &context) {
-  const mcp::JsonValue *value = require_member(object, key, context);
+  const godot_autopilot::util::JsonValue *value = require_member(object, key, context);
   if (!value->IsInt()) {
     throw std::runtime_error(context + " member is not an integer: " + key);
   }
@@ -125,15 +119,15 @@ std::filesystem::path require_data_file(const std::string &relative) {
 
 std::vector<SearchQueryEntry>
 load_search_queries(const std::filesystem::path &path) {
-  const mcp::JsonValue root = load_json(path);
-  const mcp::JsonValue *queries =
+  const godot_autopilot::util::JsonValue root = load_json(path);
+  const godot_autopilot::util::JsonValue *queries =
       require_member(root, "queries", path.generic_string());
   if (!queries->IsArray()) {
     throw std::runtime_error(path.generic_string() +
                              " member is not an array: queries");
   }
   std::vector<SearchQueryEntry> entries;
-  for (const mcp::JsonValue &item : queries->GetArray()) {
+  for (const godot_autopilot::util::JsonValue &item : queries->GetArray()) {
     if (!item.IsObject()) {
       throw std::runtime_error(path.generic_string() +
                                " query entry is not an object");
@@ -147,13 +141,13 @@ load_search_queries(const std::filesystem::path &path) {
     if (entry.text.empty()) {
       throw std::runtime_error("search query text is empty: " + entry.id);
     }
-    const mcp::JsonValue *expect =
+    const godot_autopilot::util::JsonValue *expect =
         require_member(item, "expect_any", "search query " + entry.id);
     if (!expect->IsArray()) {
       throw std::runtime_error("search query expect_any is not an array: " +
                                entry.id);
     }
-    for (const mcp::JsonValue &name : expect->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &name : expect->GetArray()) {
       if (!name.IsString() || name.GetString().empty()) {
         throw std::runtime_error(
             "search query expect_any holds an empty or non-string entry: " +
@@ -191,12 +185,12 @@ SearchBaseline load_search_baseline() {
     return baseline;
   }
   baseline.present = true;
-  const mcp::JsonValue root = load_json(*path);
+  const godot_autopilot::util::JsonValue root = load_json(*path);
   if (!root.IsObject()) {
     throw std::runtime_error("search baseline root is not an object: " +
                              path->generic_string());
   }
-  if (const mcp::JsonValue *hit_count = root.Find("hit_count");
+  if (const godot_autopilot::util::JsonValue *hit_count = root.Find("hit_count");
       hit_count != nullptr) {
     if (!hit_count->IsInt() || hit_count->GetInt() < 0) {
       throw std::runtime_error(
@@ -205,7 +199,7 @@ SearchBaseline load_search_baseline() {
     }
     baseline.hit_count = hit_count->GetInt();
   }
-  if (const mcp::JsonValue *query_count = root.Find("query_count");
+  if (const godot_autopilot::util::JsonValue *query_count = root.Find("query_count");
       query_count != nullptr) {
     if (!query_count->IsInt() || query_count->GetInt() < 0) {
       throw std::runtime_error(
@@ -214,7 +208,7 @@ SearchBaseline load_search_baseline() {
     }
     baseline.query_count = query_count->GetInt();
   }
-  const mcp::JsonValue *entries = root.Find("queries");
+  const godot_autopilot::util::JsonValue *entries = root.Find("queries");
   if (entries == nullptr) {
     entries = root.Find("results");
   }
@@ -223,7 +217,7 @@ SearchBaseline load_search_baseline() {
       throw std::runtime_error(
           "search baseline queries is not an array: " + path->generic_string());
     }
-    for (const mcp::JsonValue &item : entries->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &item : entries->GetArray()) {
       if (!item.IsObject()) {
         throw std::runtime_error("search baseline query entry is not an object: " +
                                  path->generic_string());
@@ -231,7 +225,7 @@ SearchBaseline load_search_baseline() {
       const std::string id =
           require_string(item, "id", "search baseline query entry");
       BaselineEntry entry;
-      if (const mcp::JsonValue *best_rank = item.Find("best_rank");
+      if (const godot_autopilot::util::JsonValue *best_rank = item.Find("best_rank");
           best_rank != nullptr) {
         if (!best_rank->IsInt() || best_rank->GetInt() < 0) {
           throw std::runtime_error(
@@ -239,7 +233,7 @@ SearchBaseline load_search_baseline() {
         }
         entry.best_rank = best_rank->GetInt();
       }
-      if (const mcp::JsonValue *hit = item.Find("hit"); hit != nullptr) {
+      if (const godot_autopilot::util::JsonValue *hit = item.Find("hit"); hit != nullptr) {
         if (!hit->IsBool()) {
           throw std::runtime_error("search baseline hit is not a boolean: " +
                                    id);
@@ -328,38 +322,16 @@ void compare_with_baseline(
 }
 
 struct SearchQualityTest : ::testing::Test {
-  std::unique_ptr<mcp::McpServer> server;
-  std::unique_ptr<mcp::McpClient> client;
-  std::thread server_thread;
   godot_autopilot::CommandQueue queue;
   godot_autopilot::ToolCatalog catalog;
   godot_autopilot::Bm25Index index;
 
   void SetUp() override {
-    auto pair = mcp::InMemoryTransport::CreatePair();
-    server = mcp::McpServer::Create(pair.server);
-    godot_autopilot::register_all_tools(*server, queue, catalog, index, 9540);
-    server_thread = std::thread([this] { server->Run(); });
-
-    mcp::ClientOptions options;
-    options.client_info =
-        mcp::Implementation{"GdaSearchQualityClient", "1.0.0"};
-    options.connect_mode = mcp::ConnectMode::Auto;
-    client = mcp::McpClient::Create(pair.client, options);
-
+    godot_autopilot::install_tool_handlers(queue, catalog, index, 9540);
     queue.drain();
   }
 
   void TearDown() override {
-    if (client) {
-      client->Close();
-    }
-    if (server) {
-      server->Close();
-    }
-    if (server_thread.joinable()) {
-      server_thread.join();
-    }
     godot_autopilot::dispatch::clear_handlers();
     godot_autopilot::clear_active_registry();
   }

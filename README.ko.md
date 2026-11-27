@@ -6,7 +6,7 @@
 [![릴리스 워크플로](https://github.com/jesspig/Godot-Autopilot/actions/workflows/release.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions/workflows/release.yml)
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![플랫폼](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
-[![프로토콜](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
+[![CLI](https://img.shields.io/badge/CLI-gda-네이티브-blue)](docs/wiki/modules/cli.md)
 ![도구](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **AI 에이전트가 에디터 안에서 Godot 게임을 빌드하고, 플레이테스트하고, 디버깅하게 하세요.**
@@ -15,11 +15,11 @@
 
 > 이 번역은 영문 [README.md](README.md)를 기준으로 합니다.
 
-Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주하는 [MCP](https://modelcontextprotocol.io/) 서버입니다. 설치하면 AI 코딩 어시스턴트(Claude Code, Cursor, Codex, OpenCode 등)가 사용자와 똑같은 방식으로 프로젝트를 다룹니다. 씬을 만들고, 속성을 조정하고, 게임을 실행하고, 버튼을 누르고, 스크린샷을 찍고, 로그를 읽은 다음, 확인한 내용을 바탕으로 계속 반복 개선합니다. 브리지 프로세스도 없고, 오류를 채팅창에 복사해 붙여넣을 필요도 없습니다. 그래픽 에디터 세션에서는 프로젝트를 열면 서버가 시작되고, 프로젝트를 닫으면 서버가 중지됩니다.
+Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주하며, 단일 로컬 `gda` CLI를 통해 실행 중인 프로젝트를 노출합니다. 설정이 필요한 프로토콜이나 엔드포인트가 없습니다. AI 코딩 어시스턴트(Claude Code, Cursor, Codex, OpenCode 등)는 CLI 명령으로 사용자와 똑같은 방식으로 프로젝트를 다룹니다. 씬을 만들고, 속성을 조정하고, 게임을 실행하고, 버튼을 누르고, 스크린샷을 찍고, 로그를 읽은 다음, 확인한 내용을 바탕으로 계속 반복 개선합니다. 브리지 프로세스도 없고, 오류를 채팅창에 복사해 붙여넣을 필요도 없습니다. 그래픽 에디터 세션에서는 프로젝트를 열면 인스턴스가 자동 등록되고, 닫으면 등록이 해제됩니다.
 
 ![Demo 001](assets/demo-001.gif)
 
-**252개의 도구**가 에디터에서 게임까지 이어지는 전체 루프를 아우릅니다: 도메인 도구 246개, 메타 도구 5개, `system_status`(정확한 개수는 버전마다 늘어나므로 `search_tools`로 에이전트에게 확인하도록 요청하세요). 325개의 이전 도구 이름 별칭은 0.6.0까지 `call_tool`로 호출할 수 있습니다(실제 도구와 이름이 겹치면 실제 도구가 우선). 스킬북은 **진입 카드 1장과 references 9편**으로 호출 프로토콜을 가르칩니다. MCP가 중단되면 GDA CLI로 대체합니다. 참고: [도구 면](docs/wiki/tool_surface_baseline.md), [스킬](docs/wiki/modules/skills.md), [CLI](docs/wiki/modules/cli.md).
+**252개의 도구**가 에디터에서 게임까지 이어지는 전체 루프를 아우릅니다: 도메인 도구 246개, 메타 도구 5개, `system_status`(정확한 개수는 버전마다 늘어나므로 `gda tool list`로 확인하세요). 325개의 이전 도구 이름 별칭은 0.6.0까지 `gda tool describe`로 확인하고 `gda tool call`로 호출할 수 있습니다(실제 도구와 이름이 겹치면 실제 도구가 우선). 스킬북은 **진입 카드 1장과 references 9편**으로 CLI 호출 프로토콜을 가르칩니다. 참고: [도구 면](docs/wiki/tool_surface_baseline.md), [스킬](docs/wiki/modules/skills.md), [CLI](docs/wiki/modules/cli.md).
 
 ## 빠른 시작
 
@@ -41,13 +41,13 @@ Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주�
      ```
 
    스크립트는 `gda` CLI를 설치하고, `project.godot`을 감지하고, 플러그인을 설치하며, 선택적으로 스킬북을 설치합니다.
-2. **프로젝트 열기** — 그래픽 에디터 세션에서는 서버가 자동으로 시작되고, 최초 실행 시 빈 루프백 포트를 하나 바인딩합니다(프로젝트별로 유지되며 `20000–29999`에서 선택). 헤드리스/커맨드라인 에디터 세션에서는 서버가 시작되지 않습니다.
-3. **AI 클라이언트 연결** — `gda status --json`을 실행하고 그 `mcp_url`을 클라이언트의 MCP 설정에 추가하세요(또는 URL을 에이전트에게 넘기고 설정을 생성해 달라고 요청하세요). Streamable HTTP를 지원하는 MCP 클라이언트라면 무엇이든 연결할 수 있으며, Claude Code, Codex, Cursor, OpenCode, Copilot 등이 대표적입니다.
+2. **프로젝트 열기** — 그래픽 에디터 세션에서는 플러그인이 인스턴스를 CLI에 자동 등록하고, 최초 실행 시 빈 루프백 포트를 하나 바인딩합니다(프로젝트별로 유지되며 `20000–29999`에서 선택). 헤드리스/커맨드라인 에디터 세션에서는 인스턴스가 제공되지 않습니다.
+3. **CLI로 연결** — `gda ping`과 `gda status --format json`을 실행해 JSON 연결 기록으로 활성 인스턴스와 로컬 엔드포인트를 확인하세요. 클라이언트 설정은 필요하지 않습니다. 모든 작업은 JSON 봉투를 출력하는 `gda` 명령입니다. Claude Code, Codex, Cursor, OpenCode, Copilot 등에서 CLI를 직접 사용할 수 있습니다.
 4. **요청하기** — 예: “달리고 점프할 수 있는 플레이어 캐릭터를 만들고, 플레이테스트한 뒤 이상해 보이는 부분을 고쳐 줘.”
 
 ## 안전 참고 사항
 
-서버는 머신의 루프백 주소에서만 수신 대기하며(포트는 플러그인이 프로젝트별로 선택하고 경로는 `/mcp`로 고정), 로컬이 아닌 주소는 거부합니다. 고위험 도구(`destructive`, `process`, `code_execute`, `game_runtime`)는 `confirm=true`가 필요하며, 전역 허용 목록은 없습니다. 자세한 내용: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
+CLI는 루프백 인스턴스에만 연결하며(포트는 플러그인이 프로젝트별로 선택하고 CLI가 자동으로 주소 지정), 로컬이 아닌 주소는 거부합니다. 고위험 도구(`destructive`, `process`, `code_execute`, `game_runtime`)는 `--confirm`가 필요하며, 전역 허용 목록은 없습니다. 자세한 내용: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
 
 ## 문서
 

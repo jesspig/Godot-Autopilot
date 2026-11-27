@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -18,11 +18,11 @@ class MetaToolsSuite : public IntegrationHarnessWithAllow {
   MetaToolsSuite() : IntegrationHarnessWithAllow("code_execute") {}
 };
 
-mcp::JsonValue make_args() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+godot_autopilot::util::JsonValue make_args() {
+  return godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
 }
 
-std::size_t results_count(const mcp::JsonValue &result) {
+std::size_t results_count(const godot_autopilot::util::JsonValue &result) {
   const auto *results = result.Find("results");
   if (results == nullptr || !results->IsArray()) {
     return 0;
@@ -31,7 +31,7 @@ std::size_t results_count(const mcp::JsonValue &result) {
 }
 
 TEST_F(MetaToolsSuite, PingReturnsPong) {
-  mcp::JsonValue result = call("ping", make_args());
+  godot_autopilot::util::JsonValue result = call("ping", make_args());
   const auto *v = result.Find("result");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsString()) << result.Dump();
@@ -39,9 +39,9 @@ TEST_F(MetaToolsSuite, PingReturnsPong) {
 }
 
 TEST_F(MetaToolsSuite, SearchToolsKeywordReturnsNonEmptyResults) {
-  mcp::JsonValue args = make_args();
-  args["query"] = mcp::JsonValue("create_scene_node");
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["query"] = godot_autopilot::util::JsonValue("create_scene_node");
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   const auto *v = result.Find("results");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsArray()) << result.Dump();
@@ -49,10 +49,10 @@ TEST_F(MetaToolsSuite, SearchToolsKeywordReturnsNonEmptyResults) {
 }
 
 TEST_F(MetaToolsSuite, SearchToolsCategorySceneReturnsNonEmptyResults) {
-  mcp::JsonValue args = make_args();
-  args["query"] = mcp::JsonValue("create_scene_node");
-  args["category"] = mcp::JsonValue("Scene");
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["query"] = godot_autopilot::util::JsonValue("create_scene_node");
+  args["category"] = godot_autopilot::util::JsonValue("Scene");
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   const auto *v = result.Find("results");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsArray()) << result.Dump();
@@ -60,12 +60,12 @@ TEST_F(MetaToolsSuite, SearchToolsCategorySceneReturnsNonEmptyResults) {
 }
 
 TEST_F(MetaToolsSuite, SearchToolsTagNodeReturnsNonEmptyResults) {
-  mcp::JsonValue args = make_args();
-  args["query"] = mcp::JsonValue("create_scene_node");
-  mcp::JsonValue tags(mcp::JsonValue::array_tag);
-  tags.PushBack(mcp::JsonValue("node"));
+  godot_autopilot::util::JsonValue args = make_args();
+  args["query"] = godot_autopilot::util::JsonValue("create_scene_node");
+  godot_autopilot::util::JsonValue tags(godot_autopilot::util::JsonValue::array_tag);
+  tags.PushBack(godot_autopilot::util::JsonValue("node"));
   args["tags"] = std::move(tags);
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   const auto *v = result.Find("results");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsArray()) << result.Dump();
@@ -73,19 +73,19 @@ TEST_F(MetaToolsSuite, SearchToolsTagNodeReturnsNonEmptyResults) {
 }
 
 TEST_F(MetaToolsSuite, SearchToolsDefaultsToTwentyResults) {
-  mcp::JsonValue result = call("search_tools", make_args());
+  godot_autopilot::util::JsonValue result = call("search_tools", make_args());
   EXPECT_EQ(results_count(result), static_cast<std::size_t>(20)) << result.Dump();
 }
 
 TEST_F(MetaToolsSuite, SearchToolsLimitTenReturnsTenResults) {
-  mcp::JsonValue args = make_args();
-  args["limit"] = mcp::JsonValue(static_cast<int64_t>(10));
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(10));
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   EXPECT_EQ(results_count(result), static_cast<std::size_t>(10)) << result.Dump();
 }
 
 TEST_F(MetaToolsSuite, SearchToolsLimitZeroReturnsAllTools) {
-  mcp::JsonValue categories = call("list_categories", make_args());
+  godot_autopilot::util::JsonValue categories = call("list_categories", make_args());
   const auto *category_list = categories.Find("categories");
   ASSERT_NE(category_list, nullptr) << categories.Dump();
   ASSERT_TRUE(category_list->IsArray()) << categories.Dump();
@@ -97,17 +97,17 @@ TEST_F(MetaToolsSuite, SearchToolsLimitZeroReturnsAllTools) {
     total += static_cast<std::size_t>(count->GetInt());
   }
 
-  mcp::JsonValue args = make_args();
-  args["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   EXPECT_EQ(results_count(result), total) << result.Dump();
   EXPECT_GT(total, static_cast<std::size_t>(20));
 }
 
 TEST_F(MetaToolsSuite, SearchToolsNegativeLimitReturnsInvalidParameter) {
-  mcp::JsonValue args = make_args();
-  args["limit"] = mcp::JsonValue(static_cast<int64_t>(-1));
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(-1));
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   const auto *error = result.Find("error");
   ASSERT_NE(error, nullptr) << result.Dump();
   ASSERT_TRUE(error->IsString()) << result.Dump();
@@ -117,16 +117,16 @@ TEST_F(MetaToolsSuite, SearchToolsNegativeLimitReturnsInvalidParameter) {
 }
 
 TEST_F(MetaToolsSuite, SearchToolsCategoryHonorsLimit) {
-  mcp::JsonValue args = make_args();
-  args["category"] = mcp::JsonValue("Scene");
-  args["limit"] = mcp::JsonValue(static_cast<int64_t>(5));
-  mcp::JsonValue result = call("search_tools", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["category"] = godot_autopilot::util::JsonValue("Scene");
+  args["limit"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(5));
+  godot_autopilot::util::JsonValue result = call("search_tools", args);
   EXPECT_LE(results_count(result), static_cast<std::size_t>(5)) << result.Dump();
   EXPECT_GT(results_count(result), static_cast<std::size_t>(0)) << result.Dump();
 }
 
 TEST_F(MetaToolsSuite, ListCategoriesReturnsNonEmptyCategories) {
-  mcp::JsonValue result = call("list_categories", make_args());
+  godot_autopilot::util::JsonValue result = call("list_categories", make_args());
   const auto *v = result.Find("categories");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsArray()) << result.Dump();
@@ -134,9 +134,9 @@ TEST_F(MetaToolsSuite, ListCategoriesReturnsNonEmptyCategories) {
 }
 
 TEST_F(MetaToolsSuite, GetToolDetailExistingReturnsToolShape) {
-  mcp::JsonValue args = make_args();
-  args["name"] = mcp::JsonValue("create_scene_node");
-  mcp::JsonValue result = call("get_tool_detail", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["name"] = godot_autopilot::util::JsonValue("create_scene_node");
+  godot_autopilot::util::JsonValue result = call("get_tool_detail", args);
   const auto *tool = result.Find("tool");
   ASSERT_NE(tool, nullptr) << result.Dump();
   const auto *name = tool->Find("name");
@@ -165,9 +165,9 @@ TEST_F(MetaToolsSuite, GetToolDetailExistingReturnsToolShape) {
 }
 
 TEST_F(MetaToolsSuite, GetToolDetailMissingToolReportsNotFound) {
-  mcp::JsonValue args = make_args();
-  args["name"] = mcp::JsonValue("no_such_tool_xyz");
-  mcp::JsonValue result = call("get_tool_detail", args);
+  godot_autopilot::util::JsonValue args = make_args();
+  args["name"] = godot_autopilot::util::JsonValue("no_such_tool_xyz");
+  godot_autopilot::util::JsonValue result = call("get_tool_detail", args);
   const auto *v = result.Find("error");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsString());
@@ -175,7 +175,7 @@ TEST_F(MetaToolsSuite, GetToolDetailMissingToolReportsNotFound) {
 }
 
 TEST_F(MetaToolsSuite, GetToolDetailMissingNameReportsMissingParameter) {
-  mcp::JsonValue result = call("get_tool_detail", make_args());
+  godot_autopilot::util::JsonValue result = call("get_tool_detail", make_args());
   const auto *v = result.Find("error");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsString());
@@ -183,10 +183,10 @@ TEST_F(MetaToolsSuite, GetToolDetailMissingNameReportsMissingParameter) {
 }
 
 TEST_F(MetaToolsSuite, CallToolUnknownToolReportsDomainToolNotFound) {
-  mcp::JsonValue args = make_args();
-  args["name"] = mcp::JsonValue("no_such_tool_xyz");
+  godot_autopilot::util::JsonValue args = make_args();
+  args["name"] = godot_autopilot::util::JsonValue("no_such_tool_xyz");
   args["arguments"] = make_args();
-  mcp::JsonValue result = call("call_tool", args);
+  godot_autopilot::util::JsonValue result = call("call_tool", args);
   const auto *v = result.Find("error");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsString());
@@ -196,7 +196,7 @@ TEST_F(MetaToolsSuite, CallToolUnknownToolReportsDomainToolNotFound) {
 }
 
 TEST_F(MetaToolsSuite, CallToolMissingNameReportsMissingParameter) {
-  mcp::JsonValue result = call("call_tool", make_args());
+  godot_autopilot::util::JsonValue result = call("call_tool", make_args());
   const auto *v = result.Find("error");
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsString());
@@ -205,19 +205,19 @@ TEST_F(MetaToolsSuite, CallToolMissingNameReportsMissingParameter) {
 }
 
 TEST_F(MetaToolsSuite, BatchExecuteAllSuccessCountsTwo) {
-  mcp::JsonValue args = make_args();
-  args["confirm"] = mcp::JsonValue(true);
-  mcp::JsonValue operations(mcp::JsonValue::array_tag);
-  mcp::JsonValue op_ping = make_args();
-  op_ping["tool"] = mcp::JsonValue("ping");
+  godot_autopilot::util::JsonValue args = make_args();
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
+  godot_autopilot::util::JsonValue operations(godot_autopilot::util::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue op_ping = make_args();
+  op_ping["tool"] = godot_autopilot::util::JsonValue("ping");
   op_ping["args"] = make_args();
   operations.PushBack(std::move(op_ping));
-  mcp::JsonValue op_categories = make_args();
-  op_categories["tool"] = mcp::JsonValue("list_categories");
+  godot_autopilot::util::JsonValue op_categories = make_args();
+  op_categories["tool"] = godot_autopilot::util::JsonValue("list_categories");
   op_categories["args"] = make_args();
   operations.PushBack(std::move(op_categories));
   args["operations"] = std::move(operations);
-  mcp::JsonValue result = call("batch_execute", args);
+  godot_autopilot::util::JsonValue result = call("batch_execute", args);
   const auto *results = result.Find("results");
   ASSERT_NE(results, nullptr) << result.Dump();
   ASSERT_TRUE(results->IsArray());
@@ -233,15 +233,15 @@ TEST_F(MetaToolsSuite, BatchExecuteAllSuccessCountsTwo) {
 }
 
 TEST_F(MetaToolsSuite, BatchExecuteUnknownToolFailsOne) {
-  mcp::JsonValue args = make_args();
-  args["confirm"] = mcp::JsonValue(true);
-  mcp::JsonValue operations(mcp::JsonValue::array_tag);
-  mcp::JsonValue op_unknown = make_args();
-  op_unknown["tool"] = mcp::JsonValue("no_such_tool_xyz");
+  godot_autopilot::util::JsonValue args = make_args();
+  args["confirm"] = godot_autopilot::util::JsonValue(true);
+  godot_autopilot::util::JsonValue operations(godot_autopilot::util::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue op_unknown = make_args();
+  op_unknown["tool"] = godot_autopilot::util::JsonValue("no_such_tool_xyz");
   op_unknown["args"] = make_args();
   operations.PushBack(std::move(op_unknown));
   args["operations"] = std::move(operations);
-  mcp::JsonValue result = call("batch_execute", args);
+  godot_autopilot::util::JsonValue result = call("batch_execute", args);
   const auto *results = result.Find("results");
   ASSERT_NE(results, nullptr) << result.Dump();
   ASSERT_TRUE(results->IsArray());

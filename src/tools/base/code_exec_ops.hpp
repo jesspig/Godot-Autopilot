@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 namespace godot {
 
@@ -17,8 +17,8 @@ namespace code_exec_ops {
 
 int max_timeout_ms();
 
-mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args);
-mcp::JsonValue handle_code_execute(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_batch_execute(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_code_execute(const godot_autopilot::util::JsonValue &args);
 
 void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
                          std::string &error);

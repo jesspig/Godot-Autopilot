@@ -1,40 +1,10 @@
-import net from "node:net";
+import { describe, expect, test } from "bun:test";
 
-import { afterEach, describe, expect, test } from "bun:test";
-import { callTool, request } from "../src/mcp/client";
+import { callTool, request } from "../src/rpc/client";
 import { CLI_VERSION } from "../src/version";
 import { CliError, ExitCode } from "../src/errors";
 import { extractPayload } from "../src/payload";
-
-const servers: ReturnType<typeof Bun.serve>[] = [];
-
-afterEach(() => {
-  while (servers.length > 0) {
-    servers.pop()!.stop();
-  }
-});
-
-function serve(handler: (req: Request) => Response | Promise<Response>): number {
-  const server = Bun.serve({ port: 0, fetch: handler });
-  servers.push(server);
-  return server.port!;
-}
-
-function sseResponse(payload: unknown, split = false): Response {
-  if (split) {
-    const lines = JSON.stringify(payload, null, 2).split("\n");
-    return new Response(`event: message\n${lines.map((l) => `data: ${l}`).join("\n")}\n\n`, {
-      headers: { "content-type": "text/event-stream" },
-    });
-  }
-  return new Response(`event: message\ndata: ${JSON.stringify(payload)}\n\n`, {
-    headers: { "content-type": "text/event-stream" },
-  });
-}
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-}
+import { rpcError, rpcResult, startNativeServer, sendHandshake, contentResult } from "./support/native-ipc";
 
 async function catchError(p: Promise<unknown>): Promise<CliError> {
   try {
@@ -47,252 +17,178 @@ async function catchError(p: Promise<unknown>): Promise<CliError> {
 }
 
 describe("callTool", () => {
-  test("SSE 成功帧", async () => {
-    const port = serve(() =>
-      sseResponse({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "{\"ok\":true}" }] } }),
-    );
-    const res = await callTool("system_status", {}, { port });
-    expect(res.id).toBe(1);
-    expect(res.result).toEqual({ content: [{ type: "text", text: "{\"ok\":true}" }] });
+  test("原生 IPC 成功帧", async () => {
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      send(rpcResult(message.id, { content: [{ type: "text", text: '{"ok":true}' }] }));
+    });
+    try {
+      const res = await callTool("system_status", {}, { port: server.port });
+      expect(typeof res.id).toBe("number");
+      expect(res.result).toEqual({ content: [{ type: "text", text: '{"ok":true}' }] });
+    } finally {
+      await server.close();
+    }
   });
 
-  test("SSE 多行 data: 帧拼接后解析", async () => {
-    const payload = { jsonrpc: "2.0", id: 7, result: { content: [{ type: "text", text: "{\"a\":\"b\",\"c\":[1,2,3]}" }] } };
-    const port = serve(() => sseResponse(payload, true));
-    const res = await callTool("system_status", { verbose: true }, { port });
-    expect(res.id).toBe(7);
-    expect(res.result).toEqual(payload.result);
+  test("进度通知帧与结果帧分别处理", async () => {
+    const seen: number[] = [];
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      if (message.method === "notifications/initialized") return;
+      send({ jsonrpc: "2.0", method: "notifications/progress", params: { progress: 1, total: 2 } });
+      send(rpcResult(message.id, { content: [{ type: "text", text: '{"a":"b"}' }] }));
+    });
+    try {
+      const res = await callTool("system_status", { verbose: true }, {
+        port: server.port,
+        progressSink: (progress) => seen.push(progress.progress),
+      });
+      expect(seen).toEqual([1]);
+      expect(res.result).toEqual({ content: [{ type: "text", text: '{"a":"b"}' }] });
+    } finally {
+      await server.close();
+    }
   });
 
-  test("纯 JSON 响应原样返回", async () => {
-    const port = serve(() => jsonResponse({ jsonrpc: "2.0", id: 3, error: { code: -32000, message: "bad tool" } }));
-    const res = await callTool("nope", {}, { port });
-    expect(res.error?.code).toBe(-32000);
-    expect(res.error?.message).toBe("bad tool");
+  test("JSON-RPC error 原样返回", async () => {
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      send(rpcError(message.id, -32000, "bad tool"));
+    });
+    try {
+      const res = await callTool("nope", {}, { port: server.port });
+      expect(res.error?.code).toBe(-32000);
+      expect(res.error?.message).toBe("bad tool");
+    } finally {
+      await server.close();
+    }
   });
 
   test("failed task 透传 task.error 结构化数据并经 extractPayload 展示", async () => {
-    const port = serve(async (req) => {
-      const body = (await req.json()) as { method?: string; id?: number };
-      if (body.method === "initialize") {
-        return sseResponse({
-          jsonrpc: "2.0",
-          id: body.id,
-          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } },
-        });
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
       }
-      if (body.method === "notifications/initialized") return new Response("", { status: 202 });
-      if (body.method === "tools/call") {
-        return sseResponse({ jsonrpc: "2.0", id: body.id, result: { resultType: "task", taskId: "t-fail" } });
+      if (message.method === "tools/call") {
+        send(rpcResult(message.id, { resultType: "task", taskId: "t-fail" }));
+        return;
       }
-      if (body.method === "tasks/get") {
-        return sseResponse({
-          jsonrpc: "2.0",
-          id: body.id,
-          result: {
-            taskId: "t-fail",
-            status: "failed",
-            statusMessage: "boom",
-            error: { code: -32603, message: "boom", data: { structured_error: { code: "backend_down" } } },
-          },
-        });
+      if (message.method === "tasks/get") {
+        send(rpcResult(message.id, {
+          taskId: "t-fail",
+          status: "failed",
+          statusMessage: "boom",
+          error: { code: -32603, message: "boom", data: { structured_error: { code: "backend_down" } } },
+        }));
+        return;
       }
-      return jsonResponse({ error: { code: -32600, message: "unexpected method" } }, 400);
+      send(rpcError(message.id, -32600, "unexpected method"));
     });
-    const res = await callTool("x", {}, { port });
-    expect(res.error?.code).toBe(-32603);
-    expect(res.error?.message).toBe("boom");
-    const data = res.error?.data as { structured_error?: { code?: string } };
-    expect(data.structured_error?.code).toBe("backend_down");
-    const extracted = extractPayload(res);
-    expect(extracted.toolFailed).toBe(true);
-    expect(extracted.failureMessage).toContain("backend_down");
+    try {
+      const res = await callTool("x", {}, { port: server.port });
+      expect(res.error?.code).toBe(-32603);
+      expect(res.error?.message).toBe("boom");
+      const data = res.error?.data as { structured_error?: { code?: string } };
+      expect(data.structured_error?.code).toBe("backend_down");
+      const extracted = extractPayload(res);
+      expect(extracted.toolFailed).toBe(true);
+      expect(extracted.failureMessage).toContain("backend_down");
+    } finally {
+      await server.close();
+    }
   });
 
   test("call_tool 包装结构", async () => {
-    let seen: { method?: string; params?: unknown; id?: number };
-    const port = serve(async (req) => {
-      seen = (await req.json()) as { method?: string; params?: unknown; id?: number };
-      return sseResponse({ jsonrpc: "2.0", id: seen.id, result: { content: [] } });
+    let seen: Record<string, unknown> | undefined;
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      if (message.method === "tools/call") {
+        seen = message;
+        send(rpcResult(message.id, { content: [] }));
+        return;
+      }
     });
-    await callTool("move_agent", { x: 1 }, { port });
-    expect(seen!.method).toBe("tools/call");
-    expect(seen!.params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
+    try {
+      await callTool("move_agent", { x: 1 }, { port: server.port });
+      expect(seen?.method).toBe("tools/call");
+      expect(seen?.params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
+    } finally {
+      await server.close();
+    }
   });
 
-  test("initialize 非 2xx 报传输错误", async () => {
-    let n = 0;
-    const port = serve(async () => {
-      n += 1;
-      if (n === 1) return jsonResponse({ error: { code: -32600, message: "x" } }, 400);
-      return new Response("{}", { status: 500 });
+  test("initialize 声明的协议版本与客户端信息固定", async () => {
+    const initParams: unknown[] = [];
+    const server = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        initParams.push(message.params);
+        send(rpcResult(message.id, { protocolVersion: "1", capabilities: {}, serverInfo: {} }));
+        return;
+      }
+      send(rpcResult(message.id, { content: [] }));
     });
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toBe("initialize failed with HTTP 500.");
-  });
-
-  test("initialized 通知非 2xx 报传输错误", async () => {
-    const port = serve(async (req) => {
-      const body = (await req.json()) as { method?: string; id?: number };
-      if (body.method === "initialize") {
-        return sseResponse({
-          jsonrpc: "2.0",
-          id: body.id,
-          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
-        });
-      }
-      if (body.method === "notifications/initialized") {
-        return new Response("{}", { status: 500 });
-      }
-      return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
-    });
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toBe("handshake failed with HTTP 500.");
-  });
-
-  test("懒握手：400 → initialize + initialized → 递增 id 重发成功，进程内不重复握手", async () => {
-    const calls: { method?: string; params?: unknown; id?: number }[] = [];
-    let initialized = false;
-    const port = serve(async (req) => {
-      const body = (await req.json()) as { method?: string; params?: unknown; id?: number };
-      calls.push(body);
-      if (body.method === "initialize") {
-        initialized = true;
-        return sseResponse({
-          jsonrpc: "2.0",
-          id: body.id,
-          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
-        });
-      }
-      if (body.method === "notifications/initialized") {
-        if (!initialized) {
-          return jsonResponse({ error: { code: -32600, message: "invalid request: notifications/initialized" } }, 400);
-        }
-        return new Response("", { status: 202 });
-      }
-      if (!initialized) {
-        return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
-      }
-      return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
-    });
-    const res = await callTool("system_status", {}, { port });
-    expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call"]);
-    expect(calls[1].params).toEqual({
-      protocolVersion: "2025-11-25",
-      capabilities: { elicitation: {} },
-      clientInfo: { name: "gda-cli", version: CLI_VERSION },
-    });
-    expect(calls[3].id).toBeGreaterThan(calls[0].id!);
-    expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-
-    await callTool("system_status", {}, { port });
-    expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call", "tools/call"]);
+    try {
+      await callTool("x", {}, { port: server.port });
+      expect(initParams[0]).toEqual({
+        protocolVersion: "1",
+        capabilities: { elicitation: {} },
+        clientInfo: { name: "gda-cli", version: CLI_VERSION },
+      });
+    } finally {
+      await server.close();
+    }
   });
 
   test("超时", async () => {
-    const port = serve(async () => {
+    const server = await startNativeServer(async (message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
       await Bun.sleep(400);
-      return new Response("{}", { status: 200 });
+      send(rpcResult(message.id, { content: [] }));
     });
-    const err = await catchError(callTool("x", {}, { port, timeoutSec: 0.05 }));
-    expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toBe("request timed out.");
-  });
-
-  test("HTTP 非 2xx 纯文本附 server 消息", async () => {
-    const port = serve(() => new Response("boom", { status: 500 }));
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.message).toBe("HTTP 500. Server says: boom.");
-  });
-
-  test("HTTP 非 2xx JSON error 附 code", async () => {
-    const port = serve(() => jsonResponse({ error: { code: -32001, message: "nope" } }, 403));
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.message).toBe("HTTP 403. Server says: nope (code -32001).");
-  });
-
-  test("HTTP 非 2xx 顶层 message", async () => {
-    const port = serve(() => jsonResponse({ message: "not found" }, 404));
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.message).toBe("HTTP 404. Server says: not found.");
-  });
-
-  test("SSE 无 data: 行", async () => {
-    const port = serve(() => new Response("event: message\n\n", { headers: { "content-type": "text/event-stream" } }));
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toBe("could not parse the SSE response (no usable data: frame).");
-  });
-
-  test("SSE data 非 JSON", async () => {
-    const port = serve(() => new Response("data: not-json\n\n", { headers: { "content-type": "text/event-stream" } }));
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.message).toBe("could not parse the SSE response (no usable data: frame).");
-  });
-
-  test("纯 JSON 响应非 JSON", async () => {
-    const port = serve(() => new Response("<html>oops</html>", { headers: { "content-type": "application/json" } }));
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.message).toBe("could not parse the plain-JSON response.");
-  });
-
-  test("连不上服务", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("x") });
-    const port = server.port!;
-    server.stop();
-    const err = await catchError(callTool("x", {}, { port }));
-    expect(err.code).toBe(ExitCode.Transport);
-    expect(err.message).toContain("cannot reach the server (");
-  });
-
-  test("IPC token 失败时 auto 模式不回退到无认证 HTTP", async () => {
-    let httpHits = 0;
-    const port = serve(() => {
-      httpHits += 1;
-      return sseResponse({ jsonrpc: "2.0", id: 1, result: { content: [] } });
-    });
-    const frame = (value: unknown): Buffer => {
-      const payload = Buffer.from(JSON.stringify(value), "utf8");
-      const header = Buffer.alloc(4);
-      header.writeUInt32BE(payload.length, 0);
-      return Buffer.concat([header, payload]);
-    };
-    let presentedToken: unknown;
-    const ipcServer = net.createServer((socket) => {
-      let buffer = Buffer.alloc(0);
-      socket.on("data", (chunk: Buffer) => {
-        buffer = Buffer.concat([buffer, chunk]);
-        while (buffer.length >= 4) {
-          const size = buffer.readUInt32BE(0);
-          if (buffer.length < 4 + size) break;
-          const message = JSON.parse(buffer.subarray(4, 4 + size).toString("utf8")) as Record<string, unknown>;
-          buffer = buffer.subarray(4 + size);
-          if (message.method === "initialize") {
-            const meta = (message.params as Record<string, unknown> | undefined)?._meta as Record<string, unknown> | undefined;
-            presentedToken = meta?.gda_token;
-          }
-          socket.write(frame({ jsonrpc: "2.0", id: message.id, error: { code: -32001, message: "IPC token rejected" } }));
-        }
-      });
-    });
-    await new Promise<void>((resolve) => ipcServer.listen(0, "127.0.0.1", resolve));
-    const address = ipcServer.address();
-    const ipcPort = typeof address === "object" && address !== null ? address.port : 0;
     try {
-      const err = await catchError(request("resources/list", {}, {
-        port,
-        timeoutSec: 5,
-        transport: "auto",
-        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: ipcPort, token: "registry-token" },
-      }));
+      const err = await catchError(callTool("x", {}, { port: server.port, timeoutSec: 0.05 }));
       expect(err.code).toBe(ExitCode.Transport);
-      expect(err.message).toContain("IPC authentication failed");
-      expect(presentedToken).toBe("registry-token");
-      expect(httpHits).toBe(0);
+      expect(err.message).toContain("timed out");
     } finally {
-      await new Promise<void>((resolve) => ipcServer.close(() => resolve()));
+      await server.close();
+    }
+  });
+
+  test("非法 JSON 帧报传输错误", async () => {
+    const payload = Buffer.from("{not-json}", "utf8");
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(payload.length, 0);
+    const invalid = Buffer.concat([header, payload]);
+    const server = await startNativeServer((message, socket, send) => {
+      if (message.method === "initialize") {
+        socket.write(invalid);
+        return;
+      }
+      send(rpcResult(message.id, { content: [] }));
+    });
+    try {
+      const err = await catchError(callTool("x", {}, { port: server.port }));
+      expect(err.code).toBe(ExitCode.Transport);
+      expect(err.message).toContain("not valid JSON");
+    } finally {
+      await server.close();
     }
   });
 
@@ -302,21 +198,59 @@ describe("callTool", () => {
     expect(err.message).toContain("request body exceeds 4 MiB");
   });
 
-  test("严格路径：请求打在 /mcp，/mcp/ 返回 404", async () => {
-    const paths: string[] = [];
-    const port = serve(async (req) => {
-      const p = new URL(req.url).pathname;
-      paths.push(p);
-      if (p === "/mcp") {
-        return sseResponse({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "{}" }] } });
+  test("IPC token 失败时不调用工具且不改投其它实例", async () => {
+    let presentedToken: unknown;
+    let toolCalls = 0;
+    const ipc = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        const params = message.params as Record<string, unknown> | undefined;
+        presentedToken = (params?._meta as Record<string, unknown> | undefined)?.gda_token;
+        send(rpcError(message.id, -32001, "IPC token rejected"));
+        return;
       }
-      return jsonResponse({ message: "not found" }, 404);
+      toolCalls += 1;
+      send(rpcResult(message.id, { content: [] }));
     });
-    const res = await callTool("system_status", {}, { port });
-    expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-    expect(paths.length).toBeGreaterThan(0);
-    for (const p of paths) {
-      expect(p).toBe("/mcp");
+    const alternate = await startNativeServer((message, _socket, send) => {
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      send(rpcResult(message.id, { content: [] }));
+    });
+    try {
+      const err = await catchError(request("resources/list", {}, {
+        port: alternate.port,
+        timeoutSec: 5,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: ipc.port, token: "registry-token" },
+      }));
+      expect(err.code).toBe(ExitCode.Transport);
+      expect(err.message).toContain("IPC authentication failed");
+      expect(presentedToken).toBe("registry-token");
+      expect(toolCalls).toBe(0);
+    } finally {
+      await ipc.close();
+      await alternate.close();
+    }
+  });
+
+  test("长度前缀帧严格按声明长度切分，多个连续帧顺序解析", async () => {
+    const methods: string[] = [];
+    const server = await startNativeServer((message, _socket, send) => {
+      methods.push(String(message.method));
+      if (message.method === "initialize") {
+        sendHandshake(message, send);
+        return;
+      }
+      if (message.method === "notifications/initialized") return;
+      send(rpcResult(message.id, { content: [{ type: "text", text: "{}" }] }));
+    });
+    try {
+      const res = await callTool("system_status", {}, { port: server.port });
+      expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+      expect(methods).toEqual(["initialize", "notifications/initialized", "tools/call"]);
+    } finally {
+      await server.close();
     }
   });
 });

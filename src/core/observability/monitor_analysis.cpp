@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "util/input_guards.hpp"
 #include "util/string_util.hpp"
@@ -18,9 +18,9 @@ namespace game_monitor_analysis {
 
 namespace {
 
-double number_field(const mcp::JsonValue &object, const char *key,
+double number_field(const godot_autopilot::util::JsonValue &object, const char *key,
                     double fallback = 0.0) {
-  const mcp::JsonValue *value = object.Find(key);
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   if (value == nullptr) {
     return fallback;
   }
@@ -33,15 +33,15 @@ double number_field(const mcp::JsonValue &object, const char *key,
   return fallback;
 }
 
-std::string string_field(const mcp::JsonValue &object, const char *key) {
-  const mcp::JsonValue *value = object.Find(key);
+std::string string_field(const godot_autopilot::util::JsonValue &object, const char *key) {
+  const godot_autopilot::util::JsonValue *value = object.Find(key);
   if (value != nullptr && value->IsString()) {
     return value->GetString();
   }
   return std::string();
 }
 
-bool read_definition(const mcp::JsonValue &entry, MonitorDef *out) {
+bool read_definition(const godot_autopilot::util::JsonValue &entry, MonitorDef *out) {
   if (!entry.IsObject()) {
     return false;
   }
@@ -113,11 +113,11 @@ void append_quoted(std::string &out, const std::string &value) {
 bool parse_header(const std::string &line, std::string *session_id,
                   std::vector<MonitorDef> *builtin,
                   std::vector<MonitorDef> *custom) {
-  mcp::JsonValue root;
+  godot_autopilot::util::JsonValue root;
   if (!util::try_parse_json(line, root) || !root.IsObject()) {
     return false;
   }
-  const mcp::JsonValue *type = root.Find("type");
+  const godot_autopilot::util::JsonValue *type = root.Find("type");
   if (type == nullptr || !type->IsString() || type->GetString() != "session") {
     return false;
   }
@@ -126,9 +126,9 @@ bool parse_header(const std::string &line, std::string *session_id,
   }
   if (builtin != nullptr) {
     builtin->clear();
-    const mcp::JsonValue *array = root.Find("builtin_monitors");
+    const godot_autopilot::util::JsonValue *array = root.Find("builtin_monitors");
     if (array != nullptr && array->IsArray()) {
-      for (const mcp::JsonValue &item : array->GetArray()) {
+      for (const godot_autopilot::util::JsonValue &item : array->GetArray()) {
         MonitorDef definition;
         if (read_definition(item, &definition)) {
           builtin->push_back(std::move(definition));
@@ -138,9 +138,9 @@ bool parse_header(const std::string &line, std::string *session_id,
   }
   if (custom != nullptr) {
     custom->clear();
-    const mcp::JsonValue *array = root.Find("custom_monitors");
+    const godot_autopilot::util::JsonValue *array = root.Find("custom_monitors");
     if (array != nullptr && array->IsArray()) {
-      for (const mcp::JsonValue &item : array->GetArray()) {
+      for (const godot_autopilot::util::JsonValue &item : array->GetArray()) {
         MonitorDef definition;
         if (read_definition(item, &definition)) {
           custom->push_back(std::move(definition));
@@ -155,11 +155,11 @@ bool parse_frame(const std::string &line, FrameSample *out) {
   if (out == nullptr) {
     return false;
   }
-  mcp::JsonValue root;
+  godot_autopilot::util::JsonValue root;
   if (!util::try_parse_json(line, root) || !root.IsObject()) {
     return false;
   }
-  const mcp::JsonValue *type = root.Find("type");
+  const godot_autopilot::util::JsonValue *type = root.Find("type");
   if (type == nullptr || !type->IsString() || type->GetString() != "frame") {
     return false;
   }
@@ -171,11 +171,11 @@ bool parse_frame(const std::string &line, FrameSample *out) {
   const char *arrays[] = {"v", "c"};
   std::vector<double> *targets[] = {&out->builtin, &out->custom};
   for (int i = 0; i < 2; ++i) {
-    const mcp::JsonValue *array = root.Find(arrays[i]);
+    const godot_autopilot::util::JsonValue *array = root.Find(arrays[i]);
     if (array == nullptr || !array->IsArray()) {
       continue;
     }
-    for (const mcp::JsonValue &item : array->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &item : array->GetArray()) {
       if (item.IsNull()) {
         targets[i]->push_back(std::numeric_limits<double>::quiet_NaN());
       } else if (item.IsInt()) {
@@ -195,19 +195,19 @@ bool parse_custom_change(const std::string &line,
   if (custom == nullptr) {
     return false;
   }
-  mcp::JsonValue root;
+  godot_autopilot::util::JsonValue root;
   if (!util::try_parse_json(line, root) || !root.IsObject()) {
     return false;
   }
-  const mcp::JsonValue *type = root.Find("type");
+  const godot_autopilot::util::JsonValue *type = root.Find("type");
   if (type == nullptr || !type->IsString() ||
       type->GetString() != "custom_change") {
     return false;
   }
   custom->clear();
-  const mcp::JsonValue *array = root.Find("custom_monitors");
+  const godot_autopilot::util::JsonValue *array = root.Find("custom_monitors");
   if (array != nullptr && array->IsArray()) {
-    for (const mcp::JsonValue &item : array->GetArray()) {
+    for (const godot_autopilot::util::JsonValue &item : array->GetArray()) {
       MonitorDef definition;
       if (read_definition(item, &definition)) {
         custom->push_back(std::move(definition));

@@ -1,0 +1,40 @@
+T-11 证据：Flag 删除、拆分与作用域
+===================================
+
+状态：代码与新增测试已写入；本子代理未运行 bun test / tsc / 构建。
+
+1. MCP 专属 flag 删除（公开 CLI 不再识别）
+  --transport    删除（args.ts STRING_FLAGS / command-spec tool.call / usageText）
+  --no-fallback  删除（BOOLEAN_FLAGS / usageText）
+  --direct       删除（BOOLEAN_FLAGS / tool.call / usageText）
+  --input        删除（STRING_FLAGS / tool.call / usageText）
+  --async        删除（BOOLEAN_FLAGS / tool.call / usageText）
+  内部 mcp/client.ts 合同保留到 T-16；CLI 侧一律传 transport:"auto"、noFallback:false，
+  通用调用统一走 gda tool call，异步统一走 gda job。
+
+2. 兼容 alias
+  --json → --format json（args.ts VALUE_ALIASES；parseArgv 与 parseCommandArgs 均归一到 formatText）
+  outputFormat() 仅接受 json；trace export 的 --format 拆为 --export-format。
+  FLAG_MIGRATIONS（command-spec.ts）逐条记录 from/to/reason，manifest 暴露 flag_migrations。
+
+3. 多义 flag 拆分
+  --force → --force-stop（editor.stop/restart）、--force-clear（docs.clear/cache.clear/job.clean）、
+            --force-install（update.run）
+  --all   → --all-projects（editor.list/project.list）、--all-buckets（docs.clear）
+  --file  → --report-file（debug.report）、--skill-file（skill.show）、--input-file（monitor.report）
+  --probe → --probe-level（editor.start）、--probe-port（editor.list）
+
+4. 作用域校验
+  command-spec.ts GLOBAL_SCOPE_FLAGS 限定命令树可用全局 flag；其余必须由 spec.flags 声明。
+  parseCommandArgs 对非 repeatable flag 重复出现直接抛 ExitCode.Usage；
+  --tag/--include 为 repeatable，收集为 string[]。
+  --args-file - 在两个 parser 中均被接受（"-" 是合法值）。
+
+5. 覆盖测试（新增，未运行）
+  cli/tests/flag-scope.test.ts：删除 flag 报错、帮助不含旧 flag、spec 不含旧 flag、
+    --json 别名、可重复 flag、单值重复报错、多义 flag 拆分、迁移表一致性。
+  cli/tests/alias-migration.test.ts：旧顶层 alias、FLAG_MIGRATIONS、manifest 迁移字段。
+  cli/tests/help-snapshots.test.ts：更新为 --force-stop 并新增退出码断言。
+
+6. 风险
+  旧测试若直接调用 parseArgv(["--transport", ...]) 或断言裸输出将失败，需主代理归并时处理。

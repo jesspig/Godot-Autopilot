@@ -6,6 +6,13 @@ import { extractZip } from "./archive";
 import { cacheRoot, selectLatest, verifyManifest, cacheAssetPath } from "./cache";
 import { CliError, ExitCode } from "./errors";
 import { isAlive, stopForce } from "./process";
+import {
+  builtinSkillFileCount,
+  builtinSkillsDigest,
+  builtinSkillsVersion,
+  verifyBuiltinSkillsAsset,
+  verifyInstalledSkills,
+} from "./skills";
 import { canApplyUpdateTo } from "./security-policy";
 import { CLI_VERSION } from "./version";
 
@@ -236,6 +243,66 @@ export async function updateCli(): Promise<number> {
   return ExitCode.Success;
 }
 
+export interface SkillsUpdateStatus {
+  asset_version: string;
+  content_digest: string;
+  file_count: number;
+  asset_ok: boolean;
+  cache_version: string | null;
+  cache_matches_asset: boolean;
+  installed_version: string | null;
+  installed_ok: boolean;
+  installed_reason: string;
+}
+
+export function skillsUpdateStatus(
+  target: string = path.join(os.homedir(), ".agents", "skills"),
+): SkillsUpdateStatus {
+  const assetVersion = builtinSkillsVersion();
+  const cached = selectLatest("skills", "en") ?? selectLatest("skills", "zh");
+  const installed = verifyInstalledSkills(target, "en");
+  return {
+    asset_version: assetVersion,
+    content_digest: builtinSkillsDigest(),
+    file_count: builtinSkillFileCount(),
+    asset_ok: verifyBuiltinSkillsAsset(),
+    cache_version: cached?.version ?? null,
+    cache_matches_asset: cached !== undefined && cached.version === assetVersion,
+    installed_version: installed.version,
+    installed_ok: installed.ok,
+    installed_reason: installed.reason,
+  };
+}
+
+export function assertSkillsAssetIntegrity(): void {
+  if (!verifyBuiltinSkillsAsset()) {
+    throw new CliError(
+      ExitCode.Transport,
+      "the builtin skills asset digest does not match its source trees",
+      "Run 'gda skills sync --force' after repairing the asset, or reinstall the CLI.",
+    );
+  }
+}
+
+export function skillsUpdateItem(
+  ok: boolean,
+  error: string,
+  target: string = path.join(os.homedir(), ".agents", "skills"),
+): UpdateItemResult {
+  const status = skillsUpdateStatus(target);
+  const from = status.installed_version ?? "";
+  const to = status.cache_version ?? status.asset_version;
+  return {
+    artifact: "skills",
+    from,
+    to,
+    source: status.cache_version === null ? "builtin" : "cache",
+    ok,
+    action: ok ? "updated" : "failed",
+    error,
+  };
+}
+
 export function updateCheck(): Record<string, unknown> {
   const cached = selectLatest("cli");
   return {
@@ -244,6 +311,7 @@ export function updateCheck(): Record<string, unknown> {
     platform: platformAsset().platform,
     cached_cli: cached?.version ?? null,
     cached_source: cached?.source ?? null,
+    skills: skillsUpdateStatus(),
     result_path: updateResultPath(),
   };
 }

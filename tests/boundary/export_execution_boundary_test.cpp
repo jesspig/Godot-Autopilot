@@ -1,20 +1,15 @@
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
-#include "prompts/prompt_handlers.hpp"
-#include "resources/debugger_resources.hpp"
-#include "resources/resource_handlers.hpp"
+#include "tools/base/runtime_ops.hpp"
 #include "tools/base/dispatch.hpp"
-#include "util/error_util.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/tool_catalog.hpp"
+#include "util/bm25_index.hpp"
+#include "util/json_value.hpp"
 
 #include <gtest/gtest.h>
 
-#include <mcp/client/McpClient.hpp>
-#include <mcp/McpError.hpp>
-#include <mcp/server/McpServer.hpp>
-#include <mcp/transport/InMemoryTransport.hpp>
-
 #include <chrono>
-#include <exception>
 #include <future>
 #include <memory>
 #include <string>
@@ -25,31 +20,15 @@ namespace {
 class ExportExecutionBoundaryTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    auto pair = mcp::InMemoryTransport::CreatePair();
-    server = mcp::McpServer::Create(pair.server);
-    godot_autopilot::register_all_resources(*server, queue);
-    godot_autopilot::register_debugger_resources(*server, queue);
-    godot_autopilot::register_all_prompts(*server, queue);
+    godot_autopilot::runtime_ops::set_editor_queue(&queue);
+    godot_autopilot::install_tool_handlers(queue, catalog, index, 9527);
     queue.drain();
-    server_thread = std::thread([this] { server->Run(); });
-
-    mcp::ClientOptions options;
-    options.client_info = mcp::Implementation{"ExportBoundaryClient", "1.0.0"};
-    options.connect_mode = mcp::ConnectMode::Auto;
-    client = mcp::McpClient::Create(pair.client, options);
   }
 
   void TearDown() override {
-    end_export();
-    if (client) {
-      client->Close();
-    }
-    if (server) {
-      server->Close();
-    }
-    if (server_thread.joinable()) {
-      server_thread.join();
-    }
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+    godot_autopilot::dispatch::clear_handlers();
+    godot_autopilot::clear_active_registry();
   }
 
   bool wait_for_queued_task() {
@@ -62,147 +41,83 @@ protected:
     return queue.stats().pending == 1u;
   }
 
-  void start_export() {
-    export_scope =
-        std::make_unique<godot_autopilot::ExportState::Scope>(export_state);
+  static void expect_export_blocked(const godot_autopilot::util::JsonValue &result) {
+    const auto *error = result.Find("error");
+    ASSERT_NE(error, nullptr);
+    ASSERT_TRUE(error->IsString());
+    EXPECT_EQ(error->GetString(),
+              godot_autopilot::dispatch::export_blocked_error_text());
+    const auto *code = result.Find("code");
+    ASSERT_NE(code, nullptr);
+    ASSERT_TRUE(code->IsString());
+    EXPECT_EQ(code->GetString(), "export_in_progress");
+    const auto *retryable = result.Find("retryable");
+    ASSERT_NE(retryable, nullptr);
+    ASSERT_TRUE(retryable->IsBool());
+    EXPECT_TRUE(retryable->GetBool());
   }
 
-  void end_export() { export_scope.reset(); }
-
   godot_autopilot::CommandQueue queue;
-  godot_autopilot::ExportState export_state;
-  std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
-  std::unique_ptr<mcp::McpServer> server;
-  std::unique_ptr<mcp::McpClient> client;
-  std::thread server_thread;
+  godot_autopilot::ToolCatalog catalog;
+  godot_autopilot::Bm25Index index;
 };
 
 TEST_F(ExportExecutionBoundaryTest,
-       ResourceStartingExportAfterSubmissionIsRejectedAtFinalBoundary) {
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params["uri"] = mcp::JsonValue("godot://engine/version");
-  std::promise<mcp::JsonValue> completed;
-  auto completed_future = completed.get_future();
-  std::thread worker([&] {
-    try {
-      completed.set_value(client->SendRequest("resources/read", params).get());
-    } catch (...) {
-      completed.set_exception(std::current_exception());
-    }
+       ToolCallStartingExportAfterSubmissionIsRejectedAtFinalBoundary) {
+  godot_autopilot::ExportState export_state;
+  std::unique_ptr<godot_autopilot::ExportState::Scope> export_scope;
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  auto completed = queue.submit([&args]() {
+    return godot_autopilot::dispatch::call_handler("search_tools", args);
   });
 
   const bool queued = wait_for_queued_task();
-  start_export();
+  export_scope =
+      std::make_unique<godot_autopilot::ExportState::Scope>(export_state);
   queue.drain();
-  end_export();
-
-  std::string response;
-  try {
-    response = completed_future.get().Dump();
-  } catch (const std::exception &error) {
-    response = error.what();
-  }
-  worker.join();
+  export_scope.reset();
 
   ASSERT_TRUE(queued);
-  EXPECT_NE(response.find(godot_autopilot::dispatch::export_blocked_error_text()),
-            std::string::npos);
+  expect_export_blocked(completed.get());
 }
 
 TEST_F(ExportExecutionBoundaryTest,
-       DebuggerResourceStartingExportAfterSubmissionIsRejectedAtFinalBoundary) {
-  std::promise<mcp::ReadResourceResult> completed;
-  auto completed_future = completed.get_future();
-  std::thread worker([&] {
-    try {
-      completed.set_value(client->ReadResource("godot://editor/output-log"));
-    } catch (...) {
-      completed.set_exception(std::current_exception());
-    }
+       ToolCallRejectsExportAlreadyInProgressAtEntry) {
+  godot_autopilot::ExportState export_state;
+  godot_autopilot::ExportState::Scope scope(export_state);
+
+  expect_export_blocked(godot_autopilot::dispatch::call_handler(
+      "search_tools", godot_autopilot::util::JsonValue::Parse("{}")));
+}
+
+TEST_F(ExportExecutionBoundaryTest,
+       QueuedToolCallCompletesWhenExportNeverStarts) {
+  godot_autopilot::util::JsonValue args(godot_autopilot::util::JsonValue::object_tag);
+  auto completed = queue.submit([&args]() {
+    return godot_autopilot::dispatch::call_handler("search_tools", args);
   });
 
   const bool queued = wait_for_queued_task();
-  start_export();
   queue.drain();
-  end_export();
-
-  try {
-    completed_future.get();
-    worker.join();
-    FAIL() << "expected HandlerError, got a successful resource response";
-  } catch (const mcp::McpError &error) {
-    worker.join();
-    EXPECT_EQ(error.Code(), mcp::McpErrorCode::HandlerError);
-    EXPECT_EQ(error.ErrorMessage(),
-              godot_autopilot::dispatch::export_blocked_error_text());
-  } catch (...) {
-    worker.join();
-    FAIL() << "expected mcp::McpError";
-  }
 
   ASSERT_TRUE(queued);
+  const auto result = completed.get();
+  EXPECT_EQ(result.Find("error"), nullptr);
+  const auto *results = result.Find("results");
+  ASSERT_NE(results, nullptr);
+  ASSERT_TRUE(results->IsArray());
+  EXPECT_FALSE(results->GetArray().empty());
 }
 
-TEST_F(ExportExecutionBoundaryTest,
-       DebuggerResourceExportInProgressRejectsAtEntryWithHandlerError) {
-  start_export();
+TEST(StableExportBlockedResultTest, PreservesShortMessageAcrossCalls) {
+  const auto first = godot_autopilot::dispatch::export_blocked_json_result();
+  const auto second = godot_autopilot::dispatch::export_blocked_json_result();
 
-  try {
-    client->ReadResource("godot://editor/output-log");
-    end_export();
-    FAIL() << "expected HandlerError, got a successful resource response";
-  } catch (const mcp::McpError &error) {
-    end_export();
-    EXPECT_EQ(error.Code(), mcp::McpErrorCode::HandlerError);
-    EXPECT_EQ(error.ErrorMessage(),
-              godot_autopilot::dispatch::export_blocked_error_text());
-  } catch (...) {
-    end_export();
-    FAIL() << "expected mcp::McpError";
-  }
-}
-
-TEST_F(ExportExecutionBoundaryTest,
-       PromptStartingExportAfterSubmissionIsRejectedAtFinalBoundary) {
-  mcp::JsonValue params(mcp::JsonValue::object_tag);
-  params["name"] = mcp::JsonValue("create-3d-scene");
-  std::promise<mcp::JsonValue> completed;
-  auto completed_future = completed.get_future();
-  std::thread worker([&] {
-    try {
-      completed.set_value(client->SendRequest("prompts/get", params).get());
-    } catch (...) {
-      completed.set_exception(std::current_exception());
-    }
-  });
-
-  const bool queued = wait_for_queued_task();
-  start_export();
-  queue.drain();
-  end_export();
-
-  std::string response;
-  try {
-    response = completed_future.get().Dump();
-  } catch (const std::exception &error) {
-    response = error.what();
-  }
-  worker.join();
-
-  ASSERT_TRUE(queued);
-  EXPECT_NE(response.find(godot_autopilot::dispatch::export_blocked_error_text()),
-            std::string::npos);
-}
-
-TEST(StableMcpErrorTest, PreservesShortMessageAcrossThrow) {
-  try {
-    godot_autopilot::util::throw_mcp_error(mcp::McpErrorCode::HandlerError,
-                                           "short error");
-    FAIL() << "expected McpError";
-  } catch (const mcp::McpError &error) {
-    EXPECT_EQ(error.Code(), mcp::McpErrorCode::HandlerError);
-    EXPECT_STREQ(error.what(), "short error");
-  }
+  EXPECT_EQ(first.Dump(), second.Dump());
+  const auto *error = second.Find("error");
+  ASSERT_NE(error, nullptr);
+  EXPECT_STREQ(error->GetString().c_str(),
+               godot_autopilot::dispatch::export_blocked_error_text().c_str());
 }
 
 } // namespace

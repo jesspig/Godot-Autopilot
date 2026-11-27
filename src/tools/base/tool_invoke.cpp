@@ -24,8 +24,8 @@ namespace {
 thread_local std::vector<std::pair<std::string, std::string>> g_span_stack;
 thread_local int64_t g_queued_wait_ms = 0;
 
-void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
-                         const mcp::JsonValue &result,
+void record_invoke_trace(const std::string &name, const godot_autopilot::util::JsonValue &args,
+                         const godot_autopilot::util::JsonValue &result,
                          const std::string &error_code) {
   std::string trace = current_trace_id();
   if (trace.empty()) {
@@ -37,7 +37,7 @@ void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
   const SanitizeResult sanitized =
       TraceRecorder::sanitize_args(args.Dump(), sanitize_policy::enabled());
   std::string err_text = error_code;
-  if (const mcp::JsonValue *err = result.Find("error")) {
+  if (const godot_autopilot::util::JsonValue *err = result.Find("error")) {
     if (err->IsString()) {
       err_text = err->GetString();
       if (err_text.size() > 256) {
@@ -176,10 +176,10 @@ RequestSpanGuard::~RequestSpanGuard() {
   }
 }
 
-mcp::JsonValue invoke_tool(const std::string &name,
-                           const mcp::JsonValue &args) {
+godot_autopilot::util::JsonValue invoke_tool(const std::string &name,
+                           const godot_autopilot::util::JsonValue &args) {
   if (ExportGuard::is_exporting()) {
-    mcp::JsonValue blocked = util::error_json(
+    godot_autopilot::util::JsonValue blocked = util::error_json(
         "editor is exporting; retry after export completes");
     record_invoke_trace(name, args, blocked, "export_blocked");
     return blocked;
@@ -189,23 +189,23 @@ mcp::JsonValue invoke_tool(const std::string &name,
     trace = TraceRecorder::new_trace_id();
   }
   const std::string span = TraceRecorder::new_span_id();
-  mcp::JsonValue result;
+  godot_autopilot::util::JsonValue result;
   {
     SpanGuard span_guard(trace, span);
     const dispatch::DepthContext depth_ctx = dispatch::capture_depth_context();
     result = dispatch::call_handler(name, args, depth_ctx);
   }
   if (result.IsObject()) {
-    const mcp::JsonValue *code = result.Find("code");
+    const godot_autopilot::util::JsonValue *code = result.Find("code");
     if (code != nullptr && code->IsString() &&
         code->GetString() == "depth_exceeded") {
       record_invoke_trace(name, args, result, "depth_exceeded");
       return result;
     }
-    const mcp::JsonValue *pending = result.Find("__gda_pending");
-    const mcp::JsonValue *deferred = result.Find("__gda_wait");
+    const godot_autopilot::util::JsonValue *pending = result.Find("__gda_pending");
+    const godot_autopilot::util::JsonValue *deferred = result.Find("__gda_wait");
     if ((pending != nullptr && pending->IsInt()) || deferred != nullptr) {
-      mcp::JsonValue rejected = util::error_json(
+      godot_autopilot::util::JsonValue rejected = util::error_json(
           "cannot invoke async tool '" + name +
           "' from within another tool on the main thread");
       record_invoke_trace(name, args, rejected, "async_nested");

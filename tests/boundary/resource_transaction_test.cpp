@@ -3,7 +3,6 @@
 #include "util/resource_fs.hpp"
 
 #include <gtest/gtest.h>
-#include <mcp/detail/sha256.hpp>
 
 #include <array>
 #include <atomic>
@@ -89,23 +88,7 @@ std::string read_bytes(const std::string &path) {
 }
 
 std::string hash_file(const fs::path &path) {
-  std::ifstream input(path, std::ios::binary);
-  mcp::detail::Sha256 sha;
-  std::array<char, 8192> buffer{};
-  while (input) {
-    input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-    sha.Update(std::string_view(buffer.data(),
-                                static_cast<size_t>(input.gcount())));
-  }
-  static const char digits[] = "0123456789abcdef";
-  const auto digest = sha.Final();
-  std::string out;
-  out.reserve(64);
-  for (uint8_t byte : digest) {
-    out.push_back(digits[byte >> 4]);
-    out.push_back(digits[byte & 0x0F]);
-  }
-  return out;
+  return godot_autopilot::resource_fs::sha256_hex(read_bytes(path.string()));
 }
 
 class StdFileTransactionFs : public FileTransactionFs {
@@ -317,7 +300,7 @@ bool has_transaction_residue(const TempTree &tree) {
   return false;
 }
 
-const mcp::JsonValue *schema_properties(const std::string &tool_name) {
+const godot_autopilot::util::JsonValue *schema_properties(const std::string &tool_name) {
   std::vector<std::unique_ptr<godot_autopilot::ToolBase>> tools;
   if (tool_name == "os_file_write") {
     tools = godot_autopilot::os_tools::make_tools();
@@ -328,10 +311,10 @@ const mcp::JsonValue *schema_properties(const std::string &tool_name) {
     if (tool->meta().name != tool_name) {
       continue;
     }
-    const mcp::JsonValue schema = tool->input_schema();
-    const mcp::JsonValue *properties = schema.Find("properties");
+    const godot_autopilot::util::JsonValue schema = tool->input_schema();
+    const godot_autopilot::util::JsonValue *properties = schema.Find("properties");
     if (properties != nullptr && properties->IsObject()) {
-      return new mcp::JsonValue(*properties);
+      return new godot_autopilot::util::JsonValue(*properties);
     }
   }
   return nullptr;
@@ -716,14 +699,14 @@ TEST(ResourceTransactionTest, CompensationRefusesConcurrentTargetOverwrite) {
 
 TEST(ResourceTransactionSchemaTest, CopyFlagsAreOptionalBooleans) {
   for (const std::string &name : {"os_file_write", "resource_file"}) {
-    std::unique_ptr<const mcp::JsonValue> properties(
+    std::unique_ptr<const godot_autopilot::util::JsonValue> properties(
         schema_properties(name));
     ASSERT_NE(properties, nullptr) << name;
     for (const std::string &flag : {"overwrite", "confirm"}) {
-      const mcp::JsonValue *parameter = properties->Find(flag.c_str());
+      const godot_autopilot::util::JsonValue *parameter = properties->Find(flag.c_str());
       ASSERT_NE(parameter, nullptr) << name << ":" << flag;
       ASSERT_TRUE(parameter->IsObject());
-      const mcp::JsonValue *type = parameter->Find("type");
+      const godot_autopilot::util::JsonValue *type = parameter->Find("type");
       ASSERT_NE(type, nullptr);
       EXPECT_EQ(type->GetString(), "boolean");
     }

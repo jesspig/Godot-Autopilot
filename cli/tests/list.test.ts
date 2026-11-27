@@ -71,7 +71,6 @@ function pluginRecord(port: number, overrides: Record<string, unknown> = {}): Re
     project_path: path.join(tmpHome, "plugin-project"),
     api_token: "plugin-token",
     endpoints: {
-      mcp: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
       api: { host: "127.0.0.1", port, path: "/api", protocol: "http", auth: "bearer" },
     },
     gda_home: tmpHome,
@@ -128,7 +127,7 @@ async function listCaptured(opts: GlobalOptions = {}): Promise<Capture> {
 }
 
 function parseList(stdout: string): Array<Record<string, unknown>> {
-  return JSON.parse(stdout) as Array<Record<string, unknown>>;
+  return (JSON.parse(stdout) as { data: Array<Record<string, unknown>> }).data;
 }
 
 async function catchCliError(p: Promise<number>): Promise<CliError> {
@@ -283,7 +282,9 @@ describe("list 合并插件索引", () => {
     writePluginIndex([pluginRecord(9601, { pid: runner, instance_id: "gda-plugin-1" })]);
     const { code, stdout } = await listCaptured({ projectsView: true });
     expect(code).toBe(ExitCode.Success);
-    const grouped = JSON.parse(stdout) as Array<{ project: string; entries: number; live: boolean; ports: number[] }>;
+    const grouped = (JSON.parse(stdout) as {
+      data: Array<{ project: string; entries: number; live: boolean; ports: number[] }>;
+    }).data;
     expect(grouped).toHaveLength(2);
     const cliGroup = grouped.find((group) => group.project === path.join(tmpHome, "cli-project"));
     expect(cliGroup?.entries).toBe(1);
@@ -293,7 +294,7 @@ describe("list 合并插件索引", () => {
   test("空索引提示可加 --probe 探测端口", async () => {
     const { code, stdout, stderr } = await listCaptured();
     expect(code).toBe(ExitCode.Success);
-    expect(stdout.trim()).toBe("[]");
+    expect((JSON.parse(stdout) as { data: unknown }).data).toEqual([]);
     expect(stderr).toContain("no CLI-started or plugin-indexed instances");
     expect(stderr).toContain("--probe");
   });
@@ -324,7 +325,7 @@ describe("list --probe 端口探测", () => {
     await closeServer(server);
     const { code, stdout, stderr } = await listCaptured({ probe: String(port) });
     expect(code).toBe(ExitCode.Success);
-    expect(stdout.trim()).toBe("[]");
+    expect((JSON.parse(stdout) as { data: unknown }).data).toEqual([]);
     expect(stderr).toContain("probed port");
   });
 
@@ -370,12 +371,11 @@ describe("list 兼容性", () => {
   test("空注册表输出空数组且退出码 0", async () => {
     const { code, stdout } = await listCaptured();
     expect(code).toBe(ExitCode.Success);
-    expect(stdout.trim()).toBe("[]");
-    expect(JSON.parse(stdout)).toEqual([]);
+    expect((JSON.parse(stdout) as { data: unknown }).data).toEqual([]);
   });
 
-  test("parseArgv 识别 list 的 --probe 端口值", () => {
-    const { opts, positionals } = parseArgv(["--probe", "9527", "list"]);
+  test("parseArgv 识别 list 的 --probe-port 端口值", () => {
+    const { opts, positionals } = parseArgv(["--probe-port", "9527", "list"]);
     expect(opts.probe).toBe("9527");
     expect(positionals).toEqual(["list"]);
   });

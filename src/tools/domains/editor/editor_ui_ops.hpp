@@ -8,7 +8,7 @@
 #include <godot_cpp/classes/tree.hpp>
 #include <godot_cpp/classes/tree_item.hpp>
 #include <godot_cpp/classes/window.hpp>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <string>
 #include <vector>
 
@@ -88,7 +88,7 @@ bool scene_tree_row_at_point(double window_x, double window_y, int window_id,
 std::vector<SceneNodeHit> pick_scene_nodes_2d(double window_x, double window_y,
                                               int window_id, int max_results,
                                               std::string *error);
-mcp::JsonValue scene_tree_row_to_json(const SceneTreeRow &row);
+godot_autopilot::util::JsonValue scene_tree_row_to_json(const SceneTreeRow &row);
 
 std::vector<Element> collect_elements(const std::string &query, const std::string &type_filter,
                                       bool interactive_only, int max_elements, bool *out_truncated);
@@ -99,12 +99,12 @@ std::vector<Element> hit_test(double window_x, double window_y, int window_id, i
 bool editor_viewport_window_mapping(const std::string &which, int index, WindowMapping *out,
                                     std::string *error);
 void draw_annotations(godot::Ref<godot::Image> image, const std::vector<MarkRect> &marks);
-mcp::JsonValue handle_get_editor_ui_elements(const mcp::JsonValue &args);
-mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_editor_viewport_geometry(const mcp::JsonValue &args);
-mcp::JsonValue handle_scene_tree_items(const mcp::JsonValue &args);
-mcp::JsonValue handle_select_scene_tree_node(const mcp::JsonValue &args);
-mcp::JsonValue handle_editor_ui(const mcp::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_editor_ui_elements(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_hit_test_editor_point(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_get_editor_viewport_geometry(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_scene_tree_items(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_select_scene_tree_node(const godot_autopilot::util::JsonValue &args);
+godot_autopilot::util::JsonValue handle_editor_ui(const godot_autopilot::util::JsonValue &args);
 
 } // namespace editor_ui_ops
 } // namespace godot_autopilot

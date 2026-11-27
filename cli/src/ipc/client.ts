@@ -1,7 +1,7 @@
 import net from "node:net";
 
 import { CliError, ExitCode, markIpcRequestSent } from "../errors";
-import type { JsonRpcResponse } from "../mcp/client";
+import type { JsonRpcResponse } from "../rpc/client";
 
 export type IpcKind = "unix" | "tcp" | "pipe";
 
@@ -82,7 +82,7 @@ function mapSocketError(error: NodeJS.ErrnoException, endpoint: IpcEndpoint): Cl
       return new CliError(
         ExitCode.Transport,
         `the IPC endpoint refused the connection${suffix}; the editor may be shutting down.`,
-        "Retry, or fall back to the port channel with --port.",
+        "Retry after confirming the instance is still running with --port."
       );
     case "EACCES":
       return new CliError(ExitCode.Transport, `permission denied connecting to the IPC endpoint${suffix}.`);
@@ -107,10 +107,16 @@ export class IpcSession {
   private readonly pending = new Map<number, PendingRequest>();
   private readonly endpoint: IpcEndpoint;
   private readonly timeoutMs: number;
+  private readonly notificationSink: (frame: Record<string, unknown>) => void;
 
-  constructor(endpoint: string | IpcEndpoint, timeoutMs: number = DEFAULT_TIMEOUT_MS) {
+  constructor(
+    endpoint: string | IpcEndpoint,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
+    notificationSink: (frame: Record<string, unknown>) => void = () => {},
+  ) {
     this.endpoint = typeof endpoint === "string" ? { path: endpoint } : endpoint;
     this.timeoutMs = this.endpoint.timeoutMs ?? timeoutMs;
+    this.notificationSink = notificationSink;
   }
 
   open(): Promise<void> {
@@ -157,10 +163,15 @@ export class IpcSession {
         this.failAll(new CliError(ExitCode.Transport, "the IPC server returned a frame that is not valid JSON."));
         return;
       }
+      const record = parsed as unknown as Record<string, unknown>;
       const id = typeof parsed.id === "number" ? parsed.id : null;
-      if (id === null) continue;
-      const entry = this.pending.get(id);
-      if (entry === undefined) continue;
+      const entry = id === null ? undefined : this.pending.get(id);
+      if (entry === undefined || id === null) {
+        if (typeof record.method === "string") {
+          this.notificationSink(record);
+        }
+        continue;
+      }
       clearTimeout(entry.timer);
       this.pending.delete(id);
       entry.resolve(parsed);

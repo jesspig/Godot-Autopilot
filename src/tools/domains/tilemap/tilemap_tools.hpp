@@ -1,7 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TILEMAP_TOOLS_HPP
 #define GODOT_AUTOPILOT_TILEMAP_TOOLS_HPP
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,64 +38,64 @@ const std::vector<ParamSpec> kCreateTilemapTilesetParams = {
     {"tile_size", "integer", "Base tile size in pixels (default: 16)", false},
 };
 
-inline mcp::JsonValue tilemap_cell_args(const mcp::JsonValue &args) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *path = args.Find("path");
+inline godot_autopilot::util::JsonValue tilemap_cell_args(const godot_autopilot::util::JsonValue &args) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
   if (path != nullptr) {
     out["node_path"] = *path;
   }
-  const mcp::JsonValue *layer = args.Find("layer");
+  const godot_autopilot::util::JsonValue *layer = args.Find("layer");
   if (layer != nullptr) {
     out["layer"] = *layer;
   }
-  mcp::JsonValue cell(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *x = args.Find("x");
-  const mcp::JsonValue *y = args.Find("y");
+  godot_autopilot::util::JsonValue cell(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *x = args.Find("x");
+  const godot_autopilot::util::JsonValue *y = args.Find("y");
   if (x != nullptr) cell["x"] = *x;
   if (y != nullptr) cell["y"] = *y;
-  const mcp::JsonValue *source_id = args.Find("source_id");
+  const godot_autopilot::util::JsonValue *source_id = args.Find("source_id");
   cell["source_id"] =
-      source_id != nullptr ? *source_id : mcp::JsonValue(static_cast<int64_t>(0));
-  const mcp::JsonValue *atlas = args.Find("atlas_coords");
+      source_id != nullptr ? *source_id : godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
+  const godot_autopilot::util::JsonValue *atlas = args.Find("atlas_coords");
   if (atlas != nullptr) {
     cell["atlas_coords"] = *atlas;
   } else {
-    mcp::JsonValue default_atlas(mcp::JsonValue::object_tag);
-    default_atlas["x"] = mcp::JsonValue(static_cast<int64_t>(-1));
-    default_atlas["y"] = mcp::JsonValue(static_cast<int64_t>(-1));
+    godot_autopilot::util::JsonValue default_atlas(godot_autopilot::util::JsonValue::object_tag);
+    default_atlas["x"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(-1));
+    default_atlas["y"] = godot_autopilot::util::JsonValue(static_cast<int64_t>(-1));
     cell["atlas_coords"] = std::move(default_atlas);
   }
-  mcp::JsonValue cells(mcp::JsonValue::array_tag);
+  godot_autopilot::util::JsonValue cells(godot_autopilot::util::JsonValue::array_tag);
   cells.PushBack(std::move(cell));
   out["cells"] = std::move(cells);
   return out;
 }
 
-inline mcp::JsonValue validate_tilemap_cell_args(const mcp::JsonValue &args) {
-  const mcp::JsonValue *path = args.Find("path");
-  const mcp::JsonValue *x = args.Find("x");
-  const mcp::JsonValue *y = args.Find("y");
+inline godot_autopilot::util::JsonValue validate_tilemap_cell_args(const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *path = args.Find("path");
+  const godot_autopilot::util::JsonValue *x = args.Find("x");
+  const godot_autopilot::util::JsonValue *y = args.Find("y");
   if (path == nullptr || !path->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: path");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: path");
     return error;
   }
   if (x == nullptr || !x->IsInt()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: x");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: x");
     return error;
   }
   if (y == nullptr || !y->IsInt()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: y");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: y");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue project_tilemap_cell_result(const mcp::JsonValue &) {
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = mcp::JsonValue("ok");
+inline godot_autopilot::util::JsonValue project_tilemap_cell_result(const godot_autopilot::util::JsonValue &) {
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = godot_autopilot::util::JsonValue("ok");
   return out;
 }
 
@@ -127,29 +127,29 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
           ToolAlias{
               "fill_tilemap_rect", "set_tilemap_cells",
               {}, {}, "0.4.0", "0.6.0",
-              [](const mcp::JsonValue &args) {
-                const mcp::JsonValue *path = args.Find("node_path");
-                const mcp::JsonValue *from = args.Find("from");
-                const mcp::JsonValue *to = args.Find("to");
+              [](const godot_autopilot::util::JsonValue &args) {
+                const godot_autopilot::util::JsonValue *path = args.Find("node_path");
+                const godot_autopilot::util::JsonValue *from = args.Find("from");
+                const godot_autopilot::util::JsonValue *to = args.Find("to");
                 if (path == nullptr || !path->IsString()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
-                  error["error"] = mcp::JsonValue(
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+                  error["error"] = godot_autopilot::util::JsonValue(
                       "missing required parameter: node_path");
                   return error;
                 }
                 if (from == nullptr || !from->IsObject()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: from");
+                      godot_autopilot::util::JsonValue("missing required parameter: from");
                   return error;
                 }
                 if (to == nullptr || !to->IsObject()) {
-                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
                   error["error"] =
-                      mcp::JsonValue("missing required parameter: to");
+                      godot_autopilot::util::JsonValue("missing required parameter: to");
                   return error;
                 }
-                return mcp::JsonValue();
+                return godot_autopilot::util::JsonValue();
               }},
       })));
   v.push_back(make_spec_tool(ToolSpec{

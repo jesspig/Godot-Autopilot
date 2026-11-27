@@ -11,15 +11,11 @@
 #include <utility>
 #include <vector>
 
-#include <mcp/JsonRpc.hpp>
-
 #include "core/observability/log_system.hpp"
 #include "core/observability/trace_recorder.hpp"
 
 namespace godot_autopilot {
 namespace monitor {
-
-std::string request_id_text(const mcp::RequestId &id);
 
 struct RequestRecord {
   std::string request_id;

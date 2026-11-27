@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import net from "node:net";
+import { sendHandshake, startNativeServer, type NativeServer } from "./support/native-ipc";
 
 const ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const CLI_SCRIPT = path.join(ROOT, "cli", "bin", "gda.ts");
@@ -31,43 +33,31 @@ const state: MockState = {
   lastWrappedParams: undefined,
 };
 
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
+function errorEnvelope(_status: number, body: unknown): Record<string, unknown> {
+  return body as Record<string, unknown>;
 }
 
-function sseResponse(envelope: unknown, multiline = false): Response {
-  let frame: string;
-  if (multiline) {
-    const record = envelope as { id?: unknown; result?: unknown };
-    const head = `{"jsonrpc": "2.0", "id": ${JSON.stringify(record.id)},`;
-    const tail = `"result": ${JSON.stringify(record.result)}}`;
-    frame = `event: message\ndata: ${head}\ndata: ${tail}\n\n`;
-  } else {
-    frame = `event: message\ndata: ${JSON.stringify(envelope)}\n\n`;
-  }
-  return new Response(frame, { headers: { "content-type": "text/event-stream" } });
+function frameEnvelope(envelope: Record<string, unknown>, _multiline = false): Record<string, unknown> {
+  return envelope;
 }
 
-function okResponse(reqId: unknown, business: unknown): Response {
-  return sseResponse({
+function okResponse(reqId: unknown, business: unknown): Record<string, unknown> {
+  return frameEnvelope({
     jsonrpc: "2.0",
     id: reqId,
     result: { content: [{ type: "text", text: JSON.stringify(business) }] },
   });
 }
 
-function rpcErrorResponse(reqId: unknown, message: string): Response {
-  return sseResponse({
+function rpcErrorResponse(reqId: unknown, message: string): Record<string, unknown> {
+  return frameEnvelope({
     jsonrpc: "2.0",
     id: reqId,
     error: { code: -32602, message },
   });
 }
 
-function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown>): Response {
+function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown>): Record<string, unknown> {
   if (name === "ping") {
     state.lastWrappedParams = { name: "call_tool", arguments: { name: "ping", arguments: args } };
     return routeWrapped(reqId, "ping", args);
@@ -75,7 +65,7 @@ function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown
   if (name === "list_categories") return okResponse(reqId, { categories: ["mock-cat"] });
   if (name === "search_tools") {
     state.lastSearchArgs = args;
-    return sseResponse(
+    return frameEnvelope(
       {
         jsonrpc: "2.0",
         id: reqId,
@@ -97,52 +87,36 @@ function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown
     });
   }
   if (name === "mock_503") {
-    return jsonResponse(503, { error: { code: -32603, message: "editor busy" } });
+    return errorEnvelope(503, { error: { code: -32603, message: "editor busy" } });
   }
   if (name === "mock_rpc_error") return rpcErrorResponse(reqId, "mock top-level JSON-RPC error");
   return okResponse(reqId, { error: { code: -32602, message: `unknown tool: ${String(name)}` } });
 }
 
-function routeWrapped(reqId: unknown, inner: unknown, innerArgs: unknown): Response {
+function routeWrapped(reqId: unknown, inner: unknown, innerArgs: unknown): Record<string, unknown> {
   if (inner === "ping") return okResponse(reqId, { pong: true });
   if (inner === "system_status") {
     return okResponse(reqId, { ok: true, engine: "mock", status: "ready" });
   }
   if (inner === "mock_echo") return okResponse(reqId, { echo: innerArgs });
   if (inner === "mock_image") {
-    return sseResponse({
+    return frameEnvelope({
       jsonrpc: "2.0",
       id: reqId,
       result: { content: [{ type: "image", data: PNG_B64, mimeType: "image/png" }] },
     });
   }
   if (inner === "mock_503") {
-    return jsonResponse(503, { error: { code: -32603, message: "editor busy" } });
+    return errorEnvelope(503, { error: { code: -32603, message: "editor busy" } });
   }
   if (inner === "mock_rpc_error") return rpcErrorResponse(reqId, "mock top-level JSON-RPC error");
   return okResponse(reqId, { error: { code: -32602, message: `unknown tool: ${String(inner)}` } });
 }
 
-async function handle(req: Request): Promise<Response> {
-  if (req.method === "GET") {
-    return jsonResponse(405, { error: { code: -32600, message: "GET not supported" } });
-  }
-  const url = new URL(req.url);
-  if (url.pathname !== "/mcp") {
-    return jsonResponse(404, { error: { code: -32601, message: "not found" } });
-  }
-  if (req.method !== "POST") {
-    return jsonResponse(405, { error: { code: -32600, message: "method not allowed" } });
-  }
-  let body: unknown;
-  try {
-    const text = await req.text();
-    body = text === "" ? {} : JSON.parse(text);
-  } catch {
-    return jsonResponse(400, { error: { code: -32700, message: "parse error" } });
-  }
+async function handle(message: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const body: unknown = message;
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    return jsonResponse(400, { error: { code: -32600, message: "invalid request" } });
+    return errorEnvelope(400, { error: { code: -32600, message: "invalid request" } });
   }
   const record = body as Record<string, unknown>;
   const method = record.method;
@@ -150,28 +124,26 @@ async function handle(req: Request): Promise<Response> {
   const reqId = record.id;
   if (method === "initialize") {
     state.initialized = true;
-    return sseResponse({
+    return frameEnvelope({
       jsonrpc: "2.0",
       id: reqId,
       result: {
         capabilities: { tools: {} },
-        protocolVersion: "2025-11-25",
+        protocolVersion: "1",
         serverInfo: { name: "mock-gda", version: "0.3.7" },
       },
     });
   }
-  if (method === "notifications/initialized") {
-    return new Response("{}", { status: 202, headers: { "content-type": "application/json" } });
-  }
+  if (method === "notifications/initialized") return null;
   if (method !== "tools/call") {
-    return jsonResponse(400, {
+    return errorEnvelope(400, {
       jsonrpc: "2.0",
       id: reqId,
       error: { code: -32600, message: "bad method" },
     });
   }
   if (!state.initialized) {
-    return jsonResponse(400, {
+    return errorEnvelope(400, {
       jsonrpc: "2.0",
       id: reqId,
       error: { code: -32600, message: "invalid request: tools/call" },
@@ -202,16 +174,19 @@ async function handle(req: Request): Promise<Response> {
   return routeDirect(reqId, name, args);
 }
 
-let server: ReturnType<typeof Bun.serve> | undefined;
+let server: NativeServer | undefined;
 let port = 0;
 
-beforeAll(() => {
-  server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: handle });
-  port = server.port as number;
+beforeAll(async () => {
+  server = await startNativeServer(async (message, _socket, send) => {
+    const response = await handle(message as Record<string, unknown>);
+    if (response !== null) send({ ...response, id: message.id });
+  });
+  port = server.port;
 });
 
-afterAll(() => {
-  server?.stop(true);
+afterAll(async () => {
+  await server?.close();
   try {
     fs.rmSync(TMP_ROOT, { recursive: true, force: true });
   } catch {
@@ -292,10 +267,11 @@ async function cliRun(args: string[], options: RunOptions = {}): Promise<RunResu
   return runCli([...args, "--port", String(port)], options);
 }
 
-function freePort(): number {
-  const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("x") });
-  const found = probe.port as number;
-  probe.stop(true);
+async function freePort(): Promise<number> {
+  const probe = net.createServer();
+  await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
+  const found = (probe.address() as net.AddressInfo).port;
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
   return found;
 }
 
@@ -315,15 +291,15 @@ function checkStatus(result: RunResult, status: number): void {
   }
 }
 
-describe("CLI MCP contract", () => {
+describe("CLI native IPC contract", () => {
   test(
-    "ping: direct tools/call name=ping, server alias fallback via call_tool, compact stdout",
+    "ping: direct tools/call name=ping, compact stdout",
     async () => {
       state.initialized = false;
       state.methods = [];
       const result = await cliRun(["ping"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ pong: true });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ pong: true });
       expect(result.stdout.trim()).not.toContain("\n");
       expect(state.lastDirectName).toBe("ping");
       expect(state.lastWrappedParams).toEqual({
@@ -331,7 +307,6 @@ describe("CLI MCP contract", () => {
         arguments: { name: "ping", arguments: {} },
       });
       expect(state.methods).toEqual([
-        "tools/call",
         "initialize",
         "notifications/initialized",
         "tools/call",
@@ -345,10 +320,14 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["status"]);
       checkStatus(result, 0);
-      const body = parseJson(result.stdout) as Record<string, unknown>;
+      const body = parseJson(result.stdout) as {
+        ok: boolean;
+        command: string;
+        data: { server: Record<string, unknown> };
+      };
       expect(body.ok).toBe(true);
-      expect(body.server).toEqual({ ok: true, engine: "mock", status: "ready" });
-      expect(body.mcp_url).toBe(`http://127.0.0.1:${port}/mcp`);
+      expect(body.command).toBe("editor.status");
+      expect(body.data.server).toEqual({ ok: true, engine: "mock", status: "ready" });
       expect(state.lastWrappedParams).toEqual({
         name: "call_tool",
         arguments: { name: "system_status", arguments: {} },
@@ -362,18 +341,18 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["categories"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ categories: ["mock-cat"] });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ categories: ["mock-cat"] });
       expect(state.lastDirectName).toBe("list_categories");
     },
     TEST_TIMEOUT_MS,
   );
 
   test(
-    "search: multiline SSE projection",
+    "search: projection of tools/call payload",
     async () => {
       const result = await cliRun(["search", "q"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ results: SEARCH_RESULTS });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ results: SEARCH_RESULTS });
       expect(state.lastDirectName).toBe("search_tools");
     },
     TEST_TIMEOUT_MS,
@@ -384,7 +363,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["search", "mock", "--category", "mock-cat", "--tags", "a,b"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ results: SEARCH_RESULTS });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ results: SEARCH_RESULTS });
       const seen = state.lastSearchArgs as Record<string, unknown> | undefined;
       expect(seen?.category).toBe("mock-cat");
       expect(seen?.tags).toEqual(["a", "b"]);
@@ -397,9 +376,9 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["describe", "mock_tool"]);
       checkStatus(result, 0);
-      const body = parseJson(result.stdout) as Record<string, unknown>;
-      expect(body.name).toBe("mock_tool");
-      expect("inputSchema" in body).toBe(true);
+      const body = parseJson(result.stdout) as { data: Record<string, unknown> };
+      expect(body.data.name).toBe("mock_tool");
+      expect("inputSchema" in body.data).toBe(true);
       expect(state.lastDirectName).toBe("get_tool_detail");
     },
     TEST_TIMEOUT_MS,
@@ -410,7 +389,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["call", "mock_echo", "--args", '{"k":1}']);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ echo: { k: 1 } });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ echo: { k: 1 } });
       expect(state.lastWrappedParams).toEqual({
         name: "call_tool",
         arguments: { name: "mock_echo", arguments: { k: 1 } },
@@ -429,8 +408,8 @@ describe("CLI MCP contract", () => {
       const second = await cliRun(["call", "mock_echo", "--args-file", argsFile]);
       checkStatus(first, 0);
       checkStatus(second, 0);
-      expect(parseJson(first.stdout)).toEqual({ echo: payload });
-      expect(parseJson(second.stdout)).toEqual({ echo: payload });
+      expect((parseJson(first.stdout) as { data: unknown }).data).toEqual({ echo: payload });
+      expect((parseJson(second.stdout) as { data: unknown }).data).toEqual({ echo: payload });
     },
     TEST_TIMEOUT_MS,
   );
@@ -440,7 +419,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["call", "ping"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual({ pong: true });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ pong: true });
       expect(state.lastDirectName).toBe("ping");
     },
     TEST_TIMEOUT_MS,
@@ -461,17 +440,34 @@ describe("CLI MCP contract", () => {
       const result = await cliRun(["call", "mock_rpc_error"]);
       checkStatus(result, 1);
       expect(result.stderr).toContain("mock top-level JSON-RPC error");
-      const body = parseJson(result.stdout) as { error?: { code?: number } };
-      expect(body.error?.code).toBe(-32602);
+      const body = parseJson(result.stdout) as {
+        ok: boolean;
+        data: unknown;
+        error: { code: string };
+      };
+      expect(body.ok).toBe(false);
+      expect(body.data).toBeNull();
+      expect(body.error.code).toBe("TOOL_FAILURE");
     },
     TEST_TIMEOUT_MS,
   );
 
   test(
-    "HTTP 503 exits 2",
+    "native IPC disconnect exits 2",
     async () => {
-      const result = await cliRun(["call", "mock_503"]);
-      checkStatus(result, 2);
+      const local = await startNativeServer((message, socket) => {
+        if (message.method === "initialize") {
+          sendHandshake(message, () => {});
+          socket.destroy();
+        }
+      });
+      try {
+        const result = await runCli(["--port", String(local.port), "ping"]);
+        checkStatus(result, 2);
+        expect(result.stderr).toContain("IPC");
+      } finally {
+        await local.close();
+      }
     },
     TEST_TIMEOUT_MS,
   );
@@ -479,7 +475,7 @@ describe("CLI MCP contract", () => {
   test(
     "connection refused exits 2",
     async () => {
-      const closed = freePort();
+      const closed = await freePort();
       const result = await runCli(["--port", String(closed), "ping"]);
       checkStatus(result, 2);
     },
@@ -504,9 +500,11 @@ describe("CLI MCP contract", () => {
       const result = await cliRun(["call", "mock_image", "--save-images", imageDir]);
       checkStatus(result, 0);
       expect(result.stdout).not.toContain(PNG_B64.slice(0, 40));
-      const body = parseJson(result.stdout) as { images?: Array<{ saved?: boolean }> };
-      expect(Array.isArray(body.images)).toBe(true);
-      expect(body.images?.[0]?.saved).toBe(true);
+      const body = parseJson(result.stdout) as {
+        data: { images?: Array<{ saved?: boolean }> };
+      };
+      expect(Array.isArray(body.data.images)).toBe(true);
+      expect(body.data.images?.[0]?.saved).toBe(true);
       const pngs = fs.readdirSync(imageDir).filter((name) => name.endsWith(".png"));
       expect(pngs).toHaveLength(1);
       const magic = fs.readFileSync(path.join(imageDir, pngs[0])).subarray(0, 8);
@@ -519,7 +517,7 @@ describe("CLI MCP contract", () => {
   test(
     "--port wins over GODOT_AUTOPILOT_PORT",
     async () => {
-      const closed = freePort();
+      const closed = await freePort();
       const result = await runCli(["--port", String(port), "ping"], { envPort: closed });
       checkStatus(result, 0);
       expect(result.stdout).toContain("pong");
@@ -544,29 +542,30 @@ describe("CLI MCP contract", () => {
       checkStatus(result, 0);
       expect(result.stdout.trim().split(/\r?\n/).length).toBeGreaterThan(1);
       expect(result.stdout).toContain('  "pong": true');
-      expect(parseJson(result.stdout)).toEqual({ pong: true });
+      expect((parseJson(result.stdout) as { data: unknown }).data).toEqual({ pong: true });
     },
     TEST_TIMEOUT_MS,
   );
 
   test(
-    "non-JSON 200 response exits 2",
+    "invalid JSON frame exits 2",
     async () => {
-      const local = Bun.serve({
-        hostname: "127.0.0.1",
-        port: 0,
-        fetch: () =>
-          new Response("<html>oops</html>", {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          }),
+      const local = await startNativeServer((message, socket, send) => {
+        if (message.method === "initialize") {
+          sendHandshake(message, send);
+          return;
+        }
+        const payload = Buffer.from("{not-json}", "utf8");
+        const header = Buffer.alloc(4);
+        header.writeUInt32BE(payload.length, 0);
+        socket.write(Buffer.concat([header, payload]));
       });
       try {
         const result = await runCli(["--port", String(local.port), "ping"]);
         checkStatus(result, 2);
-        expect(result.stderr).toContain("could not parse the plain-JSON response.");
+        expect(result.stderr).toContain("not valid JSON");
       } finally {
-        local.stop(true);
+        await local.close();
       }
     },
     TEST_TIMEOUT_MS,
@@ -575,23 +574,20 @@ describe("CLI MCP contract", () => {
   test(
     "client timeout exits 2",
     async () => {
-      const local = Bun.serve({
-        hostname: "127.0.0.1",
-        port: 0,
-        fetch: async () => {
-          await Bun.sleep(300);
-          return new Response("{}", {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          });
-        },
+      const local = await startNativeServer(async (message, _socket, send) => {
+        if (message.method === "initialize") {
+          sendHandshake(message, send);
+          return;
+        }
+        await Bun.sleep(300);
+        send({ jsonrpc: "2.0", id: message.id, result: { content: [] } });
       });
       try {
         const result = await runCli(["--port", String(local.port), "ping", "--timeout", "0.05"]);
         checkStatus(result, 2);
-        expect(result.stderr).toContain("request timed out.");
+        expect(result.stderr).toContain("timed out");
       } finally {
-        local.stop(true);
+        await local.close();
       }
     },
     TEST_TIMEOUT_MS,

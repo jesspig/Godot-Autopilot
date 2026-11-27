@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 
 #include "tools/domains/capture/capture_ops.hpp"
 
@@ -11,7 +11,7 @@ namespace {
 
 using godot_autopilot::capture_ops::is_pending_subcall_response;
 using godot_autopilot::capture_ops::unwrap_subcall_section;
-using mcp::JsonValue;
+using godot_autopilot::util::JsonValue;
 
 JsonValue parse(const std::string &text) {
   return JsonValue::Parse(text);

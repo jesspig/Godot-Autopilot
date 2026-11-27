@@ -1,13 +1,14 @@
 ---
 type: 模块文档
 title: 技能卡与 references
-description: 1 张入口技能卡与 9 篇 references 的目录结构、词数预算、构建管线、guard 规则、MCP 资源计数与安装清理
+description: CLI-only 技能书目录、入口卡契约、8 个 recipe 的八段结构、加载预算、构建管线与守卫规则
 tags:
   - 模块
   - 技能
   - references
-  - MCP
-timestamp: "2026-11-25T23:22:40+08:00"
+  - CLI
+  - 守卫
+timestamp: "2026-11-26T09:00:00+08:00"
 resource:
   - skills/
   - skills-zh/
@@ -18,100 +19,97 @@ resource:
 
 # 技能卡与 references（`skills/`、`skills-zh/`）
 
-> 审计日期：2026-11-25（VERSION 为正式版 0.3.5：10 册自包含技能书收敛为 1 张入口卡 + 9 篇 references；MCP skills 资源 21→12；安装器新增 `--prune`）。
+> 当前状态：T-12 已强化守卫，旧技能书预期被拒绝（TDD 失败基线）；T-13 按本页契约重写 EN/ZH 内容。守卫只检查结构、命令、flag、JSON、预算与 parity，不描述 MCP 协议。
 
 ## 目录结构
 
-```text
-skills/godot-autopilot/SKILL.md
-skills/godot-autopilot/references/setup.md
-skills/godot-autopilot/references/tools.md
-skills/godot-autopilot/references/scene-system.md
-skills/godot-autopilot/references/scripting.md
-skills/godot-autopilot/references/resources.md
-skills/godot-autopilot/references/runtime.md
-skills/godot-autopilot/references/content.md
-skills/godot-autopilot/references/csharp.md
-skills/godot-autopilot/references/servers.md
-skills-zh/godot-autopilot/…（与 EN 同构）
-```
+一本技能书 = `godot-autopilot/SKILL.md` + `references/**/*.md`；EN/ZH 相对路径必须完全同构。
 
-- 每个语言目录恰好 1 个 `SKILL.md` + 9 个 `references/*.md`，共 10 个文件。
-- `SKILL.md` 的 frontmatter 只有 `name` 与 `description`；references 不带 frontmatter，首行为 `#` 标题。
-- EN 与 ZH 的相对路径集合必须完全相等；章节结构保持一致。
-- 入口卡承担连接、发现、`gda docs` 规则、9 组任务路由、症状直达、confirm 与变更/观测/验证环；领域细节下沉到 references。
+- `SKILL.md` frontmatter 只允许 `name` 与 `description`；`references/` 不带 frontmatter，首行为 `#` 标题。
+- 守卫拒绝除 `SKILL.md` 与 `references/*.md`（含 `references/recipes/*.md`）之外的任何路径。
+- T-13 的目标结构：`SKILL.md`；`references/` 下 `setup.md`、`cli.md`、`safety.md`、`offline.md`、`scene.md`、`scripting.md`、`resources.md`、`runtime.md`、`debugging.md`、`testing.md`、`content.md`、`csharp.md`、`servers.md`、`workflows.md`；`references/recipes/` 下 8 个 recipe。
+- 入口卡承担 CLI-only 启动、动态发现、确认、错误恢复与一级指令路由；领域细节下沉到 references。
 
-## 词数预算
+## 入口卡 CLI-only 契约
 
-| 文件 | 预算 |
+`SKILL.md` 必须同时满足：
+
+- CLI-only 词表（守卫 token 表见 `tests/guard/skills_guard.ts`）：不出现 `MCP`、`Model Context Protocol` 等旧协议词、旧端点配置 token 与 `godot://skills`、`search_tools`、`get_tool_detail`、`call_tool`、`list_categories`、`resources/list`、`resources/read`、`prompts/list`、`prompts/get`、`tasks/get`、`tasks/cancel`、`resultType`、`taskId` 与 `--direct`、`--transport`、`--no-fallback`、`--input`、`--async`。
+- CLI-only 健康探测：`gda ping`（或 `gda tool ping`），只描述为健康探测，不是 handshake。
+- 动态发现：`gda tool list`、`gda tool search`、`gda tool describe`；通用逃生口 `gda tool call`。工具名、数量与 schema 一律现场查询，不写死。
+- 确认：`--confirm` 与 `confirmation_required`；结果未知不重发。
+- 错误恢复：`gda doctor`、`gda job`。
+- 一级指令路由：至少 3 行指向 `references/` 的表格路由行。
+
+## Recipe 契约
+
+固定 8 个 recipe，路径 `references/recipes/<id>.md`，id 为 `bootstrap`、`scene-script`、`asset-pipeline`、`playtest-debug`、`safe-refactor`、`error-recovery`、`skills-sync`、`long-task`。
+
+- 每个 recipe 首行标题必须是 `# <id>`，与文件名同构（EN/ZH 相同）。
+- 每个 recipe 必须按序包含 `## 1.` 到 `## 8.` 八个编号小节，依次对应：触发条件与输入、前置检查、可复制的 CLI 命令、每步观察字段、验证与退出条件、失败分支、安全与确认点、明确不做什么。
+- recipe 内命令必须存在于 CLI 契约；JSON 示例按 envelope/action schema 校验。
+
+## 命令、flag 与 JSON 契约
+
+- 命令与局部 flag 由 `cli/src/command-spec.ts`（`COMMAND_GROUPS`、`COMMAND_SPECS`、`LEGACY_ALIASES`、`FLAG_MIGRATIONS`）与 `cli/src/args.ts` 派生；守卫校验完整 `gda <group> <subcommand>` 与命令局部 flag，不再只校验顶层 `gda`。
+- 已迁移 flag（`--all`、`--force`、`--file`、`--probe` 等）分类为 `migrated-flag`，并给出替代 flag 提示；MCP 时代 flag 分类为 `mcp`。`skills_contract.test.ts` 暂过滤这两类，T-13 重写后移除过滤恢复严格断言。
+- fenced JSON 必须可解析且为对象；key 限定为 `cli/src/output.ts` 的 envelope 控制键与工具参数 schema 键；含 `action` 时必须是非空字符串且在 CLI/工具 action 集合内。
+- 禁止易漂移事实：工具数量 `252`/`253`、别名数量 `325`、版本窗口 `0.4.x`/`0.6.x`/`0.4.0`/`0.6.0`，以及完整旧名→canonical 迁移表（表头含 alias/old/legacy/deprecated/canonical/migration 且带 Markdown 分隔行即命中）。
+- EN/ZH parity：路径集合、命令/flag token 集合、代码块命令顺序、recipe ID 与八段结构一致。
+
+## 加载预算
+
+按文件实际空白分词统计，不在技能正文固化数值；守卫常量在 `tests/guard/skills_guard.ts`。
+
+| 项 | 上限 |
 |---|---:|
-| `SKILL.md` | 1,800 |
-| `references/setup.md` | 800 |
-| `references/tools.md` | 1,100 |
-| `references/scene-system.md` | 1,300 |
-| `references/scripting.md` | 900 |
-| `references/resources.md` | 900 |
-| `references/runtime.md` | 1,300 |
-| `references/content.md` | 800 |
-| `references/csharp.md` | 800 |
-| `references/servers.md` | 900 |
-| 合计 | 10,600 |
+| 单文件 | 2,000 tokens |
+| 全量加载 | 24,000 tokens |
 
-- 硬上限 12,000 词；单文件硬上限 2,000 词。
-- 统计口径：按空白分词（`split(/\s+/)`），代码块与正文同权；EN 与 ZH 同预算。实测值随内容变化，不在文档内固化。
-- 新增或扩写 reference 时先核对预算，再写内容；超预算优先删示例与重复段落。
+超预算先拆重复段落，再删低价值示例；不得删安全段。
 
 ## 构建管线
 
-- `bun run build:skills-asset` 执行 [`cli/scripts/build-skills-asset.ts`](../../../cli/scripts/build-skills-asset.ts)，生成 `cli/assets/skills.json`：`{version, files, files_zh, retired}`。
+- `bun run build:skills-asset` 执行 [`cli/scripts/build-skills-asset.ts`](../../../cli/scripts/build-skills-asset.ts)，生成 `cli/assets/skills.json`：`{schema_version, version, file_count, content_digest, files, files_zh, retired}`。
+- `schema_version` 固定为 1；`file_count` 是 EN/ZH 各自的文件数（生成时校验相等）；`content_digest` 是版本与两种语言规范化文件树的 SHA-256，安装前复算，不匹配即拒绝安装。
+- `retired` 是退役目录名数组，供安装器精确清理；不参与内容嵌入。
 - 构建期 [`cmake/skill_gen.cmake`](../../../cmake/skill_gen.cmake) 调用 [`tools/embed_skills.ts`](../../../tools/embed_skills.ts)，把 `skills/` 嵌入 `build/generated/skill_content_embedded.h`；`SKILL_COUNT=1`。
-- `retired` 是退役目录名数组（当前 9 项），供安装器精确清理；它不参与内容嵌入。
 - 两个生成物都由脚本产出，禁止手工编辑；改内容后重新运行构建脚本或重新 configure。
+
+## 安装、升级同步与回滚
+
+- 安装入口 `install skills` / `skill install` 与 `update skills` 共用受管同步：`cli/src/skills.ts` 计算旧清单与新清单 diff，`cli/src/archive.ts` 的 `applyManagedTree` 负责逐文件临时文件写入 + 原子替换，失败按备份反向恢复并清理 `*.tmp`。
+- 安装目录内的 `.gda-skills-manifest.json` 记录实际使用的 `version`、`content_digest`、单语言 `tree_digest`、`lang` 与受管文件清单；安装报告输出真实 asset 版本与 digest，不回报 CLI 版本或缓存假版本。
+- 删除范围仅限同一受管书内、以 `.md` 结尾且不在新清单中的旧 reference；跨技能书、清单外路径、`..` 逃逸与非文件路径一律拒绝。清单外的顶层目录（用户自建技能）只列入 `preserved`，永不删除。
+- `retired` 目录只在 `--prune`（sync 的 `--force` 亦隐含）下清理，先原子改名到临时备份，全部写盘成功后删除备份；失败恢复原目录。
+- 内容 digest 损坏、旧清单 schema 非法或越界声明时拒绝同步；`--force` 可重建受管文件与清单，但不会碰清单外目录。
+- CLI 预演：`gda skills sync --check`（等价于子动作 `--dry-run`），输出 `would_delete` / `would_overwrite` / `preserved`，全程只读；强制写入用 `--force-install`（等价于子动作 `--force`）。
+- 当前 `skills sync` 作为 `skills` 命令的子动作实现；`command-spec.ts` 与 `args.ts` 中一等公民的 `gda skill sync --dry-run` / `--force` 注册待补（见 T-14 遗留项）。
 
 ## Guard 与测试
 
-- [`tests/guard/skills_guard.ts`](../../../tests/guard/skills_guard.ts)：`BOOKS` 只含 `godot-autopilot`；接受 `SKILL.md` 与 `references/*.md`，拒绝其它路径与非 Markdown；检查禁用词、`gda` 命令/flag 契约、EN/ZH 命令 parity、asset 漂移。
-- [`tests/unit/skill_gen_test.cpp`](../../../tests/unit/skill_gen_test.cpp)：`kSkillCount=1`、`kSkillFileCount=10`；每个技能必须有 `SKILL.md`，辅助文件必须在 `references/` 下；backtick 词白名单覆盖 references 使用的状态字段。
-- [`tests/unit/skill_resources_test.cpp`](../../../tests/unit/skill_resources_test.cpp)：技能资源计数 12，文件 URI 指向 `references/*.md`。
-- 常用验证：`bun tests/guard/skills_guard.ts`、`ctest --preset debug -R "Skill|skills_guard"`、`bun test cli/tests`。
-
-## MCP 资源
-
-技能资源共 **12** 个：
-
-- 1 个目录：`godot://skills`；
-- 1 个技能：`godot://skills/godot-autopilot`；
-- 10 个文件：`godot://skills/godot-autopilot/SKILL.md` 与 9 篇 references。
-
-`gda skills list|show [--file <rel>] [--zh]` 在无运行实例时读取仓库或内置 asset；`show` 的 `--file` 必须是技能目录内的相对路径。
-
-## 安装与清理
-
-```bash
-gda install skills
-gda install skills --zh --offline
-gda install skills --path "<project>/.agents/skills" --force
-gda install skills --prune
-```
-
-- 默认目标 `~/.agents/skills`；项目级用 `--path`。
-- `--prune` 只删除 `retired` 名单与目标目录现有条目的交集；未加时输出 `stale`，不删除。
-- 语言切换需要 `--force`，因为目录名相同、内容不同。
+- [`tests/guard/skills_guard.ts`](../../../tests/guard/skills_guard.ts)：`--self-test` 验证负例样本逐条被拒；普通模式对 `skills/`、`skills-zh/` 全量检查并校验 asset 漂移。
+- [`cli/tests/skills_contract.test.ts`](../../../cli/tests/skills_contract.test.ts)：临时过滤已迁移 flag 的 `migrated-flag` 与带迁移 token 的 `mcp` 违规，其余违规必须为空。
+- [`tests/unit/skill_gen_test.cpp`](../../../tests/unit/skill_gen_test.cpp)：纯 `ToolCatalog`/ToolSpec 构造 fixture，不依赖 MCP SDK；校验零 MCP、零漂移事实、入口卡 CLI-only、recipe 八段与反引号 action 回验。
+- [`tests/unit/skill_resources_test.cpp`](../../../tests/unit/skill_resources_test.cpp)：仅测试 `godot://skills` URI 解析与内容解析，不使用 MCP SDK fixture。
+- 常用验证：`bun tests/guard/skills_guard.ts --self-test`、`bun tests/guard/skills_guard.ts`、`ctest --preset debug -R "Skill|skills_guard"`、`bun test cli/tests`。
 
 ## 维护步骤（改结构时）
 
-1. 同步修改 `skills/` 与 `skills-zh/`，保持相对路径与章节结构一致。
-2. 更新上方词数预算与实测值。
-3. 若文件数变化：同步 `tools/embed_skills.ts` 的 `SKILL_COUNT`、`tests/unit/skill_gen_test.cpp` 的 `kSkillFileCount`、`tests/unit/skill_resources_test.cpp` 的资源计数；若技能数变化还要改 `skills_guard.ts` 的 `BOOKS`。
-4. 若退役目录变化：改 `cli/scripts/build-skills-asset.ts` 的 `RETIRED_SKILLS`，并重新生成 asset。
-5. 依次运行 `bun run build:skills-asset`、guard、`ctest --preset debug -R "Skill|skills_guard"`、`bun test cli/tests`。
+1. 同步修改 `skills/` 与 `skills-zh/`，保持相对路径、recipe ID、章节编号、命令顺序、JSON key 与 action 一致。
+2. 结构或 recipe 数量变化时，同步 `tools/embed_skills.ts` 的 `SKILL_COUNT`、`tests/unit/skill_gen_test.cpp` 的 `kSkillFileCount` 与 `kRecipeIds`、`tests/guard/skills_guard.ts` 的 `RECIPE_IDS` 与预算常量。
+3. 退役目录变化时改 `cli/scripts/build-skills-asset.ts` 的 `RETIRED_SKILLS`，并重新生成 asset。
+4. 依次运行 `bun run build:skills-asset`、守卫 `--self-test`、守卫、生成器、CLI 技能测试与 ctest 技能子集。
 
 ## 失败签名
 
 | 症状 | 原因 | 首步动作 |
 |---|---|---|
+| `mcp` / `migrated-flag` | 正文仍含旧协议词或已迁移 flag | 已改为 CLI-only 写法（守卫保留历史分类键） |
+| `drift-count` / `drift-version` / `drift-alias-table` | 固化数量、版本窗口或迁移表 | 改为动态发现规则 |
+| `entry-cli-only` / `entry-routing` | 入口卡缺启动/发现/确认/恢复/路由 | 补齐入口卡契约 |
+| `recipe-missing` / `recipe-id` / `recipe-sections` | recipe 缺失、ID 不匹配或少段 | 按八段结构重排 |
+| `json-key` / `json-action` / `json-parse` | JSON 示例不合 schema | 按 envelope/action schema 修正 |
+| `budget-file` / `budget-total` | 加载预算超限 | 拆重复、删低价值示例，不动安全段 |
+| `command-parity` / `command-order-parity` | EN/ZH 命令或顺序不一致 | 以 EN 为准同步 ZH |
 | `asset-drift` | 改了内容但没重生成 asset | `bun run build:skills-asset` |
-| `unexpected-file` | 出现 `references/` 之外的辅助路径 | 移到 `references/*.md` 或删除 |
-| `unknown-flag` | 技能正文引用了未注册的 CLI flag | 先在 `cli/src/args.ts` 注册 |
-| 安装后旧目录仍在 | 未传 `--prune` | `gda install skills --prune` |
-| 资源计数不符 | asset 或嵌入头未重建 | 重新生成 asset 并重新 configure/build |

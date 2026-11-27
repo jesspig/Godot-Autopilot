@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <initializer_list>
-#include <mcp/JsonValue.hpp>
+#include "util/json_value.hpp"
 #include <memory>
 #include <string>
 #include <utility>
@@ -87,16 +87,16 @@ inline ToolSpec audio_action_spec(ToolSpec spec,
   return spec;
 }
 
-inline mcp::JsonValue audio_args_with_action(const mcp::JsonValue &args,
+inline godot_autopilot::util::JsonValue audio_args_with_action(const godot_autopilot::util::JsonValue &args,
                                              const char *action) {
-  mcp::JsonValue out = args.IsObject()
+  godot_autopilot::util::JsonValue out = args.IsObject()
                            ? args
-                           : mcp::JsonValue(mcp::JsonValue::object_tag);
-  out["action"] = mcp::JsonValue(action);
+                           : godot_autopilot::util::JsonValue(godot_autopilot::util::JsonValue::object_tag);
+  out["action"] = godot_autopilot::util::JsonValue(action);
   return out;
 }
 
-inline bool audio_result_has_error(const mcp::JsonValue &result) {
+inline bool audio_result_has_error(const godot_autopilot::util::JsonValue &result) {
   return result.IsObject() &&
          (result.Find("error") != nullptr ||
           result.Find("structured_error") != nullptr ||
@@ -108,7 +108,7 @@ inline ToolAlias audio_alias(const char *name, const char *canonical,
   ToolAlias alias;
   alias.name = name;
   alias.canonical = canonical;
-  alias.adapt_args = [action](const mcp::JsonValue &args) {
+  alias.adapt_args = [action](const godot_autopilot::util::JsonValue &args) {
     return audio_args_with_action(args, action);
   };
   alias.deprecated_since = "0.4.0";
@@ -116,119 +116,119 @@ inline ToolAlias audio_alias(const char *name, const char *canonical,
   return alias;
 }
 
-inline mcp::JsonValue validate_audio_bus_layout_alias(
-    const mcp::JsonValue &args) {
-  const mcp::JsonValue *action = args.Find("action");
+inline godot_autopilot::util::JsonValue validate_audio_bus_layout_alias(
+    const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *action = args.Find("action");
   if (action == nullptr) {
-    return mcp::JsonValue();
+    return godot_autopilot::util::JsonValue();
   }
   if (!action->IsString()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
     error["error"] =
-        mcp::JsonValue("invalid parameter: action must be layout, count or name");
+        godot_autopilot::util::JsonValue("invalid parameter: action must be layout, count or name");
     return error;
   }
   const std::string view = action->GetString();
   if (view != "layout" && view != "count" && view != "name") {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue(
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue(
         "unknown action '" + view +
         "' for get_audio_bus_layout (expected layout, count, name)");
     return error;
   }
   if (view == "name") {
-    const mcp::JsonValue *index = args.Find("bus_index");
+    const godot_autopilot::util::JsonValue *index = args.Find("bus_index");
     if (index == nullptr || !index->IsInt()) {
-      mcp::JsonValue error(mcp::JsonValue::object_tag);
-      error["error"] = mcp::JsonValue("missing required parameter: bus_index");
+      godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+      error["error"] = godot_autopilot::util::JsonValue("missing required parameter: bus_index");
       return error;
     }
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue project_audio_bus_layout_alias(
-    const mcp::JsonValue &result, const mcp::JsonValue &args) {
+inline godot_autopilot::util::JsonValue project_audio_bus_layout_alias(
+    const godot_autopilot::util::JsonValue &result, const godot_autopilot::util::JsonValue &args) {
   if (audio_result_has_error(result)) {
     return result;
   }
   std::string view = "layout";
-  const mcp::JsonValue *action = args.Find("action");
+  const godot_autopilot::util::JsonValue *action = args.Find("action");
   if (action != nullptr && action->IsString()) {
     view = action->GetString();
   }
-  const mcp::JsonValue *inner = result.Find("result");
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   if (view == "count") {
-    const mcp::JsonValue *count =
+    const godot_autopilot::util::JsonValue *count =
         inner != nullptr && inner->IsObject() ? inner->Find("count") : nullptr;
     out["result"] =
-        count != nullptr ? *count : mcp::JsonValue(static_cast<int64_t>(0));
+        count != nullptr ? *count : godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
     return out;
   }
   if (view == "name") {
-    const mcp::JsonValue *bus =
+    const godot_autopilot::util::JsonValue *bus =
         inner != nullptr && inner->IsObject() ? inner->Find("bus") : nullptr;
-    const mcp::JsonValue *name =
+    const godot_autopilot::util::JsonValue *name =
         bus != nullptr && bus->IsObject() ? bus->Find("name") : nullptr;
-    out["result"] = name != nullptr ? *name : mcp::JsonValue(std::string());
+    out["result"] = name != nullptr ? *name : godot_autopilot::util::JsonValue(std::string());
     return out;
   }
-  out["result"] = inner != nullptr ? *inner : mcp::JsonValue();
+  out["result"] = inner != nullptr ? *inner : godot_autopilot::util::JsonValue();
   return out;
 }
 
-inline mcp::JsonValue project_audio_bus_count(const mcp::JsonValue &result) {
+inline godot_autopilot::util::JsonValue project_audio_bus_count(const godot_autopilot::util::JsonValue &result) {
   if (audio_result_has_error(result)) {
     return result;
   }
-  const mcp::JsonValue *inner = result.Find("result");
-  const mcp::JsonValue *count =
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *count =
       inner != nullptr && inner->IsObject() ? inner->Find("count") : nullptr;
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
   out["result"] =
-      count != nullptr ? *count : mcp::JsonValue(static_cast<int64_t>(0));
+      count != nullptr ? *count : godot_autopilot::util::JsonValue(static_cast<int64_t>(0));
   return out;
 }
 
-inline mcp::JsonValue project_audio_bus_name(const mcp::JsonValue &result) {
+inline godot_autopilot::util::JsonValue project_audio_bus_name(const godot_autopilot::util::JsonValue &result) {
   if (audio_result_has_error(result)) {
     return result;
   }
-  const mcp::JsonValue *inner = result.Find("result");
-  const mcp::JsonValue *bus =
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *bus =
       inner != nullptr && inner->IsObject() ? inner->Find("bus") : nullptr;
-  const mcp::JsonValue *name =
+  const godot_autopilot::util::JsonValue *name =
       bus != nullptr && bus->IsObject() ? bus->Find("name") : nullptr;
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  out["result"] = name != nullptr ? *name : mcp::JsonValue(std::string());
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  out["result"] = name != nullptr ? *name : godot_autopilot::util::JsonValue(std::string());
   return out;
 }
 
-inline mcp::JsonValue validate_audio_bus_name_alias(
-    const mcp::JsonValue &args) {
-  const mcp::JsonValue *index = args.Find("bus_index");
+inline godot_autopilot::util::JsonValue validate_audio_bus_name_alias(
+    const godot_autopilot::util::JsonValue &args) {
+  const godot_autopilot::util::JsonValue *index = args.Find("bus_index");
   if (index == nullptr || !index->IsInt()) {
-    mcp::JsonValue error(mcp::JsonValue::object_tag);
-    error["error"] = mcp::JsonValue("missing required parameter: bus_index");
+    godot_autopilot::util::JsonValue error(godot_autopilot::util::JsonValue::object_tag);
+    error["error"] = godot_autopilot::util::JsonValue("missing required parameter: bus_index");
     return error;
   }
-  return mcp::JsonValue();
+  return godot_autopilot::util::JsonValue();
 }
 
-inline mcp::JsonValue project_audio_input_devices(
-    const mcp::JsonValue &result) {
+inline godot_autopilot::util::JsonValue project_audio_input_devices(
+    const godot_autopilot::util::JsonValue &result) {
   if (audio_result_has_error(result)) {
     return result;
   }
-  mcp::JsonValue out(mcp::JsonValue::object_tag);
-  const mcp::JsonValue *inner = result.Find("result");
-  const mcp::JsonValue *devices =
+  godot_autopilot::util::JsonValue out(godot_autopilot::util::JsonValue::object_tag);
+  const godot_autopilot::util::JsonValue *inner = result.Find("result");
+  const godot_autopilot::util::JsonValue *devices =
       inner != nullptr && inner->IsObject() ? inner->Find("devices") : nullptr;
   if (devices != nullptr) {
     out["result"] = *devices;
   } else {
-    out["error"] = mcp::JsonValue("devices not available");
+    out["error"] = godot_autopilot::util::JsonValue("devices not available");
   }
   return out;
 }
@@ -267,12 +267,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
            "{\"action\":\"add_effect\",\"bus_index\":0,\"effect_type\":\"AudioEffectReverb\",\"at_position\":-1}"}),
       {
           [](ToolAlias alias) {
-            alias.adapt_args = [](const mcp::JsonValue &args) {
-              mcp::JsonValue out = args.IsObject()
+            alias.adapt_args = [](const godot_autopilot::util::JsonValue &args) {
+              godot_autopilot::util::JsonValue out = args.IsObject()
                                        ? args
-                                       : mcp::JsonValue(
-                                             mcp::JsonValue::object_tag);
-              const mcp::JsonValue *legacy_action = args.Find("action");
+                                       : godot_autopilot::util::JsonValue(
+                                             godot_autopilot::util::JsonValue::object_tag);
+              const godot_autopilot::util::JsonValue *legacy_action = args.Find("action");
               const bool count_view =
                   legacy_action != nullptr && legacy_action->IsString() &&
                   legacy_action->GetString() == "count";
@@ -283,7 +283,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               if (count_view) {
                 out.GetObject().erase("bus_index");
               }
-              out["action"] = mcp::JsonValue(
+              out["action"] = godot_autopilot::util::JsonValue(
                   bus_view ? "get_info" : "get_layout");
               return out;
             };
