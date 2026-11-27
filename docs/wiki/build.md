@@ -133,7 +133,7 @@ resource:
 
 ## CI 与 Release
 
-`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + 测试 `ctest --preset debug -E "^gda_runner_|^pool_" --output-on-failure`（`-E` 模式随 L2 引擎轨删除已无匹配对象，实际等价无过滤全跑）；ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 装入 PATH，`resolvePreset` 恒选 `debug` 而非 `debug-portable`（ctest 步骤写死 `ctest --preset debug`、不经过 `resolvePreset`，依赖该前提）；sccache + `third_party/` 子模块缓存加速（`actions/checkout` 带 `submodules: true`；`actions/cache` 的 path 为 `third_party/godot-cpp`、`third_party/mcp-cpp-sdk`、`third_party/googletest`，key `submodules-debug-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`，shas 取 `git ls-files -s third_party` 的 gitlink sha，子模块升级即换 key）。build job 不装 Python：开发链只依赖 Bun + CMake + 编译器，skill 嵌入由 `oven-sh/setup-bun@v2` 提供的 Bun 执行 `tools/embed_skills.ts`；`release.yml` 的 build job 同步为 Bun setup。另有 `cli-bins` 作业：三平台各自 `bun build --compile` 出可执行文件并跑 `--version` / `list` 冒烟，**不发布**（发布走 `release.yml` 的 `cli` 作业）。
+`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + 测试 `ctest --preset debug -E "^gda_runner_|^pool_" --output-on-failure`（`-E` 模式随 L2 引擎轨删除已无匹配对象，实际等价无过滤全跑）；ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 装入 PATH，`resolvePreset` 恒选 `debug` 而非 `debug-portable`（ctest 步骤写死 `ctest --preset debug`、不经过 `resolvePreset`，依赖该前提）；sccache + `third_party/` 子模块缓存加速（`actions/checkout` 带 `submodules: true`；`actions/cache` 的 path 为 `third_party/godot-cpp`、`third_party/googletest`（旧协议 SDK 已移除），key `submodules-debug-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`，shas 取 `git ls-files -s third_party` 的 gitlink sha，子模块升级即换 key）。build job 不装 Python：开发链只依赖 Bun + CMake + 编译器，skill 嵌入由 `oven-sh/setup-bun@v2` 提供的 Bun 执行 `tools/embed_skills.ts`；`release.yml` 的 build job 同步为 Bun setup。另有 `cli-bins` 作业：三平台各自 `bun build --compile` 出可执行文件并跑 `--version` / `list` 冒烟，**不发布**（发布走 `release.yml` 的 `cli` 作业）。
 
 `.github/workflows/release.yml` — tag 双格式触发（`v*.*.*` / `[0-9]*.*.*`，另支持 `workflow_dispatch` 手动指定 tag）：
 
@@ -188,7 +188,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 - **skill 内容嵌入头**：技能正文存于仓库根 `skills/` 标准目录（1 张入口卡 + 9 篇 references，共 10 个 .md，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.ts`（Bun 执行）生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)` 保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
-- 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
+- 链接库（PRIVATE）：`godot-cpp` 与当前本机协议栈；旧协议 SDK 的 `mcp-server` / `mcp-http` 链接已移除；
 - MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:100`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
 - **Unity 构建已接线生效**：`set_target_properties(godot-autopilot PROPERTIES UNITY_BUILD ${GDA_UNITY_ENABLED} UNITY_BUILD_BATCH_SIZE ${GDA_UNITY_BATCH})`（`CMakeLists.txt`，add_library 之后）——实测 Debug batch=8（16 核）；
 - `option(GDA_ENABLE_TESTS ... OFF)`，开启后 `add_subdirectory(tests)`（详见 [tests.md](./tests.md)）。
@@ -203,7 +203,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `BuildOptimization.cmake` | 硬件感知并行度（核心规则） | `GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`（CACHE 优先、其次 ENV）、`GDA_UNITY_BUILD`（ON 且核数 >1 时启用）、`GDA_UNITY_BATCH_SIZE`（0=auto）、`GDA_MAX_COMPILE_MEM_MB`（默认 1500）、`GDA_MAX_LINK_MEM_MB`（默认 4000）、`GDA_UNITY_MEM_MB`（默认 500）；`CMAKE_BUILD_PARALLEL_LEVEL` 对**所有**生成器生效；`gda_compile_pool`/`gda_link_pool` 仅在 `if(CMAKE_GENERATOR MATCHES "Ninja")` 时注册（`:84-91`），非 Ninja 只打印 `[gda] Ninja jobs: N (non-Ninja generator)`，其余并行度与 Unity 计算照常 |
 | `CompilerOptions.cmake` | 按编译器分发 flags | Clang/clang-cl 与 MSVC：`/utf-8 /bigobj /W4 /EHsc` + `_CRT_SECURE_NO_WARNINGS`、`_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS`、`_WIN32_WINNT=0x0A00`；**MSVC 分支（`elseif(MSVC)`，即真正的 cl.exe）额外 `/Zc:lambda`**，clang-cl 走的是第一个 `if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")` 分支、不加该开关（见下「MSVC lambda 捕获差异」小节）；**调试信息格式按配置**：MSVC 分支 `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT` = Debug `ProgramDatabase`（`/Zi`+外部 PDB）/其余 `Embedded`（`/Z7`）；clang-cl（Windows）分支 Debug 设 `Embedded` CodeView，由链接器 `/debug /pdb:<TARGET_PDB>` 汇总为外部 `godot-autopilot.pdb`；两种情况下 Release 都不新增外部符号；GCC/Clang 非 Windows 非 CI 追加 `-march=native`；`find_package(Threads REQUIRED)`；`CMAKE_POSITION_INDEPENDENT_CODE ON` |
 | `Cache.cmake` | 编译缓存自动探测 | 优先 sccache（支持 MSVC），回退 ccache（仅 GCC/Clang）；命中则设 `CMAKE_C/CXX_COMPILER_LAUNCHER` |
-| `Dependencies.cmake` | `third_party/` 子模块依赖（纯 `add_subdirectory`，无 FetchContent） | `GDA_THIRD_PARTY_DIR`（`${CMAKE_SOURCE_DIR}/third_party`）、`GDA_SUBMODULE_BIN_DIR`（`${CMAKE_BINARY_DIR}/_sub`）、`gda_require_submodule(<name>)`（子模块缺失即 `FATAL_ERROR` 并提示 `git submodule update --init --recursive`，故意不做网络回退）、`MCP_WITH_OPENSSL "OFF"`（CACHE STRING ... FORCE，仅 `add_subdirectory(mcp-cpp-sdk)` 前设置；SDK 0.3.8 起三态开关 AUTO/ON/OFF，GDA 仅监听 127.0.0.1 明文 HTTP 无 TLS 需求，故显式 OFF）、`GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE）；`godot-cpp` @ `10.0.0-stable`（commit `507ed9d`）、`mcp-cpp-sdk` @ `0.3.12`（commit `7a62e63`） |
+| `Dependencies.cmake` | `third_party/` 子模块依赖（纯 `add_subdirectory`，无 FetchContent） | `GDA_THIRD_PARTY_DIR`（`${CMAKE_SOURCE_DIR}/third_party`）、`GDA_SUBMODULE_BIN_DIR`（`${CMAKE_BINARY_DIR}/_sub`）、`gda_require_submodule(<name>)`（子模块缺失即 `FATAL_ERROR` 并提示 `git submodule update --init --recursive`，故意不做网络回退）、`MCP_WITH_OPENSSL "OFF"`（CACHE STRING ... FORCE，旧协议 SDK 已移除；当前无该开关，GDA 仅监听 127.0.0.1 明文 HTTP 无 TLS 需求，故显式 OFF）、`GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE）；`godot-cpp` @ `10.0.0-stable`（commit `507ed9d`）；旧协议 SDK 已移除 |
 | `Lto.cmake` | 仅 Release 的链接优化 | 优先级 Clang ThinLTO（`-flto=thin`）> MSVC LTCG（`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`）> GCC IPO（`CheckIPOSupported`）；非 Release 直接跳过 |
 | `skill_gen.cmake` | skill 标准目录构建期嵌入（09-08 新增） | `GDA_BUN_EXECUTABLE`（`find_program(NAMES bun)`；未命中或 `bun --version` 失败即 `FATAL_ERROR` 并提示安装 Bun 1.4+）+ configure 期 `--version` 可用性自检；`add_custom_command` 执行 `"${GDA_BUN_EXECUTABLE}" tools/embed_skills.ts` 生成 `<build>/generated/skill_content_embedded.h` + `add_custom_target(gda_skill_embed_header)`；依赖 `skills/*/[SKILL.md|references/*.md|scripts/*.mjs]`（CONFIGURE_DEPENDS） |
 
@@ -216,7 +216,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | 子模块 | 上游仓库 | tag | commit |
 |---|---|---|---|
 | `third_party/godot-cpp` | `godotengine/godot-cpp` | `10.0.0-stable` | `507ed9d840c01a3c5b2a39af8bb4000bfac30bf5` |
-| `third_party/mcp-cpp-sdk` | `jesspig/modelcontextprotocol-cpp-sdk` | `0.3.12` | `7a62e636bceeab63c07d820b85a60414a430ea06` |
+| 旧协议 SDK（已移除） | 原仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 原 `0.3.12` | 原 `7a62e636bceeab63c07d820b85a60414a430ea06` |
 | `third_party/googletest` | `google/googletest` | `v1.15.2` | `b514bdc898e2951020cbdca1304b75f5950d1f59` |
 
 - **检出方式**：`git clone --recurse-submodules <repo>`，或事后 `git submodule update --init --recursive`；子模块源码在 `build/` 之外，不受清理 `build/` 影响。
@@ -228,7 +228,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 - **编译作业数** = `min(总内存/1500MB, 核数-2)`，下限 1；同时写入 `CMAKE_BUILD_PARALLEL_LEVEL`；
 - **链接作业数** = `min(总内存/4000MB, 2)`，下限 1（链接内存密集，刻意收紧）；
-- 作业池命名 `gda_compile_pool` / `gda_link_pool`，加 `gda_` 前缀是**刻意规避**与 mcp-cpp-sdk 自带 `compile_pool`/`link_pool` 的全局同名冲突（`BuildOptimization.cmake:83` 注释）；
+- 作业池命名 `gda_compile_pool` / `gda_link_pool`，加 `gda_` 前缀是**刻意规避**与旧协议 SDK（已移除）自带 `compile_pool`/`link_pool` 的历史同名冲突（`BuildOptimization.cmake:83` 注释）；
 - **Unity batch** = `min(总内存/500MB, (核数+1)/2)`，下限 2。
 
 ### 预设（`CMakePresets.json`）

@@ -30,7 +30,7 @@ resource:
 
 ## 0. 当前安全姿态
 
-- 只有 `/mcp` 与 IPC 两个协议面；REST `/api`、Bearer 认证、allow-list / `GODOT_AUTOPILOT_ALLOW` / `GODOT_AUTOPILOT_AUTH_MODE` 与 `McpConfigDock` 已移除，CLI 为纯客户端。`api_token` 模块现仅提供 `generate_token()`（32 字节随机值的十六进制）与 `constant_time_equals()`；IPC 令牌只经实例登记 `endpoints.ipc.token` 分发，不再有令牌文件与 REST Bearer 路径。
+- 只有本机 HTTP 通道与 IPC 两个协议面；REST `/api`、Bearer 认证、allow-list / `GODOT_AUTOPILOT_ALLOW` / `GODOT_AUTOPILOT_AUTH_MODE` 与 `McpConfigDock` 已移除，CLI 仅通过这些本机通道连接插件。`api_token` 模块现仅提供 `generate_token()`（32 字节随机值的十六进制）与 `constant_time_equals()`；IPC 令牌只经实例登记 `endpoints.ipc.token` 分发，不再有令牌文件与 REST Bearer 路径。
 - 保留 `side_effect` 元数据；MCP 工具声明 `read_only_hint`、`destructive_hint`、`open_world_hint`。高风险工具（`destructive` / `process` / `code_execute` / `game_runtime`）每次调用都必须带 `arguments.confirm=true`，否则返回 `confirmation_required`。经 `call_tool` 代理时按**目标工具**的 `side_effect` 判定（`elicitation_detail::effective_side_effect`）：兼容 elicitation 的客户端在缺 confirm 时收到 `elicitation/create`，拒绝则不执行；工具层始终以 `confirmation::error()` 兜底。另 `os_file_write` 的 `action=trash` 也要求 `confirm=true`（`src/tools/domains/os/trash_confirm.hpp`）。
 - `confirm` 不是安全边界；它只阻止误触，调用方仍需自行审查目标与参数。审计仍记录工具、`side_effect`、结果与错误。服务端现在用 `confirmation::resolve_confirmation` 把 `args.confirm`、call_tool 嵌套 `arguments.confirm` 与 `inputResponses`（对象 `action:accept` 或布尔 `true` 简写）归一为单个决策；elicitation 只负责交互询问，`SpecTool` 仍是唯一执行门禁。畸形响应返回 `invalid_input_response`，不再静默忽略。
 - `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 的暴露面（253 个顶层工具），不改变安全姿态：导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定、主线程派发全部继续生效。full 下每个域工具走与 `call_tool` 相同的注册回调与 dispatch 预算，不新增线程、不绕过 `ExportGuard`。
@@ -38,20 +38,20 @@ resource:
 
 ## 1. 可信客户端模型
 
-- 默认模型是“同一用户账户下、同一台机器上的受信 MCP 客户端”。默认监听 `127.0.0.1:<port>/mcp`（端口由插件首次启动在 20000–29999 随机分配并持久化），这不是身份认证；能够连接本机端口的其他本地进程也视为可调用方。
+- 默认模型是“同一用户账户下、同一台机器上的受信 CLI 调用方”。默认监听 `127.0.0.1:<port>`（端口由插件首次启动在 20000–29999 随机分配并持久化），这不是身份认证；能够连接本机端口的其他本地进程也视为可调用方。
 - 服务器不应把客户端名称、版本或 MCP 初始化信息当作认证凭据。日志中的客户端信息只用于诊断，不改变授权边界。
 - 暴露给非环回地址等价于把编辑器控制权暴露给网络可达方；在没有认证、授权和加密层时不得作为安全的远程部署方式。
-- **0.3.2 起只有 `/mcp` 一个协议面**：REST `/api`、API token 与 Bearer 认证已移除；`/mcp` 沿用「环回 + 可信客户端」模型，无应用层认证，高风险工具由 `confirm=true` 控制（见 §3）。
+- **0.3.2 起只有本机 HTTP 一个协议面**：REST `/api`、API token 与 Bearer 认证已移除；本机通道沿用「环回 + 可信调用方」模型，无应用层认证，高风险工具由 `--confirm` 控制（见 §3）。
 
 ## 2. 监听要求
 
 - 默认必须绑定环回地址 `127.0.0.1`；`GODOT_AUTOPILOT_HOST` 是显式覆盖入口，不得静默改变默认值。
 - 截至 2026-09-02，非环回地址在 `ServerContext::start()` 直接拒绝启动并返回 `refusing non-loopback listen address`，不进入工具注册或传输启动，以避免无认证远程控制面；如需远程，须先提供应用层认证并显式允许。
 - `GODOT_AUTOPILOT_HOST=0.0.0.0` 表示监听所有接口，只能作为明确的运维选择；文档、配置界面和诊断日志必须让该风险可见，当前实现会拒绝该值。
-- 端口解析顺序：**环境变量 `GODOT_AUTOPILOT_PORT` ＞ 工程级配置偏好（集中根下工程目录的 `config.json` 的 `port` 键）＞ 自动分配**。自动分配从 `20000–29999` 随机候选序列取首个可用端口。**显式指定端口（环境变量 / 配置偏好）绑定失败时不自动更换**，直接启动失败并报 `the requested port N is unavailable: <原因>`；只有自动分配才顺延。监听地址与端点独立配置，端点固定为 `/mcp`，端口是唯一可配项。端口模型与候选序列见 [端口与实例登记](modules/ports.md)。
+- 端口解析顺序：**环境变量 `GODOT_AUTOPILOT_PORT` ＞ 工程级配置偏好（集中根下工程目录的 `config.json` 的 `port` 键）＞ 自动分配**。自动分配从 `20000–29999` 随机候选序列取首个可用端口。**显式指定端口（环境变量 / 配置偏好）绑定失败时不自动更换**，直接启动失败并报 `the requested port N is unavailable: <原因>`；只有自动分配才顺延。监听地址与端点独立配置，端点由 CLI 自动寻址，端口是唯一可配项。端口模型与候选序列见 [端口与实例登记](modules/ports.md)。
 - 环回约束是**两层**，缺一不可，改任一层都要重新验证：
   - **绑定层**（本项目）：`ServerContext::start()` 用 `is_loopback_host()` 判定 `127.0.0.1`/`::1`/`[::1]`，其余值拒绝启动（`src/core/server_context.cpp:28-29`、`:75-76`）。
-  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.12`，commit `7a62e636bceeab63c07d820b85a60414a430ea06`，由 `.gitmodules` 与 gitlink 确定）。
+  - **请求层**（依赖）：当前本机协议栈在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。旧协议 SDK 已移除，不再有对应子模块与锁定版本。
   - 因此“把绑定地址放宽”并不能让非环回 Host 的请求可用；反向的 DNS 重绑定（用本机主机名或局域网 IP 访问）由请求层拦下。
 
 ## 3. 高风险工具分类
@@ -114,18 +114,18 @@ resource:
 
 技能书是 MCP 客户端失效时的说明书，也是**唯一**的脚本化调用载体；脚本化通道只有 GDA CLI 一条（`bunx`、全局安装、独立二进制是同一载体的三种分发方式）。CLI 不是第二服务端，只经 MCP 协议与编辑器进程内的同一台服务器对话：
 
-- 目标固定为 `127.0.0.1` 字面量（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，代理环境变量被刻意忽略，保持环回直连。
+- 目标固定为 `127.0.0.1` 字面量（`src/rpc/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，代理环境变量被刻意忽略，保持环回直连。
 - 请求头仅 `Content-Type: application/json` 与 `Accept`，无认证头；响应只做 JSON 解析，永不求值或执行。
 - 写盘只有两处：`--save-images DIR` 内的解码图片（自生成文件名）与 CLI 自身的 state dir（实例登记表与日志，见 §3.4）；`--args-file` 只读 JSON，不写盘。
 - 技能文档禁手写 HTTP：技能文档的全部 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（单元测试 逐文件断言），调用统一走 GDA CLI；无 CLI 可用则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
-- 握手：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 已升级为标准 `initialize` 流程（`840e648`），`cli/tests/contract.test.ts` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
+- 握手：依赖 SDK 0.3.7 起严格要求完整握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 已升级为标准 `initialize` 流程（`840e648`），`cli/tests/contract.test.ts` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险工具仍要求 `confirm=true`（§3）、脱敏仍默认开启（§3.2）。
 
 ### 3.4 CLI 安全包络（2026-10-18 新增）
 
 gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技能书调用阶梯第二级，其安全包络如下：
 
-- **目标固定为 `127.0.0.1` 字面量**（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置。
+- **目标固定为 `127.0.0.1` 字面量**（`src/rpc/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置。
 - **退出码四态**：0 = 成功；1 = 工具失败（业务载荷含 `error`，读载荷不读传输层）；2 = 传输或环境失败（连接拒绝、超时、HTTP 错误、引擎缺失）；3 = 用法错误（未知命令、缺参、非法选项）。1 属业务层，2 与 3 属通道自身不可用——客户端据此决定重试还是改用法，不得把 2 读成「工具无返回」。
 - **无 shell 拼接**：进程 spawn 全部经 argv 数组（`node:child_process` 的 `spawn`/`spawnSync`），不经过 shell 解释；参数均为字面量或数字 pid，无可注入面。
 - **启动即脱父，pid 即本次拉起的编辑器（10-20 修正）**：Windows 上**直连 `spawn(编辑器, args, { detached: true })`**（`cli/src/process.ts:68-102`），`detached` 使编辑器脱离父进程与控制台，随后 `child.unref()`；`spawn` 返回值即**本次拉起的编辑器自身 pid**。此前的 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**——按端口/映像名/时间窗匹配既可能命中无关进程，也拿不到「本次拉起」的确切 pid。现路径无任何端口反查，登记表 pid 精确等于被拉起的编辑器。
@@ -134,7 +134,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - **状态文件仅落 state dir**：`instances.json`、`instances.lock`、`logs/` 全部限定在 `GODOT_AUTOPILOT_CLI_HOME` 覆写值或 `<集中根>/cli/`（集中根 = `GODOT_AUTOPILOT_HOME` 覆写 > `os.homedir()`，其下固定目录名 `.godot-autopilot`）解析出的目录内，不写工程目录、不写仓库。
 - **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；**引擎定位只此一条链**——**不读 `GODOT_PATH`**（该变量历史上仅服务已删除的 L2 引擎测试，避免把测试引擎路径带入生产），**也不读 `<project>/.env`**；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
 - **不收集个人信息**：CLI 不读取工程内容、不上报任何遥测；唯一本地状态是实例登记表（id/project/port/pid/startedAt/headless/godot/log），且只存本机路径与 pid。
-- **IPC 认证失败不降级**：`call`/`resources`/`prompts` 统一复用 `parseTransport` 并传递 `endpoints.ipc.token`；IPC 返回 `-32001`（token rejected）或 `-32002`（initialize required）时明确抛错，`auto` 模式也拒绝回退到无认证 HTTP（`cli/src/mcp/client.ts`）。显式 `--socket` 的令牌来自 `GODOT_AUTOPILOT_IPC_TOKEN`。
+- **IPC 认证失败不降级**：`call`/`resources`/`prompts` 统一复用 `parseTransport` 并传递 `endpoints.ipc.token`；IPC 返回 `-32001`（token rejected）或 `-32002`（initialize required）时明确抛错，`auto` 模式也拒绝回退到无认证 HTTP（`cli/src/rpc/client.ts`）。显式 `--socket` 的令牌来自 `GODOT_AUTOPILOT_IPC_TOKEN`。
 - **请求已发出后不回退重发**：请求写入 socket 后超时或断连被标记为 `ipcRequestSent`，错误说明结果未知且未重试，不再回退 HTTP；仅请求尚未发出时保留连接不可达的既有回退；显式 socket 路径遇认证拒绝也不再吞错改走端口通道（`cli/src/ipc/client.ts`、`cli/src/commands/call.ts`）。
 - 不改变默认安全姿态：监听仍仅环回（§2）、高风险工具仍要求 `confirm=true`（§3）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 `ExportGuard` 与确认要求。
 
@@ -147,7 +147,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - 标准路径是 `CommandQueue::submit()` 入队（带预算的调用走 `submit_tracked()` 以获得任务 id 与取消能力），由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，经 `future` 返回结果。唯一排空点是 `_process()`；09-20 起 `drain()` 前先执行 `LogPersist::flush_on_main_thread()`（本地日志/trace 增量写盘，同为 Godot 文件 API，必须主线程），09-21 起再在前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）。
 - trace 上下文跨线程纪律（09-20 起）：`dispatch::call_handler` 在提交侧 `capture_trace_context()`（纯 std 线程局部变量，不触碰 Godot API）、执行侧用 `ScopedTraceContext` 恢复，并用 `steady_clock` 测量排队等待（`queue_wait_ms`）；`LogPersist` 的入队缓冲与游标由互斥保护，只存纯 std 字符串。
 - **trace 截图与轨迹的落盘通道（10-20 修正）**：`LogPersist` 的 Godot 文件 API 调用**只在主线程**执行，落盘路径唯一：`flush_on_main_thread()` → `append_persist_file()`（`godot::FileAccess` 写日志）、`append_trace_payload()`（纯 std `std::ofstream` 追加 trace jsonl）、`flush_trace_images()`（`godot::FileAccess` 写截图 PNG，`godot::DirAccess` 建 `traces/images/`）；`init_session()` / `rotate_on_init()` / `prune_persist_dir()` 同样只在主线程。此前 `store_trace_image()` 在调用方线程（`SpecTool::execute` 所在 transport 线程）直接 `godot::FileAccess::open` + `store_buffer` 落盘，违反本节首条契约；10-20 起改为只做 base64 解码与**入主线程缓冲**（`enqueue_trace_image()`，互斥保护的 `image_buffer_`，上限 64 条 / 64 MiB，超限丢最旧并计 `dropped_trace_images`），写盘由 `flush_on_main_thread()` 末端的 `flush_trace_images()` 完成；`write_trace_now()`（超时等即时 trace 追加）也收敛到同一条持锁通道 `append_trace_payload()`，与 `flush_on_main_thread()` 的 jsonl 追加共用 `mutex_`，并发追加不再撕裂行。**当前口径**：transport 线程只写纯 std 内存缓冲与 trace 事件，`FileAccess`/`DirAccess` 一律主线程。
-- 协议侧钩子线程（09-21 起）：`ServerContext` 接入 `opts.on_request`（`monitor::begin_request`，含 `_meta` 的 traceparent 提取）与 `opts.on_notification`，响应侧经 `opts.outgoing_filters`（`mcp::FilterPipeline` + `MessageFilterFuncAdapter`）在 SDK worker 线程捕获出站 `JsonRpcResponse`/`JsonRpcErrorResponse`，完成 `monitor::end_request`/`note_protocol_error`（SDK 的 `on_response` 仅用于「服务端发起请求的应答」，不覆盖我方回复客户端的响应）；这些钩子与 `monitor` 门面均为纯 std、不触碰 Godot API（仅写 `TraceRecorder`/`LogSystem` 内存缓冲，落盘由主线程 flush），`RequestRegistry` 有互斥保护（上限 4096、FIFO 淘汰）。`begin_request` 现以内部 request key（`mcp_wire::request_id_key`）作为 `RequestRecord::request_id` 与 trace 事件 `request_id`，客户端原 id 另存 `RequestRecord::client_request_id`，`end_request`/`note_protocol_error` 同样用内部 key——跨连接同号请求的内部追踪归因互不覆盖。
+- 协议侧钩子线程（09-21 起）：`ServerContext` 接入 `opts.on_request`（`monitor::begin_request`，含 `_meta` 的 traceparent 提取）与 `opts.on_notification`，响应侧经 `opts.outgoing_filters`（`FilterPipeline` + `MessageFilterFuncAdapter`，GDA 门面）在 SDK worker 线程捕获出站 `JsonRpcResponse`/`JsonRpcErrorResponse`，完成 `monitor::end_request`/`note_protocol_error`（SDK 的 `on_response` 仅用于「服务端发起请求的应答」，不覆盖我方回复客户端的响应）；这些钩子与 `monitor` 门面均为纯 std、不触碰 Godot API（仅写 `TraceRecorder`/`LogSystem` 内存缓冲，落盘由主线程 flush），`RequestRegistry` 有互斥保护（上限 4096、FIFO 淘汰）。`begin_request` 现以内部 request key（`mcp_wire::request_id_key`）作为 `RequestRecord::request_id` 与 trace 事件 `request_id`，客户端原 id 另存 `RequestRecord::client_request_id`，`end_request`/`note_protocol_error` 同样用内部 key——跨连接同号请求的内部追踪归因互不覆盖。
 - 明确例外（09-13 起）：`call_tool` 元工具的编排回调在 MCP/transport 线程执行——等待运行时响应（`runtime_ops::wait_pending_response`）与截图定型不占用主线程，保证等待期间调试器消息泵与编辑器主线程不被阻塞。**回调自身不触碰 Godot API**：领域工具 handler 经 `dispatch::call_handler` 路由回主线程，截图读盘经队列提交。但「不触碰 Godot API」不等于「不写 trace」：`call_tool` 在 transport 线程直接执行 `SpecTool::execute`（`src/tools/base/tool_spec.hpp:168`），记录 `TraceEvent`（`monitor::tool_call`）、写 `LogSystem` 内存缓冲，并调用 `LogPersist::store_trace_image()` 将截图载荷**入队**（10-20 起仅入队，落盘在主线程）。因此 transport 线程写 trace/log 内存缓冲是常态而非例外，准确契约是：**transport 线程可写纯 std 的 trace/log 内存缓冲，但不得直接调用 Godot API，也不得直接落盘**。
 - 只有不访问 Godot API 的纯 C++ 逻辑可留在 HTTP 线程；只读缓冲区若由代码明确保证线程安全，才可使用该例外。新增例外必须在代码和文档中同时说明。
 - 主线程判定以队列首次 `drain()` 记录的线程为准；队列必须在插件正常生命周期内先完成主线程初始化，再处理依赖 Godot API 的任务。
@@ -160,7 +160,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 
 ## 5. 停止与重载
 
-- 停止顺序是：阻止服务器继续接受新请求，调用 `McpServer::Close()`，再调用 transport `Close()`，清理 handler 与 registry，最后释放 `ServerContext`。插件退出时先停服务器，再 `CommandQueue::close()` 并清空 `runtime_ops` 指针，最后释放其他插件组件（`main.cpp:_exit_tree`）。
+- 停止顺序是：阻止服务器继续接受新请求，调用 GDA 本机服务 `Close()`，再调用 transport `Close()`，清理 handler 与 registry，最后释放 `ServerContext`。插件退出时先停服务器，再 `CommandQueue::close()` 并清空 `runtime_ops` 指针，最后释放其他插件组件（`main.cpp:_exit_tree`）。
 - 重载/改端口是原子意图而非并行启动：先执行 `stop()`，再更新端口并 `start()`；`start()` 任意阶段失败会清理已创建的 transport/server 并重置 handler/registry，不会假报运行中。
 - `CommandQueue` 已具备 `open/close/is_closed`、容量限制（默认 1024）、关闭时拒绝未执行任务并通过 `future` 抛异常、首次 `drain()` 固定主线程且错误线程 `drain()` 返回 false 的语义；09-29 起另有 `submit_tracked()`（返回任务 id + future）、`cancel(id)`（仅取消尚未 drain 的任务并在 future 抛 `cancelled before execution`）、`last_drain_age_ms()`（最近一次 drain 距今毫秒数，未 drain 为 -1）、`oldest_pending_age_ms()`（最旧排队任务年龄，空队为 -1）与 `Stats::cancelled` 计数；析构自动 `close()`。实现保证停止期间未完成 future 有明确结果，且不会在 `ServerContext` 已销毁后触碰 Godot 对象。
 - 停止/重载与队列排空并发时，禁止产生悬垂引用、重复响应或把旧实例任务交给新实例。异步运行时请求必须以 request id 关联，`runtime_ops` 保证先登记 pending 再广播、超时后标记 `Cancelled`、迟到响应丢弃并告警。传输层请求号去重按 **(connection_id, request_id)** 作用域（11-18 起）：跨连接同 id 合法受理，出站 id 改写为内部 id、响应回填客户端原 id（见 [modules/core.md](modules/core.md) GodotTransport 节）；同连接重复 id 仍拒绝。

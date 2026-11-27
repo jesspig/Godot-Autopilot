@@ -22,7 +22,7 @@ for (const needle of [
   "## Option A",
   "## Option B",
   "## Option C",
-  "## Connect your MCP client",
+  "## Connect through the CLI",
   "## Verify the installation",
   "## Troubleshooting",
   "scripts/install.sh",
@@ -33,7 +33,7 @@ for (const needle of [
   "~/.agents/skills",
   "<project>/.agents/skills",
   "project.godot",
-  "mcp_url",
+  "connection record",
   "sha256sums.txt",
 ]) {
   if (!install.includes(needle)) fail(`INSTALL.md is missing ${needle}`);

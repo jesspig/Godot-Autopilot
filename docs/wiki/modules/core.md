@@ -19,7 +19,7 @@ resource: src/core/
 > 目录布局：`src/core/` 分根目录（基座与线程模型）、`transport/`（HTTP 与端口）、`observability/`（日志/轨迹/监控/脱敏）、`storage/`（集中根/工程目录/实例登记）；共 31 个业务 `.cpp`（不含 header-only 与版本模板）。
 ## 模块简介
 
-`src/core/` 是插件的基础设施层：负责把 HTTP 线程（mcp-cpp-sdk 自研网络栈）的请求安全地桥接到 Godot 主线程、提供进程内日志与统一埋点门面（`monitor`/`monitor_env`/`perf_sampler`）、配置常量、运行时模式检测、资源缓存、场景脏状态跟踪，以及 MCP 服务器的生命周期管理。所有模块位于命名空间 `godot_autopilot`（`ResourceRegistry`/`SceneDirtyTracker` 使用 `godot_autopilot::resource_registry` / `godot_autopilot::scene_dirty_tracker` 子命名空间）。
+`src/core/` 是插件的基础设施层：负责把 HTTP 线程（GDA 自研本机协议栈，旧协议 SDK 已移除）的请求安全地桥接到 Godot 主线程、提供进程内日志与统一埋点门面（`monitor`/`monitor_env`/`perf_sampler`）、配置常量、运行时模式检测、资源缓存、场景脏状态跟踪，以及本机实例的生命周期管理。所有模块位于命名空间 `godot_autopilot`（`ResourceRegistry`/`SceneDirtyTracker` 使用 `godot_autopilot::resource_registry` / `godot_autopilot::scene_dirty_tracker` 子命名空间）。
 
 ## 职责表
 
@@ -29,11 +29,11 @@ resource: src/core/
 | 配置常量 | `config.hpp` | 端口、超时、缓冲区上限等编译期常量（GDA_ 前缀） | `server_context.cpp`、`runtime/game_bridge.cpp` 等 |
 | 路径工具 | `path_util.hpp`（header-only） | 原子写入与唯一临时路径：`atomic_temp_path()` / `write_file_atomically()`（先写 `path.tmp-<n>` 再 rename，失败清理临时文件、保留旧目标） | `InstanceRegistry`、`PluginConfig` |
 | `ExportGuard` | `export_guard.cpp/hpp` | 导出期**实例级**标志（实例注册表聚合），供工具分发拒绝工具调用 / MCP 资源 / MCP 提示词三类入口 | `dispatch::export_blocked_result`、`_enter_tree` 注册 |
-| `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（内存缓冲，含 `detail` 与 `trace_id`/`span_id`），单例 | 全部模块、`McpLogDock`、log 类资源、`LogPersist`（增量落盘） |
-| `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化（工程级目录）：轮转保留、健康计数、trace 单通道写入；截图在主线程落盘 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显；dispatch 超时经 `write_trace_now` 直写）、`McpLogDock`（Open Traces 打开 `trace_dir()`） |
+| `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（内存缓冲，含 `detail` 与 `trace_id`/`span_id`），单例 | 全部模块、`GdaLogDock`、log 类资源、`LogPersist`（增量落盘） |
+| `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化（工程级目录）：轮转保留、健康计数、trace 单通道写入；截图在主线程落盘 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显；dispatch 超时经 `write_trace_now` 直写）、`GdaLogDock`（Open Traces 打开 `trace_dir()`） |
 | `TraceRecorder` | `trace_recorder.cpp/hpp`（09-20 新增） | 进程内 trace 事件环形缓冲（容量 20000），含 schema v2 字段、脱敏与 JSON 行格式化纯函数 | `monitor`（统一写入）、`SpecTool::execute`、`dispatch`、`tool_invoke`、`LogPersist` |
 | `sanitize_policy` | `sanitize_policy.cpp/hpp`（header 内含原子缓存） | 脱敏开关全局缓存，按 env > config > 默认 true 解析 | `main.cpp`（入口初始化）、`SpecTool::execute`/`tool_invoke`/`LogPersist::store_trace_image` |
-| `monitor`（统一埋点门面） | `monitor.hpp/cpp`（纯 std，可被 MCP SDK worker 线程调用） | 统一埋点门面：写入便捷函数、协议侧钩子（按内部 request key 归因，客户端原 id 另存 `RequestRecord`）、请求关联表、计数与脱敏辅助 | `tool_spec`/`dispatch`/`tool_invoke`、`server_context`、`main.cpp`、`autopilot_tools`、`runtime_ops`、`resource_handlers`/`debugger_resources`、`mcp_log_dock` |
+| `monitor`（统一埋点门面） | `monitor.hpp/cpp`（纯 std，可被 SDK worker 线程调用） | 统一埋点门面：写入便捷函数、协议侧钩子（按内部 request key 归因，客户端原 id 另存 `RequestRecord`）、请求关联表、计数与脱敏辅助 | `tool_spec`/`dispatch`/`tool_invoke`、`server_context`、`main.cpp`、`autopilot_tools`、`runtime_ops`、`resource_handlers`/`debugger_resources`、`gda_log_dock` |
 | `monitor_env` | `monitor_env.cpp`（09-21 新增） | `environment_snapshot()`（**仅主线程**）写 `kind=snapshot` 环境快照 | `main.cpp`（`_enter_tree`） |
 | `perf_sampler` | `perf_sampler.hpp/cpp`（09-21 新增） | 主线程周期采样写 `kind=perf` 事件，并做请求超时看门狗 | `main.cpp`（`_enter_tree` 注入队列、`_process` 每帧 tick） |
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
@@ -43,7 +43,7 @@ resource: src/core/
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：按 request_id 归因 + 未归因计数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
 | `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止、工具/资源/prompt 注册；入站别名改写为 `call_tool` 包装 | `main.cpp` 入口 |
-| `PluginConfig` | `plugin_config.cpp/hpp` | 两级配置持久化：工程级 `port`、全局级 `show_time`/`desensitize`（默认 true）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源；写回经 `write_config_value()` 原子落盘，解析失败时拒绝覆盖 | `ServerContext`（`load_port`）、`McpLogDock`（`load_show_time`/`save_show_time`）、`sanitize_policy::initialize`（无 `GODOT_AUTOPILOT_DESENSITIZE` 时读 `load_desensitize`） |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 两级配置持久化：工程级 `port`、全局级 `show_time`/`desensitize`（默认 true）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源；写回经 `write_config_value()` 原子落盘，解析失败时拒绝覆盖 | `ServerContext`（`load_port`）、`GdaLogDock`（`load_show_time`/`save_show_time`）、`sanitize_policy::initialize`（无 `GODOT_AUTOPILOT_DESENSITIZE` 时读 `load_desensitize`） |
 | `HomeResolver` | `gda_home.cpp/hpp`（10-21 新增） | 家目录**集中根**解析：显式 `GODOT_AUTOPILOT_HOME` → 平台家目录（Windows `USERPROFILE` / POSIX `HOME`）→ 派生兜底（Windows 由 `%APPDATA%` 上溯两级；POSIX 由 `XDG_DATA_HOME` 或 `$HOME/.local/share` 上溯两级）→ 覆写值仅形状校验、不合法则回退派生候选（以存在性为探针），首个通过者胜出，全不通过返回空串并记 Warning | `ProjectStore::root_dir`、`ServerContext::write_instance_record`（写 `gda_home` 字段） |
 | `ProjectStore` | `project_store.cpp/hpp`（10-21 新增） | 存储布局解析：集中根目录名 `GDA_HOME_DIR_NAME`（`.godot-autopilot`）、工程目录名 `<工程目录名>-<路径 FNV-1a 哈希前 8 位>`（工程名经非法字符替换并截断 40 字符）、全局配置路径、工程级配置路径、全局实例索引路径、工程级实例目录 | `StoragePaths`、`InstanceRegistry` |
 | `StoragePaths` | `storage_paths.cpp/hpp`（10-21 新增） | 语义化存储路径门面：全局配置、工程目录、工程配置、`logs/`、`traces/`、`captures/` 六个目录的绝对路径 | `LogPersist`（日志/轨迹落盘）、`capture_ops`（截图落盘）、`PluginConfig` |
@@ -92,11 +92,11 @@ resource: src/core/
 - `void log_detailed(LogLevel, LogCategory, summary, detail, trace_id = {}, span_id = {})` — 带诊断 `detail` 的日志（`LogEntry.detail`，上限 `MAX_DETAIL_CHARS = 8192`，超出截断并附 `...[truncated]`），与 `log` 共用同一缓冲与 `serial` 序列；09-21 起扩展为 6 参重载（追加 `trace_id`/`span_id` 关联字段，旧 4 参签名委托至它），`LogEntry` 同步追加 `trace_id`/`span_id`
 - `query(const Query&)` — 支持 `min_level` / `filter_text`（大小写不敏感；`message` 未命中时继续匹配 `detail`，09-21 起再匹配 `trace_id`/`span_id`） / `category` 过滤
 - `query_recent(size_t limit)` — 取最近 N 条（`godot://log/recent` 资源经 `query_recent(50)` 消费，`resource_handlers.cpp:544`）
-- `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（`McpLogDock::poll_new_entries` 与 `get_plugin_log` 的 `since_index` 消费，`mcp_log_dock.cpp:241`、`debugger_ops.cpp:763`）
+- `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（`GdaLogDock::poll_new_entries` 与 `get_plugin_log` 的 `since_index` 消费，`gda_log_dock.cpp:241`、`debugger_ops.cpp:763`）
 - `static LogSystem& instance()` — 局部静态单例
-- **缓冲本体仅内存**（无回调、无 Godot 控制台直接输出；`McpLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）；磁盘落盘由 `LogPersist` 增量拉取（游标 `last_log_serial_`，见下节）
-- MCP 侧消费方：`get_plugin_log`（debugger_ops）经 `query`/`query_from` 读取同一缓冲（级别/分类/子串/增量过滤，值拷贝快照），与 `McpLogDock` 并行消费互不影响；过滤口径有差异——非增量分支走 `LogSystem::query`（`filter_text` 匹配 `message`∪`detail`），`since_index` 分支经 `plugin_log_entry_matches`（`debugger_ops.cpp:660`）只匹配 `message`，且响应条目仅含 `serial`/`timestamp`/`level`/`category`/`message` 五个字段（不含 `detail`）
-- **SDK 日志桥（11-18 新增）**：`route_sdk_logs()`（`log_system.cpp:110-122`）在 `ServerContext::start()` 装配时调用——SDK 日志级别低于 Error 时抬到 Error（`mcp::SetLogLevel`），并经 `mcp::SetLogHandler` 把 SDK 日志路由进同一环形缓冲：消息以 `task store:` 开头归 `LogCategory::Tools`，其余归 `LogCategory::Transport`；级别经 `sdk_log_level` 映射，文本统一加 `MCP SDK: ` 前缀并附 `req=`/`method=` 上下文（`sdk_log_text`）。task persist 失败等 SDK 侧故障从此可经 `get_plugin_log` 与 `gda-*.log` 观测，不再静默。
+- **缓冲本体仅内存**（无回调、无 Godot 控制台直接输出；`GdaLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）；磁盘落盘由 `LogPersist` 增量拉取（游标 `last_log_serial_`，见下节）
+- CLI 侧消费方：`get_plugin_log`（debugger_ops）经 `query`/`query_from` 读取同一缓冲（级别/分类/子串/增量过滤，值拷贝快照），与 `GdaLogDock` 并行消费互不影响；过滤口径有差异——非增量分支走 `LogSystem::query`（`filter_text` 匹配 `message`∪`detail`），`since_index` 分支经 `plugin_log_entry_matches`（`debugger_ops.cpp:660`）只匹配 `message`，且响应条目仅含 `serial`/`timestamp`/`level`/`category`/`message` 五个字段（不含 `detail`）
+- **SDK 日志桥（11-18 新增）**：`route_sdk_logs()`（`log_system.cpp:110-122`）在 `ServerContext::start()` 装配时调用——SDK 日志级别低于 Error 时抬到 Error（`SetLogLevel` GDA 门面），并经 `SetLogHandler` 把 SDK 日志路由进同一环形缓冲：消息以 `task store:` 开头归 `LogCategory::Tools`，其余归 `LogCategory::Transport`；级别经 `sdk_log_level` 映射，文本统一加 `MCP SDK: ` 前缀并附 `req=`/`method=` 上下文（`sdk_log_text`）。task persist 失败等 SDK 侧故障从此可经 `get_plugin_log` 与 `gda-*.log` 观测，不再静默。
 - **错误路径日志**：`ErrorPathEvent{request_id, method, error_code, connection_id, exception_type}`（`log_system.hpp:27-33`）+ `format_error_path_detail()` / `classify_error_path_exception()` / `log_error_path()`（`log_system.cpp:54-78`）。`log_error_path` 以 `LogLevel::Error` + `LogCategory::Transport`、summary `MCP error path` 落库，detail 形如 `request_id="..." method="..." error_code=N connection_id="..." exception_type="..."`（字符串值双引号包裹并转义 `"`/`\\`，控制字符替换为空格），随后由 `LogPersist` 写入 `gda-<stamp>.log`。`exception_type`：`non_std_exception`（message 前缀 `internal error: non-std exception`）、`std_exception`（前缀 `internal error: ` 或 `handler error: `），其余为空串（普通 JSON-RPC 校验错误，非异常）。调用点两处：HTTP 错误响应（`mcp_http_shim.cpp:262-274` 的 `log_http_error_path`，覆盖 parse error / method not found / 无 session 等）与 SDK 出站错误响应过滤器（`server_context.cpp:297-319`，先从待响应表补 method/connection_id 再落盘）
 
 ### LogPersist（单例，09-20 新增）
@@ -109,7 +109,7 @@ resource: src/core/
 - 写失败降级：`FileAccess` 以 `READ_WRITE` 打开失败时回退 `WRITE`（前者不创建新文件），仍失败或 `store_string` 失败时 `write_failed_` 置位——仅首次记一条 System 错误日志，本会话后续 flush 丢弃缓冲、不再重试；每次失败累加 `flush_failures` 并发 `kind=persist_health` 事件
 - `store_trace_image(span_id, kind, base64_png)` — **不在 transport 线程落盘**：脱敏开启时直接返回空串（`image_ref` 为空，jsonl 内仍保留 `image_hash`/`image_bytes`/`image_width`/`image_height`）；否则仅 base64 解码、拼出 `traces/images/trace-<session>-<span>-<kind>.png` 的相对与绝对路径并入**主线程图片缓冲**（`enqueue_trace_image`），返回相对路径 `images/...` 作为 `image_ref`。真正写盘发生在主线程的 `flush_trace_images()` 内
 - `enqueue_trace_image(payload)` / `flush_trace_images()` — 图片缓冲（`image_buffer_`，上限 `kTraceImageBufferMaxEntries = 64` 条 / `kTraceImageBufferMaxBytes = 64 MiB`）溢出时**丢最旧**并累加 `dropped_trace_images`、记一条 System Warning；`flush_on_main_thread()` 末尾调 `flush_trace_images()`，经 Godot `FileAccess`（`WRITE`）逐张落盘，成功时累加 `bytes_written`（`bytes_written` 的图片部分在落盘处累加）
-- 健康计数：`dropped_log_lines()`/`dropped_trace_lines()`/`dropped_trace_images()`/`bytes_written()`/`flush_failures()`/`rotations()`/`pruned_files()` 访问器 + `health_summary()`（汇总文本，含 `dropped_trace_images`），随 `kind=persist_health` 事件一并落盘；`trace_dir()` 返回工程级 `traces` 目录绝对路径（供 McpLogDock「Open Traces」按钮使用）
+- 健康计数：`dropped_log_lines()`/`dropped_trace_lines()`/`dropped_trace_images()`/`bytes_written()`/`flush_failures()`/`rotations()`/`pruned_files()` 访问器 + `health_summary()`（汇总文本，含 `dropped_trace_images`），随 `kind=persist_health` 事件一并落盘；`trace_dir()` 返回工程级 `traces` 目录绝对路径（供 GdaLogDock「Open Traces」按钮使用）
 - 静态工具函数：`level_name`/`category_name`、`format_human_line`、`session_stamp_from_ticks`、`should_prune`（单元测试 `log_persist_test` 覆盖 8 项）
 
 ### TraceRecorder（单例，09-20 新增）
@@ -172,21 +172,21 @@ resource: src/core/
 
 - `record_error(int64_t count = 1, const std::string& request_id = {})` — 累积待消费错误（mutex 保护）；带 request_id 时计入 `by_request[request_id]`，否则计入 `unattributed`；`count <= 0` 直接忽略
 - `int64_t consume_new_errors(const std::string& request_id = {})` — 取走并清零 `unattributed`，再额外取走并清除该 request_id 的条目（一次性消费）
-- `count_response_errors(const mcp::JsonValue&)` — 顶层与 `results` 数组逐项经 `object_has_error` 判定；命中条件为存在 `error` 键、`runtime_error` 值为 true、或 `structured_error.code` 是非空字符串（覆盖 batch_execute 子结果）
+- `count_response_errors(const util::JsonValue&)` — 顶层与 `results` 数组逐项经 `object_has_error` 判定；命中条件为存在 `error` 键、`runtime_error` 值为 true、或 `structured_error.code` 是非空字符串（覆盖 batch_execute 子结果）
 - 接线点：`register_all.cpp` 的 RegisterTool 回调按本次请求的 `client_request_id_text()` 调用 `record_error(new_errors, id)`，并把 `consume_new_errors(id)` 作为顶层字段 `new_errors_since_last_call` 附到响应上（含 0 值）；游戏侧 `runtime_ops.cpp` 收到 runtime_error 增量时以无 id 形式 `record_error()`，落入 `unattributed`
-- 同一 `call_tool` 回调还承担截图响应后处理：经 `util::try_attach_image_content`（`util/mcp_image_content.hpp`）把 `capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen` 的 PNG base64 转为 MCP image content 块，文本 JSON 的 `data` 替换为 `"<attached-as-image-content>"` 并加 `image_attached:true`；`batch_execute`/`code_execute` 内的调用不附加 image 块
+- 同一调用回调还承担截图响应后处理：经 `util::try_attach_image_content`（`util/mcp_image_content.hpp`）把 `capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen` 的 PNG base64 转为 image content 块，文本 JSON 的 `data` 替换为 `"<attached-as-image-content>"` 并加 `image_attached:true`；`batch_execute`/`code_execute` 内的调用不附加 image 块
 
 ### editor_readiness（命名空间函数，非类，08-24 新增）
 
 导入/扫描就绪门控，避免 reimport 类调用撞上进行中的文件系统扫描：
 
 - `bool is_import_in_progress()` — 经 `EditorInterface::get_resource_filesystem()` 查 `is_scanning()` 与 `is_importing()`（后者以 `has_method` 探测，兼容引擎版本差异）；接口不可用时返回 false
-- `mcp::JsonValue busy_error()` — 构造软错误 `{"error": "editor is currently importing/scanning resources; retry shortly", "retryable": true, "retry_after_ms": 500}`
+- `util::JsonValue busy_error()` — 构造软错误 `{"error": "editor is currently importing/scanning resources; retry shortly", "retryable": true, "retry_after_ms": 500}`
 - 消费方：`resource_ops`（reimport 双入口与 uid 重建）和 `text_ops`（write_file 命中已导入文件）的 reimport 路径——导入中且有实际工作量时返回 busy_error，scan 场景幂等跳过
 
 ### GodotTransport（单例，09-30 新增 pending meta）
 
-MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）；09-30 起为错误路径日志提供待响应元数据：
+本机消息通道（`TransportBase` GDA 门面子类，`godot_transport.hpp:40-87`）；09-30 起为错误路径日志提供待响应元数据：
 
 - `submit(parsed, connection_id, &error)` — 请求（非通知）登记 `PendingExchange{promise, future, request_id, connection_id, method, internal_id}`：去重 key = `connection_id + '\x1f' + request_id`（`make_pending_key`，**按连接作用域**——跨连接同 id 不再互拒，同连接同 id 在途时拒绝第二次提交，报 `request id already in flight (connection <id>)`）；提交时经 `next_internal_id_` 分配内部 id 并**把出站请求 id 改写为内部 id**（`request->id = internal_id`），`id_index_` 以 `request_id_key(internal_id)`（`i:<n>` / `s:<str>`）反查去重 key；响应按内部 id 匹配后**回填客户端原 id**（`response->id = request_id`），保障并发路由；`notifications/cancelled` 的 `params.request_id` 同样按 (connection, 原 id) 改写为对应内部 id；发送失败时回滚登记
 - `set_inbound_rewrite(InboundRewrite)`（`godot_transport.hpp:54`）— `submit()` 在去重登记与内部 id 改写**之前**对入站消息调用该钩子；`ServerContext` 用它把命中别名（`dispatch::resolve_alias_canonical`）的 `tools/call` 包装为 `call_tool{name, arguments}`，使别名直调也走 `call_tool` 的确认/预算路径
@@ -197,13 +197,13 @@ MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）�
 ### ServerContext
 
 - 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()`/`resolve_host()` 解析端口与主机并写 Transport 日志；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
-- `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；装配时经 `route_sdk_logs()` 把 SDK 日志级别抬到 ≥Error 并路由进 LogSystem（见 LogSystem 节；`MCP_LOG_LEVEL` 未设置时 SDK 默认 Off）
+- `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = 本机控制路径（旧端点已移除）`、`stateless = true`、`enable_legacy_sse = false`）→ GDA 本机服务 `Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；装配时经 `route_sdk_logs()` 把 SDK 日志级别抬到 ≥Error 并路由进 LogSystem（见 LogSystem 节；`MCP_LOG_LEVEL` 未设置时 SDK 默认 Off）
 - `void stop()` — 幂等关闭 `server_`/`transport_`，清空 dispatch handler 与 active registry；析构函数对非空资源兜底调用
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
-- MCP 服务器标识：`mcp::Implementation{"godot-autopilot", GDA_VERSION}`（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
+- 实例标识：`Implementation{"godot-autopilot", GDA_VERSION}`（GDA 门面）（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
 - 缓存提示（`server_context.cpp:95-103`）：MCP 2026-07-28 规范要求六类 cacheable 结果携带缓存提示，协商到 2026 era 的客户端会按必填字段校验；`ttlMs=0` 表示"立即过期"，仅满足字段声明，客户端仍每次重新拉取，行为与未声明时一致
 - 生命周期回调（全部写 Transport 类别日志）：`on_method_called`（Debug）、`on_client_connected` / `on_initialized` / `on_transport_close`（Info）、`on_protocol_error` / `on_transport_error`（Error）
-- 协议埋点接线：`opts.on_request` → `monitor::begin_request`（提取 `_meta` 里的 traceparent）；`opts.on_notification` → `note_notification`；**响应侧走 `opts.outgoing_filters`**（`mcp::FilterPipeline` + `MessageFilterFuncAdapter`）捕获出站 `JsonRpcResponse`/`JsonRpcErrorResponse` 后才做 `end_request`/`note_protocol_error`——SDK 的 `on_response` 只覆盖「服务端发起请求的应答」，不覆盖我方回复客户端的响应，误用会让所有请求只剩 begin 没有 end。`on_client_connected`/`on_transport_close`/`on_transport_error`/`on_protocol_error` 追加 `note_client`/`note_transport`/`error_event`；start/stop/restart/失败均发 lifecycle/error 事件。实测结论见 [2026-09-21 changelog](../changelog/2026-09-21-log.md)
+- 协议埋点接线：`opts.on_request` → `monitor::begin_request`（提取 `_meta` 里的 traceparent）；`opts.on_notification` → `note_notification`；**响应侧走 `opts.outgoing_filters`**（`FilterPipeline` + `MessageFilterFuncAdapter`，GDA 门面）捕获出站 `JsonRpcResponse`/`JsonRpcErrorResponse` 后才做 `end_request`/`note_protocol_error`——SDK 的 `on_response` 只覆盖「服务端发起请求的应答」，不覆盖我方回复客户端的响应，误用会让所有请求只剩 begin 没有 end。`on_client_connected`/`on_transport_close`/`on_transport_error`/`on_protocol_error` 追加 `note_client`/`note_transport`/`error_event`；start/stop/restart/失败均发 lifecycle/error 事件。实测结论见 [2026-09-21 changelog](../changelog/2026-09-21-log.md)
 - 诊断日志增强：初始化 / 注册工具 / 启动传输 / 停止 / 重启等关键流程均有诊断日志；`start()` 启动失败输出捕获到的真实异常类型（不再硬编码 "unknown exception"）；09-20 起非环回拒绝、协议/传输错误、启动失败与 `restart` 路径另发 `log_detailed`（`endpoint=host:port` + `msg=...`），把失败与端点关联
 - `register_tools()` 注册四类：工具、资源、prompt、调试器专用资源/prompt
 
@@ -278,7 +278,7 @@ MCP 消息通道（`mcp::TransportBase` 子类，`godot_transport.hpp:40-87`）�
 
 ```mermaid
 flowchart LR
-    Client[MCP Client] -->|POST /mcp 端口 20000–29999 自动分配| HTTP[SDK HTTP 线程]
+    Client[CLI 客户端] -->|本机环回端口 20000–29999 自动分配| HTTP[SDK HTTP 线程]
     HTTP -->|queue.submit() 返回 future| Q[CommandQueue 互斥队列]
     Q -->|_process 每帧 drain| Main[Godot 主线程]
     Main --> API[Godot API / 场景 / 引擎]
@@ -287,13 +287,13 @@ flowchart LR
 
 - HTTP 线程绝不直接触碰 Godot API：领域工具经 `dispatch::call_handler` 判断——非主线程时经 `run_on_main_thread_with_budget`（`submit_tracked` + 按 flags 决策的等待预算 + 超时取消 + 结构化 `main_thread_timeout` 错误，`dispatch.cpp:291-409`）投递主线程并等待；资源/prompt 注册同样走带预算的等待入口（`dispatch::run_bounded_on_main_thread`，`dispatch.hpp:45-64`）
 - 唯一编排层例外（09-13 下午起）：`call_tool` 元工具回调在 MCP 线程执行（等待运行时响应/截图定型不再占用主线程消息泵），编排逻辑自身不触碰 Godot API、领域工具 handler 仍由 dispatch 路由回主线程；其余 6 个元工具仍走带预算的等待入口
-- 排空点唯一：`GodotAutopilotPlugin::_process(double)` 先 `perf_sampler::tick(delta)`（09-21 起按周期采样 `kind=perf` 并做请求超时看门狗）再 `LogPersist::instance().flush_on_main_thread()`（把上一帧以来累积的日志/trace 增量写盘）再 `s_queue.drain()`，随后轮询 `McpLogDock`；`LogPersist` 的缓冲与游标有互斥保护（入队可发生在任意线程），写盘固定主线程
+- 排空点唯一：`GodotAutopilotPlugin::_process(double)` 先 `perf_sampler::tick(delta)`（09-21 起按周期采样 `kind=perf` 并做请求超时看门狗）再 `LogPersist::instance().flush_on_main_thread()`（把上一帧以来累积的日志/trace 增量写盘）再 `s_queue.drain()`，随后轮询 `GdaLogDock`；`LogPersist` 的缓冲与游标有互斥保护（入队可发生在任意线程），写盘固定主线程
 - `drain()` 首次执行时把当前线程记为"主线程"，此后 `is_main_thread()` 据此判定
 - 主线程等待预算（`dispatch.cpp`）：非主线程的领域工具调用统一经 `run_on_main_thread_with_budget`（`call_tool` 代理与直连 meta 工具共用）等待主线程；预算由 `main_thread_wait_budget_ms(flags, default_ms, health_ms, long_blocking_ms)`（**4 参**，10-20 起新增 `long_blocking_ms`）按 flags 决策——默认 `GDA_DISPATCH_WAIT_DEFAULT_MS`（27000ms，env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`），`kHealthProbe` 用 `GDA_DISPATCH_WAIT_HEALTH_MS`（5000ms，env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`），`kLongBlocking` 用 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS`（常量 **29000ms** = `GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`，经 `env_int_clamped` 钳制在 `[1000, 29000]`：未设时生效 29000ms，设了可下调，不再是无界等待）；参数非正时回退默认预算。超时先 `cancel(id)`（命中表示任务尚未执行、不会执行；未命中表示已被主线程取走），再返回结构化 `main_thread_timeout` 错误（附 `queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），并直写 trace 与 Transport Warning；队列满/关闭时返回 `code="queue_unavailable"`（`retryable=true`）；`ping`/`system_status` 为健康探针，`code_execute`/`batch_execute` 为长阻塞工具
 
 ## 生命周期（插件 ↔ ServerContext）
 
-1. `GDExtensionEntryPoint`（`main.cpp`）：`MODULE_INITIALIZATION_LEVEL_SCENE` 在非编辑器进程调用 `game_bridge::register_listener()`（桥接类注册与消息捕获）；`MODULE_INITIALIZATION_LEVEL_EDITOR` 先 `debugger_ops::register_classes()`（2 个调试器捕获类）、再依次 `ClassDB::register_class` 注册 4 个类（`McpLogDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，`main.cpp:431-434`），最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
+1. `GDExtensionEntryPoint`（`main.cpp`）：`MODULE_INITIALIZATION_LEVEL_SCENE` 在非编辑器进程调用 `game_bridge::register_listener()`（桥接类注册与消息捕获）；`MODULE_INITIALIZATION_LEVEL_EDITOR` 先 `debugger_ops::register_classes()`（2 个调试器捕获类）、再依次 `ClassDB::register_class` 注册 4 个类（`GdaLogDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，`main.cpp:431-434`），最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
 2. `_enter_tree`：`monitor::lifecycle("plugin_enter_tree")` → `s_queue.open()`（`main.cpp:113`）→ `perf_sampler::set_queue(&queue())` → `sanitize_policy::initialize()` + `LogPersist::init_session()`（09-21 起重置日志/轨迹游标）→ `monitor::environment_snapshot()`（写 `kind=snapshot`）→ `runtime_ops::set_editor_queue(&queue())` 注入队列（`main.cpp:141-142`，**在 `s_queue.open()` 之后**）→ 记 `tools_singleton_registered` lifecycle + Log Dock/输出捕获/调试器插件 → `new ServerContext(queue)` 并 `start()`（成功发 `server_ready` lifecycle）→ Config Dock → `add_export_plugin(ExportGuard)` → 记 `plugin_ready`；`gda_cmdline_mode()` 为真时跳过 UI/服务器（`GDA_FORCE_HEADLESS=1` 反向禁用 cmdline 模式，语义与变量名相反）
 3. `_process`：每帧 `perf_sampler::tick(delta)` + `LogPersist::flush_on_main_thread()` + `s_queue.drain()` + Dock 轮询
 4. `_exit_tree`：`ServerContext::stop()` + delete → 注销各组件，末尾再 `flush_on_main_thread()` 收尾（`main.cpp:315`）
@@ -324,7 +324,7 @@ flowchart LR
 | `GDA_PORT_CANDIDATE_BASE` | `20000` | `int` | 自动分配端口候选区间下界 |
 | `GDA_PORT_CANDIDATE_LIMIT` | `29999` | `int` | 自动分配端口候选区间上界 |
 | `GDA_PORT_PROBE_LIMIT` | `256` | `int` | 自动分配时最多探测的候选数（`static_assert` 不得超候选总数） |
-| `GDA_MCP_PATH` | `"/mcp"` | `const char *` | MCP 协议端点路径（常量，不可配置） |
+| `GDA_MCP_PATH`（历史常量） | 旧端点路径已移除 | `const char *` | 旧协议端点路径（已移除，不可配置） |
 | `GDA_HOME_DIR_NAME` | `".godot-autopilot"` | `const char *` | 家目录集中根的目录名 |
 | `GDA_PROJECT_HASH_LENGTH` | `8` | `int` | 工程目录名中路径哈希的十六进制位数 |
 | `GDA_HEALTHY_ACTIVITY_THRESHOLD_MS` | `3000` | `int64_t` | `get_game_status` 健康判定阈值（`game_bridge.cpp`） |
@@ -362,8 +362,8 @@ flowchart LR
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
 | README.md / README.zh-CN.md（前提） | "Godot 4.7+" | `.gdextension` 的 `compatibility_minimum = "4.7"`（`devtools/lib/gdextension.ts`），AGENTS.md 亦写 4.7 | 一致 ✓ |
 | README.md / README.zh-CN.md（安装） | "图形界面编辑器打开项目时服务端自动启动" | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 一致（README 已限定图形界面会话）✓ |
-| AGENTS.md（架构/端口段） | 端口自动分配（20000–29999，按工程持久化）、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
-| README.md / README.zh-CN.md（安全段） | 回环监听 + 端口自动分配（20000–29999）+ `/mcp` + 高风险工具 `confirm` | 与代码一致 | 一致 ✓ |
+| AGENTS.md（架构/端口段） | 端口自动分配（20000–29999，按工程持久化）、CLI 自动寻址、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
+| README.md / README.zh-CN.md（安全段） | 回环监听 + 端口自动分配（20000–29999）+ CLI 自动寻址 + 高风险工具 `--confirm` | 与代码一致 | 一致 ✓ |
 | AGENTS.md | 日志类别 "仅此几个：System、Transport、Tools、Resources、Prompts" | `LogCategory` 枚举完全相同 | 一致 ✓ |
 
 ## 相关页面

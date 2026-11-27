@@ -30,7 +30,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 调用通道（2026-11-13 T-03）
 
-插件在 TCP 端口之外额外监听一条本机 IPC 通道（Windows loopback TCP、POSIX AF_UNIX；4 字节大端长度前缀 + JSON，单帧 4 MiB；首帧 `initialize` 校验实例令牌），与 TCP `/mcp` 并存、绑定失败仅告警并降级；实例登记以 `endpoints.ipc = {kind, path|host+port, token, protocol, framing, auth, version}` 表达端点（缺字段按无 IPC 处理）。CLI `gda call --socket <path>` 或 `endpoints.ipc` 可直连该通道，失败默认回退端口通道。实现见 `src/core/transport/ipc_transport.cpp`、`ipc_framing.cpp`、`ipc_endpoint.cpp`。
+插件在 TCP 端口之外额外监听一条本机 IPC 通道（Windows loopback TCP、POSIX AF_UNIX；4 字节大端长度前缀 + JSON，单帧 4 MiB；首帧 `initialize` 校验实例令牌），与 TCP 本机通道并存、绑定失败仅告警并降级；实例登记以 `endpoints.ipc = {kind, path|host+port, token, protocol, framing, auth, version}` 表达端点（缺字段按无 IPC 处理）。CLI `gda call --socket <path>` 或 `endpoints.ipc` 可直连该通道，失败默认回退端口通道。实现见 `src/core/transport/ipc_transport.cpp`、`ipc_framing.cpp`、`ipc_endpoint.cpp`。
 
 ### MCP 工具面：catalog 253 = 5 元工具 + 247 领域工具 + `system_status`
 
@@ -88,8 +88,8 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 编辑器 UI
 
-- 自定义底部日志面板 `McpLogDock`（"GDA Log"）：按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同时匹配 message 与 detail）、折叠重复、Detail 显示诊断 detail、Open Logs 打开工程级日志目录（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/logs`）、Open Traces 打开同工程 `traces` 目录与 Trace 视图（日志行带可点击 `[trace]` 标记，按 trace_id 渲染结构化事件列表，默认关闭）。"Show timestamps" 开关控制每条日志的 `[HH:MM:SS]` 本地时间前缀，经 `<集中根>/config.json`（默认 `~/.godot-autopilot/config.json`）的 `show_time` 键持久化；新路径缺该键时回退旧 `user://godot_autopilot/config.json`。折叠重复日志时，除条数外始终显示最新一条的时间，不受总开关控制。
-- 右侧配置面板 `McpConfigDock`（"MCP Config"）已于 0.3.2 移除：端口由插件持有并持久化，MCP 配置从 `gda status --json` 的 `mcp_url` 生成，授权门改为高风险工具的 `confirm`，技能通过 `gda install skills` 安装。当前仅保留 `McpLogDock`。
+- 自定义底部日志面板 `GdaLogDock`（"GDA Log"）：按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同时匹配 message 与 detail）、折叠重复、Detail 显示诊断 detail、Open Logs 打开工程级日志目录（`<集中根>/projects/<项目名>-<路径哈希前 8 位>/logs`）、Open Traces 打开同工程 `traces` 目录与 Trace 视图（日志行带可点击 `[trace]` 标记，按 trace_id 渲染结构化事件列表，默认关闭）。"Show timestamps" 开关控制每条日志的 `[HH:MM:SS]` 本地时间前缀，经 `<集中根>/config.json`（默认 `~/.godot-autopilot/config.json`）的 `show_time` 键持久化；新路径缺该键时回退旧 `user://godot_autopilot/config.json`。折叠重复日志时，除条数外始终显示最新一条的时间，不受总开关控制。
+- 右侧配置面板 `McpConfigDock` 已于 0.3.2 移除：端口由插件持有并持久化，连接由 `gda status --format json` 的连接记录确认，授权门改为高风险工具的 `--confirm`，技能通过 `gda install skills` 安装。当前仅保留 `GdaLogDock`。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; retry after export completes"}`）；导出期拒绝现覆盖**工具调用 / MCP 资源 / MCP 提示词**三类入口，本轮补齐提示词的 `prompts_detail::reject_if_exporting()` 与动态工具 `AutopilotTools.call_tool` 的拦截。导出标志为**实例级**——每个 `ExportGuard` 实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表，任一实例处于导出期即返回 true。
 
 ### Computer Use grounding（09-15）
@@ -105,9 +105,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 |---|---|---|
 | 引擎 | Godot 4.x GDExtension（目标 4.7，见 `.gdextension` 的 `compatibility_minimum`） | `devtools/lib/gdextension.ts` |
 | 绑定层 | godot-cpp，tag `10.0.0-stable`，submodule commit `507ed9d` | `third_party/godot-cpp`、`cmake/Dependencies.cmake` |
-| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），tag `0.3.12`，submodule commit `7a62e63`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
-| HTTP / 异步 | mcp-cpp-sdk 自研网络栈（内部 HTTP 线程） | mcp-cpp-sdk 内置（0.3.x 起移除 libhv） |
-| JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
+| 本机协议 | GDA 自研本机控制面（旧协议 SDK 已移除） | 同上 |
+| HTTP / 异步 | GDA 自研网络栈（内部 HTTP 线程） | 当前实现内置（旧协议 SDK 已移除） |
+| JSON | `util::JsonValue`（GDA JSON 门面，自研解析器） | 当前实现内置（旧协议 SDK 已移除） |
 | 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、生成器双路径预设（有 ninja 用 `debug`/`release`，无则 `debug-portable`/`release-portable`） | 根 `CMakeLists.txt`、`CMakePresets.json`、`devtools/lib/config.ts` |
 | 编译 | 优先 Clang/clang-cl 自动探测，MSVC/GCC 回退；sccache/ccache、LTO（ThinLTO/LTCG/IPO）、Unity 构建、作业池（仅 Ninja 注册）、按 ninja 可用性自动选预设 | `cmake/BuildOptimization.cmake`、`devtools/lib/cmake.ts` 等 |
 | 测试 | googletest（`third_party/googletest` 子模块，tag `v1.15.2` / commit `b514bdc`；单元 + 集成两层 gtest，程序化四层口径见 [tests.md](./tests.md)） | `tests/` |
@@ -126,7 +126,7 @@ Godot-Autopilot/
 ├── scripts/                    # 安装与发布辅助脚本：install.ps1 / install.sh
 ├── cmake/                      # 构建模块：Dependencies / BuildOptimization / Lto / Cache / CompilerOptions / Platform / skill_gen
 ├── tools/                      # 构建辅助脚本：embed_skills.ts（经 cmake/skill_gen.cmake 调用，构建期嵌入 skill 内容）
-├── third_party/                # git submodule 依赖：godot-cpp / mcp-cpp-sdk / googletest（版本由 gitlink commit 锁定，见 .gitmodules）
+├── third_party/                # git submodule 依赖：godot-cpp / googletest（旧协议 SDK 已移除；版本由 gitlink commit 锁定，见 .gitmodules）
 ├── src/
 │   ├── main.cpp                # GDExtension 入口 + GodotAutopilotPlugin(EditorPlugin) 生命周期
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
@@ -138,12 +138,12 @@ Godot-Autopilot/
 │   ├── prompts/                # 提示词模板：12 个（prompt_handlers 7 通用 + debugger_prompts 5 调试）
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval/verify) + gda_protocol.hpp
 │   ├── csharp_bridge/          # C# 反射桥源码（6 个 .cs）：GdaCSharpBridge / GdaCSharpRuntime / BridgeCall / BridgeGetSet / BridgeConvert / BridgeEvents；静态 Interlocked token 分配、unsubscribeAll() 与 _ExitTree() 解绑
-│   ├── ui/                     # 编辑器 UI：mcp_log_dock（0.3.2 删除 mcp_config_dock）
+│   ├── ui/                     # 编辑器 UI：gda_log_dock（0.3.2 删除 mcp_config_dock）
 │   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、scene_verify、
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 30 个文件（7 cpp + 23 hpp）
 │   │                           #   本轮新增 header-only helper：hash_util（摘要/哈希）、input_guards（取参与输入校验公共守卫）、string_util（大小写与字符串公共函数）；另有 core/path_util 提供原子写与路径工具
 ├── skills/                     # 插件技能卡源（1 张入口卡 + 9 篇 references；共 10 个 .md）
-├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 37 个 .test.ts
+├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/rpc/ 调用客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 37 个 .test.ts
 ├── tests/                      # 单元/边界/集成 gtest 目标 + support/ 夹具 + guard/ 源码守卫（含 no_python_guard）+ probe/ 传输探针（数值见 tests.md 数值核算总表）
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，scripts.gda-dev-tools → devtools/main.ts，零运行时依赖）
@@ -157,11 +157,11 @@ Godot-Autopilot/
 
 ```mermaid
 flowchart LR
-    Host[MCP 主机: Claude Desktop / Cursor / opencode 等] -->|POST http://127.0.0.1:&lt;port&gt;/mcp| HTTP[SDK HTTP 线程<br/>StreamableHttpServerTransport]
+    Host[CLI 客户端: gda / Agent] -->|本机环回连接| HTTP[SDK HTTP 线程<br/>StreamableHttpServerTransport]
     HTTP -->|queue.submit() 返回 future| Q[CommandQueue 互斥队列]
     Q -->|_process 每帧 drain()| Main[Godot 主线程]
     Main --> API[Godot API / 场景 / 引擎]
-    Main --> Dock[McpLogDock 日志面板]
+    Main --> Dock[GdaLogDock 日志面板]
     HTTP -->|engine-debugger 通道| Runtime[游戏运行时进程<br/>game_bridge 桥接]
     HTTP -.future.get() 同步等待.-> HTTP
 ```
@@ -178,7 +178,7 @@ flowchart LR
 | 工具命名 | `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case，如 `create_scene_node`、`property_set`、`resource_query`）；合并工具用 `action` 参数区分动作 |
 | 代码前缀 | 常量 `GDA_`（如 `GDA_DEFAULT_PORT`）；运行时环境变量 `GODOT_AUTOPILOT_PORT`/`GODOT_AUTOPILOT_HOST`、`GDA_FORCE_HEADLESS` |
 | 产物 | `godot-autopilot`（库名/插件目录/`.gdextension` 名） |
-| 端口 | 首次启动在 20000–29999 随机分配并按工程持久化（`GODOT_AUTOPILOT_PORT` 环境变量覆盖），端点 `/mcp`；默认仅绑定 `127.0.0.1`，`GODOT_AUTOPILOT_HOST` 非环回值由 `ServerContext::start()` 拒绝 |
+| 端口 | 首次启动在 20000–29999 随机分配并按工程持久化（`GODOT_AUTOPILOT_PORT` 环境变量覆盖），端点由 CLI 自动寻址；默认仅绑定 `127.0.0.1`，`GODOT_AUTOPILOT_HOST` 非环回值由 `ServerContext::start()` 拒绝 |
 
 ## 关键数字速查
 

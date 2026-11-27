@@ -34,7 +34,7 @@ resource:
 
 `SKILL.md` 必须同时满足：
 
-- 零 MCP：不出现 `MCP`、`Model Context Protocol`、`mcp_url`、`mcpServers`、`godot://skills`、`search_tools`、`get_tool_detail`、`call_tool`、`list_categories`、`resources/list`、`resources/read`、`prompts/list`、`prompts/get`、`tasks/get`、`tasks/cancel`、`resultType`、`taskId` 与 `--direct`、`--transport`、`--no-fallback`、`--input`、`--async`。
+- CLI-only 词表（守卫 token 表见 `tests/guard/skills_guard.ts`）：不出现 `MCP`、`Model Context Protocol` 等旧协议词、旧端点配置 token 与 `godot://skills`、`search_tools`、`get_tool_detail`、`call_tool`、`list_categories`、`resources/list`、`resources/read`、`prompts/list`、`prompts/get`、`tasks/get`、`tasks/cancel`、`resultType`、`taskId` 与 `--direct`、`--transport`、`--no-fallback`、`--input`、`--async`。
 - CLI-only 健康探测：`gda ping`（或 `gda tool ping`），只描述为健康探测，不是 handshake。
 - 动态发现：`gda tool list`、`gda tool search`、`gda tool describe`；通用逃生口 `gda tool call`。工具名、数量与 schema 一律现场查询，不写死。
 - 确认：`--confirm` 与 `confirmation_required`；结果未知不重发。
@@ -105,7 +105,7 @@ resource:
 
 | 症状 | 原因 | 首步动作 |
 |---|---|---|
-| `mcp` / `migrated-flag` | 正文仍含 MCP 词或已迁移 flag | T-13 改为 CLI-only 写法 |
+| `mcp` / `migrated-flag` | 正文仍含旧协议词或已迁移 flag | 已改为 CLI-only 写法（守卫保留历史分类键） |
 | `drift-count` / `drift-version` / `drift-alias-table` | 固化数量、版本窗口或迁移表 | 改为动态发现规则 |
 | `entry-cli-only` / `entry-routing` | 入口卡缺启动/发现/确认/恢复/路由 | 补齐入口卡契约 |
 | `recipe-missing` / `recipe-id` / `recipe-sections` | recipe 缺失、ID 不匹配或少段 | 按八段结构重排 |

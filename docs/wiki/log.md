@@ -17,7 +17,7 @@
 
 - **知识库增量维护（代码质量治理与安全加固批次）**：上次同步点 `b349cb5`（2026-11-21），以 `git diff b349cb5` 定界，覆盖 11-21 尾至 11-23 的提交与工作树改动；本轮不升版，`VERSION` / `CLI_VERSION` 保持 `0.3.4-dev`。按真实源码同步受影响页面段落，逐页 `timestamp` 统一为 `2026-11-23T17:28:29+08:00`，页头审计日期同步 `2026-11-23`。要点：ST-01～ST-05 代码质量治理（受保护配置键、trash confirm、反序列化边界、IPC token 契约、公共 util 与按键统一、提示词漂移修正）、多分支安全加固（路径 containment、资源事务、可信回滚、元工具 elicitation/递归守卫、部署/安装/存储可靠性）、CLI 命令面 22→23 与单测口径重算、技能合并 `gda-change-gate`。程序化测试未统一运行，数值以静态源码核算为准，实测口径见 [tests.md](tests.md)「数值核算总表」。详见 [changelog/2026-11-23-log.md](changelog/2026-11-23-log.md)。
 
-- **0.3.4 正式发布收口**：根 `VERSION` / `CLI_VERSION` 去 `-dev` 后缀为 `0.3.4`，`cli/assets/skills.json` 由官方脚本从新 `VERSION` 重新生成；wiki 中五处「当前开发版 0.3.4-dev」陈述改为正式版并同步页头日期与 `timestamp`；新增发布说明 [release-notes/0.3.4.md](../release-notes/0.3.4.md)，汇总工具面压缩（459→252）、技能与 e2e 重组、mcp-cpp-sdk 0.3.12 升级与 ST-01～ST-05 质量治理。仅改本地文件，未打 tag / 推送 / 触发发布流程。详见 [changelog/2026-11-23-log.md](changelog/2026-11-23-log.md)。
+- **0.3.4 正式发布收口**：根 `VERSION` / `CLI_VERSION` 去 `-dev` 后缀为 `0.3.4`，`cli/assets/skills.json` 由官方脚本从新 `VERSION` 重新生成；wiki 中五处「当前开发版 0.3.4-dev」陈述改为正式版并同步页头日期与 `timestamp`；新增发布说明 [release-notes/0.3.4.md](../release-notes/0.3.4.md)，汇总工具面压缩（459→252）、技能与 e2e 重组、旧协议 SDK 0.3.12 升级与 ST-01～ST-05 质量治理。仅改本地文件，未打 tag / 推送 / 触发发布流程。详见 [changelog/2026-11-23-log.md](changelog/2026-11-23-log.md)。
 
 ## 2026-11-21
 
@@ -25,7 +25,7 @@
 
 ## 2026-11-19
 
-- **mcp-cpp-sdk 0.3.12 依赖升级**：gitlink `93e18ef` → `7a62e63`（tag `0.3.12` dereferenced commit `7a62e636bceeab63c07d820b85a60414a430ea06`），修复 Windows 上 FileTaskStore 压缩句柄冲突导致的 task store 中毒；六处版本 pin 同步为 `0.3.12` / `7a62e63`，页头审计日期与 frontmatter `timestamp` 同步，历史条目未改写；CLI 中毒诊断兜底保留。GDA 业务源码零改动，不升版。详见 [changelog/2026-11-19-log.md](changelog/2026-11-19-log.md)。
+- **旧协议 SDK 0.3.12 依赖升级（历史）**：gitlink `93e18ef` → `7a62e63`（tag `0.3.12` dereferenced commit `7a62e636bceeab63c07d820b85a60414a430ea06`），修复 Windows 上 FileTaskStore 压缩句柄冲突导致的 task store 中毒；六处版本 pin 同步为 `0.3.12` / `7a62e63`，页头审计日期与 frontmatter `timestamp` 同步，历史条目未改写；CLI 中毒诊断兜底保留。GDA 业务源码零改动，不升版。详见 [changelog/2026-11-19-log.md](changelog/2026-11-19-log.md)。
 
 ## 2026-11-18
 

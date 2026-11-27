@@ -23,7 +23,7 @@ resource: src/
 | [hi-godot/godot-ai](https://github.com/hi-godot/godot-ai) | Python FastMCP(HTTP) + WebSocket → 编辑器插件 | 约 43 工具/120+ op，主打客户端一键 attach 自动配置与 AssetLib/Snap 分发 |
 | Godot MCP Pro | 商业 MCP 服务器 | 宣称 162 工具/23 类别，开箱即用面最广的付费方案 |
 | GodotPilot | 社区开源 MCP（Node.js） | 以自然语言驱动编辑器启动/运行、场景节点与 GDScript 增删改查 |
-| [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp) | stdio MCP 服务器（npx 分发） | 社区使用最广的轻量方案：launch/run/调试输出捕获 + 打包 GDScript 操作脚本 |
+| [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp) | stdio 控制服务（npx 分发） | 社区使用最广的轻量方案：launch/run/调试输出捕获 + 打包 GDScript 操作脚本 |
 | [IvanMurzak/Godot-MCP](https://github.com/IvanMurzak/Godot-MCP) | C# 编辑器插件 + 共享 MCP 服务端 | Unity-MCP 同源栈：42 工具/12 族，云托管（ai-game.dev）或自托管 GameDev-MCP-Server |
 
 > 定位以各仓库 README 自述为准，功能数字随对方版本演进，仅作对齐参照不构成评测结论。
@@ -96,7 +96,7 @@ resource: src/
 
 ## 已交付：依赖升级 + C# 解析修复 + 计数复核（10-16）
 
-- **mcp-cpp-sdk 0.3.4 → 0.3.7**（仅安全迁移，不启用新特性）：SDK 自 0.3.5 起删除 `JsonValue::FromObject` / `FromArray`，8 处调用点就地替换为 `JsonValue(JsonValue::Object{...})`，全仓复核归零。
+- **旧协议 SDK 0.3.4 → 0.3.7（历史）**（仅安全迁移，不启用新特性）：SDK 自 0.3.5 起删除 `JsonValue::FromObject` / `FromArray`，8 处调用点就地替换为 `JsonValue(JsonValue::Object{...})`，全仓复核归零。
 - **`parse_csharp_classes` 基类解析缺陷修复**：类名与 `:` 之间未跳过空白（`Foo <T>` 泛型形态同样漏判），先红 6 失败后全绿。
 - **计数复核**：域工具 448→**451**（+3：`csharp_list_members` / `create_csharp_script` / `dotnet_environment`），catalog 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 147 / 候选 305。
 - 详见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)。
@@ -104,7 +104,7 @@ resource: src/
 ## 已交付：CLI 载体落地（10-18）
 
 - **新增 `cli/`**（Bun + TS 源码直跑，零运行时依赖、无构建步骤）+ 根 `package.json` / `bun.lock`；命令族 `gda`（调用族 6 + 生命周期 4），寻址链五级（`GODOT_AUTOPILOT_PORT` → cwd 登记 → trace → config → 9527），登记表 `instances.json` + 锁 + 死 pid 清理，生命周期 `start`（Godot 链 / 端口 9530–9599 / 导入预步 / 就绪探测 / Windows 蹦床脱父）/ `stop`（优雅优先，`--force` 强杀）。
-- **协议握手升级**：CLI 改为标准 MCP `initialize` 流程（mcp-cpp-sdk 0.3.7 起严格要求完整握手）。
+- **协议握手升级**：CLI 改为标准握手流程（依赖 SDK 0.3.7 起严格要求完整握手）。
 - **新增 `version_sync_guard` 守卫**，ctest 注册点 476→478。
 - 详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)。
 
@@ -131,7 +131,7 @@ resource: src/
 
 ## 遗留：P3 待规划
 
-- **客户端桥接深化**：配置面板与 `client_config_gen` 已随 0.3.2 移除，MCP 配置改由 `gda status --json` 的 `mcp_url` 生成；对标 godot-ai 的 attach 桥与"Configure all"全家桶仍余 stdio bridge、状态点探测差距
+- **客户端桥接深化**：配置面板与 `client_config_gen` 已随 0.3.2 移除，连接由 `gda status --format json` 的连接记录确认（CLI-only，无需客户端配置）；对标 godot-ai 的 attach 桥与"Configure all"全家桶仍余 stdio bridge、状态点探测差距
 - **AssetLib 上架**：当前经 GitHub Release zip 分发（`bun run gda-dev-tools package`），未进 Godot Asset Library
 
 ## 出站链接

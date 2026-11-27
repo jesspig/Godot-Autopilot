@@ -1,7 +1,3 @@
 {
-  "mcpServers": {
-    "godot-autopilot": {
-      "url": "http://127.0.0.1:9527/mcp"
-    }
-  }
+  "_note": "GDA is CLI-only: use `gda ping`, `gda status --format json` and `gda tool call <tool>`. No client configuration is required."
 }

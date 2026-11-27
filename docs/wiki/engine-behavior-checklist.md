@@ -222,7 +222,7 @@ resource: src/tools/
 | 授权拒绝路径无自动断言缺口 | 2 | 47 号默认拒绝态结构化断言 | `47_authorization_gate.json` |
 | Godot 4.7.2 启动期 root certificate store ERROR（环境敏感） | 10 | 错误计数用增量游标而非绝对计数 | 旧 tests.md isolated 名单节（git 历史） |
 
-> 附注：mcp-cpp-sdk 客户端响应等待缺陷属已删除测试客户端（`tests/runner`）的缺陷，生产服务端不受影响，不构成引擎行为验收点，此处仅存目（旧 tests.md「已知遗留」）。
+> 附注：旧协议 SDK（已移除）的客户端响应等待缺陷属已删除测试客户端（`tests/runner`）的缺陷，生产服务端不受影响，不构成引擎行为验收点，此处仅存目（旧 tests.md「已知遗留」）。
 
 ## A 类迁移对照表
 

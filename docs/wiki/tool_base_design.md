@@ -47,8 +47,8 @@ struct ToolSpec {
   SideEffect side_effect = SideEffect::None;
   uint32_t flags = tool_flags::kNone;
   std::vector<ParamSpec> params;               // ParamSpec = schema::ParamDef
-  std::function<mcp::JsonValue(const mcp::JsonValue &)> handler;
-  mcp::JsonValue raw_schema;                   // 非空对象时优先于 params 生成 schema
+  std::function<util::JsonValue(const util::JsonValue &)> handler;
+  util::JsonValue raw_schema;                  // 非空对象时优先于 params 生成 schema
 };
 
 inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec);
@@ -107,12 +107,12 @@ class SpecTool : public ToolBase, public ISideEffect {
 - **图片事件**：结果对象（或 `result` 子对象）的 `data` 仅在 `format == "png"` 时收集；`diff_image_data` 为字符串即收集（不校验 `format`，空串亦进入）。命中项算 FNV-1a 哈希与字节数，`image_width`/`image_height` 取同 scope 整型 `width`/`height`（缺省 0），落盘 `traces/images/`（仅脱敏关闭时，`LogPersist::store_trace_image`）；jsonl 行只写 `image_ref`（脱敏时为空，其余图片字段 `image_hash`/`image_bytes`/`image_width`/`image_height` 照写）
 - **日志等级**：失败或 `duration_ms > 2000ms`（`kSlowToolMs`）记 Warning，其余 Debug；detail 行附 `trace=/span=/parent=/depth=/queue=/dur=/auth=/err=/args=`，慢工具与 `retryable` 结果分别加 `slow_tool=true`/`retryable=true`
 - **`err=` 取值口径**：由 `spec_detail::error_code_of(result)`（`tool_spec.hpp:57-68`）决定：存在 `structured_error` 且 `code` 为字符串时取该值，否则回退字面量 `"error"`；trace 的 `error_code` 与 detail 的 `err=` 同源，按错误码统计只覆盖带 `structured_error.code` 的工具，普通 `{"error": "..."}` 记为 `error`
-- **`detail` 可见性**：`get_plugin_log` 响应条目只含 `serial`/`timestamp`/`level`/`category`/`message`，不含 `detail`；detail 仅在 McpLogDock（"Detail" 开关，默认关闭）与落盘日志（`format_human_line(..., include_detail=true)`）中可见
+- **`detail` 可见性**：`get_plugin_log` 响应条目只含 `serial`/`timestamp`/`level`/`category`/`message`，不含 `detail`；detail 仅在 GdaLogDock（"Detail" 开关，默认关闭）与落盘日志（`format_human_line(..., include_detail=true)`）中可见
 - **落盘链路**：事件进入 `TraceRecorder` 内存缓冲（容量 20000），主线程 `LogPersist::flush_on_main_thread()` 增量转写为 `traces/trace-<stamp>.jsonl`（首行含 `session_start`，服务器就绪后追加 `server_ready`，结构键见 [核心模块](modules/core.md)）；09-21 起 jsonl 内事件按 `kind` 区分（`lifecycle`/`protocol_request`/`protocol_response`/`tool_call`/`persist_health`/`perf`/`snapshot`/`concurrency` 等，schema v2 新键齐备），L2 `30_observability` 对字段与 kind 做断言
 
 ## traits 收编终态（kCaptureImage/kSceneTarget/kUndoable）
 
-- **`kCaptureImage`（7 工具，图片附件单一来源；2026-11-23 按基线 `tools` 数组重算）**：`register_all.cpp` 的 `call_tool` 回调按 flag 判定——registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content；仅未知工具名走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`，`src/util/mcp_image_content.hpp`）。
+- **`kCaptureImage`（7 工具，图片附件单一来源；2026-11-23 按基线 `tools` 数组重算）**：`register_all.cpp` 的调用回调按 flag 判定——registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content；仅未知工具名走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`，`src/util/mcp_image_content.hpp`）。
 - **`kSceneTarget`（42 工具，成功响应幂等补全）**：见上节 `run_post` 第 3 步；仅补缺失的 `scene_path`/`scene_unsaved`，不做脏标记。
 - **`kUndoable`（24 工具，纯标记）**：各 handler 自管 undo，`run_post` 无动作。
 - 计数口径（2026-11-23 重算）：以 `src/tools/domains/*/*_tools.hpp` 中每个 `make_spec_tool(ToolSpec{ ... })` **块**为单位，统计该块 flags 表达式是否出现该 flag——即「多少工具声明了该 flag」，非 grep 文本出现次数。246 个域工具块统计得：`kSceneTarget` 27 / `kUndoable` 17 / `kMutating` 79 / `kNone` 159 / `kCaptureImage` 7 / `kObserve` 4 / `kLongBlocking` 3（`kMutating`+1、`kNone`−1 来自 `run_gdscript_tests` 改为 `kMutating`）（`kMeta`/`kDynamic`/`kHealthProbe` 只出现在元工具与动态工具上，不在域工具块内）。运行时以 `get_tool_detail` 回显为准。

@@ -1,7 +1,7 @@
 ---
 type: 模块指南
 title: 游戏运行时监视器
-description: 编辑器启动的游戏运行逐帧采集 59 项 Godot Performance 监视器与自动发现的自定义监控，JSONL 落盘，按会话用 CLI 或 MCP 调取与分析
+description: 编辑器启动的游戏运行逐帧采集 59 项 Godot Performance 监视器与自动发现的自定义监控，JSONL 落盘，按会话用 CLI 调取与分析
 tags:
   - 监视器
   - 性能
@@ -58,7 +58,7 @@ resource: src/core/observability/
 
 ## 调取与分析
 
-MCP 工具 `game_monitor`：`status` / `sessions` / `report` / `export`。`report` 返回帧时间 avg/p95/p99/max、慢帧数、各监视器 min/max/avg/p50/p95/p99/first/last/delta；`export` 把会话复制到 GDA home 的 `monitor-sessions/`。
+CLI 命令 `gda monitor`：`status` / `sessions` / `report` / `export`。`report` 返回帧时间 avg/p95/p99/max、慢帧数、各监视器 min/max/avg/p50/p95/p99/first/last/delta；`export` 把会话复制到 GDA home 的 `monitor-sessions/`。
 
 CLI：
 
@@ -79,7 +79,7 @@ gda monitor report  --file <path-to-jsonl> [--slow <ms>]
 | `src/core/observability/game_monitor.{hpp,cpp}` | 逐帧采样、自定义监控发现、JSONL 写入与轮转 |
 | `src/core/observability/monitor_analysis.{hpp,cpp}` | 纯函数解析与统计，零引擎依赖 |
 | `src/runtime/game_bridge.cpp` | 游戏进程钩子：帧回调接入与退出收尾 |
-| `src/tools/domains/monitor/` | MCP 工具 `game_monitor` |
+| `src/tools/domains/monitor/` | CLI 命令 `gda monitor` |
 | `cli/src/monitor.ts`、`cli/src/commands/monitor.ts` | CLI 离线分析与会话调取 |
 
 相关：[core.md](core.md)、[tests.md](../tests.md)、[安全契约](../security_contract.md)。
