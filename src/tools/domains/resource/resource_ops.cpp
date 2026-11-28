@@ -1544,6 +1544,29 @@ godot_autopilot::util::JsonValue handle_get_uid(const godot_autopilot::util::Jso
                               "use a res:// project resource path");
   path = normalized_path;
 
+  const std::string sidecar = path + ".uid";
+  const godot::String sidecar_gs = godot::String::utf8(sidecar.c_str());
+  auto *uid_svc = godot::ResourceUID::get_singleton();
+  if (uid_svc && godot::FileAccess::file_exists(sidecar_gs)) {
+    godot::Ref<godot::FileAccess> sidecar_file =
+        godot::FileAccess::open(sidecar_gs, godot::FileAccess::READ);
+    if (!sidecar_file.is_null()) {
+      const std::string raw = util::to_std(sidecar_file->get_as_text());
+      const std::string normalized =
+          resource_ops_detail::normalized_uid_sidecar(raw);
+      if (!normalized.empty()) {
+        const int64_t sidecar_uid =
+            uid_svc->text_to_id(godot::String(normalized.c_str()));
+        if (sidecar_uid > 0) {
+          godot_autopilot::util::JsonValue r(
+              godot_autopilot::util::JsonValue::object_tag);
+          r["result"] = godot_autopilot::util::JsonValue(sidecar_uid);
+          return r;
+        }
+      }
+    }
+  }
+
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
     godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);

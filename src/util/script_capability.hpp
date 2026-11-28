@@ -114,7 +114,7 @@ inline Result classify(bool loadable, bool is_packed_scene, bool is_script,
     r.code = Code::kMountable;
     return r;
   }
-  if (resource_class == "CSharpScript") {
+  if (resource_class == "CSharpScript" || !is_tool) {
     r.runtime_mountable = true;
     r.code = Code::kRuntimeOnly;
     return r;

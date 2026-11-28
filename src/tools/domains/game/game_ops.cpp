@@ -224,7 +224,10 @@ godot_autopilot::util::JsonValue handle_game_status(const godot_autopilot::util:
     return error_json("get_game_status parameters must be an object");
   for (const auto &entry : args.GetObject()) {
     if (entry.first != "wait_ready" && entry.first != "session_id")
-      return error_json("get_game_status accepts no parameters");
+      return error_json("unknown parameter for get_game_status: " +
+                        entry.first +
+                        "; accepted parameters: wait_ready (boolean), "
+                        "session_id (integer)");
   }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))

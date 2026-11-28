@@ -2,6 +2,7 @@
 
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
 #include "util/scene_path.hpp"
@@ -144,22 +145,16 @@ bool parse_color_value(const godot_autopilot::util::JsonValue &val, godot::Color
     return true;
   }
   if (val.IsObject()) {
-    static const char *kChannelKeys[4] = {"r", "g", "b", "a"};
-    float channels[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-    for (int i = 0; i < 4; i++) {
-      auto *it = val.Find(kChannelKeys[i]);
-      if (!it || !it->IsNumber()) {
-        continue;
-      }
-      const double v = it->GetDouble();
-      if (v < 0.0 || v > 1.0) {
-        out_error = std::string("color channel '") + kChannelKeys[i] +
-                    "' out of range: expected a float in [0, 1]";
-        return false;
-      }
-      channels[i] = static_cast<float>(v);
+    double channels[4] = {0.0, 0.0, 0.0, 1.0};
+    std::string channel_error;
+    if (!parse_color_channels(val, channels, channel_error)) {
+      out_error = channel_error;
+      return false;
     }
-    out_color = godot::Color(channels[0], channels[1], channels[2], channels[3]);
+    out_color = godot::Color(static_cast<float>(channels[0]),
+                             static_cast<float>(channels[1]),
+                             static_cast<float>(channels[2]),
+                             static_cast<float>(channels[3]));
     return true;
   }
   out_error =
@@ -174,7 +169,7 @@ bool apply_per_side(const godot_autopilot::util::JsonValue &val, FnAll apply_all
                     const char *const (&side_keys)[4],
                     std::string &out_error) {
   if (val.IsNumber()) {
-    apply_all(val.GetDouble());
+    apply_all(util::json_number(&val, 0.0));
     return true;
   }
   if (!val.IsObject()) {
@@ -187,7 +182,7 @@ bool apply_per_side(const godot_autopilot::util::JsonValue &val, FnAll apply_all
   for (int i = 0; i < 4; i++) {
     auto *it = val.Find(side_keys[i]);
     if (it && it->IsNumber()) {
-      apply_side(i, it->GetDouble());
+      apply_side(i, util::json_number(it, 0.0));
     }
   }
   return true;
@@ -226,6 +221,35 @@ bool is_user_path(const std::string &p) {
 }
 
 } // namespace
+
+bool parse_color_channels(const godot_autopilot::util::JsonValue &val,
+                          double (&channels)[4], std::string &out_error) {
+  if (!val.IsObject()) {
+    out_error =
+        "invalid color: expected a hex string like \"#rrggbb\" or an object "
+        "{r,g,b,a} with floats in [0, 1]";
+    return false;
+  }
+  static const char *kChannelKeys[4] = {"r", "g", "b", "a"};
+  channels[0] = 0.0;
+  channels[1] = 0.0;
+  channels[2] = 0.0;
+  channels[3] = 1.0;
+  for (int i = 0; i < 4; i++) {
+    auto *it = val.Find(kChannelKeys[i]);
+    if (!it || !it->IsNumber()) {
+      continue;
+    }
+    const double v = util::json_number(it, channels[i]);
+    if (v < 0.0 || v > 1.0) {
+      out_error = std::string("color channel '") + kChannelKeys[i] +
+                  "' out of range: expected a float in [0, 1]";
+      return false;
+    }
+    channels[i] = v;
+  }
+  return true;
+}
 
 godot_autopilot::util::JsonValue handle_create_theme_resource(const godot_autopilot::util::JsonValue &args) {
   std::string path;
@@ -694,7 +718,7 @@ godot_autopilot::util::JsonValue handle_set_control_layout(const godot_autopilot
       if (!entry.second.IsNumber()) {
         return util::error_json("invalid anchors." + entry.first + ": expected a number");
       }
-      anchor_vals[idx] = entry.second.GetDouble();
+      anchor_vals[idx] = util::json_number(&entry.second, 0.0);
       anchor_set[idx] = true;
     }
   }
@@ -720,7 +744,7 @@ godot_autopilot::util::JsonValue handle_set_control_layout(const godot_autopilot
       if (!entry.second.IsNumber()) {
         return util::error_json("invalid offsets." + entry.first + ": expected a number");
       }
-      offset_vals[idx] = entry.second.GetDouble();
+      offset_vals[idx] = util::json_number(&entry.second, 0.0);
       offset_set[idx] = true;
     }
   }
@@ -767,7 +791,7 @@ godot_autopilot::util::JsonValue handle_set_control_layout(const godot_autopilot
       if (!entry.second.IsNumber()) {
         return util::error_json("invalid min_size." + entry.first + ": expected a number");
       }
-      double v = entry.second.GetDouble();
+      double v = util::json_number(&entry.second, 0.0);
       if (v < 0.0) {
         return util::error_json("invalid min_size." + entry.first + ": expected a non-negative number");
       }

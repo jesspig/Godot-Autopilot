@@ -16,7 +16,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const envelope = await callTool(
     "get_tool_detail",
     { name: positional[0] },
-    { port: target.port, timeoutSec: callTimeoutSec(opts), direct: true },
+    { port: target.port, ipcEndpoint: target.ipcEndpoint, timeoutSec: callTimeoutSec(opts), direct: true },
   );
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
   return emit(extracted, opts);

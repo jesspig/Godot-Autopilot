@@ -23,7 +23,7 @@ const std::vector<std::string> kTweenEditorPropertyActions = {
 const std::vector<ParamSpec> kGameTweenParams = {
     {"node_path", "string", "create/callback/method: node path in the running game process, e.g. /root/Main/Player; callback and method target this node", false},
     {"property", "string", "create: property to animate, e.g. position, scale or modulate:a; must exist on the node", false},
-    {"target_value", "object", "create/method: final value the property animates to (create) or the end value interpolated into the method (method), converted with the same chain as game_script action=execute script_action=set_property (e.g. {\"x\": 10, \"y\": 20} for a Vector2, a plain number for scalar properties)", false},
+    {"target_value", "object", "create/method: final value the property animates to (create) or the end value interpolated into the method (method), converted with the same chain as game_script action=execute script_action=set_property (e.g. {\"x\": 10, \"y\": 20} for a Vector2)", false},
     {"duration", "number", "create/method/interval: tween step duration in seconds (number greater than 0)", false},
     {"trans", "integer", "create: transition type 0-10 (0=linear default, 1=sine, 2=quint, 3=quart, 4=quad, 5=expo, 6=elastic, 7=cubic, 8=circ, 9=bounce, 10=back)", false},
     {"ease", "integer", "create: ease type 0-3 (0=in, 1=out, 2=in_out, 3=out_in; default 2)", false},
@@ -49,7 +49,7 @@ const std::vector<ParamSpec> kTweenEditorPropertyParams = {
     {"action", "string", "Tween step to add to the preview: 'property' (default when omitted), 'callback', 'method' or 'interval'", false},
     {"path", "string", "Anchor node path in the edited scene (e.g. 'Player/Sprite2D'); its SceneTree hosts the preview tween and callback/method resolve on this node. The response includes scene_path and scene_unsaved to confirm which scene the preview node belongs to", false},
     {"property", "string", "property: property to animate, e.g. position, scale or modulate:a; must exist on the node or the call fails fast", false},
-    {"target_value", "object", "property/method: final value the property animates to (property) or the end value interpolated into the method (method), converted with the same chain as property_set (e.g. {\"x\": 10, \"y\": 20} for a Vector2, a plain number for scalar properties)", false},
+    {"target_value", "object", "property/method: final value the property animates to (property) or the end value interpolated into the method (method), converted with the same chain as property_set (e.g. {\"x\": 10, \"y\": 20} for a Vector2)", false},
     {"from_value", "object", "method: starting value passed to method_name, converted with the same chain as target_value", false},
     {"duration", "number", "property/method/interval: step duration in seconds (number greater than 0)", false},
     {"method_name", "string", "method: method on path that receives the interpolated value each step; must exist on the node", false},

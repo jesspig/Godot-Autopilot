@@ -9,7 +9,7 @@ const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 export async function run(_positional: string[], opts: GlobalOptions): Promise<number> {
   assertCallFamilyUsage("ping", opts);
   const target = resolveTarget(opts, TARGET_CONTEXT);
-  const envelope = await callTool("ping", {}, { port: target.port, timeoutSec: callTimeoutSec(opts), direct: true });
+  const envelope = await callTool("ping", {}, { port: target.port, ipcEndpoint: target.ipcEndpoint, timeoutSec: callTimeoutSec(opts), direct: true });
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
   return emit(extracted, opts);
 }

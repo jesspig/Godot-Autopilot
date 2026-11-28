@@ -30,6 +30,7 @@ struct NativeCallResult {
   std::string traceparent;
   JsonValue payload;
   std::string tool;
+  std::string deferred_tool;
 };
 
 inline JsonValue error_result(const std::string &message, const std::string &code) {
@@ -110,6 +111,7 @@ inline NativeCallResult call_tool(const std::string &tool, const JsonValue &args
       target_name = name->GetString();
     }
   }
+  out.deferred_tool = target_name;
   godot_autopilot::SideEffect effect = godot_autopilot::SideEffect::None;
   auto registry = godot_autopilot::get_active_registry();
   if (registry != nullptr) {
@@ -218,11 +220,29 @@ inline NativeCallResult await_pending(NativeCallResult call,
       call.payload.Find("timeout_ms") == nullptr) {
     call.payload["timeout_ms"] = JsonValue(deadline_ms);
   }
+  const std::string &wait_tool =
+      call.deferred_tool.empty() ? call.tool : call.deferred_tool;
   call.payload = godot_autopilot::dispatch::resolve_deferred_wait(
-      call.tool, std::move(call.payload));
+      wait_tool, std::move(call.payload));
   call.pending = false;
+  std::vector<JsonValue> images;
+  auto registry = godot_autopilot::get_active_registry();
+  if (registry != nullptr) {
+    auto target = registry->find_any(wait_tool);
+    if (target != nullptr &&
+        (target->tool_flags() &
+         godot_autopilot::tool_flags::kCaptureImage) != 0) {
+      godot_autopilot::util::try_attach_image_data(call.payload, images);
+    } else {
+      godot_autopilot::util::try_attach_image_content(wait_tool,
+                                                      call.payload, images);
+    }
+  } else {
+    godot_autopilot::util::try_attach_image_content(wait_tool,
+                                                    call.payload, images);
+  }
   call.result = wrap_result(
-      call.payload, godot_autopilot::tool_result_is_error(call.payload), {});
+      call.payload, godot_autopilot::tool_result_is_error(call.payload), images);
   return call;
 }
 

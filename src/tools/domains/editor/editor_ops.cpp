@@ -888,7 +888,8 @@ godot_autopilot::util::JsonValue handle_undo_redo_start(const godot_autopilot::u
     e["error"] = godot_autopilot::util::JsonValue("EditorUndoRedoManager not available");
     return e;
   }
-  undo_redo->create_action(godot::String(action_name.c_str()));
+  undo_redo->create_action(godot::String(action_name.c_str()),
+                           godot::UndoRedo::MERGE_DISABLE, editor);
   godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);
   r["result"] = godot_autopilot::util::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -966,20 +967,65 @@ godot_autopilot::util::JsonValue handle_undo_redo_add_method(const godot_autopil
     e["error"] = godot_autopilot::util::JsonValue("EditorUndoRedoManager not available");
     return e;
   }
+  godot::UndoRedo *history = undo_redo->get_history_undo_redo(
+      godot::EditorUndoRedoManager::GLOBAL_HISTORY);
+  if (!history) {
+    godot_autopilot::util::JsonValue e(godot_autopilot::util::JsonValue::object_tag);
+    e["error"] = godot_autopilot::util::JsonValue(
+        "global undo history is not available — call editor_undo create first");
+    return e;
+  }
   auto *val = args.Find("value");
+  const godot::Callable callable(node, godot::StringName(method.c_str()));
+  godot::Variant bound;
+  if (val && !val->IsNull()) {
+    std::string hint;
+    godot::ClassDBSingleton *cdb = godot::ClassDBSingleton::get_singleton();
+    if (cdb) {
+      const godot::TypedArray<godot::Dictionary> methods =
+          cdb->class_get_method_list(node->get_class());
+      for (int i = 0; i < methods.size(); ++i) {
+        const godot::Dictionary entry = methods[i];
+        if (!entry.has("name") ||
+            util::to_std(static_cast<godot::String>(entry["name"])) != method) {
+          continue;
+        }
+        if (!entry.has("args")) {
+          break;
+        }
+        const godot::Array params = entry["args"];
+        if (params.size() == 0) {
+          break;
+        }
+        const godot::Dictionary param = params[0];
+        if (!param.has("type")) {
+          break;
+        }
+        const auto type =
+            static_cast<godot::Variant::Type>(static_cast<int>(param["type"]));
+        if (type != godot::Variant::NIL && type != godot::Variant::OBJECT &&
+            type != godot::Variant::DICTIONARY && type != godot::Variant::CALLABLE &&
+            type != godot::Variant::SIGNAL && type != godot::Variant::RID) {
+          hint = util::ascii_lowercase(
+              util::to_std(godot::Variant::get_type_name(type)));
+        }
+        break;
+      }
+    }
+    bound = hint.empty() ? VariantJson::deserialize(*val)
+                         : VariantJson::deserialize(*val, hint);
+  }
   if (is_do) {
     if (val && !val->IsNull()) {
-      godot::Variant var = VariantJson::deserialize(*val);
-      undo_redo->add_do_method(node, godot::StringName(method.c_str()), var);
+      history->add_do_method(callable.bind(bound));
     } else {
-      undo_redo->add_do_method(node, godot::StringName(method.c_str()));
+      history->add_do_method(callable);
     }
   } else {
     if (val && !val->IsNull()) {
-      godot::Variant var = VariantJson::deserialize(*val);
-      undo_redo->add_undo_method(node, godot::StringName(method.c_str()), var);
+      history->add_undo_method(callable.bind(bound));
     } else {
-      undo_redo->add_undo_method(node, godot::StringName(method.c_str()));
+      history->add_undo_method(callable);
     }
   }
   godot_autopilot::util::JsonValue r(godot_autopilot::util::JsonValue::object_tag);

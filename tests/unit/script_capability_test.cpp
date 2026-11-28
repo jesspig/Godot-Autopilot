@@ -61,9 +61,17 @@ TEST(ScriptCapabilityTest, PackedSceneNeedsNodeRoot) {
   EXPECT_EQ(bad.code, Code::kNotANode);
 }
 
-TEST(ScriptCapabilityTest, UnknownScriptIsRejected) {
-  const auto r = classify(true, false, true, "GDScript", "Node", false, false,
+TEST(ScriptCapabilityTest, ToolScriptWithoutInstanceIsRejected) {
+  const auto r = classify(true, false, true, "GDScript", "Node", false, true,
                           false, true);
   EXPECT_FALSE(r.runtime_mountable);
   EXPECT_EQ(r.code, Code::kInvalidScript);
+}
+
+TEST(ScriptCapabilityTest, NonToolGdScriptIsRuntimeOnly) {
+  const auto r = classify(true, false, true, "GDScript", "Node", false, false,
+                          false, true);
+  EXPECT_TRUE(r.runtime_mountable);
+  EXPECT_FALSE(r.editor_runnable);
+  EXPECT_EQ(r.code, Code::kRuntimeOnly);
 }

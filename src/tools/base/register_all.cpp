@@ -337,10 +337,6 @@ static godot_autopilot::util::JsonValue meta_call_tool_impl(godot_autopilot::uti
                                   dispatch::capture_depth_context());
 }
 
-static godot_autopilot::util::JsonValue meta_call_tool_wait(const std::string& name, godot_autopilot::util::JsonValue result) {
-    return dispatch::resolve_deferred_wait(name, std::move(result));
-}
-
 void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
                      ToolCatalog& catalog, Bm25Index& index) {
     const auto derived_start = std::chrono::steady_clock::now();
@@ -564,7 +560,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         spec.flags = tool_flags::kMeta;
         spec.handler = [](const godot_autopilot::util::JsonValue& args) -> godot_autopilot::util::JsonValue {
             std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
-            godot_autopilot::util::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
+            godot_autopilot::util::JsonValue j = meta_call_tool_impl(args);
             if (!name.empty()) {
                 LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
             }
