@@ -6,6 +6,10 @@
 namespace godot_autopilot {
 namespace theme_ops {
 
+bool parse_color_channels(const godot_autopilot::util::JsonValue &val,
+                          double (&channels)[4],
+                          std::string &out_error);
+
 godot_autopilot::util::JsonValue handle_create_theme_resource(const godot_autopilot::util::JsonValue &args);
 godot_autopilot::util::JsonValue handle_set_theme_color(const godot_autopilot::util::JsonValue &args);
 godot_autopilot::util::JsonValue handle_set_theme_constant(const godot_autopilot::util::JsonValue &args);
