@@ -51,6 +51,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const target = resolveTarget(opts, TARGET_CONTEXT);
   const envelope = await callTool("search_tools", args, {
     port: target.port,
+    ipcEndpoint: target.ipcEndpoint,
     timeoutSec: callTimeoutSec(opts),
     direct: true,
   });

@@ -32,6 +32,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   if (positional.length === 0) {
     const categories = await callTool("list_categories", {}, {
       port: target.port,
+      ipcEndpoint: target.ipcEndpoint,
       timeoutSec: callTimeoutSec(opts),
       direct: true,
     });
@@ -52,6 +53,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const envelope = await callTool("search_tools", args, {
     port: target.port,
+    ipcEndpoint: target.ipcEndpoint,
     timeoutSec: callTimeoutSec(opts),
     direct: true,
   });
