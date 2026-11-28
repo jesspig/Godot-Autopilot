@@ -206,6 +206,40 @@ godot::Callable callable_on(godot::Node *node, const std::string &method) {
 
 } // namespace
 
+bool tween_ops_property_is_indexed(const std::string &property) {
+  return property.find(':') != std::string::npos;
+}
+
+bool tween_ops_property_path_valid(const std::string &property,
+                                   std::string &error) {
+  if (property.empty() || property.front() == ':' || property.back() == ':' ||
+      property.find("::") != std::string::npos ||
+      property.find('/') != std::string::npos) {
+    error = "invalid property path: " + property;
+    return false;
+  }
+  return true;
+}
+
+bool tween_ops_property_type_hint(godot::Node *node,
+                                  const std::string &property,
+                                  std::string &hint, std::string &error) {
+  if (!tween_ops_property_path_valid(property, error))
+    return false;
+  godot::Variant current;
+  if (tween_ops_property_is_indexed(property)) {
+    current = node->get_indexed(godot::NodePath(godot::String(property.c_str())));
+  } else {
+    current = node->get(godot::StringName(property.c_str()));
+  }
+  if (current.get_type() == godot::Variant::NIL) {
+    error = "cannot infer property type from '" + property + "' on node";
+    return false;
+  }
+  hint = util::to_std(godot::Variant::get_type_name(current.get_type()));
+  return true;
+}
+
 JV handle_create_game_tween(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_game_tween called");
@@ -490,16 +524,23 @@ JV handle_tween_editor_property(const JV &args) {
   bool parallel = false;
   if (!read_parallel(args, parallel, error))
     return error;
+  std::string property;
+  std::string property_hint;
+  std::string validation_error;
+  std::string method;
   if (action == "property") {
     const JV *prop_p = args.Find("property");
     if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
       return util::error_json("missing required parameter: property "
                               "(non-empty property name, e.g. position)");
+    property = prop_p->GetString();
     if (!args.Find("target_value"))
       return util::error_json("missing required parameter: target_value "
                               "(final value the property animates to)");
     if (!check_positive_duration(args, error))
       return error;
+    if (!tween_ops_property_path_valid(property, validation_error))
+      return util::error_json(validation_error);
   } else if (action == "method") {
     if (!args.Find("from_value"))
       return util::error_json("missing required parameter: from_value "
@@ -531,9 +572,32 @@ JV handle_tween_editor_property(const JV &args) {
   if (!tree)
     return util::error_json("SceneTree not available for node " +
                             path_p->GetString());
+  if (action == "callback" || action == "method") {
+    const char *method_key =
+        action == "callback" ? "callback_method" : "method_name";
+    if (!read_named_method(args, method_key, node, method, error))
+      return error;
+  }
+  if (action == "callback") {
+    if (auto *callback_args = args.Find("callback_args")) {
+      if (!callback_args->IsArray())
+        return util::error_json("callback_args must be an array");
+    }
+  }
+  if (action == "property") {
+    if (!tween_ops_property_type_hint(node, property, property_hint,
+                                      validation_error))
+      return util::error_json(validation_error);
+  }
+
   godot::Ref<godot::Tween> tween = tree->create_tween();
   if (!tween.is_valid())
     return util::error_json("SceneTree::create_tween returned null");
+  auto fail = [&tween](const std::string &message) {
+    if (tween.is_valid())
+      tween->kill();
+    return util::error_json(message);
+  };
   if (auto *trans = args.Find("trans"))
     tween->set_trans(
         static_cast<godot::Tween::TransitionType>(trans->GetInt()));
@@ -547,28 +611,19 @@ JV handle_tween_editor_property(const JV &args) {
   inner["path"] = JV(path_p->GetString());
   inner["parallel"] = JV(parallel);
   if (action == "property") {
-    const std::string property = args.Find("property")->GetString();
     const double duration = util::json_number(args.Find("duration"), 0.0);
-    godot::Variant initial = node->get(godot::StringName(property.c_str()));
-    const std::string type_hint =
-        util::to_std(godot::Variant::get_type_name(initial.get_type()));
     godot::Variant final_value =
-        VariantJson::deserialize(*args.Find("target_value"), type_hint);
+        VariantJson::deserialize(*args.Find("target_value"), property_hint);
     godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
         node, godot::NodePath(godot::String(property.c_str())), final_value,
         duration);
     if (!tweener.is_valid())
-      return util::error_json("tween_property rejected property '" + property +
-                              "' on node " + path_p->GetString());
+      return fail("tween_property rejected property '" + property +
+                  "' on node " + path_p->GetString());
     inner["property"] = JV(property);
   } else if (action == "callback") {
-    std::string method;
-    if (!read_named_method(args, "callback_method", node, method, error))
-      return error;
     godot::Callable callable = callable_on(node, method);
     if (auto *callback_args = args.Find("callback_args")) {
-      if (!callback_args->IsArray())
-        return util::error_json("callback_args must be an array");
       godot::Array bound;
       for (const auto &item : callback_args->GetArray())
         bound.push_back(VariantJson::deserialize(item));
@@ -577,9 +632,6 @@ JV handle_tween_editor_property(const JV &args) {
     tween->tween_callback(callable);
     inner["callback_method"] = JV(method);
   } else if (action == "method") {
-    std::string method;
-    if (!read_named_method(args, "method_name", node, method, error))
-      return error;
     const double duration = util::json_number(args.Find("duration"), 0.0);
     godot::Variant from = VariantJson::deserialize(*args.Find("from_value"));
     godot::Variant to = VariantJson::deserialize(*args.Find("target_value"));

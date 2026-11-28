@@ -1808,10 +1808,45 @@ bool tween_number(const JV &params, const char *key, double &out) {
   return true;
 }
 
+bool tween_property_is_indexed(const std::string &property) {
+  return property.find(':') != std::string::npos;
+}
+
+bool tween_property_path_valid(const std::string &property, std::string &error) {
+  if (property.empty() || property.front() == ':' || property.back() == ':' ||
+      property.find("::") != std::string::npos ||
+      property.find('/') != std::string::npos) {
+    error = "invalid property path: " + property;
+    return false;
+  }
+  return true;
+}
+
+bool tween_property_type_hint(godot::Node *node, const std::string &property,
+                              std::string &hint, std::string &error) {
+  if (!tween_property_path_valid(property, error))
+    return false;
+  godot::Variant current;
+  if (tween_property_is_indexed(property)) {
+    current = node->get_indexed(godot::NodePath(godot::String(property.c_str())));
+  } else {
+    current = node->get(godot::StringName(property.c_str()));
+  }
+  if (current.get_type() == godot::Variant::NIL) {
+    error = "cannot infer property type from '" + property + "' on node";
+    return false;
+  }
+  hint = util::to_std(godot::Variant::get_type_name(current.get_type()));
+  return true;
+}
+
 JV op_tween_create(const JV &params) {
   const JV *kind_p = params.Find("kind");
   const std::string kind =
       (kind_p && kind_p->IsString()) ? kind_p->GetString() : std::string("property");
+  if (kind != "property" && kind != "method" && kind != "callback" &&
+      kind != "interval")
+    return error_result("invalid tween kind: " + kind);
   const bool needs_node = kind != "interval";
   const JV *path_p = params.Find("node_path");
   if (needs_node &&
@@ -1831,9 +1866,61 @@ JV op_tween_create(const JV &params) {
     if (!tree)
       return error_result("no scene tree available for tween interval");
   }
+
+  const JV *prop_p = nullptr;
+  const JV *target_p = nullptr;
+  const JV *method_p = nullptr;
+  const JV *from_p = nullptr;
+  const JV *to_p = nullptr;
+  double duration = 0.0;
+  std::string property_hint;
+  std::string method;
+  std::string validation_error;
+  if (kind == "property") {
+    prop_p = params.Find("property");
+    if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
+      return error_result("missing required parameter: property");
+    target_p = params.Find("target_value");
+    if (!target_p)
+      return error_result("missing required parameter: target_value");
+    if (!tween_number(params, "duration", duration) || duration <= 0.0)
+      return error_result("missing required parameter: duration");
+    if (!tween_property_type_hint(node, prop_p->GetString(), property_hint,
+                                  validation_error))
+      return error_result(validation_error);
+  } else if (kind == "method" || kind == "callback") {
+    method_p = params.Find("method");
+    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+      return error_result("missing required parameter: method");
+    method = method_p->GetString();
+    if (!node->has_method(godot::StringName(method.c_str())))
+      return error_result("method not found on the target node: " + method);
+    if (kind == "method") {
+      from_p = params.Find("from");
+      to_p = params.Find("to");
+      if (!from_p || !to_p || !tween_number(params, "duration", duration) ||
+          duration <= 0.0)
+        return error_result("missing required parameters: from/to/duration");
+    }
+  } else {
+    if (!tween_number(params, "duration", duration) || duration <= 0.0)
+      return error_result("missing required parameter: duration");
+  }
+
+  JV inner(JV::object_tag);
+  inner["kind"] = JV(kind);
+  if (path_p) {
+    inner["path"] = *path_p;
+  }
+
   godot::Ref<godot::Tween> tween = tree->create_tween();
   if (!tween.is_valid())
     return error_result("SceneTree::create_tween returned null");
+  auto fail = [&tween](const std::string &message) {
+    if (tween.is_valid())
+      tween->kill();
+    return error_result(message);
+  };
   if (const JV *trans = params.Find("trans"))
     tween->set_trans(
         static_cast<godot::Tween::TransitionType>(trans->GetInt()));
@@ -1844,57 +1931,23 @@ JV op_tween_create(const JV &params) {
   const JV *parallel = params.Find("parallel");
   tween->set_parallel(parallel && parallel->IsBool() && parallel->GetBool());
 
-  JV inner(JV::object_tag);
-  inner["kind"] = JV(kind);
-  if (path_p) {
-    inner["path"] = *path_p;
-  }
   if (kind == "property") {
-    const JV *prop_p = params.Find("property");
-    if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
-      return error_result("missing required parameter: property");
-    const JV *target_p = params.Find("target_value");
-    double duration = 0.0;
-    if (!target_p || !tween_number(params, "duration", duration) ||
-        duration <= 0.0)
-      return error_result("missing required parameter: duration");
-    godot::Variant initial =
-        node->get(godot::StringName(prop_p->GetString().c_str()));
-    const std::string type_hint =
-        util::to_std(godot::Variant::get_type_name(initial.get_type()));
-    godot::Variant final_value = VariantJson::deserialize(*target_p, type_hint);
+    godot::Variant final_value =
+        VariantJson::deserialize(*target_p, property_hint);
     godot::Ref<godot::PropertyTweener> tweener = tween->tween_property(
         node, godot::NodePath(godot::String(prop_p->GetString().c_str())),
         final_value, duration);
     if (!tweener.is_valid())
-      return error_result("tween_property rejected property '" +
-                          prop_p->GetString() + "'");
+      return fail("tween_property rejected property '" +
+                  prop_p->GetString() + "'");
     inner["property"] = *prop_p;
   } else if (kind == "method") {
-    const JV *method_p = params.Find("method");
-    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
-      return error_result("missing required parameter: method");
-    const std::string method = method_p->GetString();
-    if (!node->has_method(godot::StringName(method.c_str())))
-      return error_result("method not found on the target node: " + method);
-    const JV *from_p = params.Find("from");
-    const JV *to_p = params.Find("to");
-    double duration = 0.0;
-    if (!from_p || !to_p || !tween_number(params, "duration", duration) ||
-        duration <= 0.0)
-      return error_result("missing required parameters: from/to/duration");
     tween->tween_method(
         godot::Callable(node, godot::StringName(method.c_str())),
         VariantJson::deserialize(*from_p), VariantJson::deserialize(*to_p),
         duration);
     inner["method"] = *method_p;
   } else if (kind == "callback") {
-    const JV *method_p = params.Find("method");
-    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
-      return error_result("missing required parameter: method");
-    const std::string method = method_p->GetString();
-    if (!node->has_method(godot::StringName(method.c_str())))
-      return error_result("method not found on the target node: " + method);
     godot::Callable callable(node, godot::StringName(method.c_str()));
     if (const JV *args_p = params.Find("callback_args")) {
       if (args_p->IsArray()) {
@@ -1906,20 +1959,15 @@ JV op_tween_create(const JV &params) {
     }
     tween->tween_callback(callable);
     inner["method"] = *method_p;
-  } else if (kind == "interval") {
-    double duration = 0.0;
-    if (!tween_number(params, "duration", duration) || duration <= 0.0)
-      return error_result("missing required parameter: duration");
-    tween->tween_interval(duration);
   } else {
-    return error_result("invalid tween kind: " + kind);
+    tween->tween_interval(duration);
   }
 
   sweep_finished_tweens();
   if (!runtime_budget::tween_capacity_available(game_tweens().size(),
-                                                GDA_MAX_TWEENS))
-    return error_result("tween registry is full (maximum " +
-                        std::to_string(GDA_MAX_TWEENS) + " live tweens)");
+                                                 GDA_MAX_TWEENS))
+    return fail("tween registry is full (maximum " +
+                std::to_string(GDA_MAX_TWEENS) + " live tweens)");
   const int64_t tween_id = tween->get_instance_id();
   game_tweens()[tween_id] = tween;
   inner["tween_id"] = JV(tween_id);
