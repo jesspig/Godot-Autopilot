@@ -391,13 +391,15 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
         request_id, pending, error_json("debugger capture plugin not initialized"));
   }
 
+  bool abandoned = false;
   {
     std::lock_guard<std::mutex> lock(pending->mtx);
-    if (pending->state != PendingRequest::State::Waiting)
-      return fail_pending_request(
-          request_id, pending,
-          error_json("game request was abandoned before dispatch"));
+    abandoned = pending->state != PendingRequest::State::Waiting;
   }
+  if (abandoned)
+    return fail_pending_request(
+        request_id, pending,
+        error_json("game request was abandoned before dispatch"));
 
   JV payload(JV::object_tag);
   payload[GDA_FIELD_REQUEST_ID] = JV(request_id);
